@@ -1,0 +1,15 @@
+build/
+classes/
+data/
+out/
+/build/
+/target/*
+!/build/libs *.jar
+.gradle/
+.settings/
+.idea/*
+*.iml
+.project
+.classpath
+/config/*
+/upload/*
