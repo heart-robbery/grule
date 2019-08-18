@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>GY</title>
+    <script src="js/jquery-3.4.1.js"></script>
+    <script src="js/vue.js"></script>
+</head>
+<body>
+<div id="app">
+    Gy welcome index
+    <div>{{msg}}</div>
+</div>
+<script>
+    var app = new Vue({
+        el: '#app',
+        data: {ws: null, msg: ''},
+        mounted: function () {
+            var _this = this;
+            this.ws = new WebSocket("ws://localhost:8080/ws");
+            this.ws.onmessage= function (msg) {
+                _this.msg = msg.data;
+            };
+            setInterval(function () {
+                _this.ws.send('xxxxxxx' + new Date());
+            }, 7000);
+        }
+    });
+</script>
+</body>
+</html>

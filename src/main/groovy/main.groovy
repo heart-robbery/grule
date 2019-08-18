@@ -1,70 +1,92 @@
 import cn.xnatural.enet.common.Log
 import cn.xnatural.enet.core.AppContext
 import cn.xnatural.enet.event.EL
-import cn.xnatural.enet.server.dao.hibernate.Hibernate
-import dao.entity.Test
+import cn.xnatural.enet.server.sched.SchedServer
+import com.alibaba.druid.pool.DruidDataSourceFactory
+import groovy.sql.Sql
 import groovy.transform.Field
 import io.undertow.Handlers
 import io.undertow.Undertow
 import io.undertow.server.HttpHandler
 import io.undertow.server.HttpServerExchange
+import io.undertow.server.handlers.resource.ClassPathResourceManager
 import io.undertow.server.session.*
 import io.undertow.websockets.core.AbstractReceiveListener
 import io.undertow.websockets.core.BufferedTextMessage
 import io.undertow.websockets.core.WebSocketChannel
+import io.undertow.websockets.core.WebSockets
 
-import java.text.SimpleDateFormat
+import javax.annotation.Resource
 import java.time.Duration
-
-import dao.entity.*
 
 //new SqlTest().run()
 //return
 
 @Field Log log = Log.of(getClass().simpleName)
 @Field def ctx = new AppContext();
-//ctx.addSource(new SchedServer())
-ctx.addSource(new Hibernate().scanEntity(Test.class))
+@Resource @Field Sql sql
+
+
+// 系统功能添加区
+ctx.addSource(new SchedServer())
+//ctx.addSource(new Remoter())
 ctx.addSource(this)
 ctx.start()
 
 
+@EL(name = "env.configured", async = false)
+def envConfigured() {
+    // ctx.addSource(new Sql(DruidDataSourceFactory.createDataSource(ctx.env().group("ds"))))
+}
+
 @EL(name = "sys.starting")
 def sysStarting() {
-    http()
+    ctx.addSource(new Sql(DruidDataSourceFactory.createDataSource(ctx.env().group("ds"))))
+    web()
 }
 
 @EL(name = "sys.started")
 def sysStarted() {
-    ctx.ep.fire("sched.after", Duration.ofSeconds(2), {
-        println 'xxxxxxxxxxxxx'
-    })
-
-    def h = (Hibernate) ctx.ep.fire('bean.get', Hibernate.class)
-    h.doWork({se ->
-        def t = new Test();
-        t.setName("aaaa" + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()))
-        t.setAge(222)
-        se.saveOrUpdate(t)
-        println se.createSQLQuery("select count(*) as num from test").singleResult
-    })
-    ctx.stop()
+    try {
+        // logic()
+    } finally {
+        // ctx.stop()
+    }
 }
 
 
 @EL(name = "sys.stopping")
 def stop() {
     if (undertow) undertow.stop()
+    if (sql) sql.close()
 }
 
 
-// undertow http
-@Field def undertow;
-def http() {
+def logic() {
+    ctx.ep.fire("sched.after", Duration.ofSeconds(2), {
+        println 'xxxxxxxxxxxxx'
+    })
+
+    sql.execute('''
+      create table if not exists test (
+          name varchar(20),
+          age int(10)
+      )
+    ''')
+    sql.executeInsert("insert into test values(?, ?)", ["xxxx" + System.currentTimeMillis(), 1111])
+    println sql.firstRow("select count(*) as num from test").num
+}
+
+
+// undertow web
+@Field def undertow
+def web() {
     undertow = Undertow.builder()
             .addHttpListener(8080, 'localhost')
             .setIoThreads(1).setWorkerThreads(1)
-            .setHandler(rootHandler())
+//            .setHandler(ctrl())
+             .setHandler(Handlers.trace(ctrl()))
+            // .setHandler(memSession(ctrl()))
             .build()
     undertow.start()
     log.info "Start listen HTTP ${undertow.listenerInfo[0].address}"
@@ -72,23 +94,17 @@ def http() {
 }
 
 
-def rootHandler() {
-    def h = ctrl();
-    sessionHandler(h)
-}
-
-
-def sessionHandler(HttpHandler next) {
+def memSession(HttpHandler next) {
     def sm = new InMemorySessionManager('mem-session');
     sm.registerSessionListener(new SessionListener() {
         @Override
-        void sessionCreated(Session session, HttpServerExchange seg) {
-            log.info "sessionCreated. id: ${session.id}"
+        void sessionCreated(Session se, HttpServerExchange seg) {
+            log.info "HTTP session created. id: ${se.id}"
         }
 
         @Override
-        void sessionDestroyed(Session session, HttpServerExchange seg, SessionListener.SessionDestroyedReason reason) {
-            log.info "sessionDestroyed. id: ${session.id}"
+        void sessionDestroyed(Session se, HttpServerExchange seg, SessionListener.SessionDestroyedReason reason) {
+            log.info "HTTP session destroyed. id: ${se.id}"
         }
     })
     new SessionAttachmentHandler(
@@ -107,17 +123,24 @@ def sessionHandler(HttpHandler next) {
 
 // 接口控制层
 def ctrl() {
+    // webSocket 处理器
+    def ws = Handlers.websocket({eg, ch ->
+        log.info "New WebSocket Connection '${ch.peerAddress}', current total: ${eg.peerConnections.size()}"
+        ch.getReceiveSetter().set(new AbstractReceiveListener() {
+            @Override
+            protected void onFullTextMessage(WebSocketChannel wsc, BufferedTextMessage msg) throws IOException {
+                log.info "receive websocket client '${wsc.peerAddress}' msg: ${msg.data}"
+            }
+        })
+        ch.resumeReceives()
+    })
+    ctx.ep.fire("sched.cron", "0/17 * * * * ?", {ws.peerConnections.each {conn -> WebSockets.sendText("qqqq" + new Date(), conn, null)}})
+
     Handlers.path()
-        .addExactPath("/", {eg -> eg.responseSender.send("index")})
+        .addPrefixPath("/", Handlers.resource(new ClassPathResourceManager(getClass().classLoader, "static")))
         .addExactPath("/test", {eg -> eg.responseSender.send("xxxxxxxxxxxxx")})
-        .addExactPath("/ws", Handlers.websocket({eg, ch ->
-            ch.getReceiveSetter().set(new AbstractReceiveListener() {
-                @Override
-                protected void onFullTextMessage(WebSocketChannel channel, BufferedTextMessage msg) throws IOException {
-                    println(msg.getData())
-                }
-            })
-            ch.resumeReceives()
-        }))
+        .addExactPath("/ws", ws)
+        .addExactPath("/xxx", {eg -> eg.responseSender.send("22222222222222")})
+        // .addExactPath("/upload", {eg -> })
         .addExactPath("/shutdown", Handlers.ipAccessControl({eg -> ctx.stop()}, false).addAllow("127.0.0.1"))
 }
