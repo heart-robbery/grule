@@ -1,23 +1,19 @@
 import cn.xnatural.enet.common.Log
 import cn.xnatural.enet.core.AppContext
 import cn.xnatural.enet.event.EL
-import cn.xnatural.enet.server.sched.SchedServer
-import com.alibaba.druid.pool.DruidDataSourceFactory
+import cn.xnatural.enet.event.EP
 import groovy.sql.Sql
 import groovy.transform.Field
-import io.undertow.Handlers
-import io.undertow.Undertow
-import io.undertow.server.HttpHandler
-import io.undertow.server.HttpServerExchange
-import io.undertow.server.handlers.resource.ClassPathResourceManager
-import io.undertow.server.session.*
-import io.undertow.websockets.core.AbstractReceiveListener
-import io.undertow.websockets.core.BufferedTextMessage
-import io.undertow.websockets.core.WebSocketChannel
-import io.undertow.websockets.core.WebSockets
+import module.UndertowWebSrv
+import okhttp3.*
+import sevice.FileUploader
 
 import javax.annotation.Resource
 import java.time.Duration
+import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 //new SqlTest().run()
 //return
@@ -25,30 +21,41 @@ import java.time.Duration
 @Field Log log = Log.of(getClass().simpleName)
 @Field def ctx = new AppContext();
 @Resource @Field Sql sql
+@Resource @Field Executor exec
+@Resource @Field OkHttpClient okClient
+@Resource @Field EP ep
 
 
 // 系统功能添加区
-ctx.addSource(new SchedServer())
+//ctx.addSource(new SchedServer())
+//ctx.addSource(new Hibernate().scanEntity(Test.class))
 //ctx.addSource(new Remoter())
+ctx.addSource(new UndertowWebSrv())
 ctx.addSource(this)
 ctx.start()
 
 
 @EL(name = "env.configured", async = false)
 def envConfigured() {
-    // ctx.addSource(new Sql(DruidDataSourceFactory.createDataSource(ctx.env().group("ds"))))
+    ctx.addSource(new FileUploader())
 }
 
 @EL(name = "sys.starting")
 def sysStarting() {
-    ctx.addSource(new Sql(DruidDataSourceFactory.createDataSource(ctx.env().group("ds"))))
-    web()
+    // ctx.addSource(new Sql(DruidDataSourceFactory.createDataSource(ctx.env().group("ds"))))
+    // ctx.addSource(okClient());
 }
 
 @EL(name = "sys.started")
 def sysStarted() {
     try {
-        // logic()
+        ctx.ep.fire("sched.after", Duration.ofSeconds(2), {
+            println 'xxxxxxxxxxxxx'
+        })
+
+        // hibernateTest()
+        // sqlTest()
+//         wsClientTest()
     } finally {
         // ctx.stop()
     }
@@ -57,16 +64,41 @@ def sysStarted() {
 
 @EL(name = "sys.stopping")
 def stop() {
-    if (undertow) undertow.stop()
-    if (sql) sql.close()
+    sql?.close()
 }
 
 
-def logic() {
-    ctx.ep.fire("sched.after", Duration.ofSeconds(2), {
-        println 'xxxxxxxxxxxxx'
-    })
+def wsClientTest() {
+    okClient.newWebSocket(new Request.Builder().url("ws://rl.cnxnu.com:9659/ppf/ar/6.0").build(), new WebSocketListener() {
+        @Override
+        void onOpen(WebSocket webSocket, Response resp) {
+            println "webSocket onOpen: ${resp.body().string()}"
+        }
+        AtomicInteger i = new AtomicInteger();
+        @Override
+        void onMessage(WebSocket webSocket, String text) {
+            System.out.println("消息" + i.getAndIncrement() + ": " + text);
+        }
+        @Override
+        void onFailure(WebSocket webSocket, Throwable t, Response response) {
+            t.printStackTrace()
+        }
+    });
+    Thread.sleep(TimeUnit.MINUTES.toMillis(10));
+}
 
+def hibernateTest() {
+//    def h = (Hibernate) ctx.ep.fire('bean.get', Hibernate.class)
+//    h.doWork({se ->
+//        def e = new Test();
+//        e.setAge(222)
+//        e.setName(new Date().toString())
+//        se.saveOrUpdate(e)
+//        println se.createSQLQuery("select count(*) as num from test").singleResult
+//    })
+}
+
+def sqlTest() {
     sql.execute('''
       create table if not exists test (
           name varchar(20),
@@ -78,69 +110,20 @@ def logic() {
 }
 
 
-// undertow web
-@Field def undertow
-def web() {
-    undertow = Undertow.builder()
-            .addHttpListener(8080, 'localhost')
-            .setIoThreads(1).setWorkerThreads(1)
-//            .setHandler(ctrl())
-             .setHandler(Handlers.trace(ctrl()))
-            // .setHandler(memSession(ctrl()))
-            .build()
-    undertow.start()
-    log.info "Start listen HTTP ${undertow.listenerInfo[0].address}"
-    undertow
-}
-
-
-def memSession(HttpHandler next) {
-    def sm = new InMemorySessionManager('mem-session');
-    sm.registerSessionListener(new SessionListener() {
+OkHttpClient okClient() {
+    new OkHttpClient.Builder()
+            .readTimeout(Duration.ofSeconds(17)).connectTimeout(Duration.ofSeconds(5))
+            .dispatcher(new Dispatcher(ctx.ep.fire("bean.get", ExecutorService.class)))
+            .cookieJar(new CookieJar() {// 共享cookie
+        final HashMap<String, List<Cookie>> cookieStore = new HashMap<>();
         @Override
-        void sessionCreated(Session se, HttpServerExchange seg) {
-            log.info "HTTP session created. id: ${se.id}"
+        void saveFromResponse(HttpUrl url, List<Cookie> cookies) {
+            cookieStore.put(url.host(), cookies);
         }
-
         @Override
-        void sessionDestroyed(Session se, HttpServerExchange seg, SessionListener.SessionDestroyedReason reason) {
-            log.info "HTTP session destroyed. id: ${se.id}"
+        List<Cookie> loadForRequest(HttpUrl url) {
+            List<Cookie> cookies = cookieStore.get(url.host());
+            return cookies != null ? cookies : new ArrayList<>(2);
         }
-    })
-    new SessionAttachmentHandler(
-            {eg ->
-                SessionConfig sc = eg.getAttachment(SessionConfig.ATTACHMENT_KEY);
-
-                def se = sm.getSession(eg, sc)
-                if (se == null) se = sm.createSession(eg, sc)
-
-                if (next) next.handleRequest(eg)
-            },
-            sm,
-            new SessionCookieConfig()
-    )
-}
-
-// 接口控制层
-def ctrl() {
-    // webSocket 处理器
-    def ws = Handlers.websocket({eg, ch ->
-        log.info "New WebSocket Connection '${ch.peerAddress}', current total: ${eg.peerConnections.size()}"
-        ch.getReceiveSetter().set(new AbstractReceiveListener() {
-            @Override
-            protected void onFullTextMessage(WebSocketChannel wsc, BufferedTextMessage msg) throws IOException {
-                log.info "receive websocket client '${wsc.peerAddress}' msg: ${msg.data}"
-            }
-        })
-        ch.resumeReceives()
-    })
-    ctx.ep.fire("sched.cron", "0/17 * * * * ?", {ws.peerConnections.each {conn -> WebSockets.sendText("qqqq" + new Date(), conn, null)}})
-
-    Handlers.path()
-        .addPrefixPath("/", Handlers.resource(new ClassPathResourceManager(getClass().classLoader, "static")))
-        .addExactPath("/test", {eg -> eg.responseSender.send("xxxxxxxxxxxxx")})
-        .addExactPath("/ws", ws)
-        .addExactPath("/xxx", {eg -> eg.responseSender.send("22222222222222")})
-        // .addExactPath("/upload", {eg -> })
-        .addExactPath("/shutdown", Handlers.ipAccessControl({eg -> ctx.stop()}, false).addAllow("127.0.0.1"))
+    }).build();
 }

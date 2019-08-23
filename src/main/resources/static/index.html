@@ -10,20 +10,47 @@
 <div id="app">
     Gy welcome index
     <div>{{msg}}</div>
+
+    <div>
+        <form id="form1">
+            <input type="file">
+            <input type="button" value="提交" @click="addFile">
+        </form>
+        {{addResult}}
+    </div>
 </div>
 <script>
     var app = new Vue({
         el: '#app',
-        data: {ws: null, msg: ''},
+        data: {ws: null, msg: '', addResult: null},
+        methods: {
+            addFile: function () {
+                var _this = this;
+                var fd = new FormData($('#form1')[0])
+                $.ajax({
+                    url: 'upload',
+                    type: 'post',
+                    data: fd,
+                    contentType: false,
+                    processData: false,
+                    success: function (resp) {
+                        _this.addResult = resp;
+                    }
+                })
+            },
+            initWs: function () {
+                var _this = this;
+                this.ws = new WebSocket("ws://localhost:8080/ws");
+                this.ws.onmessage= function (msg) {
+                    _this.msg = msg.data;
+                };
+                setInterval(function () {
+                    _this.ws.send('xxxxxxx' + new Date());
+                }, 7000);
+            }
+        },
         mounted: function () {
-            var _this = this;
-            this.ws = new WebSocket("ws://localhost:8080/ws");
-            this.ws.onmessage= function (msg) {
-                _this.msg = msg.data;
-            };
-            setInterval(function () {
-                _this.ws.send('xxxxxxx' + new Date());
-            }, 7000);
+            // this.initWs();
         }
     });
 </script>
