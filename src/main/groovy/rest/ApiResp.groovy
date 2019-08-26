@@ -1,14 +1,13 @@
 package rest
 
 import com.alibaba.fastjson.JSON
-import groovy.transform.ToString
+import com.alibaba.fastjson.serializer.SerializerFeature
 
-@ToString
 class ApiResp<T> implements Serializable {
-    boolean success;
-    T       data;
-    String  errorMsg;
-    String  errorId;
+    private boolean success;
+    private T data;
+    private String errorMsg;
+    private String reqId;
 
     static <T> ApiResp<T> ok() {
         return new ApiResp().setSuccess(true);
@@ -28,7 +27,7 @@ class ApiResp<T> implements Serializable {
 
 
     static ApiResp fail(String errorMsg) {
-        return new ApiResp().setSuccess(false).setErrorMsg(errorMsg);
+        return new ApiResp().setSuccess(false).setErrorMsg(errorMsg).setReqId(UUID.randomUUID().toString());
     }
 
 
@@ -49,6 +48,7 @@ class ApiResp<T> implements Serializable {
         ((Map) getData()).put(attrName, attrValue);
         return (ApiResp<LinkedHashMap<String, Object>>) this;
     }
+
 
     boolean isSuccess() {
         return success;
@@ -83,15 +83,22 @@ class ApiResp<T> implements Serializable {
     }
 
 
-    String getErrorId() {
-        return errorId;
+    String getReqId() {
+        return reqId;
     }
 
 
-    ApiResp<T> setErrorId(String errorId) {
-        this.errorId = errorId;
+    ApiResp<T> setReqId(String errorId) {
+        this.reqId = errorId;
         return this;
     }
 
-    def toJSONStr() { JSON.toJSONString(this) }
+
+    def toJSONStr() { JSON.toJSONString(this, SerializerFeature.WriteMapNullValue) }
+
+
+    @Override
+    String toString() {
+        return toJSONStr()
+    }
 }

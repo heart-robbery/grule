@@ -4,8 +4,9 @@ import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import groovy.sql.Sql
 import groovy.transform.Field
-import module.UndertowWebSrv
+import module.UndertowServer
 import okhttp3.*
+import rest.TplRest
 import sevice.FileUploader
 
 import javax.annotation.Resource
@@ -15,11 +16,12 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
+
 //new SqlTest().run()
 //return
 
 @Field Log log = Log.of(getClass().simpleName)
-@Field def ctx = new AppContext();
+@Field def ctx = new AppContext()
 @Resource @Field Sql sql
 @Resource @Field Executor exec
 @Resource @Field OkHttpClient okClient
@@ -30,15 +32,16 @@ import java.util.concurrent.atomic.AtomicInteger
 //ctx.addSource(new SchedServer())
 //ctx.addSource(new Hibernate().scanEntity(Test.class))
 //ctx.addSource(new Remoter())
-ctx.addSource(new UndertowWebSrv())
+ctx.addSource(new UndertowServer())
+ctx.addSource(new TplRest())
 ctx.addSource(this)
 ctx.start()
-
 
 @EL(name = "env.configured", async = false)
 def envConfigured() {
     ctx.addSource(new FileUploader())
 }
+
 
 @EL(name = "sys.starting")
 def sysStarting() {
@@ -52,7 +55,6 @@ def sysStarted() {
         ctx.ep.fire("sched.after", Duration.ofSeconds(2), {
             println 'xxxxxxxxxxxxx'
         })
-
         // hibernateTest()
         // sqlTest()
 //         wsClientTest()
