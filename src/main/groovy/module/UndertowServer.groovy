@@ -146,7 +146,9 @@ class UndertowServer extends ServerTpl {
     // 请求处理
     protected void process(HttpServerExchange eg) {
         try {
-            // eg as GroovyObject
+            // def eg = hse as GroovyObject
+            println('eg is GroovyObject: ' + (eg instanceof GroovyObject))
+            println('eg metaClass: ' + eg.metaClass)
             // 统一打印参数
             if (!eg.requestPath.contains('favicon.ico')) {
                 if (Methods.GET.equals(eg.requestMethod)) {
@@ -155,8 +157,10 @@ class UndertowServer extends ServerTpl {
                     if (eg.getRequestHeaders().getFirst(Headers.CONTENT_TYPE).contains('application/json')) {
                         eg.startBlocking()
                         def s = eg.inputStream.getText('utf-8');
-                        eg['jsonStr'] = s
+                        eg.properties.put('jsonStr', s)
                         log.info("REQUEST STARTING. path: ${eg.requestPath}, jsonParamStr: ${s}")
+//                        eg.responseSender.send(ApiResp.ok(eg.properties['jsonStr']).toJSONStr())
+//                        return
                     } else if (eg.getRequestHeaders().getFirst(Headers.CONTENT_TYPE).contains('application/x-www-form-urlencoded')) {
                         eg.startBlocking()
                         def s = eg.inputStream.getText('utf-8');

@@ -27,8 +27,8 @@ class TplRest extends ServerTpl {
     }
 
     // content-type 验证
-    def cType = {String type ->
-        if (eg.getRequestHeaders().getFirst(Headers.CONTENT_TYPE).contains(type)) {true}
+    def cType = {eg, String type ->
+        if (eg.getRequestHeaders().getFirst(Headers.CONTENT_TYPE).contains(type)) {return true}
         eg.responseSender.send(ApiResp.fail("content-type must be '${type}'").toJSONStr())
         false
     }
@@ -75,7 +75,7 @@ class TplRest extends ServerTpl {
         def fu = bean(FileUploader.class)
         def exec = bean(Executor.class)
         preH("allowed-methods(POST)", { HttpServerExchange eg ->
-            if (!cType('multipart/form-data')) return
+            if (!cType(eg, 'multipart/form-data')) return
 
             def parser = new MultiPartParserDefinition().setDefaultEncoding('utf-8').setExecutor(exec)
             parser.setFileSizeThreshold(10485760L)
@@ -114,8 +114,8 @@ class TplRest extends ServerTpl {
     // content-type application/json
     def appJson() {
         preH("allowed-methods(POST)", { HttpServerExchange eg ->
-            if (!cType('application/json')) return
-            eg.responseSender.send(ApiResp.ok(eg['jsonStr']).toJSONStr())
+            if (!cType(eg, 'application/json')) return
+            eg.responseSender.send(ApiResp.ok(eg.properties['jsonStr']).toJSONStr())
         })
     }
 }
