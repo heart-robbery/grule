@@ -2,8 +2,8 @@ package sevice
 
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.server.ServerTpl
+import ctrl.common.FileData
 import org.apache.commons.io.IOUtils
-import rest.FileData
 
 import java.util.concurrent.Executors
 

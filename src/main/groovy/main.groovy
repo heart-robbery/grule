@@ -2,12 +2,18 @@ import cn.xnatural.enet.common.Log
 import cn.xnatural.enet.core.AppContext
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
-import groovy.sql.Sql
+import cn.xnatural.enet.server.dao.hibernate.Hibernate
+import cn.xnatural.enet.server.http.netty.NettyHttp
+import cn.xnatural.enet.server.resteasy.NettyResteasy
+import cn.xnatural.enet.server.session.MemSessionManager
+import cn.xnatural.enet.server.session.RedisSessionManager
+import ctrl.RestTpl
+import dao.entity.Test
+import dao.repo.TestRepo
 import groovy.transform.Field
-import module.UndertowServer
 import okhttp3.*
-import rest.TplRest
 import sevice.FileUploader
+import sevice.TestService
 
 import javax.annotation.Resource
 import java.time.Duration
@@ -22,32 +28,35 @@ import java.util.concurrent.atomic.AtomicInteger
 
 @Field Log log = Log.of(getClass().simpleName)
 @Field def ctx = new AppContext()
-@Resource @Field Sql sql
 @Resource @Field Executor exec
 @Resource @Field OkHttpClient okClient
 @Resource @Field EP ep
 
 
-// 系统功能添加区
+// 系统功添加区能
 //ctx.addSource(new SchedServer())
-//ctx.addSource(new Hibernate().scanEntity(Test.class))
+ctx.addSource(new Hibernate().scanEntity(Test.class).scanRepo(TestRepo.class))
 //ctx.addSource(new Remoter())
-ctx.addSource(new UndertowServer())
-ctx.addSource(new TplRest())
+// ctx.addSource(new UndertowServer())
+ctx.addSource(new NettyHttp(8080));
+ctx.addSource(new NettyResteasy().scan(RestTpl.class));
 ctx.addSource(this)
 ctx.start()
 
+
 @EL(name = "env.configured", async = false)
 def envConfigured() {
+    if (ctx.env().getBoolean("session.enabled", false)) {
+        String t = ctx.env().getString("session.type", "memory");
+        // 根据配置来启动用什么session管理
+        if ("memory".equalsIgnoreCase(t)) ctx.addSource(new MemSessionManager());
+        else if ("redis".equalsIgnoreCase(t)) ctx.addSource(new RedisSessionManager());
+    }
     ctx.addSource(new FileUploader())
+    ctx.addSource(new TestService())
 }
 
 
-@EL(name = "sys.starting")
-def sysStarting() {
-    // ctx.addSource(new Sql(DruidDataSourceFactory.createDataSource(ctx.env().group("ds"))))
-    // ctx.addSource(okClient());
-}
 
 @EL(name = "sys.started")
 def sysStarted() {
@@ -66,7 +75,7 @@ def sysStarted() {
 
 @EL(name = "sys.stopping")
 def stop() {
-    sql?.close()
+    // sql?.close()
 }
 
 
@@ -89,27 +98,29 @@ def wsClientTest() {
     Thread.sleep(TimeUnit.MINUTES.toMillis(10));
 }
 
+
 def hibernateTest() {
-//    def h = (Hibernate) ctx.ep.fire('bean.get', Hibernate.class)
-//    h.doWork({se ->
-//        def e = new Test();
-//        e.setAge(222)
-//        e.setName(new Date().toString())
-//        se.saveOrUpdate(e)
-//        println se.createSQLQuery("select count(*) as num from test").singleResult
-//    })
+    def h = (Hibernate) ctx.ep.fire('bean.get', Hibernate.class)
+    h.doWork({se ->
+        def e = new Test();
+        e.setAge(222)
+        e.setName(new Date().toString())
+        se.saveOrUpdate(e)
+        println se.createSQLQuery("select count(*) as num from test").singleResult
+    })
 }
 
-def sqlTest() {
-    sql.execute('''
-      create table if not exists test (
-          name varchar(20),
-          age int(10)
-      )
-    ''')
-    sql.executeInsert("insert into test values(?, ?)", ["xxxx" + System.currentTimeMillis(), 1111])
-    println sql.firstRow("select count(*) as num from test").num
-}
+
+//def sqlTest() {
+//    sql.execute('''
+//      create table if not exists test (
+//          name varchar(20),
+//          age int(10)
+//      )
+//    ''')
+//    sql.executeInsert("insert into test values(?, ?)", ["xxxx" + System.currentTimeMillis(), 1111])
+//    println sql.firstRow("select count(*) as num from test").num
+//}
 
 
 OkHttpClient okClient() {
