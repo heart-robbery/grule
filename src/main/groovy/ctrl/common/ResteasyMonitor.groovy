@@ -32,13 +32,13 @@ class ResteasyMonitor implements ContainerRequestFilter, ContainerResponseFilter
 
 
     @Override
-    public void filter(ContainerRequestContext reqCtx) throws IOException {
+    void filter(ContainerRequestContext reqCtx) throws IOException {
         reqCtx.setProperty("startTime", System.currentTimeMillis());
     }
 
 
     @Override
-    public void filter(ContainerRequestContext reqCtx, ContainerResponseContext respCtx) throws IOException {
+    void filter(ContainerRequestContext reqCtx, ContainerResponseContext respCtx) throws IOException {
         Object startTime = reqCtx.getProperty("startTime");
         if (startTime != null && !ignore.contains(reqCtx.getUriInfo().getPath())) {
             long spend = System.currentTimeMillis() - (long) startTime;

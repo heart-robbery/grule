@@ -21,7 +21,7 @@ class FileUploader extends ServerTpl {
     FileUploader() { super("file-uploader"); }
 
 
-    @EL(name = "web.started")
+    @EL(name = "sys.starting")
     protected void init() {
         attrs.putAll((Map<? extends String, ?>) ep.fire("env.ns", getName()));
         try {
@@ -92,7 +92,7 @@ class FileUploader extends ServerTpl {
             // 创建文件并写入
             def f = new File(localDir + File.separator + fd.getResultName());
             f.withDataOutputStream {IOUtils.copy(fd.inputStream, it)}
-            log.info("Saved file ${f.absolutePath}, origin name ${fd.originName}")
+            log.info("Saved file $f.absolutePath, origin name ${fd.originName}")
             return fd
         }
 

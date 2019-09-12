@@ -8,8 +8,13 @@ import cn.xnatural.enet.server.resteasy.NettyResteasy
 import cn.xnatural.enet.server.session.MemSessionManager
 import cn.xnatural.enet.server.session.RedisSessionManager
 import ctrl.RestTpl
+import ctrl.common.ExHandler
+import ctrl.common.FastJsonCfgResolver
+import ctrl.common.ResteasyMonitor
 import dao.entity.Test
+import dao.entity.UploadFile
 import dao.repo.TestRepo
+import dao.repo.UploadFileRepo
 import groovy.transform.Field
 import okhttp3.*
 import sevice.FileUploader
@@ -23,6 +28,15 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 
+// Class.forName('dao.entity.Test')
+//def c = getClass().classLoader.loadClass('dao.entity.UploadFile')
+//println(c)
+//c = new GroovyClassLoader().loadClass('dao.entity.UploadFile')
+//return
+//def ss = ''
+//ss.invokeMethod()
+//return
+
 //new SqlTest().run()
 //return
 
@@ -33,13 +47,14 @@ import java.util.concurrent.atomic.AtomicInteger
 @Resource @Field EP ep
 
 
+
 // 系统功添加区能
 //ctx.addSource(new SchedServer())
-ctx.addSource(new Hibernate().scanEntity(Test.class).scanRepo(TestRepo.class))
-//ctx.addSource(new Remoter())
+ctx.addSource(new Hibernate().entities(Test.class, UploadFile.class).repos(TestRepo.class, UploadFileRepo.class))
+// ctx.addSource(new Remoter())
 // ctx.addSource(new UndertowServer())
 ctx.addSource(new NettyHttp(8080));
-ctx.addSource(new NettyResteasy().scan(RestTpl.class));
+ctx.addSource(new NettyResteasy().sources(ExHandler.class, FastJsonCfgResolver.class, ResteasyMonitor.class, RestTpl.class));
 ctx.addSource(this)
 ctx.start()
 
@@ -103,8 +118,10 @@ def hibernateTest() {
     def h = (Hibernate) ctx.ep.fire('bean.get', Hibernate.class)
     h.doWork({se ->
         def e = new Test();
-        e.setAge(222)
-        e.setName(new Date().toString())
+        e.with {
+            setAge(222)
+            setName(new Date().toString())
+        }
         se.saveOrUpdate(e)
         println se.createSQLQuery("select count(*) as num from test").singleResult
     })

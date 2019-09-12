@@ -156,7 +156,6 @@ class RestTpl extends ServerTpl {
     @Consumes("application/x-www-form-urlencoded")
     @Produces("application/json")
     ApiResp form(@FormParam("attr") String attr, @FormParam("ss") Integer ss) {
-        log.info("form request test.");
         return ok().attr("attr", attr).attr("ss", ss);
     }
 
