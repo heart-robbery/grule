@@ -36,6 +36,8 @@ dependencies {
 //    compile ('io.undertow:undertow-websockets-jsr:2.0.23.Final') {
 //        exclude group: 'io.undertow', module: 'undertow-servlet'
 //    }
+    // compile 'org.apache.tomcat.embed:tomcat-embed-core:9.0.24'
+    // compile 'org.springframework:spring-webmvc:5.1.9.RELEASE'
     compile 'org.hibernate:hibernate-core:5.4.1.Final'
     // compile 'org.grails:grails-datastore-gorm-hibernate5:7.0.1.RELEASE'
     compile 'com.alibaba:druid:1.1.12'
@@ -50,6 +52,10 @@ dependencies {
         exclude group:'org.slf4j', module:'slf4j-api'
         exclude group:'com.mchange', module:'c3p0'
     }
+
+    compile 'io.ratpack:ratpack-groovy:1.7.3'
+    compile 'io.ratpack:ratpack-session:1.7.3'
+    // compile 'io.ratpack:ratpack-session-redis:1.7.3'
 }
 
 

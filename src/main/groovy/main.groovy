@@ -7,7 +7,9 @@ import cn.xnatural.enet.server.http.netty.NettyHttp
 import cn.xnatural.enet.server.resteasy.NettyResteasy
 import cn.xnatural.enet.server.session.MemSessionManager
 import cn.xnatural.enet.server.session.RedisSessionManager
+import com.alibaba.fastjson.JSON
 import ctrl.RestTpl
+import ctrl.common.ApiResp
 import ctrl.common.ExHandler
 import ctrl.common.FastJsonCfgResolver
 import ctrl.common.ResteasyMonitor
@@ -17,6 +19,11 @@ import dao.repo.TestRepo
 import dao.repo.UploadFileRepo
 import groovy.transform.Field
 import okhttp3.*
+import ratpack.form.Form
+import ratpack.handling.Context
+import ratpack.handling.Handler
+import ratpack.render.RendererSupport
+import ratpack.session.SessionModule
 import sevice.FileUploader
 import sevice.TestService
 
@@ -27,18 +34,59 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
+import static ratpack.groovy.Groovy.ratpack
+import static ratpack.handling.Handlers.chain
+import static ratpack.handling.Handlers.contentTypes
 
-// Class.forName('dao.entity.Test')
-//def c = getClass().classLoader.loadClass('dao.entity.UploadFile')
-//println(c)
-//c = new GroovyClassLoader().loadClass('dao.entity.UploadFile')
-//return
-//def ss = ''
-//ss.invokeMethod()
-//return
+ratpack {
+    serverConfig {
+        port(8080)
+        threads(1)
+        connectTimeoutMillis(1000 * 10)
+        idleTimeout(Duration.ofSeconds(10))
+        sysProps()
+    }
+    bindings {
+        module(SessionModule.class)
+    }
+    handlers {
+        register({
+            add(new RendererSupport<ApiResp>() {
+                @Override
+                void render(Context ctx, ApiResp resp) throws Exception {
+                    ctx.response.contentType('application/json')
+                    ctx.response.send(JSON.toJSONString(resp))
+                }
+            })
+        })
 
-//new SqlTest().run()
-//return
+        // 主页
+        get({ render file("static/index.html") })
+        // form 表单提交
+        post('form', {
+            parse(Form.class).then({form ->
+                // form.file('').fileName // 提取上传的文件
+                render ApiResp.ok(form.values())
+            })
+        })
+        // 路径模板
+        get(":fName") {
+            println "get $pathTokens.fName"
+            getResponse().cookie('Cache-Control', "max-age=60")
+            render file("static/$pathTokens.fName")
+        }
+        // 依次按顺序执行多个handler
+        get('json', chain(contentTypes('application/json'), {
+            render 'json'
+        } as Handler))
+        // 依次从外往里执行多个handler, 例: pre/sub
+        prefix('pre') {
+            get('sub', { render 'pre/sub' })
+            get('sub2', { render 'pre/sub2' })
+        }
+    }
+}
+return
 
 @Field Log log = Log.of(getClass().simpleName)
 @Field def ctx = new AppContext()
