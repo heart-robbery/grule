@@ -8,6 +8,7 @@ import cn.xnatural.enet.server.resteasy.NettyResteasy
 import cn.xnatural.enet.server.session.MemSessionManager
 import cn.xnatural.enet.server.session.RedisSessionManager
 import com.alibaba.fastjson.JSON
+import com.alibaba.fastjson.serializer.SerializerFeature
 import ctrl.RestTpl
 import ctrl.common.ApiResp
 import ctrl.common.ExHandler
@@ -21,9 +22,8 @@ import groovy.transform.Field
 import okhttp3.*
 import ratpack.form.Form
 import ratpack.handling.Context
-import ratpack.handling.Handler
 import ratpack.render.RendererSupport
-import ratpack.session.SessionModule
+import ratpack.server.BaseDir
 import sevice.FileUploader
 import sevice.TestService
 
@@ -35,8 +35,6 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 import static ratpack.groovy.Groovy.ratpack
-import static ratpack.handling.Handlers.chain
-import static ratpack.handling.Handlers.contentTypes
 
 ratpack {
     serverConfig {
@@ -45,40 +43,52 @@ ratpack {
         connectTimeoutMillis(1000 * 10)
         idleTimeout(Duration.ofSeconds(10))
         sysProps()
+        registerShutdownHook(false)
+        baseDir(BaseDir.find('static/'))
     }
     bindings {
-        module(SessionModule.class)
+        // module(SessionModule.class)
     }
     handlers {
         register({
+            // 接口返回json格式
             add(new RendererSupport<ApiResp>() {
                 @Override
                 void render(Context ctx, ApiResp resp) throws Exception {
                     ctx.response.contentType('application/json')
-                    ctx.response.send(JSON.toJSONString(resp))
+                    ctx.response.send(JSON.toJSONString(resp, SerializerFeature.WriteMapNullValue))
                 }
             })
         })
 
-        // 主页
-        get({ render file("static/index.html") })
-        // form 表单提交
+        // 接收form 表单提交
         post('form', {
             parse(Form.class).then({form ->
                 // form.file('').fileName // 提取上传的文件
                 render ApiResp.ok(form.values())
             })
         })
+        // 主页
+        get('') { render file('static/index.html') }
         // 路径模板
         get(":fName") {
             println "get $pathTokens.fName"
             getResponse().cookie('Cache-Control', "max-age=60")
             render file("static/$pathTokens.fName")
         }
-        // 依次按顺序执行多个handler
-        get('json', chain(contentTypes('application/json'), {
-            render 'json'
-        } as Handler))
+        get("js/:fName") {
+            getResponse().cookie('Cache-Control', "max-age=60")
+            render file("static/js/$pathTokens.fName")
+        }
+        get("css/:fName") {
+            getResponse().cookie('Cache-Control', "max-age=60")
+            render file("static/css/$pathTokens.fName")
+        }
+        post('json') {
+            parse(Map.class).then({ jo ->
+                render(ApiResp.ok(jo))
+            })
+        }
         // 依次从外往里执行多个handler, 例: pre/sub
         prefix('pre') {
             get('sub', { render 'pre/sub' })
@@ -118,7 +128,6 @@ def envConfigured() {
     ctx.addSource(new FileUploader())
     ctx.addSource(new TestService())
 }
-
 
 
 @EL(name = "sys.started")

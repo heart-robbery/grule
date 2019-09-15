@@ -53,8 +53,12 @@ dependencies {
         exclude group:'com.mchange', module:'c3p0'
     }
 
-    compile 'io.ratpack:ratpack-groovy:1.7.3'
-    compile 'io.ratpack:ratpack-session:1.7.3'
+    compile ('io.ratpack:ratpack-groovy:1.7.3') {
+        exclude group: 'org.codehaus.groovy'
+        exclude group: 'io.netty'
+        // exclude group: 'com.fasterxml.jackson.datatype'
+    }
+    // compile 'io.ratpack:ratpack-session:1.7.3'
     // compile 'io.ratpack:ratpack-session-redis:1.7.3'
 }
 
