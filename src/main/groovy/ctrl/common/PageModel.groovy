@@ -1,19 +1,14 @@
 package ctrl.common
 
 import cn.xnatural.enet.server.dao.hibernate.Page
-import io.swagger.v3.oas.annotations.media.Schema
 
 import java.util.function.Function
 import java.util.stream.Collectors
 
 class PageModel<T> extends BasePojo {
-    @Schema(description = "第几页.从0开始", example = "o")
     private Integer       pageIndex;
-    @Schema(description = "每页大小", example = "15")
     private Integer       pageSize;
-    @Schema(description = "总页数")
     private Integer       totalPage;
-    @Schema(description = "数据集")
     private Collection<T> list;
 
 

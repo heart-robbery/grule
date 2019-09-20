@@ -23,6 +23,9 @@
     var app = new Vue({
         el: '#app',
         data: {ws: null, msg: '', addResult: null},
+        mounted: function () {
+            // this.initWs();
+        },
         methods: {
             addFile: function () {
                 var _this = this;
@@ -49,9 +52,7 @@
                 }, 7000);
             }
         },
-        mounted: function () {
-            // this.initWs();
-        }
+
     });
 </script>
 </body>

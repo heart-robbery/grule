@@ -21,7 +21,7 @@ class FileUploader extends ServerTpl {
     FileUploader() { super("file-uploader"); }
 
 
-    @EL(name = "sys.starting")
+    @EL(name = "web.started")
     protected void init() {
         attrs.putAll((Map<? extends String, ?>) ep.fire("env.ns", getName()));
         try {
@@ -83,8 +83,8 @@ class FileUploader extends ServerTpl {
      * @param fds
      */
     // @Monitor(warnTimeOut = 7000)
-    void save(FileData... fds) {
-        if (fds == null || fds.length == 0) return;
+    def save(List<FileData> fds) {
+        if (fds == null || fds.isEmpty()) return fds;
 
         // 文件流copy
         def doSave = {FileData fd ->
@@ -92,17 +92,23 @@ class FileUploader extends ServerTpl {
             // 创建文件并写入
             def f = new File(localDir + File.separator + fd.getResultName());
             f.withDataOutputStream {IOUtils.copy(fd.inputStream, it)}
-            log.info("Saved file $f.absolutePath, origin name ${fd.originName}")
+            log.info("Saved file: $f.absolutePath, origin name: ${fd.originName}")
             return fd
         }
 
         // 并发上传
-        if (fds.length >= 2) {
-            def execs = Executors.newFixedThreadPool(fds.size() - 1)
-            def fs = fds.drop(1).collect {fd -> execs.submit(doSave(fd))}.collect()
-            doSave(fds[0])
-            fs.each {f -> f.get()}
-        } else if (fds.length == 1){ doSave(fds[0]) }
+        if (fds.size() >= 2) {
+            def execs
+            try {
+                execs = Executors.newFixedThreadPool(fds.size() - 1)
+                def fs = fds.drop(1).collect {fd -> execs.submit(doSave(fd))}.collect()
+                doSave(fds[0])
+                fs.each {f -> f.get()}
+            } finally {
+                execs?.shutdown()
+            }
+        } else if (fds.size() == 1){ doSave(fds[0]) }
+        fds
     }
 
 
