@@ -23,9 +23,12 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 
-new core.AppContext().start()
+def app = new core.AppContext()
+println(app.env.user.home)
+app.start()
 
 return
+
 
 @Field Log log = Log.of(getClass().simpleName)
 @Field def ctx = new AppContext()

@@ -1,5 +1,3 @@
-import static org.slf4j.event.Level.*
-
 sys.name='gy'
 sys.exec.corePoolSize=4
 
@@ -18,6 +16,3 @@ dao {
 
 //  文件上传本地存放目录
 fileUploader.localDir='e:/tmp/upload/gy'
-
-log.level.core.AppContext = WARN
-log.path='e:/tmp/log/gy'

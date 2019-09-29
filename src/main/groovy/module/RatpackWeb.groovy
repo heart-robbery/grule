@@ -31,9 +31,7 @@ class RatpackWeb extends ServerTpl {
 
     RatpackServer srv;
 
-    RatpackWeb() {
-        super('ratpack')
-    }
+    RatpackWeb() { super('ratpack') }
 
 
     @EL(name = 'sys.starting')

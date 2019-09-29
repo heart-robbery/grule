@@ -8,12 +8,13 @@ import static core.Utils.pid
 
 class AppContext {
     static final ConfigObject env
-    protected final static Logger log
+    protected final Logger log = LoggerFactory.getLogger(AppContext.class)
 
     static {
         // 加载配置文件
-        env = new ConfigSlurper().parse(Class.forName('config'))
-        log = LoggerFactory.getLogger(AppContext.class)
+        def cs = new ConfigSlurper();
+        env = cs.parse(Class.forName('config'))
+        env.merge(cs.parse(System.properties))
     }
 
 
