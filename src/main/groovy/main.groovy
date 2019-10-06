@@ -1,75 +1,68 @@
-import cn.xnatural.enet.common.Log
-import cn.xnatural.enet.core.AppContext
+import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
-import cn.xnatural.enet.server.dao.hibernate.Hibernate
-import cn.xnatural.enet.server.session.MemSessionManager
-import cn.xnatural.enet.server.session.RedisSessionManager
+import core.AppContext
+import core.module.EhcacheSrv
+import core.module.SchedSrv
+import core.module.jpa.BaseRepo
+import core.module.jpa.HibernateSrv
+import ctrl.TestCtrl
 import dao.entity.Test
 import dao.entity.UploadFile
-import dao.repo.TestRepo
-import dao.repo.UploadFileRepo
 import groovy.transform.Field
-import module.RatpackWeb
+import ctrl.RatpackWeb
 import okhttp3.*
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import sevice.FileUploader
 import sevice.TestService
 
 import javax.annotation.Resource
+import java.text.SimpleDateFormat
 import java.time.Duration
-import java.util.concurrent.Executor
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 
-def app = new core.AppContext()
-println(app.env.user.home)
-app.start()
-
-return
-
-
-@Field Log log = Log.of(getClass().simpleName)
-@Field def ctx = new AppContext()
-@Resource @Field Executor exec
-@Resource @Field OkHttpClient okClient
+@Field Logger log = LoggerFactory.getLogger(getClass())
+@Lazy @Field OkHttpClient okClient = createOkClient()
 @Resource @Field EP ep
+@Resource @Field ExecutorService exec
+@Field AppContext ctx = new AppContext()
 
-
-
-// 系统功添加区能
-//ctx.addSource(new SchedServer())
-ctx.addSource(new Hibernate().entities(Test.class, UploadFile.class).repos(TestRepo.class, UploadFileRepo.class))
-ctx.addSource(new RatpackWeb())
+// 系统功能添加区
+ctx.addSource(new EhcacheSrv())
+ctx.addSource(new SchedSrv())
+ctx.addSource(new HibernateSrv().entities(Test, UploadFile))
+ctx.addSource(new RatpackWeb().ctrls(TestCtrl))
+ctx.addSource(new FileUploader())
+ctx.addSource(new TestService())
 ctx.addSource(this)
-ctx.start()
-
-
-@EL(name = "env.configured", async = false)
-def envConfigured() {
-    if (ctx.env().getBoolean("session.enabled", false)) {
-        String t = ctx.env().getString("session.type", "memory");
-        // 根据配置来启动用什么session管理
-        if ("memory".equalsIgnoreCase(t)) ctx.addSource(new MemSessionManager());
-        else if ("redis".equalsIgnoreCase(t)) ctx.addSource(new RedisSessionManager());
-    }
-    ctx.addSource(new FileUploader())
-    ctx.addSource(new TestService())
-}
+ctx.start() // 启动系统
 
 
 @EL(name = "sys.started")
 def sysStarted() {
     try {
-        ctx.ep.fire("sched.after", Duration.ofSeconds(2), {
-            println 'xxxxxxxxxxxxx'
+        // cache test
+        ep.fire('cache.set', 'test', 'aa', new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()))
+
+        ep.fire("sched.after", Duration.ofSeconds(2), {
+            log.info 'cache.get: ' + ep.fire('cache.get', 'test', 'aa')
         })
-        // hibernateTest()
+        hibernateTest()
+
+        def hp = ep.fire('http.getHp')
+        if (hp) {
+            log.info '接口访问: ' + okClient.newCall(new Request.Builder().get().url("http://$hp/dao").build()).execute().body().string()
+        }
+
         // sqlTest()
-//         wsClientTest()
+        // wsClientTest()
     } finally {
-        // ctx.stop()
+        // ep.fire('sched.after', EC.of(this).args(Duration.ofSeconds(5), {System.exit(0)}).completeFn({ec -> if (ec.noListener) System.exit(0) }))
     }
 }
 
@@ -77,6 +70,19 @@ def sysStarted() {
 @EL(name = "sys.stopping")
 def stop() {
     // sql?.close()
+}
+
+
+@EL(name = 'bean.get', async = false)
+def findBean(EC ec, Class bType, String bName) {
+    if (ec.result) return ec.result
+    if (bType.isAssignableFrom(OkHttpClient.class)) {
+        if (okClient) return okClient
+        else {
+            okClient = createOkClient()
+            return okClient
+        }
+    }
 }
 
 
@@ -96,20 +102,15 @@ def wsClientTest() {
             t.printStackTrace()
         }
     });
-    Thread.sleep(TimeUnit.MINUTES.toMillis(10));
+    Thread.sleep(TimeUnit.MINUTES.toMillis(10))
 }
 
 
 def hibernateTest() {
-    def h = (Hibernate) ctx.ep.fire('bean.get', Hibernate.class)
-    h.doWork({se ->
-        def e = new Test();
-        e.with {
-            setAge(222)
-            setName(new Date().toString())
-        }
-        se.saveOrUpdate(e)
-        println se.createSQLQuery("select count(*) as num from test").singleResult
+    BaseRepo repo = ep.fire('bean.get', BaseRepo.class);
+    repo?.trans({ se ->
+        repo.saveOrUpdate(new Test(age: 222, name: new Date().toString()))
+        log.info "total: " + repo.count(Test.class)
     })
 }
 
@@ -126,20 +127,20 @@ def hibernateTest() {
 //}
 
 
-OkHttpClient okClient() {
+OkHttpClient createOkClient() {
     new OkHttpClient.Builder()
             .readTimeout(Duration.ofSeconds(17)).connectTimeout(Duration.ofSeconds(5))
-            .dispatcher(new Dispatcher(ctx.ep.fire("bean.get", ExecutorService.class)))
+            .dispatcher(new Dispatcher(exec))
             .cookieJar(new CookieJar() {// 共享cookie
-        final HashMap<String, List<Cookie>> cookieStore = new HashMap<>();
-        @Override
-        void saveFromResponse(HttpUrl url, List<Cookie> cookies) {
-            cookieStore.put(url.host(), cookies);
-        }
-        @Override
-        List<Cookie> loadForRequest(HttpUrl url) {
-            List<Cookie> cookies = cookieStore.get(url.host());
-            return cookies != null ? cookies : new ArrayList<>(2);
-        }
-    }).build();
+                final Map<String, List<Cookie>> cookieStore = new ConcurrentHashMap<>()
+                @Override
+                void saveFromResponse(HttpUrl url, List<Cookie> cookies) {
+                    cookieStore.put(url.host(), cookies)
+                }
+                @Override
+                List<Cookie> loadForRequest(HttpUrl url) {
+                    List<Cookie> cookies = cookieStore.get(url.host())
+                    return cookies != null ? cookies : new ArrayList<>(7)
+                }
+            }).build()
 }

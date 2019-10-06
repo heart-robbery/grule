@@ -1,41 +1,34 @@
 package ctrl.common
 
-import org.apache.commons.lang3.StringUtils
+import groovy.transform.ToString
 import sevice.FileUploader
 
+@ToString(excludes = 'inputStream')
 class FileData {
-    /**
-     * 扩展名
-     */
-    String      extension;
     /**
      * 原始文件名(包含扩展名)
      */
-    String      originName;
+    String      originName
     /**
-     * 系统生成的唯一名(不包含扩展名)
+     * 系统生成唯一文件名(包含扩展名)
      */
-    String      generatedName;
+    String generatedName
     /**
      * 文件流
      */
-    transient InputStream inputStream;
+    transient InputStream inputStream
     /**
      * 大小
      */
-    Long        size;
-
-    String getResultName() {
-        if (!generatedName) generatedName = UUID.randomUUID().toString().replace('-', '')
-        return (StringUtils.isEmpty(getExtension()) ? getGeneratedName() : (getGeneratedName() + "." + getExtension()));
-    }
+    Long        size
 
 
     FileData setOriginName(String fName) {
         this.originName = fName
-        def arr = FileUploader.extractFileName(fName)
-        if (arr && arr.length > 1) extension = arr[1]
-        return this;
+        def extension = FileUploader.extractFileExtension(fName)
+        def id = UUID.randomUUID().toString().replace('-', '')
+        generatedName = (extension ? (id + '.' + extension) : id)
+        this
     }
 
 }

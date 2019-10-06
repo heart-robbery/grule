@@ -1,9 +1,8 @@
 package sevice
 
 import cn.xnatural.enet.event.EL
-import cn.xnatural.enet.server.ServerTpl
+import core.module.ServerTpl
 import ctrl.common.FileData
-import org.apache.commons.io.IOUtils
 
 import java.util.concurrent.Executors
 
@@ -11,52 +10,44 @@ class FileUploader extends ServerTpl {
     /**
      * 文件上传的 本地保存目录
      */
-    private String localDir;
+    private String localDir
     /**
      * 文件上传 的访问url前缀
      */
-    private URI    urlPrefix;
+    private URI    urlPrefix
 
 
-    FileUploader() { super("file-uploader"); }
+    @EL(name = "web.started", async = false)
+    protected def init() {
+        localDir = attrs.localDir?:new URL("file:upload").getFile()
+        File dir = new File(localDir); dir.mkdirs()
+        log.info("save upload file local dir: {}", dir.getAbsolutePath())
 
-
-    @EL(name = "web.started")
-    protected void init() {
-        attrs.putAll((Map<? extends String, ?>) ep.fire("env.ns", getName()));
-        try {
-            localDir = getStr("local-dir", new URL("file:upload").getFile());
-            File dir = new File(localDir); dir.mkdirs();
-            log.info("save upload file local dir: {}", dir.getAbsolutePath());
-
-            urlPrefix = URI.create(getStr("url-prefix", ("http://" + ep.fire("http.getHp") + "/file/")) + "/").normalize();
-            log.info("access upload file url prefix: {}", urlPrefix);
-        } catch (MalformedURLException e) {
-            log.error(e);
-        }
+        urlPrefix = URI.create(attrs.urlPrefix?:("http://" + ep.fire("http.getHp") + "/file/") + "/").normalize()
+        log.info("access upload file url prefix: {}", urlPrefix)
     }
 
 
     /**
-     *  例: 文件名为 aa.txt, 返回: arr[0]=aa, arr[1]=txt
+     *  返回文件名的扩展名
      * @param fileName
      * @return
      */
-    static String[] extractFileName(String fileName) {
-        if (fileName == null || fileName.isEmpty()) return [null, null];
-        int i = fileName.lastIndexOf(".");
-        if (i == -1) return [fileName, null];
-        return [fileName.substring(0, i), fileName.substring(i + 1)];
+    static String extractFileExtension(String fileName) {
+        if (!fileName) return ''
+        int i = fileName.lastIndexOf(".")
+        if (i == -1) return ''
+        return fileName.substring(i + 1)
     }
 
 
     /**
      * 映射 文件名 到一个 url
-     * @param fileName
+     * @param fileName 完整的文件名
      * @return
      */
     String toFullUrl(String fileName) {
-        return urlPrefix.resolve(fileName).toString();
+        urlPrefix.resolve(fileName).toString()
     }
 
 
@@ -66,15 +57,15 @@ class FileUploader extends ServerTpl {
      * @return
      */
     File findFile(String fileName) {
-        return new File(localDir + File.separator + fileName);
+        new File(localDir + File.separator + fileName)
     }
 
 
     @EL(name = "deleteFile")
     void delete(String fileName) {
-        File f = new File(localDir + File.separator + fileName);
-        if (f.exists()) f.delete();
-        else log.warn("delete file '${fileName}' not exists");
+        File f = new File(localDir + File.separator + fileName)
+        if (f.exists()) f.delete()
+        else log.warn("delete file '{}' not exists", fileName)
     }
 
 
@@ -84,16 +75,22 @@ class FileUploader extends ServerTpl {
      */
     // @Monitor(warnTimeOut = 7000)
     def save(List<FileData> fds) {
-        if (fds == null || fds.isEmpty()) return fds;
+        if (!fds) return fds
 
         // 文件流copy
         def doSave = {FileData fd ->
             if (fd == null) return
             // 创建文件并写入
-            def f = new File(localDir + File.separator + fd.getResultName());
-            f.withDataOutputStream {IOUtils.copy(fd.inputStream, it)}
-            log.info("Saved file: $f.absolutePath, origin name: ${fd.originName}")
-            return fd
+            def f = new File(localDir + File.separator + fd.generatedName)
+            f.withOutputStream {os ->
+                def bs = new byte[4096]
+                int n
+                while (-1 != (n = fd.inputStream.read(bs))) {
+                    os.write(bs, 0, n)
+                }
+            }
+            log.info("Saved file: {}, origin name: {}", f.absolutePath, fd.originName)
+            fd
         }
 
         // 并发上传

@@ -1,6 +1,6 @@
 package dao.entity
 
-import cn.xnatural.enet.server.dao.hibernate.LongIdEntity
+import core.module.jpa.LongIdEntity
 import org.hibernate.annotations.DynamicUpdate
 
 import javax.persistence.Entity
@@ -16,15 +16,15 @@ import javax.persistence.InheritanceType
 @DynamicUpdate
 class UploadFile extends LongIdEntity {
     /**
-     * 第3方 文件服务器 返回的 文件标识(用于从第3方去获取的凭证)
+     * 系统生产的唯一文件名(可用作第3方文件服务器的文件id)
      */
-    String thirdFileId;
+    String finalName
     /**
      * 原始文件名
      */
-    String originName;
+    String originName
     /**
      * 备注
      */
-    String comment;
+    String comment
 }

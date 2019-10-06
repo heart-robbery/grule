@@ -1,11 +1,12 @@
 package dao.entity
 
-import cn.xnatural.enet.server.dao.hibernate.LongIdEntity
+
+import core.module.jpa.UUIDEntity
 
 import javax.persistence.Entity
 
 @Entity
-class Test extends LongIdEntity {
+class Test extends UUIDEntity {
     String name;
     Integer age;
 }

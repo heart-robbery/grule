@@ -1,33 +1,32 @@
 package ctrl.common
 
-import com.alibaba.fastjson.JSON
-import com.alibaba.fastjson.serializer.SerializerFeature
-
 class ApiResp<T> implements Serializable {
-    private boolean success;
-    private T data;
-    private String errorMsg;
-    private String reqId;
+    boolean success
+    T data
+    String desc
+    String reqId
+
 
     static <T> ApiResp<T> ok() {
-        return new ApiResp().setSuccess(true);
+        return new ApiResp(success: true)
     }
 
 
     static <T> ApiResp ok(T data) {
-        return new ApiResp().setSuccess(true).setData(data);
+        new ApiResp(success: true, data: data)
     }
 
 
-    static ApiResp<LinkedHashMap<String, Object>> ok(String attrName, Object attrValue) {
-        ApiResp<LinkedHashMap<String, Object>> ret = ok(new LinkedHashMap<>(5));
-        ret.getData().put(attrName, attrValue);
-        return ret;
+    static ApiResp<LinkedHashMap<String, Object>> ok(String aName, Object aValue) {
+        ApiResp<LinkedHashMap<String, Object>> resp = ok(new LinkedHashMap<>(5));
+        resp.getData().put(aName, aValue)
+        resp
     }
 
 
-    static ApiResp fail(String errorMsg) {
-        return new ApiResp().setSuccess(false).setErrorMsg(errorMsg).setReqId(UUID.randomUUID().toString());
+
+    static <T> ApiResp fail(String errMsg) {
+        new ApiResp(success: false, desc: errMsg)
     }
 
 
@@ -39,66 +38,13 @@ class ApiResp<T> implements Serializable {
      * @return
      */
     ApiResp<LinkedHashMap<String, Object>> attr(String attrName, Object attrValue) {
-        if (getData() == null) {
-            setData((T) new LinkedHashMap<String, Object>(5));
+        if (!data) {
+            data = new LinkedHashMap<String, Object>(5)
         }
-        if (getData() != null && !(getData() instanceof Map)) {
-            throw new IllegalArgumentException(getClass().getSimpleName() + "的data类型必须为Map类型");
+        if (data && !(data instanceof Map)) {
+            throw new IllegalArgumentException("data类型必须为Map类型")
         }
-        ((Map) getData()).put(attrName, attrValue);
-        return (ApiResp<LinkedHashMap<String, Object>>) this;
-    }
-
-
-    boolean isSuccess() {
-        return success;
-    }
-
-
-    T getData() {
-        return data;
-    }
-
-
-    ApiResp<T> setSuccess(boolean pSuccess) {
-        success = pSuccess;
-        return this;
-    }
-
-
-    ApiResp<T> setData(T data) {
-        this.data = data;
-        return this;
-    }
-
-
-    String getErrorMsg() {
-        return errorMsg;
-    }
-
-
-    ApiResp<T> setErrorMsg(String errorMsg) {
-        this.errorMsg = errorMsg;
-        return this;
-    }
-
-
-    String getReqId() {
-        return reqId;
-    }
-
-
-    ApiResp<T> setReqId(String errorId) {
-        this.reqId = errorId;
-        return this;
-    }
-
-
-    def toJSONStr() { JSON.toJSONString(this, SerializerFeature.WriteMapNullValue) }
-
-
-    @Override
-    String toString() {
-        return toJSONStr()
+        ((Map) data).put(attrName, attrValue)
+        this
     }
 }

@@ -19,10 +19,6 @@
 
 @if "%DEBUG%" == "" @echo off
 
-@rem 
-@rem $Revision$ $Date$
-@rem
-
 @rem Set local scope for the variables with windows NT shell
 if "%OS%"=="Windows_NT" setlocal
 
@@ -31,7 +27,7 @@ if "%OS%"=="Windows_NT" setlocal
 set DIRNAME=%~dp0
 if "%DIRNAME%" == "" set DIRNAME=.\
 
-set CLASSNAME=org.codehaus.groovy.tools.shell.Main
+set CLASSNAME=org.apache.groovy.groovysh.Main
 
 "%DIRNAME%\startGroovy.bat" "%DIRNAME%" %CLASSNAME% %*
 

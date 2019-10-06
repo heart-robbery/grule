@@ -37,7 +37,7 @@ if (logPath) {
 }
 
 logger('ch.qos.logback', WARN)
-logger('core.AppContext', INFO)
+//logger('org.hibernate', DEBUG)
 root(INFO, appenders)
 
 env.log.level.flatten().each {k, v -> logger(k, v) }
