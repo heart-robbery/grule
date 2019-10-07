@@ -1,3 +1,5 @@
+import java.time.Duration
+
 sys.name='gy'
 sys.exec.corePoolSize=4
 
@@ -29,3 +31,7 @@ jpa {
 fileUploader.localDir='e:/tmp/upload/gy'
 
 //ep.track = ['bean.get']
+
+
+web.session.enabled=true
+web.session.expire=20

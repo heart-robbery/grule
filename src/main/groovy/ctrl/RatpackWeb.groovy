@@ -3,8 +3,10 @@ package ctrl
 import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.serializer.SerializerFeature
+import core.module.EhcacheSrv
 import core.module.ServerTpl
 import ctrl.common.ApiResp
+import org.ehcache.Cache
 import ratpack.error.internal.ErrorHandler
 import ratpack.handling.Chain
 import ratpack.handling.Context
@@ -16,6 +18,7 @@ import ratpack.util.internal.TransportDetector
 
 import javax.annotation.Resource
 import java.time.Duration
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
 
@@ -111,13 +114,7 @@ class RatpackWeb extends ServerTpl {
         // 拦截器
         chain.all({ctx ->
             log.info("Process Request '{}': {}", ctx.get(RequestId.TYPE), ctx.request.uri)
-            if (attrs.session.enabled) { // 添加session控制
-                def sId = ctx.request.oneCookie('sId')?:UUID.randomUUID().toString().replace('-', '')
-                ctx.metaClass.sId = sId
-                ep.fire("session.access", sId)
-                def c = ctx.response.cookie('sId', sId)
-                c.maxAge = TimeUnit.MINUTES.toSeconds(attrs.session.expire?:30 + 2)
-            }
+            if (attrs.session.enabled) session(ctx)
             ctx.next()
         })
 
@@ -127,9 +124,39 @@ class RatpackWeb extends ServerTpl {
         }
     }
 
+    // 处理session
+    def session(Context ctx) {
+        def sId = ctx.request.oneCookie('sId')?:UUID.randomUUID().toString().replace('-', '')
+        ctx.metaClass.sId = sId
+        def c = ctx.response.cookie('sId', sId)
+        c.maxAge = TimeUnit.MINUTES.toSeconds(attrs.session.expire?:30 + 2)
+
+        if ('redis' == attrs.session.type) {
+
+        } else {
+            // session的数据, 用ehcache 保存 session 数据
+            def sData = ep.fire("${EhcacheSrv.F_NAME}.get", 'session', sId)
+            if (sData) {
+                sData.accessTime = System.currentTimeMillis()
+                ctx.metaClass.sData = sData
+            } else {
+                synchronized (this) {
+                    sData = ep.fire("${EhcacheSrv.F_NAME}.get", 'session', sId)
+                    if (!sData) {
+                        sData = new ConcurrentHashMap()
+                        sData.id = sId
+                        sData.accessTime = System.currentTimeMillis()
+                        Cache cache = ep.fire("${EhcacheSrv.F_NAME}.create", 'session', Duration.ofMinutes(attrs.session.expire?:30L), attrs.session.maxLimit?:100000)
+                        cache.put(sId, sData)
+                        ctx.metaClass.sData = sData
+                        log.info("New session '{}' at {}", sId, sData.accessTime)
+                    }
+                }
+            }
+        }
+    }
+
 
     @EL(name = 'http.getHp', async = false)
-    def getHp() {
-        srv.bindHost + ':' + srv.bindPort
-    }
+    def getHp() { srv.bindHost + ':' + srv.bindPort }
 }

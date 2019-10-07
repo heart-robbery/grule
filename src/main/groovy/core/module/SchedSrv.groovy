@@ -13,12 +13,13 @@ import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 
 class SchedSrv extends ServerTpl {
+    static final F_NAME  = 'sched'
     @Resource
     protected Executor exec
     protected Scheduler scheduler
     
     
-    SchedSrv() { super('sched') }
+    SchedSrv() { super(F_NAME) }
 
 
     @EL(name = "sys.starting")

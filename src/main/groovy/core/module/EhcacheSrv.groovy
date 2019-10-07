@@ -17,9 +17,10 @@ import static org.ehcache.config.units.EntryUnit.ENTRIES
 import static org.ehcache.config.units.MemoryUnit.MB
 
 class EhcacheSrv extends ServerTpl {
+    static final F_NAME = 'ehcache'
     protected CacheManager cm
 
-    EhcacheSrv() { super('ehcache') }
+    EhcacheSrv() { super(F_NAME) }
 
     @EL(name = "sys.starting")
     def start() {
@@ -40,8 +41,8 @@ class EhcacheSrv extends ServerTpl {
 
 
     @EL(name = '${name}.create', async = false)
-    Cache<Object, Object> createCache(String cName, Duration expire, Integer heapOfEntries, Integer heapOfMB) {
-        Cache<Object, Object> cache = cm.getCache(cName, Object.class, Object.class);
+    Cache<Object, Object> getOrCreateCache(String cName, Duration expire, Integer heapOfEntries, Integer heapOfMB) {
+        Cache<Object, Object> cache = cm.getCache(cName, Object.class, Object.class)
         if (cache == null) {
             synchronized (this) {
                 cache = cm.getCache(cName, Object.class, Object.class) // 不同线程同时进来, cache为null
@@ -53,7 +54,9 @@ class EhcacheSrv extends ServerTpl {
                     else if (heapOfEntries != null) b = b.heap(heapOfEntries, ENTRIES)
                     else if (heapOfMB != null) b = b.heap(heapOfMB, MB)
                     cache = cm.createCache(cName, newCacheConfigurationBuilder(Object.class, Object.class, b.build())
-                        .withExpiry(ExpiryPolicyBuilder.timeToLiveExpiration(expire?:Duration.ofSeconds(attrs.getOrDefault("expire." + cName, attrs.getOrDefault("defaultExpire", 60 * 30)))))
+                        .withExpiry(ExpiryPolicyBuilder.timeToLiveExpiration(
+                            expire?:attrs.expire.(cName)?:attrs.defaultExpire?:Duration.ofMinutes(30L)
+                        ))
                     )
                 }
             }
@@ -64,8 +67,8 @@ class EhcacheSrv extends ServerTpl {
 
     @EL(name = ['${name}.set', "cache.set"], async = false)
     def set(String cName, Object key, Object value) {
-        log.trace(name + ".set. cName: {}, key: {}, value: " + value, cName, key);
-        cm.getCache(cName, Object.class, Object.class)?:createCache(cName, null, attrs.heapOfEntries?:1000, null).put(key, value)
+        log.trace(name + ".set. cName: {}, key: {}, value: " + value, cName, key)
+        getOrCreateCache(cName, null, attrs.heapOfEntries.(cName)?:attrs.defaultHeapOfEntries?:1000, null).put(key, value)
     }
 
 
@@ -77,14 +80,14 @@ class EhcacheSrv extends ServerTpl {
 
     @EL(name = ['${name}.evict', "cache.evict"], async = false)
     def evict(String cName, Object key) {
-        log.debug(name + ".evict. cName: {}, key: {}", cName, key);
-        cm.getCache(cName, Object.class, Object.class)?.remove(key);
+        log.debug(name + ".evict. cName: {}, key: {}", cName, key)
+        cm.getCache(cName, Object.class, Object.class)?.remove(key)
     }
 
 
-    @EL(name = ['${name}.clear', "cache.clear"])
+    @EL(name = ['${name}.clear', "cache.clear"], async = false)
     def clear(String cName) {
-        log.info("{}.clear. cName: {}", name, cName);
-        cm.getCache(cName, Object.class, Object.class)?.clear();
+        log.info("{}.clear. cName: {}", name, cName)
+        cm.getCache(cName, Object.class, Object.class)?.clear()
     }
 }

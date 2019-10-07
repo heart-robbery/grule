@@ -48,7 +48,7 @@ class TestCtrl extends CtrlTpl {
     // session 测试
     def session(Chain chain) {
         chain.get('session') {ctx ->
-            ctx.render ctx.sId
+            ctx.render ok(ctx.sData)
         }
     }
 

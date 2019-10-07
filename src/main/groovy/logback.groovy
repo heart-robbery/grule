@@ -37,6 +37,7 @@ if (logPath) {
 }
 
 logger('ch.qos.logback', WARN)
+//logger('core.module.EhcacheSrv', TRACE)
 //logger('org.hibernate', DEBUG)
 root(INFO, appenders)
 

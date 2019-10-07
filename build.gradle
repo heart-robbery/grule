@@ -27,7 +27,7 @@ dependencies {
     // compile ('org.codehaus.groovy:groovysh:2.5.6')
     // compile ('org.codehaus.groovy:groovy-jmx:2.5.6')
     // compile 'org.codehaus.groovy:groovy-templates:2.5.6'
-    compile ('cn.xnatural.enet:enet-event:0.0.11')
+    compile ('cn.xnatural.enet:enet-event:0.0.10')
 //    compile ('cn.xnatural.enet:enet-core:0.0.11') {
 //        exclude group: 'org.codehaus.groovy'
 //    }
