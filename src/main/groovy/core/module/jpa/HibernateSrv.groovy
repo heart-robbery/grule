@@ -146,15 +146,15 @@ class HibernateSrv extends ServerTpl {
      * @return
      */
     protected def initDataSource() {
-        if (ds) throw new RuntimeException('Datasource already exist')
+        if (ds) throw new RuntimeException('DataSource already exist')
         Map<String, Object> dsAttr = attrs.ds
 
-        log.debug("Create datasource properties: {}", dsAttr)
+        log.debug("Create dataSource properties: {}", dsAttr)
 
         // Hikari 数据源
         try {
             ds = (DataSource) Class.forName('com.zaxxer.hikari.HikariDataSource').newInstance()
-            dsAttr.each {k, v -> ds.(k) = v}
+            dsAttr.each {k, v -> if (ds.hasProperty(k)) ds.(k) = v}
         } catch (ClassNotFoundException ex) {}
 
         dsAttr.put("validationQuery", "select 1")

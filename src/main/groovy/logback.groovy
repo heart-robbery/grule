@@ -9,6 +9,9 @@ import static core.AppContext.env
 import static core.Utils.pid
 
 def appenders = []
+// 日志文件名
+def logFileName = 'sys'
+// 日志文件路径
 def logPath = env.log.path?:'e:/tmp/log/gy'
 
 appender('console', ConsoleAppender) {
@@ -26,9 +29,9 @@ if (logPath) {
             delegate.pattern = "%d{yyyy-MM-dd HH:mm:ss.SSS} [%-7thread] [${pid()}] [%-5level] [%-50.50C :%-3L] => %m%n"
             delegate.charset = Charset.forName("utf8")
         }
-        file = logPath + '/sys.log'
+        file = "$logPath/${logFileName}.log"
         rollingPolicy(SizeAndTimeBasedRollingPolicy) {
-            delegate.fileNamePattern = "${logPath}/sys.%d{yyyy-MM-dd}.log.%i"
+            delegate.fileNamePattern = "${logPath}/${logFileName}.%d{yyyy-MM-dd}.log.%i"
             delegate.maxFileSize = FileSize.valueOf('7MB')
             delegate.maxHistory = 100
             delegate.totalSizeCap = FileSize.valueOf('5GB')

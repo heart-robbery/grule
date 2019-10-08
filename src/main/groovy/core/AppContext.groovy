@@ -19,12 +19,12 @@ import static core.Utils.pid
 import static java.util.Collections.emptyList
 
 class AppContext {
-    static final ConfigObject env
-    protected final Logger log = LoggerFactory.getLogger(AppContext.class)
+    static final    ConfigObject        env
+    protected final Logger              log          = LoggerFactory.getLogger(AppContext.class)
     /**
      * 系统名字. 用于多个系统启动区别
      */
-    protected       String              name = env.sys.name
+    protected final String              name         = env.sys.name
     /**
      * 系统运行线程池. {@link #initExecutor()}}
      */
@@ -36,7 +36,7 @@ class AppContext {
     /**
      * 服务对象源
      */
-    protected       Map<String, Object> sourceMap    = new ConcurrentHashMap<>()
+    protected final Map<String, Object> sourceMap    = new ConcurrentHashMap<>()
     /**
      * 启动时间
      */
@@ -44,9 +44,9 @@ class AppContext {
     /**
      * jvm关闭钩子
      */
-    protected       Thread              shutdownHook = new Thread({
+    protected final Thread              shutdownHook = new Thread({
         // 通知各个模块服务关闭
-        ep.fire("sys.stopping", EC.of(this).async(false).completeFn({ec ->
+        ep.fire("sys.stopping", EC.of(this).async(false).completeFn({ ec ->
             exec.shutdown()
             // 不删除的话会执行两遍
             // if (shutdownHook) Runtime.getRuntime().removeShutdownHook(shutdownHook)
@@ -72,17 +72,17 @@ class AppContext {
         // 1. 初始化系统线程池
         initExecutor()
         // 2. 初始化事件中心
-        initEp(); ep.addListenerSource(this);
+        initEp(); ep.addListenerSource(this)
         sourceMap.each({k, v -> inject(v); ep.addListenerSource(v) })
         // 3. 通知所有服务启动
         ep.fire("sys.starting", EC.of(this).completeFn({ ec ->
-            if (shutdownHook) Runtime.getRuntime().addShutdownHook(shutdownHook);
+            if (shutdownHook) Runtime.getRuntime().addShutdownHook(shutdownHook)
             sourceMap.each{s, o -> inject(o)} // 自动注入
             log.info("Started Application "+ (name ? '\'' + name + '\'' : '') +" in {} seconds (JVM running for {})",
                 (System.currentTimeMillis() - startup.getTime()) / 1000.0,
                 ManagementFactory.getRuntimeMXBean().getUptime() / 1000.0
-            );
-            ep.fire("sys.started", EC.of(this));
+            )
+            ep.fire("sys.started", EC.of(this))
         }))
     }
 
@@ -100,10 +100,10 @@ class AppContext {
     ) {
         if (!source || !name) throw new IllegalArgumentException('source and name must be not empty')
         if ("sys".equalsIgnoreCase(name) || "env".equalsIgnoreCase(name) || "log".equalsIgnoreCase(name)) {
-            log.warn("Name property cannot equal 'sys', 'env' or 'log' . source: {}", source); return;
+            log.warn("Name property cannot equal 'sys', 'env' or 'log' . source: {}", source); return
         }
         if (sourceMap.containsKey(name)) {
-            log.warn("Name property '{}' already exist in source: {}", name, sourceMap.get(name)); return;
+            log.warn("Name property '{}' already exist in source: {}", name, sourceMap.get(name)); return
         }
         sourceMap.put(name, source)
         if (ep) { inject(source); ep.addListenerSource(source) }
@@ -120,22 +120,22 @@ class AppContext {
             Resource r = f.getAnnotation(Resource.class);
             if (r == null) return
             try {
-                f.setAccessible(true);
-                Object v = f.get(o);
+                f.setAccessible(true)
+                Object v = f.get(o)
                 if (v) return // 已经存在值则不需要再注入
 
                 // 取值
-                if (EP.class.isAssignableFrom(f.getType())) v = wrapEpForSource(o);
-                else if (Executor.class.isAssignableFrom(f.getType())) v = wrapExecForSource(o);
-                else if (ConfigObject.class.isAssignableFrom(f.getType())) v = env;
-                else if (AppContext.class.isAssignableFrom(f.getType())) v = this;
-                else v = ep.fire("bean.get", EC.of(this).sync().args(f.getType(), r.name())); // 全局获取bean对象
+                if (EP.class.isAssignableFrom(f.getType())) v = wrapEpForSource(o)
+                else if (Executor.class.isAssignableFrom(f.getType())) v = wrapExecForSource(o)
+                else if (ConfigObject.class.isAssignableFrom(f.getType())) v = env
+                else if (AppContext.class.isAssignableFrom(f.getType())) v = this
+                else v = ep.fire("bean.get", EC.of(this).sync().args(f.getType(), r.name())) // 全局获取bean对象
 
                 if (v == null) return
-                f.set(o, v);
-                log.trace("Inject @Resource field '{}' for object '{}'", f.getName(), o);
-            } catch (Exception e) { log.error("inject error!", e); }
-        });
+                f.set(o, v)
+                log.trace("Inject @Resource field '{}' for object '{}'", f.getName(), o)
+            } catch (Exception e) { log.error("inject error!", e) }
+        })
     }
 
 
@@ -148,22 +148,22 @@ class AppContext {
      */
     @EL(name = ["bean.get", "sys.bean.get"], async = false, order = 1f)
     protected def findLocalBean(EC ec, Class beanType, String beanName) {
-        if (ec.result != null) return ec.result; // 已经找到结果了, 就直接返回
+        if (ec.result != null) return ec.result // 已经找到结果了, 就直接返回
 
         Object bean = null;
         if (beanName && beanType) {
-            bean = sourceMap.get(beanName);
-            if (!bean && !beanType.isAssignableFrom(bean.getClass())) bean = null;
+            bean = sourceMap.get(beanName)
+            if (!bean && !beanType.isAssignableFrom(bean.getClass())) bean = null
         } else if (beanName && !beanType) {
-            bean = sourceMap.get(beanName);
+            bean = sourceMap.get(beanName)
         } else if (!beanName && beanType) {
             for (Map.Entry<String, Object> entry : sourceMap.entrySet()) {
                 if (beanType.isAssignableFrom(entry.getValue().getClass())) {
-                    bean = entry.getValue(); break;
+                    bean = entry.getValue(); break
                 }
             }
         }
-        bean;
+        bean
     }
 
 
@@ -179,22 +179,22 @@ class AppContext {
                 final AtomicInteger i = new AtomicInteger(1);
                 @Override
                 Thread newThread(Runnable r) {
-                    return new Thread(r, "sys-" + i.getAndIncrement());
+                    return new Thread(r, "sys-" + i.getAndIncrement())
                 }
             }
         ) {
             @Override
             void execute(Runnable fn) {
                 try {
-                    super.execute(fn);
+                    super.execute(fn)
                 } catch (RejectedExecutionException ex) {
-                    log.warn("Thread pool rejected new task very heavy load. {}", this);
+                    log.warn("Thread pool rejected new task very heavy load. {}", exec)
                 } catch (Throwable t) {
-                    log.error("Task happen unknown error", t);
+                    log.error("Task happen unknown error", t)
                 }
             }
         };
-        exec.allowCoreThreadTimeOut(true);
+        exec.allowCoreThreadTimeOut(true)
     }
 
 
@@ -207,17 +207,17 @@ class AppContext {
             @Override
             protected Object doPublish(String eName, EC ec) {
                 if ("sys.starting" == eName || "sys.stopping" == eName || "sys.started" == eName) {
-                    if (ec.source() != AppContext.this) throw new UnsupportedOperationException("not allow fire event '$eName'");
+                    if (ec.source() != AppContext.this) throw new UnsupportedOperationException("not allow fire event '$eName'")
                 }
                 if ("env.updateAttr" == eName) {
-                    if (ec.source() != env) throw new UnsupportedOperationException("not allow fire event '$eName'");
+                    if (ec.source() != env) throw new UnsupportedOperationException("not allow fire event '$eName'")
                 }
-                return super.doPublish(eName, ec);
+                return super.doPublish(eName, ec)
             }
             @Override
             String toString() { "coreEp" }
         }
-        ep.addTrackEvent(env.ep.track as String[]);
+        ep.addTrackEvent(env.ep.track as String[])
     }
 
 
@@ -241,32 +241,32 @@ class AppContext {
                 return exec.awaitTermination(timeout, unit);
             }
             @Override
-            <T> Future<T> submit(Callable<T> task) { return exec.submit(task); }
+            <T> Future<T> submit(Callable<T> task) { exec.submit(task) }
             @Override
-            <T> Future<T> submit(Runnable task, T result) { return exec.submit(task, result); }
+            <T> Future<T> submit(Runnable task, T result) { exec.submit(task, result) }
             @Override
-            Future<?> submit(Runnable task) { return exec.submit(task); }
+            Future<?> submit(Runnable task) { exec.submit(task) }
             @Override
             <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks) throws InterruptedException {
-                return exec.invokeAll(tasks);
+                exec.invokeAll(tasks)
             }
             @Override
             <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException {
-                return exec.invokeAll(tasks, timeout, unit);
+                exec.invokeAll(tasks, timeout, unit)
             }
             @Override
             <T> T invokeAny(Collection<? extends Callable<T>> tasks) throws InterruptedException, ExecutionException {
-                return exec.invokeAny(tasks);
+                exec.invokeAny(tasks)
             }
             @Override
             <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-                return exec.invokeAny(tasks, timeout, unit);
+                exec.invokeAny(tasks, timeout, unit)
             }
             @Override
-            void execute(Runnable cmd) { exec.execute(cmd); }
-            int getCorePoolSize() { return exec.corePoolSize }
-            int getWaitingCount() { return exec.queue.size(); }
-        };
+            void execute(Runnable cmd) { exec.execute(cmd) }
+            int getCorePoolSize() { exec.corePoolSize }
+            int getWaitingCount() { exec.queue.size() }
+        }
     }
 
 
@@ -280,26 +280,26 @@ class AppContext {
             @Override
             protected void init(Executor exec, Logger log) {}
             @Override
-            EP addTrackEvent(String... eNames) { ep.addTrackEvent(eNames); return this; }
+            EP addTrackEvent(String... eNames) { ep.addTrackEvent(eNames); return this }
             @Override
-            EP delTrackEvent(String... eNames) { ep.delTrackEvent(eNames); return this; }
+            EP delTrackEvent(String... eNames) { ep.delTrackEvent(eNames); return this }
             @Override
             EP removeEvent(String eName, Object s) {
-                if (source != null && s != null && source != s) throw new UnsupportedOperationException("Only allow remove event of this source: " + source);
-                ep.removeEvent(eName, s); return this;
+                if (source != null && s != null && source != s) throw new UnsupportedOperationException("Only allow remove event of this source: $source");
+                ep.removeEvent(eName, s); return this
             }
             @Override
-            EP addListenerSource(Object s) { ep.addListenerSource(s); return this; }
+            EP addListenerSource(Object s) { ep.addListenerSource(s); return this }
             @Override
-            boolean exist(String... eNames) { return ep.exist(eNames); }
+            boolean exist(String... eNames) { return ep.exist(eNames) }
             @Override
             Object fire(String eName, EC ec) {
-                if (ec.source() == null) ec.source(source);
-                return ep.fire(eName, ec);
+                if (ec.source() == null) ec.source(source)
+                return ep.fire(eName, ec)
             }
             @Override
             String toString() {
-                return "wrappedCoreEp:" + source.getClass().getSimpleName();
+                return "wrappedCoreEp: $source.class.simpleName"
             }
         };
     }

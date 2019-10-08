@@ -8,19 +8,13 @@ jpa {
         hibernate.hbm2ddl.auto='update'
     }
     ds {
-        // druid/dbcp2 的配置
         // url='jdbc:h2:e:/tmp/h2/gy;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
-//        url='jdbc:h2:e:/tmp/h2/gy'
-//        username='root'
-//        password='root'
-//        minIdle='1'
-//        maxActive='5'
-//        validationQuery='select 1'
-
-        // hikari 的配置
-        jdbcUrl='jdbc:h2:e:/tmp/h2/gy'
+        jdbcUrl=url='jdbc:h2:e:/tmp/h2/gy'
         username='root'
         password='root'
+        minIdle='1'
+        maxActive='5'
+        validationQuery='select 1'
         minimumIdle=1
         maximumPoolSize=5
     }
@@ -32,6 +26,16 @@ fileUploader.localDir='e:/tmp/upload/gy'
 
 //ep.track = ['bean.get']
 
-
+// web 配置
 web.session.enabled=true
-web.session.expire=20
+//web.session.type='redis'
+// session 过期时间
+web.session.expire=Duration.ofMinutes(10)
+
+
+// redis 相关配置
+redis {
+    host='19.19.22.54'
+    password='_@Fintell'
+    database=0
+}

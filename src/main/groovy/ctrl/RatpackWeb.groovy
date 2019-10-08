@@ -4,6 +4,7 @@ import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.serializer.SerializerFeature
 import core.module.EhcacheSrv
+import core.module.RedisClient
 import core.module.ServerTpl
 import ctrl.common.ApiResp
 import org.ehcache.Cache
@@ -14,13 +15,11 @@ import ratpack.handling.RequestId
 import ratpack.render.RendererSupport
 import ratpack.server.BaseDir
 import ratpack.server.RatpackServer
-import ratpack.util.internal.TransportDetector
 
 import javax.annotation.Resource
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
-import java.util.concurrent.TimeUnit
 
 class RatpackWeb extends ServerTpl {
     @Resource
@@ -34,9 +33,9 @@ class RatpackWeb extends ServerTpl {
 
     @EL(name = 'sys.starting')
     def start() {
-        TransportDetector.NioTransport.metaClass.invokeMethod = {String name, args
-            println '======================'
-        }
+//        TransportDetector.NioTransport.metaClass.invokeMethod = {String name, args
+//            println '======================'
+//        }
         srv = RatpackServer.start({ srv ->
             srv.serverConfig({ builder ->
                 builder.with {
@@ -124,17 +123,49 @@ class RatpackWeb extends ServerTpl {
         }
     }
 
+
+    @Lazy RedisClient redis = bean(RedisClient)
     // 处理session
     def session(Context ctx) {
         def sId = ctx.request.oneCookie('sId')?:UUID.randomUUID().toString().replace('-', '')
         ctx.metaClass.sId = sId
         def c = ctx.response.cookie('sId', sId)
-        c.maxAge = TimeUnit.MINUTES.toSeconds(attrs.session.expire?:30 + 2)
+        c.maxAge = ((Duration) attrs.session.expire).seconds?:Duration.ofMinutes(32L).seconds
 
-        if ('redis' == attrs.session.type) {
+        if ('redis' == attrs.session.type) { // session的数据, 用redis 保存 session 数据
+            def sData = new Expando(new ConcurrentHashMap([id:sId])) {
+                @Override
+                Object getProperty(String pName) {
+                    def v = super.getProperty(pName)
+                    if (v != null) return v
+                    else {
+                        // 取不到就从redis 里面取
+                        v = redis.hget("session:$sId", pName)
+                        getProperties().put(pName, v)
+                    }
+                    v
+                }
 
-        } else {
-            // session的数据, 用ehcache 保存 session 数据
+                @Override
+                void setProperty(String pName, Object newValue) {
+                    // 先更新到redis中
+                    redis.hset("session:$sId", pName, newValue, ((Duration) attrs.session.expire?:Duration.ofMinutes(30)).seconds.intValue())
+                    super.setProperty(pName, newValue)
+                }
+            }
+            ctx.metaClass.sData = sData
+            if (redis.exists("session:$sId")) {
+                sData.accessTime = System.currentTimeMillis()
+            } else {
+                synchronized (this) {
+                    if (!redis.exists("session:$sId")) {
+                        sData.id = sId
+                        sData.accessTime = System.currentTimeMillis()
+                        log.info("New session '{}' at {}", sId, sData.accessTime)
+                    }
+                }
+            }
+        } else {// session的数据, 默认用ehcache 保存 session 数据
             def sData = ep.fire("${EhcacheSrv.F_NAME}.get", 'session', sId)
             if (sData) {
                 sData.accessTime = System.currentTimeMillis()
@@ -146,7 +177,7 @@ class RatpackWeb extends ServerTpl {
                         sData = new ConcurrentHashMap()
                         sData.id = sId
                         sData.accessTime = System.currentTimeMillis()
-                        Cache cache = ep.fire("${EhcacheSrv.F_NAME}.create", 'session', Duration.ofMinutes(attrs.session.expire?:30L), attrs.session.maxLimit?:100000)
+                        Cache cache = ep.fire("${EhcacheSrv.F_NAME}.create", 'session', attrs.session.expire?:Duration.ofMinutes(30L), attrs.session.maxLimit?:100000)
                         cache.put(sId, sData)
                         ctx.metaClass.sData = sData
                         log.info("New session '{}' at {}", sId, sData.accessTime)

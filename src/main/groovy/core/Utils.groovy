@@ -6,6 +6,12 @@ import java.lang.reflect.Method
 import java.util.function.Consumer
 
 class Utils {
+    /**
+     * 得到jvm进程号
+     * @return
+     */
+    static String pid() { ManagementFactory.getRuntimeMXBean().getName().split("@")[0] }
+
 
     /**
      * 查找方法
@@ -56,11 +62,4 @@ class Utils {
             c = c.getSuperclass()
         } while (c != null)
     }
-
-
-    /**
-     * 得到jvm进程号
-     * @return
-     */
-    static String pid() { ManagementFactory.getRuntimeMXBean().getName().split("@")[0] }
 }

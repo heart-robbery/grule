@@ -60,6 +60,7 @@ dependencies {
         exclude group:'com.mchange'
         exclude group:'com.zaxxer'
     }
+    compile 'redis.clients:jedis:3.1.0'
 
     compile ('io.ratpack:ratpack-core:1.7.3') {
         exclude group: 'io.netty'

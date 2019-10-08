@@ -7,6 +7,7 @@ import dao.entity.UploadFile
 import io.netty.handler.codec.http.HttpResponseStatus
 import ratpack.form.Form
 import ratpack.handling.Chain
+import ratpack.handling.RequestId
 import sevice.FileUploader
 import sevice.TestService
 
@@ -23,7 +24,7 @@ class TestCtrl extends CtrlTpl {
 
     // 测试抛出错误
     def error(Chain chain) {
-        chain.get('error') {ctx -> throw new RuntimeException('xxxxxxxxxxxx') }
+        chain.get('error') {ctx -> throw new RuntimeException('错误测试') }
     }
 
 
@@ -48,7 +49,8 @@ class TestCtrl extends CtrlTpl {
     // session 测试
     def session(Chain chain) {
         chain.get('session') {ctx ->
-            ctx.render ok(ctx.sData)
+            ctx.sData.lastReqId = ctx.get(RequestId.TYPE).toString()
+            ctx.render ok([id:ctx.sData.id, accessTime: ctx.sData.accessTime])
         }
     }
 

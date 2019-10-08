@@ -3,6 +3,7 @@ import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import core.AppContext
 import core.module.EhcacheSrv
+import core.module.RedisClient
 import core.module.SchedSrv
 import core.module.jpa.BaseRepo
 import core.module.jpa.HibernateSrv
@@ -35,6 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger
 // 系统功能添加区
 ctx.addSource(new EhcacheSrv())
 ctx.addSource(new SchedSrv())
+ctx.addSource(new RedisClient())
 ctx.addSource(new HibernateSrv().entities(Test, UploadFile))
 ctx.addSource(new RatpackWeb().ctrls(TestCtrl))
 ctx.addSource(new FileUploader())
@@ -108,10 +110,10 @@ def wsClientTest() {
 
 def hibernateTest() {
     BaseRepo repo = ep.fire('bean.get', BaseRepo.class);
-    repo?.trans({ se ->
+    repo?.trans{
         repo.saveOrUpdate(new Test(age: 222, name: new Date().toString()))
         log.info "total: " + repo.count(Test.class)
-    })
+    }
 }
 
 
