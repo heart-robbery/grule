@@ -8,6 +8,7 @@ import core.module.RedisClient
 import core.module.ServerTpl
 import ctrl.common.ApiResp
 import org.ehcache.Cache
+import org.ehcache.core.EhcacheManager
 import ratpack.error.internal.ErrorHandler
 import ratpack.handling.Chain
 import ratpack.handling.Context
@@ -17,6 +18,7 @@ import ratpack.server.BaseDir
 import ratpack.server.RatpackServer
 
 import javax.annotation.Resource
+import java.text.SimpleDateFormat
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
@@ -36,6 +38,7 @@ class RatpackWeb extends ServerTpl {
 //        TransportDetector.NioTransport.metaClass.invokeMethod = {String name, args
 //            println '======================'
 //        }
+        // 入口handler ratpack.server.internal.NettyHandlerAdapter
         srv = RatpackServer.start({ srv ->
             srv.serverConfig({ builder ->
                 builder.with {
@@ -110,9 +113,12 @@ class RatpackWeb extends ServerTpl {
             })
         }
 
+        def ignoreSuffix = new HashSet(['.js', '.css', '.html', 'favicon.ico', *attrs.ignoreInfoUrlSuffix?:[]])
         // 拦截器
         chain.all({ctx ->
-            log.info("Process Request '{}': {}", ctx.get(RequestId.TYPE), ctx.request.uri)
+            if (!ignoreSuffix.find{ctx.request.uri.endsWith(it)}) {
+                log.info("Process Request '{}': {}", ctx.get(RequestId.TYPE), ctx.request.uri)
+            }
             if (attrs.session.enabled) session(ctx)
             ctx.next()
         })
@@ -125,6 +131,7 @@ class RatpackWeb extends ServerTpl {
 
 
     @Lazy RedisClient redis = bean(RedisClient)
+    @Lazy EhcacheSrv ehcache = bean(EhcacheSrv)
     // 处理session
     def session(Context ctx) {
         def sId = ctx.request.oneCookie('sId')?:UUID.randomUUID().toString().replace('-', '')
@@ -133,7 +140,8 @@ class RatpackWeb extends ServerTpl {
         c.maxAge = ((Duration) attrs.session.expire).seconds?:Duration.ofMinutes(32L).seconds
 
         if ('redis' == attrs.session.type) { // session的数据, 用redis 保存 session 数据
-            def sData = new Expando(new ConcurrentHashMap([id:sId])) {
+            if (redis == null) throw new RuntimeException('RedisClient is not exist')
+            def sData = new Expando(new ConcurrentHashMap()) {
                 @Override
                 Object getProperty(String pName) {
                     def v = super.getProperty(pName)
@@ -149,38 +157,36 @@ class RatpackWeb extends ServerTpl {
                 @Override
                 void setProperty(String pName, Object newValue) {
                     // 先更新到redis中
-                    redis.hset("session:$sId", pName, newValue, ((Duration) attrs.session.expire?:Duration.ofMinutes(30)).seconds.intValue())
+                    redis.hset("session:$sId", pName, newValue, (attrs.session.expire?:Duration.ofMinutes(30)).seconds.intValue())
                     super.setProperty(pName, newValue)
                 }
             }
             ctx.metaClass.sData = sData
             if (redis.exists("session:$sId")) {
-                sData.accessTime = System.currentTimeMillis()
+                sData.id = sId
             } else {
                 synchronized (this) {
                     if (!redis.exists("session:$sId")) {
                         sData.id = sId
-                        sData.accessTime = System.currentTimeMillis()
-                        log.info("New session '{}' at {}", sId, sData.accessTime)
+                        log.info("New session '{}'", sId)
                     }
                 }
             }
         } else {// session的数据, 默认用ehcache 保存 session 数据
-            def sData = ep.fire("${EhcacheSrv.F_NAME}.get", 'session', sId)
+            if (ehcache == null) throw new RuntimeException('EhcacheSrv is not exist')
+            def sData = ehcache.get('session', sId)
             if (sData) {
-                sData.accessTime = System.currentTimeMillis()
                 ctx.metaClass.sData = sData
             } else {
                 synchronized (this) {
-                    sData = ep.fire("${EhcacheSrv.F_NAME}.get", 'session', sId)
+                    sData = ehcache.get('session', sId)
                     if (!sData) {
                         sData = new ConcurrentHashMap()
                         sData.id = sId
-                        sData.accessTime = System.currentTimeMillis()
-                        Cache cache = ep.fire("${EhcacheSrv.F_NAME}.create", 'session', attrs.session.expire?:Duration.ofMinutes(30L), attrs.session.maxLimit?:100000)
+                        Cache cache = ehcache.getOrCreateCache('session', attrs.session.expire?:Duration.ofMinutes(30L), attrs.session.maxLimit?:100000, null)
                         cache.put(sId, sData)
                         ctx.metaClass.sData = sData
-                        log.info("New session '{}' at {}", sId, sData.accessTime)
+                        log.info("New session '{}'", sId)
                     }
                 }
             }

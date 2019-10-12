@@ -68,7 +68,7 @@ class EhcacheSrv extends ServerTpl {
     @EL(name = ['${name}.set', "cache.set"], async = false)
     def set(String cName, Object key, Object value) {
         log.trace(name + ".set. cName: {}, key: {}, value: " + value, cName, key)
-        getOrCreateCache(cName, null, attrs.heapOfEntries.(cName)?:attrs.defaultHeapOfEntries?:1000, null).put(key, value)
+        getOrCreateCache(cName, null, attrs.heapOfEntries.(cName)?:attrs.defaultHeapOfEntries?:10000, null).put(key, value)
     }
 
 

@@ -30,7 +30,7 @@ fileUploader.localDir='e:/tmp/upload/gy'
 web.session.enabled=true
 //web.session.type='redis'
 // session 过期时间
-web.session.expire=Duration.ofMinutes(10)
+web.session.expire=Duration.ofMinutes(30)
 
 
 // redis 相关配置

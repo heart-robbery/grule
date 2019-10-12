@@ -3,30 +3,103 @@
 <head>
     <meta charset="UTF-8">
     <title>GY</title>
+    <link rel="stylesheet" href="css/bootstrap.min.4.3.1.css" type="text/css">
+    <!--<link rel="stylesheet" href="css/iview.4.0.0.css" type="text/css">-->
     <script src="js/jquery-3.4.1.js"></script>
     <script src="js/vue.js"></script>
+    <!--<script src="js/iview.min.4.0.0.js"></script>-->
 </head>
 <body>
-<div id="app">
-    Gy welcome index
-    <div>{{msg}}</div>
+<div id="app" class="container-fluid">
+    <!--Gy welcome index-->
+    <!--<div>{{msg}}</div>-->
 
-    <div>
-        <form id="form1">
-            <input type="file" name="file">
-            <input type="button" value="提交" @click="addFile">
-        </form>
-        {{addResult}}
+    <!--<i-button type="primary" @click="addComponent"/>-->
+    <div class="flex-row">
+        <select v-model="optId" filterable remote :loading="loading" :remote-method="search">
+            <option v-for="(opt, index) in list" :value="opt.id" :key="index">{{opt.label}}</option>
+        </select>
     </div>
+
+    <div class="flex-row">
+        <form >
+            <div class="form-group">
+                <label>标签1</label>
+                <input v-model="addForm.tag1" class="form-control-plaintext" placeholder="标签1"/>
+            </div>
+            <!--<form-item label="标签1">-->
+                <!--<i-input v-model="addForm.tag1" placeholder="标签1"/>-->
+            <!--</form-item>-->
+            <!--<form-item label="标签2">-->
+                <!--<i-input v-model="addForm.tag2" placeholder="标签2"/>-->
+            <!--</form-item>-->
+            <!--<form-item label="标签3">-->
+                <!--<i-input v-model="addForm.tag3" placeholder="标签3"/>-->
+            <!--</form-item>-->
+            <!--<form-item label="html代码">-->
+                <!--<i-input v-model="addForm.htmlCode" type="textarea" :autosize="{minRows: 10,maxRows: 50}"/>-->
+            <!--</form-item>-->
+            <!--<form-item label="groovy代码">-->
+                <!--<i-input v-model="addForm.groovyCode" type="textarea" :autosize="{minRows: 10,maxRows: 50}"/>-->
+            <!--</form-item>-->
+            <!--<form-item label="java代码">-->
+                <!--<i-input v-model="addForm.javaCode" type="textarea" :autosize="{minRows: 10,maxRows: 50}"/>-->
+            <!--</form-item>-->
+            <!--<form-item label="备注">-->
+                <!--<i-input v-model="addForm.comment" type="textarea" :autosize="{minRows: 10,maxRows: 50}"/>-->
+            <!--</form-item>-->
+        </form>
+    </div>
+
+    <!--<div>-->
+        <!--<form id="form1">-->
+            <!--<input type="file" name="file">-->
+            <!--<input type="button" value="提交" @click="addFile">-->
+        <!--</form>-->
+        <!--{{addResult}}-->
+    <!--</div>-->
 </div>
 <script>
     var app = new Vue({
         el: '#app',
-        data: {ws: null, msg: '', addResult: null},
+        data: {
+            ws: null, msg: '', addResult: null,
+            optId:'', loading: false, list: [],
+            showAddForm: false, addForm: {
+
+            }
+        },
         mounted: function () {
             // this.initWs();
+            this.search('')
         },
         methods: {
+            addComponent: function() {
+                this.showAddForm = true
+            },
+            search: function(keyword) {
+                var _this = this
+                // 选择某个选项时
+                if (keyword != '' && keyword == _this.optId) {
+
+                }
+                _this.loading = true
+                $.ajax({
+                    url: 'search?keyword=' + keyword,
+                    success: function (resp) {
+                        _this.loading = false
+                        if (resp.success) {
+                            _this.list = resp.data
+                        } else {
+                            _this.list = []
+                            app.$Notice.error({
+                                title: '错误提示',
+                                desc: resp.desc
+                            })
+                        }
+                    }
+                })
+            },
             addFile: function () {
                 var _this = this;
                 var fd = new FormData($('#form1')[0])

@@ -7,7 +7,9 @@ import core.module.RedisClient
 import core.module.SchedSrv
 import core.module.jpa.BaseRepo
 import core.module.jpa.HibernateSrv
+import ctrl.MainCtrl
 import ctrl.TestCtrl
+import dao.entity.Component
 import dao.entity.Test
 import dao.entity.UploadFile
 import groovy.transform.Field
@@ -37,8 +39,8 @@ import java.util.concurrent.atomic.AtomicInteger
 ctx.addSource(new EhcacheSrv())
 ctx.addSource(new SchedSrv())
 ctx.addSource(new RedisClient())
-ctx.addSource(new HibernateSrv().entities(Test, UploadFile))
-ctx.addSource(new RatpackWeb().ctrls(TestCtrl))
+ctx.addSource(new HibernateSrv().entities(Test, UploadFile, Component))
+ctx.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl))
 ctx.addSource(new FileUploader())
 ctx.addSource(new TestService())
 ctx.addSource(this)
@@ -47,6 +49,7 @@ ctx.start() // 启动系统
 
 @EL(name = "sys.started")
 def sysStarted() {
+    return
     try {
         // cache test
         ep.fire('cache.set', 'test', 'aa', new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()))

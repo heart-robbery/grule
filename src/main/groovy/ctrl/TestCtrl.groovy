@@ -50,9 +50,10 @@ class TestCtrl extends CtrlTpl {
     def session(Chain chain) {
         chain.get('session') {ctx ->
             ctx.sData.lastReqId = ctx.get(RequestId.TYPE).toString()
-            ctx.render ok([id:ctx.sData.id, accessTime: ctx.sData.accessTime])
+            ctx.render ok([id:ctx.sData.id])
         }
     }
+
 
     // 接收form 表单提交
     def form(Chain chain) {
@@ -120,6 +121,15 @@ class TestCtrl extends CtrlTpl {
                 get('sub', { ctx -> ctx.render 'pre/sub' })
                 get('sub2', { ctx -> ctx.render 'pre/sub2' })
             }
+        }
+    }
+
+
+    // html 文件
+    def html(Chain chain) {
+        chain.get(":fName.html") { ctx ->
+            // ctx.response.cookie('Cache-Control', "max-age=60")
+            ctx.render ctx.file("static/${ctx.pathTokens.fName}.html")
         }
     }
 
