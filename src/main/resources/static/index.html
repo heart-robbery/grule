@@ -3,11 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <title>GY</title>
-    <link rel="stylesheet" href="css/bootstrap.min.4.3.1.css" type="text/css">
-    <!--<link rel="stylesheet" href="css/iview.4.0.0.css" type="text/css">-->
+    <!--<link rel="stylesheet" href="css/bootstrap.min.4.3.1.css" type="text/css">-->
+    <link rel="stylesheet" href="css/iview.4.0.0.css" type="text/css">
     <script src="js/jquery-3.4.1.js"></script>
     <script src="js/vue.js"></script>
-    <!--<script src="js/iview.min.4.0.0.js"></script>-->
+    <script src="js/iview.min.4.0.0.js"></script>
+    <style>
+        html,body,#app,.flex-row{
+            width: 100%;
+        }
+        .flex-row{
+            width: 60%;
+            margin: 2vh auto;
+        }
+        form{
+            width: 100%;
+            border: 1px solid #eeeeee;
+            overflow: hidden;
+        }
+        form .form-group{
+            float: left;
+            display: flex;
+            flex-direction: row;
+            width: 94%;
+            margin-top: 2vh;
+            margin-left: 3%;
+        }
+        form .form-small-group{
+            width: 47%;
+        }
+
+        form .form-group label{
+            width: 12%;
+        }
+        form .form-small-group label{
+            width: 24%;
+        }
+        form .form-group input{
+            width: 70%;
+            border: 1px solid #000;
+        }
+        .flex-row>input{
+            width: 40%;
+            margin: 2vh 30%;
+        }
+        form .form-group textarea{
+            width: 84.5%;
+        }
+    </style>
 </head>
 <body>
 <div id="app" class="container-fluid">
@@ -16,16 +59,35 @@
 
     <!--<i-button type="primary" @click="addComponent"/>-->
     <div class="flex-row">
-        <select v-model="optId" filterable remote :loading="loading" :remote-method="search">
-            <option v-for="(opt, index) in list" :value="opt.id" :key="index">{{opt.label}}</option>
-        </select>
+        <!--<i-select />-->
+        <input type="text" list="search" @change="search">
+        <datalist id="search">
+            <template v-for="item in list">
+                <option :value="item.id">{{item.label}}</option>
+            </template>
+        </datalist>
     </div>
 
     <div class="flex-row">
         <form >
-            <div class="form-group">
+            <div class="form-group form-small-group">
                 <label>标签1</label>
-                <input v-model="addForm.tag1" class="form-control-plaintext" placeholder="标签1"/>
+                <input v-model="addForm.tag1"/>
+            </div>
+            <div class="form-group form-small-group">
+                <label>标签2</label>
+                <input v-model="addForm.tag2"/>
+            </div>
+            <div class="form-group">
+                <label>html代码</label>
+                <textarea v-model="addForm.htmlCode" rows="15"></textarea>
+            </div>
+            <div class="form-group">
+                <label>groovy代码</label>
+                <textarea v-model="addForm.groovyCode" rows="15"></textarea>
+            </div>
+            <div>
+                <button @click="addComponent">添加</button>
             </div>
             <!--<form-item label="标签1">-->
                 <!--<i-input v-model="addForm.tag1" placeholder="标签1"/>-->
@@ -65,9 +127,7 @@
         data: {
             ws: null, msg: '', addResult: null,
             optId:'', loading: false, list: [],
-            showAddForm: false, addForm: {
-
-            }
+            showAddForm: false, addForm: {}
         },
         mounted: function () {
             // this.initWs();
@@ -75,7 +135,22 @@
         },
         methods: {
             addComponent: function() {
-                this.showAddForm = true
+                var _this = this
+                $.ajax({
+                    url:'addComponent',
+                    type: 'post',
+                    data: _this.addForm,
+                    success: function (resp) {
+                        if (resp.success) {
+
+                        } else {
+                            app.$Notice.error({
+                                title: '成功提示',
+                                desc: '添加成功'
+                            })
+                        }
+                    }
+                })
             },
             search: function(keyword) {
                 var _this = this
