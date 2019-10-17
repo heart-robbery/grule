@@ -1,33 +1,40 @@
 package ctrl.common
 
+import groovy.transform.ToString
+
+@ToString
 class ApiResp<T> implements Serializable {
+    /**
+     * 请求是否成功
+     */
     boolean success
+    /**
+     * 请求返回的数据
+     */
     T data
+    /**
+     * 当前请求返回说明
+     */
     String desc
+    /**
+     * 唯一请求id
+     */
     String reqId
 
 
-    static <T> ApiResp<T> ok() {
-        return new ApiResp(success: true)
-    }
+    static <T> ApiResp<T> ok() { return new ApiResp(success: true) }
 
 
-    static <T> ApiResp ok(T data) {
-        new ApiResp(success: true, data: data)
-    }
+    static <T> ApiResp ok(T data) { new ApiResp(success: true, data: data) }
 
 
     static ApiResp<LinkedHashMap<String, Object>> ok(String aName, Object aValue) {
-        ApiResp<LinkedHashMap<String, Object>> resp = ok(new LinkedHashMap<>(5));
-        resp.getData().put(aName, aValue)
-        resp
+        new ApiResp(success: true, data: [aName, aValue] as LinkedHashMap)
     }
 
 
 
-    static <T> ApiResp fail(String errMsg) {
-        new ApiResp(success: false, desc: errMsg)
-    }
+    static <T> ApiResp fail(String errMsg) { new ApiResp(success: false, desc: errMsg) }
 
 
     /**

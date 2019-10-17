@@ -13,7 +13,7 @@ import dao.entity.Component
 import dao.entity.Test
 import dao.entity.UploadFile
 import groovy.transform.Field
-import ctrl.RatpackWeb
+import ctrl.ratpack.RatpackWeb
 import okhttp3.*
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory

@@ -83,63 +83,6 @@ class HibernateSrv extends ServerTpl {
         this
     }
 
-    
-    protected PersistenceUnitInfo createPersistenceUnit() {
-        initDataSource();
-        new PersistenceUnitInfo() {
-            @Override
-            String getPersistenceUnitName() { attrs.persistenceUnitName?:name }
-
-            @Override
-            String getPersistenceProviderClassName() {HibernatePersistenceProvider.class.getName()}
-
-            @Override
-            PersistenceUnitTransactionType getTransactionType() {null}
-
-            @Override
-            DataSource getJtaDataSource() {null}
-
-            @Override
-            DataSource getNonJtaDataSource() {ds}
-
-            @Override
-            List<String> getMappingFileNames() {null}
-
-            @Override
-            List<URL> getJarFileUrls() {null}
-
-            @Override
-            URL getPersistenceUnitRootUrl() {null}
-
-            @Override
-            List<String> getManagedClassNames() {entities}
-
-            @Override
-            boolean excludeUnlistedClasses() {true}
-
-            @Override
-            SharedCacheMode getSharedCacheMode() {UNSPECIFIED }
-
-            @Override
-            ValidationMode getValidationMode() {ValidationMode.AUTO}
-
-            @Override
-            Properties getProperties() {null }
-
-            @Override
-            String getPersistenceXMLSchemaVersion() {null}
-
-            @Override
-            ClassLoader getClassLoader() {getClass().getClassLoader()}
-
-            @Override
-            void addTransformer(ClassTransformer transformer) {}
-
-            @Override
-            ClassLoader getNewTempClassLoader() {null}
-        }
-    }
-
 
     /**
      * 初始化数据源

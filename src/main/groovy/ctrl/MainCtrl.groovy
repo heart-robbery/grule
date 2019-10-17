@@ -4,6 +4,7 @@ import core.module.jpa.BaseRepo
 import dao.entity.Component
 import ratpack.form.Form
 import ratpack.handling.Chain
+import sevice.FileUploader
 
 import java.util.stream.Collectors
 
@@ -13,6 +14,58 @@ import static ctrl.common.ApiResp.ok
 class MainCtrl extends CtrlTpl {
 
     @Lazy def repo = bean(BaseRepo)
+
+
+    // 主页
+    def index(Chain chain) {
+        chain.get('') { ctx -> ctx.render ctx.file('static/index.html') }
+    }
+
+
+    // 获取上传的文件
+    def file(Chain chain) {
+        def fu = bean(FileUploader.class)
+        chain.get('file/:fName') {ctx ->
+            ctx.response.cookie('Cache-Control', "max-age=60")
+            ctx.render fu.findFile(ctx.pathTokens.fName).toPath()
+        }
+    }
+
+
+    // html 文件
+//    def html(Chain chain) {
+//        chain.get(":fName.html") { ctx ->
+//            // ctx.response.cookie('Cache-Control', "max-age=60")
+//            ctx.render ctx.file("static/${ctx.pathTokens.fName}.html")
+//        }
+//    }
+
+
+    // js 文件
+    def js(Chain chain) {
+        chain.get("js/:fName") { ctx ->
+            ctx.response.cookie('Cache-Control', "max-age=60")
+            ctx.render ctx.file("static/js/$ctx.pathTokens.fName")
+        }
+    }
+
+
+    // css 文件
+    def css(Chain chain) {
+        chain.get("css/:fName") {ctx ->
+            ctx.response.cookie('Cache-Control', "max-age=60")
+            ctx.render ctx.file("static/css/$ctx.pathTokens.fName")
+        }
+    }
+
+
+    // 登录
+    def login(Chain chain) {
+        chain.post('login') {ctx ->
+            ctx?.sData?.uId = 'xxxxxxxx'
+        }
+    }
+
 
     // 搜索组件
     def search(Chain chain) {
@@ -62,6 +115,7 @@ class MainCtrl extends CtrlTpl {
     // 添加组件
     def addComponent(Chain chain) {
         chain.post('addComponent') {ctx ->
+            // ctx.auth('admin')
             ctx.parse(Form).then{fd ->
                 repo.saveOrUpdate(
                     new Component(

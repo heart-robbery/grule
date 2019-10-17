@@ -1,4 +1,4 @@
-package ctrl
+package ctrl.ratpack
 
 import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
@@ -6,9 +6,9 @@ import com.alibaba.fastjson.serializer.SerializerFeature
 import core.module.EhcacheSrv
 import core.module.RedisClient
 import core.module.ServerTpl
+import ctrl.CtrlTpl
 import ctrl.common.ApiResp
 import org.ehcache.Cache
-import org.ehcache.core.EhcacheManager
 import ratpack.error.internal.ErrorHandler
 import ratpack.handling.Chain
 import ratpack.handling.Context
@@ -18,15 +18,17 @@ import ratpack.server.BaseDir
 import ratpack.server.RatpackServer
 
 import javax.annotation.Resource
-import java.text.SimpleDateFormat
+import java.security.AccessControlException
 import java.time.Duration
+import java.util.Map.Entry
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
+import java.util.concurrent.atomic.AtomicInteger
 
 class RatpackWeb extends ServerTpl {
     @Resource
-    Executor exec
-    RatpackServer srv
+    Executor                      exec
+    RatpackServer                 srv
     @Lazy protected List<CtrlTpl> ctrls = new LinkedList<>()
 
 
@@ -92,6 +94,7 @@ class RatpackWeb extends ServerTpl {
                     ctx.response.contentType('application/json')
                     resp.reqId = ctx.get(RequestId.TYPE).toString()
                     ctx.response.send(JSON.toJSONString(resp, SerializerFeature.WriteMapNullValue))
+                    log.debug("End Request '{}', response: {}", resp.reqId, resp)
                 }
             })
 
@@ -107,19 +110,42 @@ class RatpackWeb extends ServerTpl {
                 @Override
                 void error(Context ctx, Throwable ex) throws Exception {
                     log.error("Request Error '" + ctx.get(RequestId.TYPE) + "', path: " + ctx.request.uri, ex)
-                    ctx.render ApiResp.fail(ex.getMessage())
+                    ctx.render new ApiResp(success: false, desc: ex.getMessage())
                     // ctx.response.status(500).send()
                 }
             })
         }
 
-        def ignoreSuffix = new HashSet(['.js', '.css', '.html', 'favicon.ico', *attrs.ignoreInfoUrlSuffix?:[]])
-        // 拦截器
+        def ignoreSuffix = new HashSet(['.js', '.css', '.html', 'favicon.ico', *attrs.ignorePrintUrlSuffix?:[]])
+        // 请求预处理
         chain.all({ctx ->
+            // 限流 TODO
+            // 打印请求
             if (!ignoreSuffix.find{ctx.request.uri.endsWith(it)}) {
-                log.info("Process Request '{}': {}", ctx.get(RequestId.TYPE), ctx.request.uri)
+                log.info("Start Request '{}': {}", ctx.get(RequestId.TYPE), ctx.request.uri)
             }
+            // session处理
             if (attrs.session.enabled) session(ctx)
+            // 权限验证
+            ctx.metaClass.auth = {String lowestRole -> // 需要的最低角色
+                String uRoles = ctx.sData?.uRoles // 当前用户的角色. 例: role1,role2,role3
+                if (!uRoles) throw new AccessControlException('需要登录获取权限')
+                if (uRoles.contains(lowestRole)) return true
+                String lowestLevel // 对应最低需要角色的等级
+                Set<String> uLevels = new HashSet(7) // 当前用户所有角色的等级
+                attrs.role.each {Entry<String, Collection> e ->
+                    if (e.key.startsWith('level')) {
+                        e.value.each {r ->
+                            if (r == lowestRole) lowestLevel = e.key
+                            if (uRoles.contains(r)) uLevels << e.key
+                        }
+                    }
+                }
+                // 如果当前用户的所有角色等级都没找到大于最低角色等级的就抛错
+                if (!uLevels.find {uLevel -> uLevel.compareToIgnoreCase(lowestLevel) > 0 ? true : false }) {
+                    throw new AccessControlException('没有权限')
+                }
+            }
             ctx.next()
         })
 

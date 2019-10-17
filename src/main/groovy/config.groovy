@@ -26,11 +26,18 @@ fileUploader.localDir='e:/tmp/upload/gy'
 
 //ep.track = ['bean.get']
 
+
 // web 配置
-web.session.enabled=true
-//web.session.type='redis'
-// session 过期时间
-web.session.expire=Duration.ofMinutes(30)
+web {
+    session.enabled=true
+    // session.type='redis'
+    // session 过期时间
+    session.expire=Duration.ofMinutes(30)
+
+    // 接口角色权限配置: level 越大权限越大, 平级level的角色权限互斥
+    role.level2=['role1', 'role2']
+    role.level3=['admin']
+}
 
 
 // redis 相关配置
@@ -39,3 +46,5 @@ redis {
     password='_@Fintell'
     database=0
 }
+
+

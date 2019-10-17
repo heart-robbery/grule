@@ -15,10 +15,15 @@ import static ctrl.common.ApiResp.ok
 
 class TestCtrl extends CtrlTpl {
 
+    TestCtrl() { prefix = 'test' }
 
-    // 主页
-    def index(Chain chain) {
-        chain.get('') { ctx -> ctx.render ctx.file('static/index.html') }
+
+    // 预处理
+    def all(Chain chain) {
+        chain.all{ctx ->
+            println "pre process start with $prefix request"
+            ctx.next()
+        }
     }
 
 
@@ -49,8 +54,8 @@ class TestCtrl extends CtrlTpl {
     // session 测试
     def session(Chain chain) {
         chain.get('session') {ctx ->
-            ctx.sData.lastReqId = ctx.get(RequestId.TYPE).toString()
-            ctx.render ok([id:ctx.sData.id])
+            ctx?.sData.lastReqId = ctx.get(RequestId.TYPE).toString()
+            ctx.render ok([id:ctx?.sData.id])
         }
     }
 
@@ -86,16 +91,6 @@ class TestCtrl extends CtrlTpl {
     }
 
 
-    // 获取上传的文件
-    def file(Chain chain) {
-        def fu = bean(FileUploader.class)
-        chain.get('file/:fName') {ctx ->
-            ctx.response.cookie('Cache-Control', "max-age=60")
-            ctx.render fu.findFile(ctx.pathTokens.fName).toPath()
-        }
-    }
-
-
     // json 参数
     def json(Chain chain) {
         chain.post('json') {ctx ->
@@ -125,29 +120,21 @@ class TestCtrl extends CtrlTpl {
     }
 
 
-    // html 文件
-    def html(Chain chain) {
-        chain.get(":fName.html") { ctx ->
-            // ctx.response.cookie('Cache-Control', "max-age=60")
-            ctx.render ctx.file("static/${ctx.pathTokens.fName}.html")
+    // 测试登录
+    def testLogin(Chain chain) {
+        chain.get('testLogin') {ctx ->
+            ctx.sData.uRoles = ctx.request.queryParams.role
+            log.warn('用户角色被改变')
+            ctx.render(ok(ctx.sData))
         }
     }
 
 
-    // js 文件
-    def js(Chain chain) {
-        chain.get("js/:fName") { ctx ->
-            ctx.response.cookie('Cache-Control', "max-age=60")
-            ctx.render ctx.file("static/js/$ctx.pathTokens.fName")
-        }
-    }
-
-
-    // css 文件
-    def css(Chain chain) {
-        chain.get("css/:fName") {ctx ->
-            ctx.response.cookie('Cache-Control', "max-age=60")
-            ctx.render ctx.file("static/css/$ctx.pathTokens.fName")
+    // 权限测试
+    def auth(Chain chain) {
+        chain.get('auth') {ctx ->
+            ctx.auth('role1')
+            ctx.render(ok(ctx.sData))
         }
     }
 }
