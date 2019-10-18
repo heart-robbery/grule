@@ -198,6 +198,28 @@
                 setInterval(function () {
                     _this.ws.send('xxxxxxx' + new Date());
                 }, 7000);
+            },
+            downXlsx() {
+                var xhr = new XMLHttpRequest();
+                xhr.open('post', 'test/downXlsx', true);
+                xhr.responseType = 'blob';
+                xhr.setRequestHeader('Content-Type', 'application/json;charset=utf-8');
+                xhr.onload = function () {
+                    if (this.status == 200) {
+                        var blob = this.response;
+                        var a = document.createElement('a');
+                        var url = window.URL.createObjectURL(blob);
+                        a.href = url;
+                        //设置文件名称
+                        a.download = '用户信息.xls';
+                        a.click();
+                    }
+                }
+                xhr.send(JSON.stringify({
+                    "type" : 1,
+                    "startDate" : "2018-01-01",
+                    "endDate" : "2018-12-31"
+                }));
             }
         },
 

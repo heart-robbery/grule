@@ -67,6 +67,11 @@ dependencies {
         // exclude group: 'com.fasterxml.jackson.core'
         exclude group: 'io.ratpack', module: 'ratpack-guice'
     }
+
+    // excel
+    // compile 'org.apache.poi:poi:4.1.0'
+    // compile 'org.apache.poi:poi-ooxml:4.1.0'
+
 //    compile ('io.ratpack:ratpack-groovy:1.7.3') {
 //        exclude group: 'org.codehaus.groovy'
 //        exclude group: 'io.netty'

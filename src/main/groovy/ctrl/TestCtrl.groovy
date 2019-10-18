@@ -8,8 +8,16 @@ import io.netty.handler.codec.http.HttpResponseStatus
 import ratpack.form.Form
 import ratpack.handling.Chain
 import ratpack.handling.RequestId
+import ratpack.websocket.WebSocket
+import ratpack.websocket.WebSocketClose
+import ratpack.websocket.WebSocketHandler
+import ratpack.websocket.WebSocketMessage
+import ratpack.websocket.WebSockets
 import sevice.FileUploader
 import sevice.TestService
+
+import java.text.SimpleDateFormat
+import java.util.concurrent.ConcurrentHashMap
 
 import static ctrl.common.ApiResp.ok
 
@@ -57,6 +65,39 @@ class TestCtrl extends CtrlTpl {
             ctx?.sData.lastReqId = ctx.get(RequestId.TYPE).toString()
             ctx.render ok([id:ctx?.sData.id])
         }
+    }
+
+
+    // websocket
+    def ws(Chain chain) {
+        Set<WebSocket> wss = ConcurrentHashMap.newKeySet()
+        chain.get('ws') {ctx ->
+            WebSockets.websocket(ctx, new WebSocketHandler<WebSocket>() {
+                @Override
+                WebSocket onOpen(WebSocket ws) throws Exception {
+                    log.info('ws connect. {}', ctx.request.remoteAddress)
+                    wss.add(ws)
+                    return ws
+                }
+
+                @Override
+                void onClose(WebSocketClose<WebSocket> close) throws Exception {
+                    close.getOpenResult().close()
+                    wss.remove(close.getOpenResult())
+                    log.info('ws closed. {}', ctx.request.remoteAddress)
+                }
+
+                @Override
+                void onMessage(WebSocketMessage<WebSocket> frame) throws Exception {
+                    log.info('receive ws msg: {}', frame.text)
+                }
+            })
+        }
+        ep.fire('sched.cron', '0/30 * * * * ?', {
+            wss.each {ws ->
+                ws.send(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date()))
+            }
+        })
     }
 
 
@@ -120,11 +161,24 @@ class TestCtrl extends CtrlTpl {
     }
 
 
+    // 下载excel文件
+    def downXlsx(Chain chain) {
+        chain.post('downXlsx') {ctx ->
+            ctx.response.contentType('application/vnd.ms-excel;charset=utf-8')
+            ctx.header('Content-Disposition', "attachment;filename=${new SimpleDateFormat("yyyyMMddHHmmss").format(new Date())}.xlsx")
+            def wb = org.apache.poi.ss.usermodel.WorkbookFactory.create(true)
+            def bos = new ByteArrayOutputStream(); wb.write(bos)
+            ctx.response.send(bos.toByteArray())
+            // wb.write(ctx.response)
+        }
+    }
+
+
     // 测试登录
     def testLogin(Chain chain) {
         chain.get('testLogin') {ctx ->
             ctx.sData.uRoles = ctx.request.queryParams.role
-            log.warn('用户角色被改变')
+            log.warn('用户权限角色被改变')
             ctx.render(ok(ctx.sData))
         }
     }

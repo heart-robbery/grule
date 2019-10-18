@@ -3,33 +3,49 @@ package ctrl.ratpack
 import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.serializer.SerializerFeature
+import core.Devourer
+import core.Utils
 import core.module.EhcacheSrv
 import core.module.RedisClient
 import core.module.ServerTpl
 import ctrl.CtrlTpl
 import ctrl.common.ApiResp
+import io.netty.channel.ChannelHandlerContext
+import io.netty.handler.codec.http.HttpRequest
 import org.ehcache.Cache
 import ratpack.error.internal.ErrorHandler
+import ratpack.func.Action
 import ratpack.handling.Chain
 import ratpack.handling.Context
+import ratpack.handling.Handler
 import ratpack.handling.RequestId
+import ratpack.impose.Impositions
 import ratpack.render.RendererSupport
 import ratpack.server.BaseDir
 import ratpack.server.RatpackServer
+import ratpack.server.internal.DefaultRatpackServer
+import ratpack.server.internal.NettyHandlerAdapter
+import ratpack.service.internal.DefaultEvent
+import ratpack.service.internal.ServicesGraph
 
 import javax.annotation.Resource
 import java.security.AccessControlException
+import java.text.SimpleDateFormat
 import java.time.Duration
 import java.util.Map.Entry
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.LongAdder
 
 class RatpackWeb extends ServerTpl {
     @Resource
     Executor                      exec
     RatpackServer                 srv
     @Lazy protected List<CtrlTpl> ctrls = new LinkedList<>()
+    /**
+     * 吞噬器.请求执行控制器
+     */
+    protected Devourer devourer
 
 
     RatpackWeb() { super('web') }
@@ -40,8 +56,19 @@ class RatpackWeb extends ServerTpl {
 //        TransportDetector.NioTransport.metaClass.invokeMethod = {String name, args
 //            println '======================'
 //        }
+
+        // 初始化请求执行控制器
+        devourer = new Devourer(getClass().simpleName, exec);
+        devourer.pause{
+            // 判断线程池里面等待执行的任务是否过多(避免让线程池里面全是请求任务在执行)
+            if (Utils.findMethod(exec.getClass(), "getWaitingCount").invoke(exec) >
+                Math.min(Runtime.getRuntime().availableProcessors(), Utils.findMethod(exec.getClass(), "getCorePoolSize").invoke(exec) * 2)
+            ) return true
+            return false
+        }
+
         // 入口handler ratpack.server.internal.NettyHandlerAdapter
-        srv = RatpackServer.start({ srv ->
+        srv = new DefaultRatpackServer({ srv ->
             srv.serverConfig({ builder ->
                 builder.with {
                     port(attrs.port?:8080)
@@ -55,21 +82,38 @@ class RatpackWeb extends ServerTpl {
                 }
             })
             srv.handlers{initChain(it)}
-        })
+        } as Action, Impositions.current()) {
+            @Override
+            protected NettyHandlerAdapter buildAdapter(DefaultRatpackServer.DefinitionBuild definition) throws Exception {
+                serverRegistry = buildServerRegistry(definition.getServerConfig(), definition.getUserRegistryFactory())
+
+                Handler ratpackHandler = buildRatpackHandler(serverRegistry, definition.getHandlerFactory())
+                ratpackHandler = decorateHandler(ratpackHandler, serverRegistry)
+
+                servicesGraph = new ServicesGraph(serverRegistry)
+                servicesGraph.start(new DefaultEvent(serverRegistry, reloading))
+                // new RatpackHander(RatpackWeb.this, serverRegistry, ratpackHandler)
+                new NettyHandlerAdapter(serverRegistry, ratpackHandler) {
+                    @Override
+                    void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                        if (msg instanceof HttpRequest) {count()}
+                        super.channelRead(ctx, msg)
+                    }
+                }
+            }
+        }
+        // srv = RatpackServer.start()
+        srv.start()
         ep.fire('web.started')
     }
 
 
     @EL(name = 'sys.stopping')
-    def stop() {
-        srv?.stop()
-    }
+    def stop() { srv?.stop() }
 
 
     @EL(name = 'sys.started')
-    def started() {
-        ctrls.each {ep.fire('inject', it)}
-    }
+    def started() { ctrls.each {ep.fire('inject', it)} }
 
 
     /**
@@ -119,7 +163,7 @@ class RatpackWeb extends ServerTpl {
         def ignoreSuffix = new HashSet(['.js', '.css', '.html', 'favicon.ico', *attrs.ignorePrintUrlSuffix?:[]])
         // 请求预处理
         chain.all({ctx ->
-            // 限流 TODO
+            // 限流? TODO
             // 打印请求
             if (!ignoreSuffix.find{ctx.request.uri.endsWith(it)}) {
                 log.info("Start Request '{}': {}", ctx.get(RequestId.TYPE), ctx.request.uri)
@@ -216,6 +260,34 @@ class RatpackWeb extends ServerTpl {
                     }
                 }
             }
+        }
+    }
+
+
+    protected Map<String, LongAdder> hourCount = new ConcurrentHashMap<>(3)
+    // 请求统计
+    protected def count() {
+        SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH")
+        boolean isNew = false
+        String hStr = sdf.format(new Date())
+        LongAdder count = hourCount.get(hStr)
+        if (count == null) {
+            synchronized (hourCount) {
+                count = hourCount.get(hStr)
+                if (count == null) {
+                    count = new LongAdder(); hourCount.put(hStr, count)
+                    isNew = true
+                }
+            }
+        }
+        count.increment()
+        if (isNew) {
+            final Calendar cal = Calendar.getInstance();
+            cal.setTime(new Date())
+            cal.add(Calendar.HOUR_OF_DAY, -1)
+            String lastHour = sdf.format(cal.getTime())
+            LongAdder c = hourCount.remove(lastHour)
+            if (c != null) log.info("{} 时共处理 http 请求: {} 个", lastHour, c)
         }
     }
 
