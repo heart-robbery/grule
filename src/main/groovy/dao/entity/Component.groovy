@@ -10,6 +10,7 @@ class Component extends UUIDEntity {
     String tag1
     String tag2
     String tag3
+    String tag4
     String comment
     String htmlCode
     String javaCode

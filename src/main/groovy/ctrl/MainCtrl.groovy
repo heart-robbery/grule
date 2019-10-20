@@ -75,10 +75,12 @@ class MainCtrl extends CtrlTpl {
                 def ret = ep.fire('cache.get', 'componentSearch', kw)
                 if (ret == null) {
                     ret = repo.findPage(Component, 0, 10, {root, query, cb ->
-                        cb.and()
-                        cb.or(
-                            cb.like(root.get('tag1'), "%$kw%"), cb.like(root.get('tag2'), "%$kw%"),
-                            cb.like(root.get('tag3'), "%$kw%"), cb.like(root.get('tag4'), "%$kw%")
+                        cb.and(
+                                cb.notEqual(root.get('enabled'), false),
+                                cb.or(
+                                        cb.like(root.get('tag1'), "%$kw%"), cb.like(root.get('tag2'), "%$kw%"),
+                                        cb.like(root.get('tag3'), "%$kw%"), cb.like(root.get('tag4'), "%$kw%")
+                                )
                         )
                     }).list.stream().flatMap{e ->
                         def list = []
@@ -86,25 +88,26 @@ class MainCtrl extends CtrlTpl {
                         if (e.tag2) list << [id: e.id, label: e.tag2]
                         if (e.tag3) list << [id: e.id, label: e.tag3]
                         if (e.tag4) list << [id: e.id, label: e.tag4]
-                        list
+                        list.stream()
                     }.collect(Collectors.toList())
                     ep.fire('cache.set', 'componentSearch', kw, ret)
                 }
                 ctx.render ok(ret)
             } else {
-                def ret = ep.fire('cache.get', 'componentSearchDefault', 'default')
+                def ret = ep.fire('cache.get', 'componentSearch', '')
                 if (ret == null) {
                     ret = repo.findPage(Component, 0, 10, {root, query, cb ->
                         cb.desc(root.get('id'))
+                        cb.notEqual(root.get('enabled'), false)
                     }).list.stream().flatMap{e ->
                         def list = []
                         if (e.tag1) list << [id: e.id, label: e.tag1]
                         if (e.tag2) list << [id: e.id, label: e.tag2]
                         if (e.tag3) list << [id: e.id, label: e.tag3]
                         if (e.tag4) list << [id: e.id, label: e.tag4]
-                        list
+                        list.stream()
                     }.collect(Collectors.toList())
-                    ep.fire('cache.set', 'componentSearchDefault', 'default', ret)
+                    ep.fire('cache.set', 'componentSearch', '', ret)
                 }
                 ctx.render ok(ret)
             }
@@ -120,11 +123,13 @@ class MainCtrl extends CtrlTpl {
                 repo.saveOrUpdate(
                     new Component(
                         enabled: true,
-                        tag1: fd.tag1, tag2: fd.tag2, tag3: fd.tag3,
+                        tag1: fd.tag1, tag2: fd.tag2, tag3: fd.tag3, tag4: fd.tag4,
                         comment: fd.comment, htmlCode: fd.htmlCode,
                         javaCode: fd.javaCode, groovyCode: fd.groovyCode
                     )
                 )
+                ctx.render ok()
+                ep.fire('cache.clear', 'componentSearch')
             }
         }
     }

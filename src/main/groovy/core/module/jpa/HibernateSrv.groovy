@@ -33,7 +33,7 @@ class HibernateSrv extends ServerTpl {
 
     @EL(name = 'sys.starting')
     def start() {
-        if (sf) throw new RuntimeException("$name is running")
+        if (sf) throw new RuntimeException("$name is already running")
         if (ep == null) {ep = new EP(); ep.addListenerSource(this)}
 
         // 创建 hibernate

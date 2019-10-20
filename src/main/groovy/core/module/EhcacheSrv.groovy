@@ -24,7 +24,7 @@ class EhcacheSrv extends ServerTpl {
 
     @EL(name = "sys.starting")
     def start() {
-        if (cm) throw new IllegalArgumentException('Cache exist! must after stop')
+        if (cm) throw new RuntimeException("$name is already running")
         if (ep == null) {ep = new EP(); ep.addListenerSource(this)}
         cm = CacheManagerBuilder.newCacheManagerBuilder().build(true)
         exposeBean(cm)

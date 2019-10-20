@@ -53,12 +53,13 @@ class RatpackWeb extends ServerTpl {
 
     @EL(name = 'sys.starting')
     def start() {
+        if (srv) throw new RuntimeException("$name is already running")
 //        TransportDetector.NioTransport.metaClass.invokeMethod = {String name, args
 //            println '======================'
 //        }
 
         // 初始化请求执行控制器
-        devourer = new Devourer(getClass().simpleName, exec);
+        devourer = new Devourer(getClass().simpleName, exec)
         devourer.pause{
             // 判断线程池里面等待执行的任务是否过多(避免让线程池里面全是请求任务在执行)
             if (Utils.findMethod(exec.getClass(), "getWaitingCount").invoke(exec) >
@@ -160,12 +161,12 @@ class RatpackWeb extends ServerTpl {
             })
         }
 
-        def ignoreSuffix = new HashSet(['.js', '.css', '.html', 'favicon.ico', *attrs.ignorePrintUrlSuffix?:[]])
+        def ignoreSuffix = new HashSet(['.js', '.css', '.html', '.png', '.ttf', '.woff', '.woff2', 'favicon.ico', '.js.map', *attrs.ignorePrintUrlSuffix?:[]])
         // 请求预处理
         chain.all({ctx ->
             // 限流? TODO
             // 打印请求
-            if (!ignoreSuffix.find{ctx.request.uri.endsWith(it)}) {
+            if (!ignoreSuffix.find{ctx.request.path.endsWith(it)}) {
                 log.info("Start Request '{}': {}", ctx.get(RequestId.TYPE), ctx.request.uri)
             }
             // session处理

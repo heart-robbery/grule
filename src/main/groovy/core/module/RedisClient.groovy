@@ -19,7 +19,7 @@ class RedisClient extends ServerTpl {
 
     @EL(name = "sys.starting")
     def start() {
-        if (pool) throw new RuntimeException("$name is running")
+        if (pool) throw new RuntimeException("$name is already running")
         if (ep == null) {ep = new EP(); ep.addListenerSource(this)}
 
         // 连接池配置

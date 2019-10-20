@@ -60,7 +60,7 @@
     <!--<i-button type="primary" @click="addComponent"/>-->
     <div class="flex-row">
         <!--<i-select />-->
-        <input type="text" list="search" @change="search">
+        <input type="text" list="search" v-model="keyword">
         <datalist id="search">
             <template v-for="item in list">
                 <option :value="item.id">{{item.label}}</option>
@@ -86,30 +86,9 @@
                 <label>groovy代码</label>
                 <textarea v-model="addForm.groovyCode" rows="15"></textarea>
             </div>
-            <div>
-                <button @click="addComponent">添加</button>
+            <div class="form-group">
+                <input type="button" @click="addComponent" value="添加"/>
             </div>
-            <!--<form-item label="标签1">-->
-                <!--<i-input v-model="addForm.tag1" placeholder="标签1"/>-->
-            <!--</form-item>-->
-            <!--<form-item label="标签2">-->
-                <!--<i-input v-model="addForm.tag2" placeholder="标签2"/>-->
-            <!--</form-item>-->
-            <!--<form-item label="标签3">-->
-                <!--<i-input v-model="addForm.tag3" placeholder="标签3"/>-->
-            <!--</form-item>-->
-            <!--<form-item label="html代码">-->
-                <!--<i-input v-model="addForm.htmlCode" type="textarea" :autosize="{minRows: 10,maxRows: 50}"/>-->
-            <!--</form-item>-->
-            <!--<form-item label="groovy代码">-->
-                <!--<i-input v-model="addForm.groovyCode" type="textarea" :autosize="{minRows: 10,maxRows: 50}"/>-->
-            <!--</form-item>-->
-            <!--<form-item label="java代码">-->
-                <!--<i-input v-model="addForm.javaCode" type="textarea" :autosize="{minRows: 10,maxRows: 50}"/>-->
-            <!--</form-item>-->
-            <!--<form-item label="备注">-->
-                <!--<i-input v-model="addForm.comment" type="textarea" :autosize="{minRows: 10,maxRows: 50}"/>-->
-            <!--</form-item>-->
         </form>
     </div>
 
@@ -126,12 +105,15 @@
         el: '#app',
         data: {
             ws: null, msg: '', addResult: null,
-            optId:'', loading: false, list: [],
+            optId:'', loading: false, list: [], keyword: '',
             showAddForm: false, addForm: {}
         },
         mounted: function () {
             // this.initWs();
             this.search('')
+        },
+        watch: {
+            keyword: function (v) {this.search(v)}
         },
         methods: {
             addComponent: function() {
@@ -142,12 +124,9 @@
                     data: _this.addForm,
                     success: function (resp) {
                         if (resp.success) {
-
+                            app.$Notice.success({title: '成功提示', desc: '添加成功'})
                         } else {
-                            app.$Notice.error({
-                                title: '成功提示',
-                                desc: '添加成功'
-                            })
+                            app.$Notice.error({title: '失败提示', desc: resp.desc, duration: 7})
                         }
                     }
                 })
@@ -167,10 +146,7 @@
                             _this.list = resp.data
                         } else {
                             _this.list = []
-                            app.$Notice.error({
-                                title: '错误提示',
-                                desc: resp.desc
-                            })
+                            app.$Notice.error({title: '错误提示', desc: resp.desc})
                         }
                     }
                 })
@@ -199,7 +175,7 @@
                     _this.ws.send('xxxxxxx' + new Date());
                 }, 7000);
             },
-            downXlsx() {
+            downXlsx: function() {
                 var xhr = new XMLHttpRequest();
                 xhr.open('post', 'test/downXlsx', true);
                 xhr.responseType = 'blob';
