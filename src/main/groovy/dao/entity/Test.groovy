@@ -7,6 +7,6 @@ import javax.persistence.Entity
 
 @Entity
 class Test extends UUIDEntity {
-    String name;
-    Integer age;
+    String name
+    Integer age
 }

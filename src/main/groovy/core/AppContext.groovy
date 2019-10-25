@@ -1,6 +1,5 @@
 package core
 
-
 import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
@@ -12,7 +11,6 @@ import javax.annotation.Resource
 import java.lang.management.ManagementFactory
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.function.Consumer
 
 import static core.Utils.iterateField
 import static core.Utils.pid
@@ -58,7 +56,10 @@ class AppContext {
         // 加载配置文件
         def cs = new ConfigSlurper()
         env = cs.parse(Class.forName('config'))
-        env.merge(cs.parse(System.properties))
+        def ps = System.properties
+        def profile = ps.getProperty('gy.profile')
+        if (profile) env.merge(cs.parse("config-$profile"))
+        env.merge(cs.parse(ps))
     }
 
 
@@ -126,9 +127,6 @@ class AppContext {
 
                 // 取值
                 if (EP.class.isAssignableFrom(f.getType())) v = wrapEpForSource(o)
-                else if (Executor.class.isAssignableFrom(f.getType())) v = wrapExecForSource(o)
-                else if (ConfigObject.class.isAssignableFrom(f.getType())) v = env
-                else if (AppContext.class.isAssignableFrom(f.getType())) v = this
                 else v = ep.fire("bean.get", EC.of(this).sync().args(f.getType(), r.name())) // 全局获取bean对象
 
                 if (v == null) return
@@ -150,16 +148,21 @@ class AppContext {
     protected def findLocalBean(EC ec, Class beanType, String beanName) {
         if (ec.result != null) return ec.result // 已经找到结果了, 就直接返回
 
-        Object bean = null;
+        Object bean
         if (beanName && beanType) {
             bean = sourceMap.get(beanName)
             if (!bean && !beanType.isAssignableFrom(bean.getClass())) bean = null
         } else if (beanName && !beanType) {
             bean = sourceMap.get(beanName)
         } else if (!beanName && beanType) {
-            for (Map.Entry<String, Object> entry : sourceMap.entrySet()) {
-                if (beanType.isAssignableFrom(entry.getValue().getClass())) {
-                    bean = entry.getValue(); break
+            if (Executor.isAssignableFrom(beanType) || ExecutorService.isAssignableFrom(beanType)) bean = wrapExecForSource(ec.source())
+            else if (AppContext.isAssignableFrom(beanType)) bean = this
+            else if (ConfigObject.isAssignableFrom(beanType)) bean = env
+            else {
+                for (Map.Entry<String, Object> entry : sourceMap.entrySet()) {
+                    if (beanType.isAssignableFrom(entry.getValue().getClass())) {
+                        bean = entry.getValue(); break
+                    }
                 }
             }
         }
@@ -174,7 +177,7 @@ class AppContext {
      */
     protected void initExecutor() {
         exec = new ThreadPoolExecutor(
-            env.sys.exec.corePoolSize?:8, env.sys.exec.maximumPoolSize?:8, env.sys.exec.keepAliveTime?:60, TimeUnit.MINUTES, new LinkedBlockingQueue<>(),
+            env.sys.exec.corePoolSize?:8, env.sys.exec.maximumPoolSize?:8, env.sys.exec.keepAliveTime?:30, TimeUnit.MINUTES, new LinkedBlockingQueue<>(),
             new ThreadFactory() {
                 final AtomicInteger i = new AtomicInteger(1);
                 @Override

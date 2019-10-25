@@ -1,4 +1,4 @@
-package core.module.jpa
+package core
 
 import java.util.function.Function
 

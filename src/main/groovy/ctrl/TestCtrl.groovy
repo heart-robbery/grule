@@ -1,10 +1,11 @@
 package ctrl
 
 import core.module.jpa.BaseRepo
-import core.module.jpa.Page
+import core.Page
 import ctrl.common.FileData
 import dao.entity.UploadFile
 import io.netty.handler.codec.http.HttpResponseStatus
+import ratpack.exec.Promise
 import ratpack.form.Form
 import ratpack.handling.Chain
 import ratpack.handling.RequestId
@@ -18,6 +19,7 @@ import sevice.TestService
 
 import java.text.SimpleDateFormat
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executor
 
 import static ctrl.common.ApiResp.ok
 
@@ -26,10 +28,15 @@ class TestCtrl extends CtrlTpl {
     TestCtrl() { prefix = 'test' }
 
 
+    @Lazy exec = bean(Executor)
+    @Lazy repo = bean(BaseRepo)
+
+
     // 预处理
     def all(Chain chain) {
         chain.all{ctx ->
-            println "pre process start with $prefix request"
+            // TODO 预处理 #prefix 前缀开头的 接口
+            // println "pre process start with $prefix request"
             ctx.next()
         }
     }
@@ -40,8 +47,6 @@ class TestCtrl extends CtrlTpl {
         chain.get('error') {ctx -> throw new RuntimeException('错误测试') }
     }
 
-
-    @Lazy repo = bean(BaseRepo)
 
     // dao 测试
     def dao(Chain chain) {
@@ -174,12 +179,25 @@ class TestCtrl extends CtrlTpl {
     }
 
 
+    // 异步处理
+    def async(Chain chain) {
+        chain.get('async') {ctx ->
+            ctx.render Promise.async{down ->
+                exec.execute{
+                    Thread.sleep(3000)
+                    down.success(ok('date', new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())))
+                }
+            }
+        }
+    }
+
+
     // 测试登录
     def testLogin(Chain chain) {
         chain.get('testLogin') {ctx ->
             ctx.sData.uRoles = ctx.request.queryParams.role
             log.warn('用户权限角色被改变')
-            ctx.render(ok(ctx.sData))
+            ctx.render ok(ctx.sData)
         }
     }
 
@@ -188,7 +206,7 @@ class TestCtrl extends CtrlTpl {
     def auth(Chain chain) {
         chain.get('auth') {ctx ->
             ctx.auth('role1')
-            ctx.render(ok(ctx.sData))
+            ctx.render ok(ctx.sData)
         }
     }
 }

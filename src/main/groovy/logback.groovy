@@ -12,7 +12,9 @@ def appenders = []
 // 日志文件名
 def logFileName = 'sys'
 // 日志文件路径
-def logPath = env.log.path?:'e:/tmp/log/gy'
+def logPath = (env.log.path?:'e:/tmp/log/gy')
+// 去掉最后的 /
+if (logPath.endsWith('/')) logPath = logPath.substring(0, logPath.length() - 2)
 
 appender('console', ConsoleAppender) {
     appenders << 'console'

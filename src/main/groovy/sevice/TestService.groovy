@@ -2,12 +2,13 @@ package sevice
 
 import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
+import core.Page
 import core.module.ServerTpl
 import core.module.jpa.BaseRepo
-import core.module.jpa.Page
 import ctrl.common.FileData
 import dao.entity.Test
 import dao.entity.UploadFile
+import org.hibernate.transform.Transformers
 
 import javax.annotation.Resource
 import java.text.SimpleDateFormat
@@ -19,7 +20,7 @@ class TestService extends ServerTpl {
 
 
     Page findTestData() {
-        repo.trans{ s ->
+        repo?.trans{ s ->
             repo.saveOrUpdate(
                 new Test(
                     name: new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()),
@@ -38,10 +39,24 @@ class TestService extends ServerTpl {
      */
     List<UploadFile> saveUpload(List<FileData> files) {
         if (!files) return Collections.emptyList()
-        repo.trans{s ->
+        repo?.trans{
             files.collect{f ->
                 repo.saveOrUpdate(new UploadFile(originName: f.originName, finalName: f.generatedName))
             }
+        }
+    }
+
+
+    def hibernateMap() {
+        repo?.trans{s ->
+            println '============='
+            println s.createNativeQuery('select name, age from test where age>10')
+                .setResultTransformer(Transformers.ALIAS_TO_ENTITY_MAP)
+                .setMaxResults(1)
+            println s.createQuery('select name,age from Test where age>10', Test)
+                // .setResultTransformer(Transformers.ALIAS_TO_ENTITY_MAP)
+                .setMaxResults(1).singleResult['age']
+            println s.createQuery('from Test where age>10').setMaxResults(1).singleResult['age']
         }
     }
 

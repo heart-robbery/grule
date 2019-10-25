@@ -42,14 +42,16 @@ class HibernateSrv extends ServerTpl {
         props.put("hibernate.physical_naming_strategy", PhysicalNaming.class.name)
         props.put("hibernate.implicit_naming_strategy", ImplicitNaming.class.name)
         props.put("hibernate.current_session_context_class", "thread")
-        props.put("hibernate.temp.use_jdbc_metadata_defaults", 'true')
+        props.put("hibernate.temp.use_jdbc_metadata_defaults", 'true') // 自动探测连接的数据库信息,该用哪个Dialect
         props.putAll(attrs.hibernate.flatten())
 
         initDataSource()
         MetadataSources ms = new MetadataSources(
-            new StandardServiceRegistryBuilder().addService(ConnectionProvider.class, new DatasourceConnectionProviderImpl(dataSource: ds, available: true)).applySettings(props).build()
+            new StandardServiceRegistryBuilder()
+                .addService(ConnectionProvider.class, new DatasourceConnectionProviderImpl(dataSource: ds, available: true))
+                .applySettings(props).build()
         )
-        ms.annotatedClasses.addAll(entities)
+        entities.each {ms.addAnnotatedClass(it)}
         sf = ms.buildMetadata().buildSessionFactory()
         exposeBean(sf, ['sessionFactory', 'entityManagerFactory'])
 

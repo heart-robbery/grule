@@ -34,9 +34,10 @@ web {
     // session 过期时间
     session.expire=Duration.ofMinutes(30)
 
-    // 接口角色权限配置: level 越大权限越大, 平级level的角色权限互斥
-    role.level2=['role1', 'role2']
-    role.level3=['admin']
+    // 一个角色代表一组权限
+    // 接口角色权限配置: level_权重数值 权重数值的权限包含小的, 平级level的角色权限互斥
+    role.level_80=['role1', 'role2']
+    role.level_100=['admin']
 }
 
 

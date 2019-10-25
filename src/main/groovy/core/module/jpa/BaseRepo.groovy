@@ -1,6 +1,6 @@
 package core.module.jpa
 
-
+import core.Page
 import org.hibernate.Session
 import org.hibernate.SessionFactory
 import org.hibernate.Transaction
@@ -19,11 +19,14 @@ import javax.persistence.criteria.Root
 import java.util.function.Function
 
 
+/**
+ * hibernate 基本操作方法集
+ */
 class BaseRepo {
-    protected Logger log = LoggerFactory.getLogger(getClass())
+    protected final Logger         log = LoggerFactory.getLogger(getClass())
     @Resource
-    protected SessionFactory sf
-    protected ConfigObject attrs
+    protected       SessionFactory sf
+    protected       ConfigObject   attrs
 
 
     static ThreadLocal<Boolean> txFlag = ThreadLocal.withInitial({false})
@@ -68,6 +71,11 @@ class BaseRepo {
     }
 
 
+    /**
+     * 保存/更新实体
+     * @param e
+     * @return
+     */
     def <E extends IEntity> E saveOrUpdate(E e) {
         trans{ s ->
             if (e instanceof BaseEntity) {
@@ -79,31 +87,34 @@ class BaseRepo {
             e
         }
     }
-    
-    
+
+
+    /**
+     * 根据id查找实体
+     * @param eType
+     * @param id
+     * @return
+     */
     def <T extends IEntity> T findById(Class<T> eType, Serializable id) {
         if (eType == null) throw new IllegalArgumentException('eType must not be null')
         trans{ s -> s.get(eType, id)}
     }
 
 
-    def findOne(Query query) {
-        trans{
-            try {
-                return query.setMaxResults(1).getSingleResult()
-            } catch (NoResultException e) {}
-            null
-        }
-    }
 
-    
     /**
      * 删实体
      * @param e
      */
     def <E extends IEntity> void delete(E e) { trans{ s -> s.delete(e)} }
-    
-    
+
+
+    /**
+     * 根据id删除
+     * @param eType
+     * @param id
+     * @return
+     */
     def <E extends IEntity> boolean delete(Class<E> eType, Serializable id) {
         if (eType == null) throw new IllegalArgumentException('eType must not be null')
         trans{ s ->
@@ -123,7 +134,7 @@ class BaseRepo {
      * @param spec
      * @return
      */
-    def <E extends IEntity> Page<E> findPage(Class<E> eType, Integer pageIndex, Integer pageSize, Specification spec) {
+    def <E extends IEntity> Page<E> findPage(Class<E> eType, Integer pageIndex, Integer pageSize, CriteriaSpec spec) {
         if (eType == null) throw new IllegalArgumentException('eType must not be null')
         trans{s ->
             CriteriaBuilder cb = s.getCriteriaBuilder()
@@ -141,13 +152,14 @@ class BaseRepo {
         }
     }
 
+
     /**
      * 根据实体类, 统计
      * @param eType
      * @param spec
      * @return
      */
-    def <E extends IEntity> long count(Class<E> eType, Specification spec = null) {
+    def <E extends IEntity> long count(Class<E> eType, CriteriaSpec spec = null) {
         if (eType == null) throw new IllegalArgumentException('eType must not be null')
         trans{ s ->
             CriteriaBuilder cb = s.getCriteriaBuilder()
@@ -160,5 +172,14 @@ class BaseRepo {
             if (p instanceof Predicate) query.where(p)
             s.createQuery(query).getSingleResult()
         }
+    }
+
+
+    /**
+     * Criteria 查询 spec
+     * @param <E>
+     */
+    trait CriteriaSpec<E> {
+        abstract def toPredicate(Root<E> root, CriteriaQuery<?> query, CriteriaBuilder cb)
     }
 }

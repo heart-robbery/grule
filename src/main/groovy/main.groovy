@@ -2,6 +2,7 @@ import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import core.AppContext
+import core.Utils
 import core.module.EhcacheSrv
 import core.module.RedisClient
 import core.module.SchedSrv
@@ -9,6 +10,7 @@ import core.module.jpa.BaseRepo
 import core.module.jpa.HibernateSrv
 import ctrl.MainCtrl
 import ctrl.TestCtrl
+import ctrl.common.FileData
 import dao.entity.Component
 import dao.entity.Test
 import dao.entity.UploadFile
@@ -29,11 +31,25 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 
+//def url = "http://19.19.9.156:8292/test/uploadReport"
+//new File('E:\\tmp\\pboc').eachFile {file ->
+//    if (file.name.endsWith(".json")) {
+//        def s = Utils.http().post(url).jsonBody(file.getText("utf-8")).execute()
+//        println("file: $file.name,  result: $s")
+//    }
+//}
+//def resp = okClient.newCall(new Request().newBuilder().post(RequestBody.create(MediaType.get('application/json'), ''))).execute()
+//resp = okClient.newCall(new Request().newBuilder().post(RequestBody.create(MediaType.get('application/json'), ''))).execute()
+//resp = okClient.newCall(new Request().newBuilder().get()).execute()
+//return
+
+
 @Field Logger log = LoggerFactory.getLogger(getClass())
 @Lazy @Field OkHttpClient okClient = createOkClient()
 @Resource @Field EP ep
 @Resource @Field ExecutorService exec
 @Field AppContext ctx = new AppContext()
+
 
 // 系统功能添加区
 ctx.addSource(new EhcacheSrv())
@@ -47,9 +63,8 @@ ctx.addSource(this)
 ctx.start() // 启动系统
 
 
-@EL(name = "sys.started")
+@EL(name = 'sys.started')
 def sysStarted() {
-    return
     try {
         // cache test
         ep.fire('cache.set', 'test', 'aa', new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()))
@@ -61,7 +76,7 @@ def sysStarted() {
 
         def hp = ep.fire('http.getHp')
         if (hp) {
-            log.info '接口访问: ' + okClient.newCall(new Request.Builder().get().url("http://$hp/dao").build()).execute().body().string()
+            log.info '接口访问: ' + okClient.newCall(new Request.Builder().get().url("http://$hp/test/dao").build()).execute().body().string()
         }
 
         // sqlTest()
@@ -72,7 +87,7 @@ def sysStarted() {
 }
 
 
-@EL(name = "sys.stopping")
+@EL(name = 'sys.stopping')
 def stop() {
     // sql?.close()
 }
@@ -81,7 +96,7 @@ def stop() {
 @EL(name = 'bean.get', async = false)
 def findBean(EC ec, Class bType, String bName) {
     if (ec.result) return ec.result
-    if (bType.isAssignableFrom(OkHttpClient.class)) {
+    if (OkHttpClient.class.isAssignableFrom(bType)) {
         if (okClient) return okClient
         else {
             okClient = createOkClient()
@@ -112,11 +127,12 @@ def wsClientTest() {
 
 
 def hibernateTest() {
-    BaseRepo repo = ep.fire('bean.get', BaseRepo.class);
-    repo?.trans{
-        repo.saveOrUpdate(new Test(age: 222, name: new Date().toString()))
-        log.info "total: " + repo.count(Test.class)
-    }
+    TestService ts = ep.fire('bean.get', TestService.class)
+    ts.hibernateMap()
+
+    ts.findTestData()
+    BaseRepo repo = ep.fire('bean.get', BaseRepo.class)
+    println "total: " + repo.count(Test)
 }
 
 
@@ -134,7 +150,7 @@ def hibernateTest() {
 
 OkHttpClient createOkClient() {
     new OkHttpClient.Builder()
-            .readTimeout(Duration.ofSeconds(17)).connectTimeout(Duration.ofSeconds(5))
+            .readTimeout(Duration.ofSeconds(15)).connectTimeout(Duration.ofSeconds(5))
             .dispatcher(new Dispatcher(exec))
             .cookieJar(new CookieJar() {// 共享cookie
                 final Map<String, List<Cookie>> cookieStore = new ConcurrentHashMap<>()

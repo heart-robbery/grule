@@ -2,39 +2,47 @@ package ctrl.common
 
 import groovy.transform.ToString
 
-@ToString
+@ToString(includePackage = false, ignoreNulls = true, allNames = true)
 class ApiResp<T> implements Serializable {
     /**
      * 请求是否成功
+     * 00: 正常
+     * 01: 通用错误
      */
-    boolean success
+    String code
     /**
      * 请求返回的数据
      */
-    T data
+    T      data
     /**
      * 当前请求返回说明
      */
     String desc
     /**
-     * 唯一请求id
+     * 流水号(唯一请求id)
      */
-    String reqId
+    String seqNo
+    /**
+     * 调用方的入参(原样返回)
+     */
+    String cus
 
 
-    static <T> ApiResp<T> ok() { return new ApiResp(success: true) }
+    static <T> ApiResp<T> ok() { return new ApiResp(code: '00') }
 
 
-    static <T> ApiResp ok(T data) { new ApiResp(success: true, data: data) }
+    static <T> ApiResp ok(T data) { new ApiResp(code: '00', data: data) }
 
 
     static ApiResp<LinkedHashMap<String, Object>> ok(String aName, Object aValue) {
-        new ApiResp(success: true, data: [aName, aValue] as LinkedHashMap)
+        new ApiResp(code: '00', data: [(aName): aValue] as LinkedHashMap)
     }
 
 
+    static <T> ApiResp fail(String errMsg) { new ApiResp(code: '01', desc: errMsg) }
 
-    static <T> ApiResp fail(String errMsg) { new ApiResp(success: false, desc: errMsg) }
+
+    static <T> ApiResp fail(String code, String errMsg) { new ApiResp(code: code, desc: errMsg) }
 
 
     /**
