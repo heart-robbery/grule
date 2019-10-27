@@ -50,12 +50,12 @@ class TestService extends ServerTpl {
     def hibernateMap() {
         repo?.trans{s ->
             println '============='
-            println s.createNativeQuery('select name, age from test where age>10')
-                .setResultTransformer(Transformers.ALIAS_TO_ENTITY_MAP)
-                .setMaxResults(1)
-            println s.createQuery('select name,age from Test where age>10', Test)
-                // .setResultTransformer(Transformers.ALIAS_TO_ENTITY_MAP)
-                .setMaxResults(1).singleResult['age']
+//            println s.createNativeQuery('select name, age from test where age>10')
+//                .setResultTransformer(Transformers.ALIAS_TO_ENTITY_MAP)
+//                .setMaxResults(1).uniqueResult()
+//            println s.createQuery('select name,age from Test where age>10')
+//                // .setResultTransformer(Transformers.ALIAS_TO_ENTITY_MAP)
+//                .setMaxResults(1).singleResult['age']
             println s.createQuery('from Test where age>10').setMaxResults(1).singleResult['age']
         }
     }

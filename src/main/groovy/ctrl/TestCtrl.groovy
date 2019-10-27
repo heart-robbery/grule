@@ -111,7 +111,7 @@ class TestCtrl extends CtrlTpl {
         chain.post('form', {ctx ->
             ctx.parse(Form.class).then({ form ->
                 // form.file('').fileName // 提取上传的文件
-                ctx.render ok(form.values())
+                ctx.render ok(form)
             })
         })
     }
@@ -122,7 +122,7 @@ class TestCtrl extends CtrlTpl {
         def fu = bean(FileUploader)
         def testSrv = bean(TestService)
         chain.post('upload', {ctx ->
-            if (!ctx.request.contentType.type.contains('multipart/form-data')) {
+            if (!ctx.request.contentType.type?.contains('multipart/form-data')) {
                 ctx.clientError(HttpResponseStatus.UNSUPPORTED_MEDIA_TYPE.code())
                 return
             }

@@ -80,17 +80,17 @@ class Utils {
 
 
     static class Http {
-        private String                      urlStr;
-        private String                      contentType;
-        private String                      method;
-        private String                      jsonBody;
-        private Map<String, Object>         params;
-        private Map<String, Object>         cookies;
-        private Map<String, String>         headers;
-        private int                         connectTimeout = 5000;
-        private int                         readTimeout = 15000;
-        private int respCode;
-        private Consumer<HttpURLConnection> preFn;
+        private String                      urlStr
+        private String                      contentType
+        private String                      method
+        private String                      jsonBody
+        private Map<String, Object>         params
+        private Map<String, Object>         cookies
+        private Map<String, String>         headers
+        private int                         connectTimeout = 5000
+        private int                         readTimeout = 15000
+        private int respCode
+        private Consumer<HttpURLConnection> preFn
 
         Http get(String url) { this.urlStr = url; this.method = 'GET'; return this }
         Http post(String url) { this.urlStr = url; this.method = 'POST'; return this }
@@ -125,12 +125,6 @@ class Utils {
             cookies.put(name, value)
             return this
         }
-        Http cookies(Map<String, Object> cookies) {
-            if (cookies == null || cookies.isEmpty()) return this
-            if (this.cookies == null) this.cookies = new HashMap<>(7)
-            this.cookies.putAll(cookies)
-            return this
-        }
         Map<String, Object> cookies() {return cookies}
         int getResponseCode() {return respCode}
 
@@ -149,18 +143,16 @@ class Utils {
                 else if ('POST' == method) url = new URL(urlStr)
                 conn = (HttpURLConnection) url.openConnection()
                 if (conn instanceof HttpsURLConnection) { // 如果是https, 就忽略验证
-                    SSLContext sc = SSLContext.getInstance('TLSv1.2'); // "TLS"
+                    SSLContext sc = SSLContext.getInstance('TLSv1.2') // "TLS"
                     sc.init(null, new TrustManager[] {new X509TrustManager() {
                         @Override
                         void checkClientTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException { }
                         @Override
                         void checkServerTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException { }
                         @Override
-                        X509Certificate[] getAcceptedIssuers() {
-                            return null;
-                        }
+                        X509Certificate[] getAcceptedIssuers() { return null }
                     }}, new java.security.SecureRandom())
-                    ((HttpsURLConnection) conn).setHostnameVerifier((s, sslSession) -> true)
+                    ((HttpsURLConnection) conn).setHostnameVerifier({s, sslSession -> true})
                     ((HttpsURLConnection) conn).setSSLSocketFactory(sc.getSocketFactory())
                 }
                 conn.setRequestMethod(method)
@@ -191,9 +183,11 @@ class Utils {
                 // cookie 设置
                 if (cookies) {
                     StringBuilder sb = new StringBuilder()
-                    cookies.forEach((s, o) -> {
-                        if (o != null) sb.append(s).append("=").append(o).append(";")
-                    })
+                    cookies.each {
+                        if (it.value != null) {
+                            sb.append(it.key).append("=").append(it.value).append(";")
+                        }
+                    }
                     conn.setRequestProperty('Cookie', sb.toString())
                 }
 
@@ -213,7 +207,7 @@ class Utils {
                             os.writeBytes(twoHyphens + boundary + end)
                             if (e.value instanceof File) {
                                 String s = "Content-Disposition: form-data; name=\"$e.key\"; filename=\"${((File) e.value).name}\"" + end
-                                os.write(s.getBytes('utf-8')); // 这样写是为了避免中文文件名乱码
+                                os.write(s.getBytes('utf-8')) // 这样写是为了避免中文文件名乱码
                                 os.writeBytes(end)
                                 // copy
                                 def is = new FileInputStream(File)
@@ -266,12 +260,10 @@ class Utils {
      * @return
      */
     static String buildUrl(String urlStr, Map<String, Object> params) {
-        if (!params) return urlStr;
-        StringBuilder sb = new StringBuilder(urlStr);
-        if (!urlStr.endsWith("?")) sb.append("?");
-        params.forEach((s, o) -> {
-            if (o != null) sb.append(s).append("=").append(o).append("&");
-        });
-        return sb.toString();
+        if (!params) return urlStr
+        StringBuilder sb = new StringBuilder(urlStr)
+        if (!urlStr.endsWith("?")) sb.append("?")
+        params.each { sb.append(it.key).append("=").append(it.value).append("&") }
+        return sb.toString()
     }
 }

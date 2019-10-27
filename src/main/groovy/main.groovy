@@ -1,21 +1,20 @@
-import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
+import com.alibaba.fastjson.JSON
 import core.AppContext
-import core.Utils
 import core.module.EhcacheSrv
+import core.module.OkHttpSrv
 import core.module.RedisClient
 import core.module.SchedSrv
 import core.module.jpa.BaseRepo
 import core.module.jpa.HibernateSrv
 import ctrl.MainCtrl
 import ctrl.TestCtrl
-import ctrl.common.FileData
+import ctrl.ratpack.RatpackWeb
 import dao.entity.Component
 import dao.entity.Test
 import dao.entity.UploadFile
 import groovy.transform.Field
-import ctrl.ratpack.RatpackWeb
 import okhttp3.*
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -25,29 +24,14 @@ import sevice.TestService
 import javax.annotation.Resource
 import java.text.SimpleDateFormat
 import java.time.Duration
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
-
-//def url = "http://19.19.9.156:8292/test/uploadReport"
-//new File('E:\\tmp\\pboc').eachFile {file ->
-//    if (file.name.endsWith(".json")) {
-//        def s = Utils.http().post(url).jsonBody(file.getText("utf-8")).execute()
-//        println("file: $file.name,  result: $s")
-//    }
-//}
-//def resp = okClient.newCall(new Request().newBuilder().post(RequestBody.create(MediaType.get('application/json'), ''))).execute()
-//resp = okClient.newCall(new Request().newBuilder().post(RequestBody.create(MediaType.get('application/json'), ''))).execute()
-//resp = okClient.newCall(new Request().newBuilder().get()).execute()
-//return
-
-
 @Field Logger log = LoggerFactory.getLogger(getClass())
-@Lazy @Field OkHttpClient okClient = createOkClient()
 @Resource @Field EP ep
 @Resource @Field ExecutorService exec
+@Resource @Field OkHttpSrv okHttp
 @Field AppContext ctx = new AppContext()
 
 
@@ -55,6 +39,7 @@ import java.util.concurrent.atomic.AtomicInteger
 ctx.addSource(new EhcacheSrv())
 ctx.addSource(new SchedSrv())
 ctx.addSource(new RedisClient())
+ctx.addSource(new OkHttpSrv())
 ctx.addSource(new HibernateSrv().entities(Test, UploadFile, Component))
 ctx.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl))
 ctx.addSource(new FileUploader())
@@ -76,7 +61,12 @@ def sysStarted() {
 
         def hp = ep.fire('http.getHp')
         if (hp) {
-            log.info '接口访问: ' + okClient.newCall(new Request.Builder().get().url("http://$hp/test/dao").build()).execute().body().string()
+            // log.info '接口访问xxx: ' + okHttp.http().get("http://$hp/test/xxx").execute()
+            log.info '接口访问dao: ' + okHttp.get("http://$hp/test/dao").cookie('sId', '222').param('type', 'file').execute()
+            log.info '接口访问form: ' + okHttp.post("http://$hp/test/form?sss=22").param('p1', '111').execute()
+            log.info '接口访问json: ' + okHttp.post("http://$hp/test/json").param('p1', '111').execute()
+            log.info '接口访问json: ' + okHttp.post("http://$hp/test/json").jsonBody(JSON.toJSONString([a:'1', b:2])).execute()
+            // log.info '接口访问upload: ' + okHttp.post("http://$hp/test/upload").param('f1', new File('C:\\Users\\86178\\Pictures\\Screenshots\\屏幕截图(1).png')).execute()
         }
 
         // sqlTest()
@@ -93,20 +83,9 @@ def stop() {
 }
 
 
-@EL(name = 'bean.get', async = false)
-def findBean(EC ec, Class bType, String bName) {
-    if (ec.result) return ec.result
-    if (OkHttpClient.class.isAssignableFrom(bType)) {
-        if (okClient) return okClient
-        else {
-            okClient = createOkClient()
-            return okClient
-        }
-    }
-}
-
 
 def wsClientTest() {
+    OkHttpClient okClient = ep.fire('bean.get', OkHttpClient.class)
     okClient.newWebSocket(new Request.Builder().url("ws://rl.cnxnu.com:9659/ppf/ar/6.0").build(), new WebSocketListener() {
         @Override
         void onOpen(WebSocket webSocket, Response resp) {
@@ -146,22 +125,3 @@ def hibernateTest() {
 //    sql.executeInsert("insert into test values(?, ?)", ["xxxx" + System.currentTimeMillis(), 1111])
 //    println sql.firstRow("select count(*) as num from test").num
 //}
-
-
-OkHttpClient createOkClient() {
-    new OkHttpClient.Builder()
-            .readTimeout(Duration.ofSeconds(15)).connectTimeout(Duration.ofSeconds(5))
-            .dispatcher(new Dispatcher(exec))
-            .cookieJar(new CookieJar() {// 共享cookie
-                final Map<String, List<Cookie>> cookieStore = new ConcurrentHashMap<>()
-                @Override
-                void saveFromResponse(HttpUrl url, List<Cookie> cookies) {
-                    cookieStore.put(url.host(), cookies)
-                }
-                @Override
-                List<Cookie> loadForRequest(HttpUrl url) {
-                    List<Cookie> cookies = cookieStore.get(url.host())
-                    return cookies != null ? cookies : new ArrayList<>(7)
-                }
-            }).build()
-}
