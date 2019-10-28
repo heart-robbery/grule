@@ -1,7 +1,7 @@
-import java.time.Duration
-
 sys.name='gy'
 sys.exec.corePoolSize=4
+
+web.port=8100
 
 jpa {
     ds {
@@ -9,7 +9,10 @@ jpa {
     }
 }
 
-//  文件上传本地存放目录
-fileUploader.localDir='/srv/gy/upload/'
+fileUploader{
+    // 文件上传本地存放目录
+    localDir='/srv/gy/upload/'
+    accessUrlPrefix="http://39.104.28.131:$http.port/file"
+}
 
 log.path='/srv/gy/log'

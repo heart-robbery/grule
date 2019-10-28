@@ -24,13 +24,15 @@ class OkHttpSrv extends ServerTpl {
     protected OkHttpClient client
     protected final Map<String, List<Cookie>> cookieStore = new ConcurrentHashMap<>()
 
+
     @EL(name = 'sys.starting')
-    def create() {
+    def init() {
         if (client) throw new RuntimeException("$name is already running")
         if (ep == null) {ep = new EP(); ep.addListenerSource(this)}
         client = new OkHttpClient.Builder()
                 .connectTimeout(attrs.connectTimeout?:Duration.ofSeconds(5))
                 .readTimeout(attrs.readTimeout?:Duration.ofSeconds(15))
+                .writeTimeout(attrs.writeTimeout?:Duration.ofSeconds(30))
                 .dispatcher(new Dispatcher(exec))
                 .cookieJar(new CookieJar() {// 共享cookie
                     @Override
@@ -54,9 +56,9 @@ class OkHttpSrv extends ServerTpl {
      */
     OkHttp get(String urlStr) {
         if (!urlStr) throw new IllegalArgumentException('url must not be empty')
-        def b = new Request.Builder().get()
-        def h = new OkHttp(this, b)
-        h.urlStr = urlStr
+        def b = new Request.Builder()
+        def h = new OkHttp(this, urlStr, b)
+        b.method = 'GET'
         h
     }
 
@@ -69,8 +71,7 @@ class OkHttpSrv extends ServerTpl {
     OkHttp post(String urlStr) {
         if (!urlStr) throw new IllegalArgumentException('url must not be empty')
         def b = new Request.Builder()
-        def h = new OkHttp(this, b)
-        h.urlStr = urlStr
+        def h = new OkHttp(this, urlStr, b)
         b.method = 'POST'
         h
     }
@@ -81,21 +82,25 @@ class OkHttpSrv extends ServerTpl {
 
     class OkHttp {
         // 宿主
-        protected final OkHttpSrv parasitifer
-        protected final Request.Builder builder
-        protected String urlStr
-        protected Map<String, Object> params
-        protected Map<String, Object> cookies
-        protected String contentType
-        protected String jsonBodyStr
+        protected final OkHttpSrv                                 parasitifer
+        protected final Request.Builder                           builder
+        protected       String                                    urlStr
+        protected       Map<String, Object>                       params
+        // 文件流:(属性名, 文件名, 文件流)
+        protected       List<Tuple3<String, String, InputStream>> fileStreams
+        protected       Map<String, Object>                       cookies
+        protected       String                                    contentType
+        protected       String                                    jsonBodyStr
 
-        OkHttp(OkHttpSrv parasitifer, Request.Builder builder) {
+        protected OkHttp(OkHttpSrv parasitifer, String urlStr, Request.Builder builder) {
             if (builder == null) throw new NullPointerException('builder == null')
             if (parasitifer == null) throw new NullPointerException('parasitifer == null')
             this.builder = builder
             this.parasitifer = parasitifer
+            this.urlStr = urlStr
         }
         OkHttp param(String pName, Object pValue) {
+            if (pName == null) throw new NullPointerException('pName == null')
             if (params == null) params = new LinkedHashMap<>()
             params.put(pName, pValue)
             if (pValue instanceof File) {
@@ -103,41 +108,67 @@ class OkHttpSrv extends ServerTpl {
             }
             this
         }
+        OkHttp fileStream(String pName, String fileName, InputStream is) {
+            if (pName == null) throw new NullPointerException('pName == null')
+            if (fileStreams == null) fileStreams = new LinkedList<>()
+            fileStreams.add(Tuple.tuple(pName, fileName, is))
+            this
+        }
         OkHttp jsonBody(String jsonBodyStr) {
             this.jsonBodyStr = jsonBodyStr
             if (contentType == null) contentType = 'application/json;charset=utf-8'
             this
         }
+        OkHttp contentType(String contentType) {
+            this.contentType = contentType
+            this
+        }
         OkHttp cookie(String name, Object value) {
+            if (name == null) throw new NullPointerException('name == null')
             if (cookies == null) cookies = new HashMap<>(7)
             cookies.put(name, value)
             this
         }
         OkHttp header(String name, Object value) {
-            builder.addHeader(name, value)
+            if (value == null) throw new NullPointerException('value == null')
+            builder.addHeader(name, value.toString())
             this
         }
+        // 请求执行
         def execute(Consumer<String> okFn = null, Consumer<Exception> failFn = {throw it}) {
             if ('GET' == builder.method) { // get 请求拼装参数
                 params?.each {
-                    if (it.key == null) return
-                    if (urlStr.endsWith('?')) urlStr += (it.key + '=' + it.value + '&')
-                    else if (urlStr.endsWith('&')) urlStr += (it.key + '=' + it.value + '&')
-                    else urlStr += ('?' + it.key + '=' + it.value + '&')
+                    if (urlStr.endsWith('?')) urlStr += (it.key + '=' + URLEncoder.encode((it.value == null ? '': it.value).toString(), 'utf-8') + '&')
+                    else if (urlStr.endsWith('&')) urlStr += (it.key + '=' + URLEncoder.encode((it.value == null ? '': it.value).toString(), 'utf-8') + '&')
+                    else urlStr += ('?' + it.key + '=' + URLEncoder.encode((it.value == null ? '': it.value).toString(), 'utf-8') + '&')
                 }
+                builder.get()
             } else if ('POST' == builder.method) {
                 if (contentType && contentType.containsIgnoreCase('application/json')) {
                     if (jsonBodyStr) builder.post(RequestBody.create(MediaType.get(contentType), (jsonBodyStr == null ? '' : jsonBodyStr)))
                     else if (params) builder.post(RequestBody.create(MediaType.get(contentType), JSON.toJSONString(params)))
                 } else if (contentType && contentType.containsIgnoreCase('multipart/form-data')) {
-
+                    def b = new MultipartBody.Builder().setType(MediaType.get(contentType))
+                    fileStreams?.each {
+                        b.addFormDataPart(it.v1, URLEncoder.encode(it.v2, 'utf-8'), RequestBody.create(MediaType.get('application/octet-stream'), it.v3))
+                    }
+                    params?.each {
+                        if (it.value instanceof File) {
+                            // b.addFormDataPart(it.key, ((File) it.value).name, RequestBody.create(MediaType.get('application/octet-stream'), (File) it.value))
+                            b.addFormDataPart(it.key, URLEncoder.encode(((File) it.value).name, 'utf-8'), RequestBody.create(MediaType.get('application/octet-stream'), (File) it.value))
+                        } else {
+                            b.addFormDataPart(it.key, URLEncoder.encode((it.value == null ? '': it.value).toString(), 'utf-8'))
+                        }
+                    }
+                    builder.post(b.build())
                 } else {
-                    String bodyStr = params?.collect { it.key + '=' + it.value + '&' }?.join('')?:''
+                    String bodyStr = params?.collect { it.key + '=' + URLEncoder.encode((it.value == null ? '': it.value).toString(), 'utf-8') + '&' }?.join('')?:''
                     if (bodyStr.endsWith('&') && bodyStr.length() > 2) bodyStr = bodyStr.substring(0, bodyStr.length() - 1)
                     builder.post(RequestBody.create(MediaType.get('application/x-www-form-urlencoded;charset=utf-8'), bodyStr))
                 }
             } else throw new RuntimeException("not support http method '$builder.method'")
 
+            // 删除url最后的&符号
             if (urlStr.endsWith('&') && urlStr.length() > 2) urlStr = urlStr.substring(0, urlStr.length() - 1)
 
             HttpUrl url = HttpUrl.get(urlStr)
@@ -148,6 +179,7 @@ class OkHttpSrv extends ServerTpl {
             }
 
             parasitifer.log.info('Send http: {}, params: {}', urlStr, params?:jsonBodyStr)
+            // 发送请求
             def call =  parasitifer.client.newCall(builder.url(url).build())
             if (okFn) {
                 call.enqueue(new Callback() {

@@ -161,7 +161,7 @@ class RatpackWeb extends ServerTpl {
                 @Override
                 void error(Context ctx, Throwable ex) throws Exception {
                     log.error("Request Error '" + ctx.get(RequestId.TYPE) + "', path: " + ctx.request.uri, ex)
-                    ctx.render new ApiResp(code: false, desc: ex.getMessage())
+                    ctx.render ApiResp.fail(ex.getMessage())
                     // ctx.response.status(500).send()
                 }
             })
@@ -256,12 +256,12 @@ class RatpackWeb extends ServerTpl {
         } else {// session的数据, 默认用ehcache 保存 session 数据
             if (ehcache == null) throw new RuntimeException('EhcacheSrv is not exist')
             def sData = ehcache.get('session', sId)
-            if (sData) {
+            if (sData != null) {
                 ctx.metaClass.sData = sData
             } else {
                 synchronized (this) {
                     sData = ehcache.get('session', sId)
-                    if (!sData) {
+                    if (sData == null) {
                         sData = new ConcurrentHashMap()
                         sData.id = sId
                         Cache cache = ehcache.getOrCreateCache('session', attrs.session.expire?:Duration.ofMinutes(30L), attrs.session.maxLimit?:100000, null)

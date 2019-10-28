@@ -2,21 +2,32 @@ package sevice
 
 import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
+import com.alibaba.fastjson.JSON
 import core.Page
+import core.module.OkHttpSrv
 import core.module.ServerTpl
 import core.module.jpa.BaseRepo
 import ctrl.common.FileData
 import dao.entity.Test
 import dao.entity.UploadFile
+import groovy.transform.Field
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
 import org.hibernate.transform.Transformers
 
 import javax.annotation.Resource
 import java.text.SimpleDateFormat
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Consumer
 
 class TestService extends ServerTpl {
     @Resource
-    BaseRepo repo
+    BaseRepo  repo
+    @Resource
+    OkHttpSrv okHttp
 
 
     Page findTestData() {
@@ -47,7 +58,7 @@ class TestService extends ServerTpl {
     }
 
 
-    def hibernateMap() {
+    def hibernateTest() {
         repo?.trans{s ->
             println '============='
 //            println s.createNativeQuery('select name, age from test where age>10')
@@ -57,6 +68,43 @@ class TestService extends ServerTpl {
 //                // .setResultTransformer(Transformers.ALIAS_TO_ENTITY_MAP)
 //                .setMaxResults(1).singleResult['age']
             println s.createQuery('from Test where age>10').setMaxResults(1).singleResult['age']
+        }
+
+        findTestData()
+        println "total: " + repo.count(Test)
+    }
+
+
+    def wsClientTest() {
+        okHttp.client().newWebSocket(new Request.Builder().url("ws://rl.cnxnu.com:9659/ppf/ar/6.0").build(), new WebSocketListener() {
+            @Override
+            void onOpen(WebSocket webSocket, Response resp) {
+                println "webSocket onOpen: ${resp.body().string()}"
+            }
+            final AtomicInteger i = new AtomicInteger()
+            @Override
+            void onMessage(WebSocket webSocket, String text) {
+                println("消息" + i.getAndIncrement() + ": " + text)
+            }
+            @Override
+            void onFailure(WebSocket webSocket, Throwable t, Response resp) {
+                t.printStackTrace()
+            }
+        })
+    }
+
+
+    def okHttpTest() {
+        def hp = ep.fire('http.getHp')
+        if (hp) {
+            // log.info '接口访问xxx: ' + okHttp.http().get("http://$hp/test/xxx").execute()
+            log.info '接口访问dao: ' + okHttp.get("http://$hp/test/dao").cookie('sId', '222').param('type', 'file').execute()
+            log.info '接口访问form: ' + okHttp.post("http://$hp/test/form?sss=22").param('p1', '中文').execute()
+            log.info '接口访问json: ' + okHttp.post("http://$hp/test/json").contentType('application/json').param('p1', '中文 123').execute()
+            log.info '接口访问json: ' + okHttp.post("http://$hp/test/json").jsonBody(JSON.toJSONString([a:'1', b:2])).execute()
+            okHttp.post("http://$hp/test/upload?cus=11111").param('p2', 'abc 怎么')
+                .param('f1', new File('C:\\Users\\xiangxb\\Desktop\\新建文本文档.txt'))
+                .execute({log.info '接口访问upload: ' + it})
         }
     }
 

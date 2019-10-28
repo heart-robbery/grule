@@ -54,7 +54,7 @@ class TestCtrl extends CtrlTpl {
         chain.get('dao') {ctx ->
             if ('file' == ctx.request.queryParams.type) {
                 ctx.render ok(Page.of(
-                    repo.findPage(UploadFile, 0, 10, { root, query, cb -> query.orderBy(cb.desc(root.get('id')))}),
+                    repo.findPage(UploadFile, 0, 10, {root, query, cb -> query.orderBy(cb.desc(root.get('id')))}),
                     {UploadFile e -> [originName: e.originName, finalName: e.finalName, id: e.id] }
                 ))
             } else {

@@ -263,7 +263,7 @@ class Utils {
         if (!params) return urlStr
         StringBuilder sb = new StringBuilder(urlStr)
         if (!urlStr.endsWith("?")) sb.append("?")
-        params.each { sb.append(it.key).append("=").append(it.value).append("&") }
+        params.each { sb.append(it.key).append("=").append(URLEncoder.encode(it.value.toString(), 'utf-8')).append("&") }
         return sb.toString()
     }
 }
