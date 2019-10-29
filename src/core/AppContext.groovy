@@ -24,12 +24,10 @@ class AppContext {
      */
     protected final String              name         = env.sys.name
     /**
-     * 系统运行线程池. {@link #initExecutor()}}
-     */
+     * 系统运行线程池. {@link #initExecutor()}}*/
     protected       ThreadPoolExecutor  exec
     /**
-     * 事件中心 {@link #initEp()}}
-     */
+     * 事件中心 {@link #initEp()}}*/
     protected       EP                  ep
     /**
      * 服务对象源
@@ -57,8 +55,8 @@ class AppContext {
         def cs = new ConfigSlurper()
         env = cs.parse(Class.forName('config'))
         def ps = System.properties
-        def profile = ps.getProperty('gy.profile')
-        if (profile) env.merge(cs.parse("config-$profile"))
+        def profile = ps.getProperty('profile')
+        if (profile) {env.merge(cs.parse("config-$profile"))}
         env.merge(cs.parse(ps))
     }
 
@@ -69,21 +67,21 @@ class AppContext {
      */
     def start() {
         if (exec) throw new RuntimeException('App is running')
-        log.info("Starting Application on {} with PID {}", InetAddress.getLocalHost().getHostName(), pid())
+        log.info('Starting Application on {} with PID {}' + (env.profile ? ", active profile: '$env.profile'" : ''), InetAddress.getLocalHost().getHostName(), pid())
         // 1. 初始化系统线程池
         initExecutor()
         // 2. 初始化事件中心
         initEp(); ep.addListenerSource(this)
         sourceMap.each({k, v -> inject(v); ep.addListenerSource(v) })
         // 3. 通知所有服务启动
-        ep.fire("sys.starting", EC.of(this).completeFn({ ec ->
+        ep.fire('sys.starting', EC.of(this).completeFn({ ec ->
             if (shutdownHook) Runtime.getRuntime().addShutdownHook(shutdownHook)
             sourceMap.each{s, o -> inject(o)} // 自动注入
             log.info("Started Application "+ (name ? '\'' + name + '\'' : '') +" in {} seconds (JVM running for {})",
                 (System.currentTimeMillis() - startup.getTime()) / 1000.0,
                 ManagementFactory.getRuntimeMXBean().getUptime() / 1000.0
             )
-            ep.fire("sys.started", EC.of(this))
+            ep.fire('sys.started', EC.of(this))
         }))
     }
 
@@ -132,7 +130,7 @@ class AppContext {
                 if (v == null) return
                 f.set(o, v)
                 log.trace("Inject @Resource field '{}' for object '{}'", f.getName(), o)
-            } catch (Exception e) { log.error("inject error!", e) }
+            } catch (Exception e) { log.error("Inject Error!", e) }
         })
     }
 
@@ -234,14 +232,14 @@ class AppContext {
             @Override
             void shutdown() {}
             @Override
-            List<Runnable> shutdownNow() { return emptyList(); }
+            List<Runnable> shutdownNow() { emptyList() }
             @Override
-            boolean isShutdown() { return exec.isShutdown(); }
+            boolean isShutdown() { exec.isShutdown() }
             @Override
-            boolean isTerminated() { return exec.isTerminated(); }
+            boolean isTerminated() { exec.isTerminated() }
             @Override
             boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
-                return exec.awaitTermination(timeout, unit);
+                exec.awaitTermination(timeout, unit)
             }
             @Override
             <T> Future<T> submit(Callable<T> task) { exec.submit(task) }
@@ -288,7 +286,7 @@ class AppContext {
             EP delTrackEvent(String... eNames) { ep.delTrackEvent(eNames); return this }
             @Override
             EP removeEvent(String eName, Object s) {
-                if (source != null && s != null && source != s) throw new UnsupportedOperationException("Only allow remove event of this source: $source");
+                if (source != null && s != null && source != s) throw new UnsupportedOperationException("Only allow remove event of this source: $source")
                 ep.removeEvent(eName, s); return this
             }
             @Override
@@ -304,6 +302,6 @@ class AppContext {
             String toString() {
                 return "wrappedCoreEp: $source.class.simpleName"
             }
-        };
+        }
     }
 }

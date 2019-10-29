@@ -93,7 +93,7 @@ class RatpackWeb extends ServerTpl {
         srv = RatpackServer.start({ srv ->
             srv.serverConfig({ builder ->
                 builder.with {
-                    port(attrs.port?:8080)
+                    port(Integer.valueOf(attrs.port?:8080))
                     threads(1)
                     connectTimeoutMillis(1000 * 10)
                     idleTimeout(Duration.ofSeconds(10))

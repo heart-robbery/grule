@@ -138,9 +138,9 @@ class OkHttpSrv extends ServerTpl {
         def execute(Consumer<String> okFn = null, Consumer<Exception> failFn = {throw it}) {
             if ('GET' == builder.method) { // get 请求拼装参数
                 params?.each {
-                    if (urlStr.endsWith('?')) urlStr += (it.key + '=' + URLEncoder.encode((it.value == null ? '': it.value).toString(), 'utf-8') + '&')
-                    else if (urlStr.endsWith('&')) urlStr += (it.key + '=' + URLEncoder.encode((it.value == null ? '': it.value).toString(), 'utf-8') + '&')
-                    else urlStr += ('?' + it.key + '=' + URLEncoder.encode((it.value == null ? '': it.value).toString(), 'utf-8') + '&')
+                    if (urlStr.endsWith('?')) urlStr += (it.key + '=' + (it.value == null ? '' : it.value).toString() + '&')
+                    else if (urlStr.endsWith('&')) urlStr += (it.key + '=' + (it.value == null ? '': it.value).toString() + '&')
+                    else urlStr += ('?' + it.key + '=' + (it.value == null ? '': it.value).toString() + '&')
                 }
                 builder.get()
             } else if ('POST' == builder.method) {
@@ -150,14 +150,13 @@ class OkHttpSrv extends ServerTpl {
                 } else if (contentType && contentType.containsIgnoreCase('multipart/form-data')) {
                     def b = new MultipartBody.Builder().setType(MediaType.get(contentType))
                     fileStreams?.each {
-                        b.addFormDataPart(it.v1, URLEncoder.encode(it.v2, 'utf-8'), RequestBody.create(MediaType.get('application/octet-stream'), it.v3))
+                        b.addFormDataPart(it.v1, it.v2, RequestBody.create(MediaType.get('application/octet-stream'), it.v3))
                     }
                     params?.each {
                         if (it.value instanceof File) {
-                            // b.addFormDataPart(it.key, ((File) it.value).name, RequestBody.create(MediaType.get('application/octet-stream'), (File) it.value))
-                            b.addFormDataPart(it.key, URLEncoder.encode(((File) it.value).name, 'utf-8'), RequestBody.create(MediaType.get('application/octet-stream'), (File) it.value))
+                            b.addFormDataPart(it.key, ((File) it.value).name, RequestBody.create(MediaType.get('application/octet-stream'), (File) it.value))
                         } else {
-                            b.addFormDataPart(it.key, URLEncoder.encode((it.value == null ? '': it.value).toString(), 'utf-8'))
+                            b.addFormDataPart(it.key, (it.value == null ? '': it.value).toString())
                         }
                     }
                     builder.post(b.build())
