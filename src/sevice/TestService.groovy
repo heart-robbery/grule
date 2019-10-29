@@ -3,6 +3,7 @@ package sevice
 import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
+import core.AppContext
 import core.Page
 import core.module.OkHttpSrv
 import core.module.ServerTpl
@@ -31,6 +32,7 @@ class TestService extends ServerTpl {
 
 
     Page findTestData() {
+        println AppContext.env.web.port
         repo?.trans{ s ->
             repo.saveOrUpdate(
                 new Test(
@@ -67,7 +69,7 @@ class TestService extends ServerTpl {
 //            println s.createQuery('select name,age from Test where age>10')
 //                // .setResultTransformer(Transformers.ALIAS_TO_ENTITY_MAP)
 //                .setMaxResults(1).singleResult['age']
-            println s.createQuery('from Test where age>10').setMaxResults(1).singleResult['age']
+            println s.createQuery('from Test where age>10').setMaxResults(1).list()
         }
 
         findTestData()

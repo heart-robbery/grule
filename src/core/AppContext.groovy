@@ -17,18 +17,18 @@ import static core.Utils.pid
 import static java.util.Collections.emptyList
 
 class AppContext {
-    static final    ConfigObject        env
-    protected final Logger              log          = LoggerFactory.getLogger(AppContext.class)
+    static final    ConfigObject       env          = initEnv()
+    protected final Logger             log          = LoggerFactory.getLogger(AppContext.class)
     /**
      * 系统名字. 用于多个系统启动区别
      */
-    protected final String              name         = env.sys.name
+    protected final String             name         = env.sys.name
     /**
      * 系统运行线程池. {@link #initExecutor()}}*/
-    protected       ThreadPoolExecutor  exec
+    protected       ThreadPoolExecutor exec
     /**
      * 事件中心 {@link #initEp()}}*/
-    protected       EP                  ep
+    protected       EP                 ep
     /**
      * 服务对象源
      */
@@ -40,7 +40,7 @@ class AppContext {
     /**
      * jvm关闭钩子
      */
-    protected final Thread              shutdownHook = new Thread({
+    protected final Thread             shutdownHook = new Thread({
         // 通知各个模块服务关闭
         ep.fire("sys.stopping", EC.of(this).async(false).completeFn({ ec ->
             exec.shutdown()
@@ -50,14 +50,22 @@ class AppContext {
     }, 'stop')
 
 
-    static {
+    // 初始化环境属性
+    private static initEnv() {
+        if (env != null) return env
+        // 执行两次
+        // println 'env =========== ' + env
         // 加载配置文件
         def cs = new ConfigSlurper()
-        env = cs.parse(Class.forName('config'))
+        ConfigObject config = cs.parse(Class.forName('config'))
         def ps = System.properties
         def profile = ps.getProperty('profile')
-        if (profile) {env.merge(cs.parse("config-$profile"))}
-        env.merge(cs.parse(ps))
+        if (profile) {
+            def c = cs.parse(Class.forName("config-$profile"))
+            config.merge(c)
+        }
+        config.merge(cs.parse(ps))
+        config
     }
 
 

@@ -3,16 +3,15 @@ import ch.qos.logback.core.util.FileSize
 
 import java.nio.charset.Charset
 
-import static ch.qos.logback.classic.Level.INFO
-import static ch.qos.logback.classic.Level.WARN
-import static core.AppContext.env
 import static core.Utils.pid
+
+def env = core.AppContext.env
 
 def appenders = []
 // 日志文件名
 def logFileName = 'sys'
 // 日志文件路径
-def logPath = (env.log.path?:'e:/tmp/log/gy')
+def logPath = (env.log?.path?:'e:/tmp/log/gy')
 // 去掉最后的 /
 if (logPath.endsWith('/')) logPath = logPath.substring(0, logPath.length() - 2)
 
@@ -41,10 +40,11 @@ if (logPath) {
     }
 }
 
+
+root(INFO, appenders)
 logger('ch.qos.logback', WARN)
 //logger('core.module.EhcacheSrv', TRACE)
 //logger('org.hibernate', DEBUG)
-root(INFO, appenders)
 
-env.log.level.flatten().each {k, v -> logger(k, v) }
+env.log?.level?.flatten().each {k, v -> logger(k, v) }
 
