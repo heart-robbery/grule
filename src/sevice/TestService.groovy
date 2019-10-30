@@ -97,7 +97,8 @@ class TestService extends ServerTpl {
 
 
     def okHttpTest() {
-        def hp = ep.fire('http.getHp')
+        def hp = ep.fire('http.hp')
+        //hp = '39.104.28.131/gy'
         if (hp) {
             // log.info '接口访问xxx: ' + okHttp.http().get("http://$hp/test/xxx").execute()
             log.info '接口访问dao: ' + okHttp.get("http://$hp/test/dao").cookie('sId', '222').param('type', 'file').execute()

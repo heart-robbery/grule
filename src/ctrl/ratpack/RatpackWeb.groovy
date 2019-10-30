@@ -14,7 +14,6 @@ import ratpack.error.internal.ErrorHandler
 import ratpack.handling.Chain
 import ratpack.handling.Context
 import ratpack.handling.RequestId
-import ratpack.http.Request
 import ratpack.render.RendererSupport
 import ratpack.server.BaseDir
 import ratpack.server.RatpackServer
@@ -142,7 +141,7 @@ class RatpackWeb extends ServerTpl {
                     def jsonStr = JSON.toJSONString(resp, SerializerFeature.WriteMapNullValue)
                     ctx.response.send(jsonStr)
                     def spend = ctx.get(Clock).instant().minusMillis(ctx.request.timestamp.toEpochMilli()).toEpochMilli()
-                    if (spend > (attrs.warnRequestTime?:4500L)) {
+                    if (spend > (Long.valueOf(attrs.warnRequestTime?:4500))) {
                         log.warn("End Request '" + resp.seqNo + "', path: " + ctx.request.uri + " , spend: " + spend + "ms, response: " + jsonStr)
                     } else {
                         log.debug("End Request '" + resp.seqNo + "', path: " + ctx.request.uri + " , spend: " + spend + "ms, response: " + jsonStr)
@@ -178,7 +177,7 @@ class RatpackWeb extends ServerTpl {
             // 统计
             count()
             // session处理
-            if (attrs.session.enabled) session(ctx)
+            if (attrs.session?.enabled) session(ctx)
             // 权限验证
             ctx.metaClass.auth = {String lowestRole -> // 需要的最低角色
                 String uRoles = ctx.sData?.uRoles // 当前用户的角色. 例: role1,role2,role3
@@ -215,12 +214,9 @@ class RatpackWeb extends ServerTpl {
     @Lazy EhcacheSrv ehcache = bean(EhcacheSrv)
     // 处理session
     def session(Context ctx) {
-        def sId = ctx.request.oneCookie('sId')?:UUID.randomUUID().toString().replace('-', '')
-        ctx.metaClass.sId = sId
-        def c = ctx.response.cookie('sId', sId)
-        c.maxAge = (attrs.session.expire?:Duration.ofMinutes(32L)).seconds
+        def sId = ctx.request.oneCookie('sId')
 
-        if ('redis' == attrs.session.type) { // session的数据, 用redis 保存 session 数据
+        if ('redis' == attrs.session?.type) { // session的数据, 用redis 保存 session 数据
             if (redis == null) throw new RuntimeException('RedisClient is not exist')
             def sData = new Expando(new ConcurrentHashMap()) {
                 @Override
@@ -238,7 +234,7 @@ class RatpackWeb extends ServerTpl {
                 @Override
                 void setProperty(String pName, Object newValue) {
                     // 先更新到redis中
-                    redis.hset("session:$sId", pName, newValue, (attrs.session.expire?:Duration.ofMinutes(30)).seconds.intValue())
+                    redis.hset("session:$sId", pName, newValue, sessionExpire.seconds.intValue())
                     super.setProperty(pName, newValue)
                 }
             }
@@ -248,7 +244,7 @@ class RatpackWeb extends ServerTpl {
             } else {
                 synchronized (this) {
                     if (!redis.exists("session:$sId")) {
-                        sData.id = sId
+                        sData.id = sId = UUID.randomUUID().toString().replace('-', '')
                         log.info("New session '{}'", sId)
                     }
                 }
@@ -263,8 +259,8 @@ class RatpackWeb extends ServerTpl {
                     sData = ehcache.get('session', sId)
                     if (sData == null) {
                         sData = new ConcurrentHashMap()
-                        sData.id = sId
-                        Cache cache = ehcache.getOrCreateCache('session', attrs.session.expire?:Duration.ofMinutes(30L), attrs.session.maxLimit?:100000, null)
+                        sData.id = sId = UUID.randomUUID().toString().replace('-', '')
+                        Cache cache = ehcache.getOrCreateCache('session', sessionExpire, Integer.valueOf(attrs.session?.maxLimit?:100000), null)
                         cache.put(sId, sData)
                         ctx.metaClass.sData = sData
                         log.info("New session '{}'", sId)
@@ -272,9 +268,14 @@ class RatpackWeb extends ServerTpl {
                 }
             }
         }
+
+        ctx.metaClass.sId = sId
+        def c = ctx.response.cookie('sId', sId)
+        c.maxAge = sessionExpire.plusSeconds(30).seconds
     }
 
 
+    // 每小时统计请求的次数
     protected Map<String, LongAdder> hourCount = new ConcurrentHashMap<>(3)
     // 请求统计
     protected def count() {
@@ -303,6 +304,14 @@ class RatpackWeb extends ServerTpl {
     }
 
 
-    @EL(name = 'http.getHp', async = false)
+    @EL(name = ['http.hp', 'web.hp'], async = false)
     def getHp() { srv.bindHost + ':' + srv.bindPort }
+
+
+    @EL(name = 'web.sessionExpire', async = false)
+    Duration getSessionExpire() {
+        if (attrs.session?.expire instanceof Duration) return attrs.session?.expire
+        else if (attrs.session?.expire instanceof Number || attrs.session?.expire instanceof String) return Duration.ofMinutes(Long.valueOf(attrs.session?.expire))
+        Duration.ofMinutes(30) // 默认session 30分钟
+    }
 }

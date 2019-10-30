@@ -41,22 +41,21 @@ class EhcacheSrv extends ServerTpl {
 
 
     @EL(name = '${name}.create', async = false)
-    Cache<Object, Object> getOrCreateCache(String cName, Duration expire, Integer heapOfEntries, Integer heapOfMB) {
+    Cache<Object, Object> getOrCreateCache(final String cName, Duration expire, Integer heapOfEntries, Integer heapOfMB) {
         Cache<Object, Object> cache = cm.getCache(cName, Object.class, Object.class)
         if (cache == null) {
             synchronized (this) {
                 cache = cm.getCache(cName, Object.class, Object.class) // 不同线程同时进来, cache为null
                 if (cache == null) {
-                    log.info(name + ".create. cName: " + cName +  ", expire: " + expire + ", heapOfEntries: "+ heapOfEntries + ", heapOfMB: " + heapOfMB)
-                    ResourcePoolsBuilder b = newResourcePoolsBuilder()
                     if (heapOfEntries != null && heapOfMB != null) throw new IllegalArgumentException("heapOfEntries 和 heapOfMB 不能同时设置")
-                    else if (heapOfEntries == null && heapOfMB == null) throw new IllegalArgumentException("heapOfEntries 和 heapOfMB 必须指定一个")
-                    else if (heapOfEntries != null) b = b.heap(heapOfEntries, ENTRIES)
-                    else if (heapOfMB != null) b = b.heap(heapOfMB, MB)
+                    if (heapOfEntries == null && heapOfMB == null) {heapOfEntries = Integer.valueOf(attrs.heapOfEntries?.(cName)?:attrs.defaultHeapOfEntries?:10000)}
+                    if (expire == null) expire = getExpire(cName)
+                    ResourcePoolsBuilder b = newResourcePoolsBuilder()
+                    if (heapOfEntries != null) b = b.heap(heapOfEntries, ENTRIES)
+                    if (heapOfMB != null) b = b.heap(heapOfMB, MB)
+                    log.info(name + ".create. cName: " + cName +  ", expire: " + expire + ", heapOfEntries: "+ heapOfEntries + ", heapOfMB: " + heapOfMB)
                     cache = cm.createCache(cName, newCacheConfigurationBuilder(Object.class, Object.class, b.build())
-                        .withExpiry(ExpiryPolicyBuilder.timeToLiveExpiration(
-                            expire?:attrs.expire.(cName)?:attrs.defaultExpire?:Duration.ofMinutes(30L)
-                        ))
+                        .withExpiry(ExpiryPolicyBuilder.timeToLiveExpiration(expire))
                     )
                 }
             }
@@ -68,7 +67,7 @@ class EhcacheSrv extends ServerTpl {
     @EL(name = ['${name}.set', "cache.set"], async = false)
     def set(String cName, Object key, Object value) {
         log.trace(name + ".set. cName: {}, key: {}, value: " + value, cName, key)
-        getOrCreateCache(cName, null, attrs.heapOfEntries.(cName)?:attrs.defaultHeapOfEntries?:10000, null).put(key, value)
+        getOrCreateCache(cName, null, null, null).put(key, value)
     }
 
 
@@ -89,5 +88,16 @@ class EhcacheSrv extends ServerTpl {
     def clear(String cName) {
         log.info("{}.clear. cName: {}", name, cName)
         cm.getCache(cName, Object.class, Object.class)?.clear()
+    }
+
+
+    protected Duration getExpire(String cName) {
+        if (attrs.expire?.(cName) instanceof Duration) return attrs.expire?.(cName)
+        else if (attrs.expire?.(cName) instanceof Number || attrs.expire?.(cName) instanceof String) return Duration.ofMinutes(Long.valueOf(attrs.expire?.(cName)))
+
+        if (attrs.defaultExpire instanceof Duration) return attrs.defaultExpire
+        else if (attrs.defaultExpire instanceof Number || attrs.defaultExpire instanceof String) return Duration.ofMinutes(Long.valueOf(attrs.defaultExpire))
+
+        Duration.ofHours(12) // 默认12小时过期
     }
 }

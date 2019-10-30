@@ -14,7 +14,7 @@ jpa {
 fileUploader {
     // 文件上传本地存放目录
     localDir="$baseDir/upload/"
-    accessUrlPrefix="http://39.104.28.131:$http.port/file"
+    accessUrlPrefix="http://39.104.28.131/gy/file/"
 }
 
 log.path="$baseDir/log"

@@ -30,9 +30,9 @@ class OkHttpSrv extends ServerTpl {
         if (client) throw new RuntimeException("$name is already running")
         if (ep == null) {ep = new EP(); ep.addListenerSource(this)}
         client = new OkHttpClient.Builder()
-                .connectTimeout(attrs.connectTimeout?:Duration.ofSeconds(5))
-                .readTimeout(attrs.readTimeout?:Duration.ofSeconds(15))
-                .writeTimeout(attrs.writeTimeout?:Duration.ofSeconds(30))
+                .connectTimeout(Duration.ofSeconds(Long.valueOf(attrs.connectTimeout?:5)))
+                .readTimeout(Duration.ofSeconds(Long.valueOf(attrs.readTimeout?:15)))
+                .writeTimeout(Duration.ofSeconds(Long.valueOf(attrs.writeTimeout?:30)))
                 .dispatcher(new Dispatcher(exec))
                 .cookieJar(new CookieJar() {// 共享cookie
                     @Override

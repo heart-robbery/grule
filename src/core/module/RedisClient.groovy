@@ -24,14 +24,15 @@ class RedisClient extends ServerTpl {
 
         // 连接池配置
         JedisPoolConfig poolCfg = new JedisPoolConfig(
-            minIdle: attrs.minIdle?:1, maxIdle: attrs.maxIdle?:5, maxTotal: attrs.maxTotal?:7, maxWaitMillis: attrs.maxWaitMillis?:5000
+            minIdle: Integer.valueOf(attrs.minIdle?:1), maxIdle: Integer.valueOf(attrs.maxIdle?:5),
+            maxTotal: Integer.valueOf(attrs.maxTotal?:7), maxWaitMillis: Integer.valueOf(attrs.maxWaitMillis?:5000)
         )
         pool = new JedisPool(
-            poolCfg, attrs.host?:'localhost', attrs.port?:6379,
-            attrs.connectionTimeout?:3000,
-            attrs.soTimeout?:7000,
+            poolCfg, attrs.host?:'localhost', Integer.valueOf(attrs.port?:6379),
+            Integer.valueOf(attrs.connectionTimeout?:3000),
+            Integer.valueOf(attrs.soTimeout?:7000),
             attrs.password?:null,
-            attrs.database?:Protocol.DEFAULT_DATABASE,
+            Integer.valueOf(attrs.database?:Protocol.DEFAULT_DATABASE),
             attrs.clientName?:null
         )
 
@@ -53,7 +54,7 @@ class RedisClient extends ServerTpl {
         log.trace(name + ".hset. cName: "+ cName +", key: {}, value: {}, seconds: " + seconds, key, value)
         exec{c ->
             c.hset(cName, key, value.toString())
-            c.expire(cName, seconds?:((Duration) attrs.expire.(cName)?:attrs.defaultExpire).seconds.intValue()?:(60 * 30))
+            c.expire(cName, seconds == null ? getExpire(cName).seconds.intValue() : seconds)
         }
     }
 
@@ -86,8 +87,17 @@ class RedisClient extends ServerTpl {
 
     @EL(name = '${name}.exec', async = false)
     Object exec(Function<Jedis, Object> fn) {
-        try (Jedis c = pool.getResource()) {
-            fn.apply(c)
-        } catch (Throwable t) { throw t }
+        try (Jedis c = pool.getResource()) {fn.apply(c)}
+    }
+
+
+    protected Duration getExpire(String cName) {
+        if (attrs.expire?.(cName) instanceof Duration) return attrs.expire?.(cName)
+        else if (attrs.expire?.(cName) instanceof Number || attrs.expire?.(cName) instanceof String) return Duration.ofMinutes(Long.valueOf(attrs.expire?.(cName)))
+
+        if (attrs.defaultExpire instanceof Duration) return attrs.defaultExpire
+        else if (attrs.defaultExpire instanceof Number || attrs.defaultExpire instanceof String) return Duration.ofMinutes(Long.valueOf(attrs.defaultExpire))
+
+        Duration.ofHours(12) // 默认12小时过期
     }
 }

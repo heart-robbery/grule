@@ -32,7 +32,7 @@ class FileUploader extends ServerTpl {
         File dir = new File(localDir); dir.mkdirs()
         log.info('save upload file local dir: {}', dir.getAbsolutePath())
 
-        accessUrlPrefix = URI.create(attrs.accessUrlPrefix?:("http://" + ep.fire("http.getHp") + "/file/") + "/").normalize()
+        accessUrlPrefix = URI.create(attrs.accessUrlPrefix?:("http://${ep.fire('http.hp')}/file/") + "/").normalize()
         log.info('access upload file url prefix: {}', accessUrlPrefix)
 
         remoteUrl = attrs.remoteUrl
