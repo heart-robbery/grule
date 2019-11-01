@@ -32,15 +32,14 @@ class TestService extends ServerTpl {
 
 
     Page findTestData() {
-        println AppContext.env.web.port
         repo?.trans{ s ->
             repo.saveOrUpdate(
                 new Test(
-                    name: new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()),
-                    age: Integer.valueOf(new SimpleDateFormat("ss").format(new Date()))
+                    name: new SimpleDateFormat('yyyy-MM-dd HH:mm:ss').format(new Date()),
+                    age: Integer.valueOf(new SimpleDateFormat('ss').format(new Date()))
                 )
             )
-            repo.findPage(Test, 0, 10, { root, query, cb -> query.orderBy(cb.desc(root.get("createTime")))})
+            repo.findPage(Test, 0, 10, { root, query, cb -> query.orderBy(cb.desc(root.get('createTime')))})
         }
     }
 
@@ -108,6 +107,37 @@ class TestService extends ServerTpl {
             okHttp.post("http://$hp/test/upload?cus=11111").param('p2', 'abc 怎么')
                 .param('f1', new File('C:\\Users\\xiangxb\\Desktop\\新建文本文档.txt'))
                 .execute({log.info '接口访问upload: ' + it})
+        }
+    }
+
+
+    // 权限测试
+    def authTest() {
+        def hp = ep.fire('http.hp')
+        if (hp) {
+            log.info("testLogin(admin): " + okHttp.get("http://$hp/test/testLogin?role=admin").execute())
+            log.info("auth(admin): " + okHttp.get("http://$hp/test/auth?role=admin").execute())
+
+            log.info("testLogin(admin): " + okHttp.get("http://$hp/test/testLogin?role=admin").execute())
+            log.info("auth(login): " + okHttp.get("http://$hp/test/auth?role=login").execute())
+
+            log.info("testLogin(role3): " + okHttp.get("http://$hp/test/testLogin?role=role3").execute())
+            log.info("auth(role2_1_1): " + okHttp.get("http://$hp/test/auth?role=role2_1_1").execute())
+
+            log.info("testLogin(role4): " + okHttp.get("http://$hp/test/testLogin?role=role4").execute())
+            log.info("auth(role4_1_1_1): " + okHttp.get("http://$hp/test/auth?role=role4_1_1_1").execute())
+
+            log.info("testLogin(admin): " + okHttp.get("http://$hp/test/testLogin?role=admin").execute())
+            log.info("auth(未知角色名): " + okHttp.get("http://$hp/test/auth?role=未知角色名").execute())
+
+            log.info("testLogin(admin): " + okHttp.get("http://$hp/test/testLogin?role=admin").execute())
+            log.info("auth(role2): " + okHttp.get("http://$hp/test/auth?role=role2").execute())
+
+            log.info("testLogin(role2_1): " + okHttp.get("http://$hp/test/testLogin?role=role2_1").execute())
+            log.info("auth(role2_1_1): " + okHttp.get("http://$hp/test/auth?role=role2_1_1").execute())
+
+            log.info("testLogin(): " + okHttp.get("http://$hp/test/testLogin?role=").execute())
+            log.info("auth(admin): " + okHttp.get("http://$hp/test/auth?role=admin").execute())
         }
     }
 

@@ -150,7 +150,7 @@ class AppContext {
      * @param beanName bean 名字
      * @return bean 对象
      */
-    @EL(name = ["bean.get", "sys.bean.get"], async = false, order = 1f)
+    @EL(name = ['bean.get', 'sys.bean.get'], async = false, order = 1f)
     protected def findLocalBean(EC ec, Class beanType, String beanName) {
         if (ec.result != null) return ec.result // 已经找到结果了, 就直接返回
 

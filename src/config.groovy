@@ -12,11 +12,9 @@ jpa {
         jdbcUrl=url='jdbc:h2:e:/tmp/h2/gy'
         username='root'
         password='root'
-        minIdle='1'
-        maxActive='5'
+        minimumIdle = minIdle='1'
+        maximumPoolSize = maxActive='5'
         validationQuery='select 1'
-        minimumIdle=1
-        maximumPoolSize=5
     }
     repo.maxPageSize=100
 }
@@ -36,8 +34,27 @@ web {
 
     // 一个角色代表一组权限
     // 接口角色权限配置: level_权重数值 权重数值的权限包含小的, 平级level的角色权限互斥
-    role.level_80=['role1', 'role2']
-    role.level_100=['admin']
+//    role.level_80=['role1', 'role2']
+//    role.level_100=['admin']
+
+    // 角色权限树. 注意不要循环引用
+    role {
+        admin = ['login', 'addUser', 'grant', 'page1', 'page2', 'page3']
+        role1 = ['login', 'page1', 'role1_1', 'role1_2']
+        // 多角色权限用list
+        role2 = [
+            [role2_1 : ['role2_1_1', 'role1_2']],
+            'login', 'page2',
+            'role2_2',
+        ]
+        role3 = ['login', role2[0], 'page3']
+        role4 {
+            role4_1 {
+                role4_1_1 = ['role4_1_1_1']
+            }
+            role4_2 = ['role4_2_1_1']
+        }
+    }
 }
 
 

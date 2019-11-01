@@ -2,11 +2,14 @@ build/
 classes/
 out/
 .gradle/
+gradle/
 .settings/
 .idea/*
 *.iml
 .project
 .classpath
+gradlew
+gradlew.bat
 config/
 upload/
 data/

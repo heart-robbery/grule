@@ -20,6 +20,7 @@ import sevice.TestService
 import java.text.SimpleDateFormat
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
+import java.util.stream.Collectors
 
 import static ctrl.common.ApiResp.ok
 
@@ -195,8 +196,8 @@ class TestCtrl extends CtrlTpl {
     // 测试登录
     def testLogin(Chain chain) {
         chain.get('testLogin') {ctx ->
-            ctx.sData.uRoles = ctx.request.queryParams.role
-            log.warn('用户权限角色被改变')
+            ctx.sData?.uRoles = Arrays.stream(ctx.request.queryParams.role.split(',')).map{it.trim()}.filter{it?true:false}.collect(Collectors.toSet())
+            log.warn('用户权限角色被改变. {}', ctx.sData?.uRoles)
             ctx.render ok(ctx.sData)
         }
     }
@@ -205,7 +206,7 @@ class TestCtrl extends CtrlTpl {
     // 权限测试
     def auth(Chain chain) {
         chain.get('auth') {ctx ->
-            ctx.auth('role1')
+            ctx.auth(ctx.request.queryParams['role'])
             ctx.render ok(ctx.sData)
         }
     }

@@ -11,6 +11,8 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.function.Consumer
 
+import static java.util.Collections.emptyList
+
 /**
  * 封装常用的http请求方式:
  * 1. get
@@ -37,12 +39,12 @@ class OkHttpSrv extends ServerTpl {
                 .cookieJar(new CookieJar() {// 共享cookie
                     @Override
                     void saveFromResponse(HttpUrl url, List<Cookie> cookies) {
-                        cookieStore.put("$url.host:$url.port", cookies)
+                        cookieStore.put("$url.host:$url.port", new ArrayList<Cookie>(cookies)) // 可更改
                     }
                     @Override
                     List<Cookie> loadForRequest(HttpUrl url) {
                         List<Cookie> cookies = cookieStore.get("$url.host:$url.port")
-                        return cookies != null ? cookies : new ArrayList<>(7)
+                        return cookies != null ? cookies : emptyList()
                     }
                 }).build()
         exposeBean(client)
@@ -82,7 +84,7 @@ class OkHttpSrv extends ServerTpl {
 
     class OkHttp {
         // 宿主
-        protected final OkHttpSrv                                 parasitifer
+        protected final OkHttpSrv                                 parent
         protected final Request.Builder                           builder
         protected       String                                    urlStr
         protected       Map<String, Object>                       params
@@ -92,11 +94,11 @@ class OkHttpSrv extends ServerTpl {
         protected       String                                    contentType
         protected       String                                    jsonBodyStr
 
-        protected OkHttp(OkHttpSrv parasitifer, String urlStr, Request.Builder builder) {
+        protected OkHttp(OkHttpSrv parent, String urlStr, Request.Builder builder) {
             if (builder == null) throw new NullPointerException('builder == null')
-            if (parasitifer == null) throw new NullPointerException('parasitifer == null')
+            if (parent == null) throw new NullPointerException('parasitifer == null')
             this.builder = builder
-            this.parasitifer = parasitifer
+            this.parent = parent
             this.urlStr = urlStr
         }
         OkHttp param(String pName, Object pValue) {
@@ -110,8 +112,10 @@ class OkHttpSrv extends ServerTpl {
         }
         OkHttp fileStream(String pName, String fileName, InputStream is) {
             if (pName == null) throw new NullPointerException('pName == null')
+            if (is == null) throw new NullPointerException('InputStream == null')
             if (fileStreams == null) fileStreams = new LinkedList<>()
             fileStreams.add(Tuple.tuple(pName, fileName, is))
+            if (contentType == null) contentType = 'multipart/form-data;charset=utf-8'
             this
         }
         OkHttp jsonBody(String jsonBodyStr) {
@@ -177,10 +181,10 @@ class OkHttpSrv extends ServerTpl {
                 cookies.each { ls.add(Cookie.parse(url, "$it.key=$it.value")) }
             }
 
-            parasitifer.log.info('Send http: {}, params: {}', urlStr, params?:jsonBodyStr)
+            parent.log.info('Send http: {}, params: {}', urlStr, params?:jsonBodyStr)
             // 发送请求
-            def call =  parasitifer.client.newCall(builder.url(url).build())
-            if (okFn) {
+            def call =  parent.client.newCall(builder.url(url).build())
+            if (okFn) { // 异步请求
                 call.enqueue(new Callback() {
                     @Override
                     void onFailure(Call c, IOException e) {failFn?.accept(e) }
@@ -190,7 +194,7 @@ class OkHttpSrv extends ServerTpl {
                         okFn?.accept(resp.body().string())
                     }
                 })
-            } else {
+            } else { // 同步请求
                 def resp = call.execute()
                 if (200 != resp.code()) throw new RuntimeException("Http error code: ${resp.code()}, url: $urlStr")
                 resp.body().string()

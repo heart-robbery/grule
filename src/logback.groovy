@@ -1,11 +1,11 @@
+import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.encoder.PatternLayoutEncoder
 import ch.qos.logback.core.util.FileSize
 
 import java.nio.charset.Charset
 
 import static core.Utils.pid
-
-def env = core.AppContext.env
+import static core.AppContext.env
 
 def appenders = []
 // 日志文件名
@@ -46,5 +46,9 @@ logger('ch.qos.logback', WARN)
 //logger('core.module.EhcacheSrv', TRACE)
 //logger('org.hibernate', DEBUG)
 
-env.log?.level?.flatten().each {k, v -> logger(k, v) }
+env.log?.level?.flatten().each {String k, v ->
+    if (v !instanceof Level) {
+        logger(k, Level.toLevel(v?.toString()))
+    } else logger(k, v)
+}
 

@@ -22,7 +22,7 @@ class EhcacheSrv extends ServerTpl {
 
     EhcacheSrv() { super(F_NAME) }
 
-    @EL(name = "sys.starting")
+    @EL(name = 'sys.starting')
     def start() {
         if (cm) throw new RuntimeException("$name is already running")
         if (ep == null) {ep = new EP(); ep.addListenerSource(this)}
@@ -33,7 +33,7 @@ class EhcacheSrv extends ServerTpl {
     }
 
 
-    @EL(name = "sys.stopping")
+    @EL(name = 'sys.stopping')
     def stop() {
         log.debug("Close '{}'", name)
         cm?.close(); cm == null
@@ -91,6 +91,11 @@ class EhcacheSrv extends ServerTpl {
     }
 
 
+    /**
+     * 获取 缓存 的过期时间
+     * @param cName 缓存名
+     * @return
+     */
     protected Duration getExpire(String cName) {
         if (attrs.expire?.(cName) instanceof Duration) return attrs.expire?.(cName)
         else if (attrs.expire?.(cName) instanceof Number || attrs.expire?.(cName) instanceof String) return Duration.ofMinutes(Long.valueOf(attrs.expire?.(cName)))

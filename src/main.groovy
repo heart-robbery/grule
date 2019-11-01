@@ -22,6 +22,20 @@ import javax.annotation.Resource
 import java.text.SimpleDateFormat
 import java.time.Duration
 
+//def f = new File('e:/tmp/code.txt')
+//f.setText('', 'utf-8')
+//new File('E:\\code_repo\\锦程消费金融\\thrall\\src\\main\\java\\com\\jccfc\\thrall').eachFileRecurse(FileType.FILES) {
+//    if (it.name.endsWith('.java')) {
+//        it.eachLine {l ->
+//            if (l.trim().isEmpty() || l.containsIgnoreCase('@author') || l.containsIgnoreCase('@create')) return
+//            f << l + '\n'
+//        }
+//        f << '\n\n'
+//    }
+//}
+//return
+
+
 @Field Logger log = LoggerFactory.getLogger(getClass())
 @Resource @Field EP ep
 @Field AppContext ctx = new AppContext()
@@ -44,6 +58,8 @@ ctx.start() // 启动系统
 def sysStarted() {
     TestService ts = ep.fire('bean.get', TestService.class)
     try {
+        ts.authTest()
+
         // cache test
         ep.fire('cache.set', 'test', 'aa', new SimpleDateFormat('yyyy-MM-dd HH:mm:ss').format(new Date()))
 
@@ -58,6 +74,7 @@ def sysStarted() {
         // sqlTest()
         // ts.wsClientTest()
     } finally {
+        // System.exit(0)
         // ep.fire('sched.after', EC.of(this).args(Duration.ofSeconds(5), {System.exit(0)}).completeFn({ec -> if (ec.noListener) System.exit(0) }))
     }
 }

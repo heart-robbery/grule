@@ -9,16 +9,8 @@ import org.hibernate.boot.MetadataSources
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder
 import org.hibernate.engine.jdbc.connections.internal.DatasourceConnectionProviderImpl
 import org.hibernate.engine.jdbc.connections.spi.ConnectionProvider
-import org.hibernate.jpa.HibernatePersistenceProvider
 
-import javax.persistence.SharedCacheMode
-import javax.persistence.ValidationMode
-import javax.persistence.spi.ClassTransformer
-import javax.persistence.spi.PersistenceUnitInfo
-import javax.persistence.spi.PersistenceUnitTransactionType
 import javax.sql.DataSource
-
-import static javax.persistence.SharedCacheMode.UNSPECIFIED
 
 class HibernateSrv extends ServerTpl {
     SessionFactory        sf
@@ -38,11 +30,11 @@ class HibernateSrv extends ServerTpl {
 
         // 创建 hibernate
         Map props = new Properties()
-        props.put("hibernate.hbm2ddl.auto", "none")
-        props.put("hibernate.physical_naming_strategy", PhysicalNaming.class.name)
-        props.put("hibernate.implicit_naming_strategy", ImplicitNaming.class.name)
-        props.put("hibernate.current_session_context_class", "thread")
-        props.put("hibernate.temp.use_jdbc_metadata_defaults", 'true') // 自动探测连接的数据库信息,该用哪个Dialect
+        props.put('hibernate.hbm2ddl.auto', 'none')
+        props.put('hibernate.physical_naming_strategy', PhysicalNaming.class.name)
+        props.put('hibernate.implicit_naming_strategy', ImplicitNaming.class.name)
+        props.put('hibernate.current_session_context_class', 'thread')
+        props.put('hibernate.temp.use_jdbc_metadata_defaults', 'true') // 自动探测连接的数据库信息,该用哪个Dialect
         props.putAll(attrs.hibernate.flatten())
 
         initDataSource()
@@ -53,15 +45,13 @@ class HibernateSrv extends ServerTpl {
         )
         entities.each {ms.addAnnotatedClass(it)}
         sf = ms.buildMetadata().buildSessionFactory()
-        exposeBean(sf, ['sessionFactory', 'entityManagerFactory'])
+        // exposeBean(sf, ['sessionFactory', 'entityManagerFactory'])
 
         // 创建hibernate的公共查询
-        repo = new BaseRepo(); repo.attrs = attrs.repo; ep.fire('inject', repo)
-        if (!repo.attrs.containsKey('defaultPageSize')) repo.attrs.defaultPageSize = 15
-        if (!repo.attrs.containsKey('maxPageSize')) repo.attrs.maxPageSize = 30
-        exposeBean(repo)
+        repo = new BaseRepo(sf); repo.attrs = attrs.repo; ep.fire('inject', repo)
+        exposeBean(repo, ["${name}_repo"])
 
-        log.info("Created {}(Hibernate) client", name)
+        log.info('Created {}(Hibernate) client', name)
         ep.fire("${name}.started")
     }
 
@@ -93,20 +83,27 @@ class HibernateSrv extends ServerTpl {
     protected def initDataSource() {
         if (ds) throw new RuntimeException('DataSource already exist')
         Map<String, Object> dsAttr = attrs.ds
-
-        log.debug("Create dataSource properties: {}", dsAttr)
+        log.debug('Create dataSource properties: {}', dsAttr)
 
         // Hikari 数据源
         try {
             ds = (DataSource) Class.forName('com.zaxxer.hikari.HikariDataSource').newInstance()
-            dsAttr.each {k, v -> if (ds.hasProperty(k)) ds.(k) = v}
+            dsAttr.each {k, v ->
+                if (ds.hasProperty(k)) {
+                    def t = ds[(k)].getClass()
+                    if (t == Integer || t == int) ds.(k) = Integer.valueOf(v)
+                    else if (t == Long || t == long) ds.(k) = Long.valueOf(v)
+                    else if (t == Boolean || t == boolean) ds.(k) = Boolean.valueOf(v)
+                    else ds.(k) = v
+                }
+            }
         } catch (ClassNotFoundException ex) {}
 
-        dsAttr.put("validationQuery", "select 1")
+        if (!dsAttr.containsKey('validationQuery')) dsAttr.put('validationQuery', 'select 1')
         // druid 数据源
         if (!ds) {
             try {
-                ds = (DataSource) Utils.findMethod(Class.forName("com.alibaba.druid.pool.DruidDataSourceFactory"), "createDataSource", Map.class).invoke(null, dsAttr)
+                ds = (DataSource) Utils.findMethod(Class.forName('com.alibaba.druid.pool.DruidDataSourceFactory'), 'createDataSource', Map.class).invoke(null, dsAttr)
             } catch(ClassNotFoundException ex) {}
         }
 
@@ -114,10 +111,10 @@ class HibernateSrv extends ServerTpl {
         if (!ds) {
             try {
                 Properties p = new Properties(); p.putAll(dsAttr)
-                ds = (DataSource) Utils.findMethod(Class.forName("org.apache.commons.dbcp2.BasicDataSourceFactory"), "createDataSource", Properties.class).invoke(null, dsAttr)
+                ds = (DataSource) Utils.findMethod(Class.forName('org.apache.commons.dbcp2.BasicDataSourceFactory'), 'createDataSource', Properties.class).invoke(null, dsAttr)
             } catch (ClassNotFoundException ex) {}
         }
-        if (!ds) throw new RuntimeException("Not found DataSource implement class")
-        log.debug("Created datasource for {} Server. {}", name, ds)
+        if (!ds) throw new RuntimeException('Not found DataSource implement class')
+        log.debug('Created datasource for {} Server. {}', name, ds)
     }
 }

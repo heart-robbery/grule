@@ -9,26 +9,25 @@ import org.hibernate.persister.entity.AbstractEntityPersister
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-import javax.annotation.Resource
-import javax.persistence.NoResultException
-import javax.persistence.Query
 import javax.persistence.criteria.CriteriaBuilder
 import javax.persistence.criteria.CriteriaQuery
 import javax.persistence.criteria.Predicate
 import javax.persistence.criteria.Root
 import java.util.function.Function
 
-
 /**
  * hibernate 基本操作方法集
  */
 class BaseRepo {
     protected final Logger         log = LoggerFactory.getLogger(getClass())
-    @Resource
-    protected       SessionFactory sf
+    protected final SessionFactory sf
     protected       ConfigObject   attrs
 
+    // 传过来 不能注入(@Resource注入多数据源有问题)
+    BaseRepo(SessionFactory sf) { this.sf = sf }
 
+
+    // 事务的线程标记
     static ThreadLocal<Boolean> txFlag = ThreadLocal.withInitial({false})
     /**
      * 事务执行方法
@@ -49,11 +48,11 @@ class BaseRepo {
                 def r = fn.apply(s); tx.commit(); s.close(); txFlag.set(false)
                 return r
             } catch (Throwable t) {
-                tx.rollback(); ex = t; s.close(); txFlag.set(false);
+                tx.rollback(); ex = t; s.close(); txFlag.set(false)
                 throw t
             } finally {
                 if (ex) {
-                    if (failFn != null) failFn.accept(ex);
+                    if (failFn != null) failFn.accept(ex)
                 } else {// 成功
                     if (okFn != null) okFn.run()
                 }
@@ -77,10 +76,10 @@ class BaseRepo {
      * @return
      */
     def <E extends IEntity> E saveOrUpdate(E e) {
-        trans{ s ->
+        trans{s ->
             if (e instanceof BaseEntity) {
                 def d = new Date()
-                if (!e.createTime) e.createTime = d
+                if (e.createTime == null) e.createTime = d
                 e.updateTime = d
             }
             s.saveOrUpdate(e)
@@ -97,7 +96,7 @@ class BaseRepo {
      */
     def <T extends IEntity> T findById(Class<T> eType, Serializable id) {
         if (eType == null) throw new IllegalArgumentException('eType must not be null')
-        trans{ s -> s.get(eType, id)}
+        trans{s -> s.get(eType, id)}
     }
 
 
@@ -117,10 +116,10 @@ class BaseRepo {
      */
     def <E extends IEntity> boolean delete(Class<E> eType, Serializable id) {
         if (eType == null) throw new IllegalArgumentException('eType must not be null')
-        trans{ s ->
-            // NOTE: 被删除的实体主键名必须为 "id";
+        trans{s ->
+            // NOTE: 被删除的实体主键名必须为 "id"
             s.createQuery("delete from $eType.simpleName where id=:id")
-                .setParameter("id", id)
+                .setParameter('id', id)
                 .executeUpdate() > 0
         }
     }
@@ -136,17 +135,17 @@ class BaseRepo {
      */
     def <E extends IEntity> Page<E> findPage(Class<E> eType, Integer pageIndex, Integer pageSize, CriteriaSpec spec) {
         if (eType == null) throw new IllegalArgumentException('eType must not be null')
+        if (pageIndex == null || pageIndex < 0) throw new IllegalArgumentException("pageIndex: $pageIndex")
+        if (pageSize == null || pageSize < 0) throw new IllegalArgumentException("pageSize: $pageSize")
         trans{s ->
             CriteriaBuilder cb = s.getCriteriaBuilder()
             CriteriaQuery<E> query = cb.createQuery(eType)
             Root<E> root = query.from(eType)
             Object p = spec?.toPredicate(root, query, cb)
             if (p instanceof Predicate) query.where(p)
-            int ps = (pageSize == null ? attrs.defaultPageSize : (pageSize > attrs.maxPageSize ? attrs.defaultPageSize : pageSize))
-            int pi = pageIndex?:0
             new Page<E>(
-                pageIndex: pi, pageSize: ps,
-                list: s.createQuery(query).setFirstResult(pi * ps).setMaxResults(ps).list(),
+                pageIndex: pageIndex, pageSize: pageSize,
+                list: s.createQuery(query).setFirstResult(pageIndex * pageSize).setMaxResults(pageSize).list(),
                 totalRow: count(eType, spec)
             )
         }
@@ -161,7 +160,7 @@ class BaseRepo {
      */
     def <E extends IEntity> long count(Class<E> eType, CriteriaSpec spec = null) {
         if (eType == null) throw new IllegalArgumentException('eType must not be null')
-        trans{ s ->
+        trans{s ->
             CriteriaBuilder cb = s.getCriteriaBuilder()
             CriteriaQuery<Long> query = cb.createQuery(Long.class)
             Root<E> root = query.from(eType)
@@ -179,7 +178,7 @@ class BaseRepo {
      * Criteria 查询 spec
      * @param <E>
      */
-    trait CriteriaSpec<E> {
+    interface CriteriaSpec<E> {
         abstract def toPredicate(Root<E> root, CriteriaQuery<?> query, CriteriaBuilder cb)
     }
 }

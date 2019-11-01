@@ -42,6 +42,13 @@ class ServerTpl {
     }
 
 
+    // 设置属性
+    ServerTpl attr(String aName, Object aValue) {
+        attrs?.put(aName, aValue)
+        this
+    }
+
+
     /**
      * bean 容器. {@link #findLocalBean}
      */

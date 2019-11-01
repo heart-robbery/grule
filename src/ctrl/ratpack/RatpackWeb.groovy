@@ -26,6 +26,7 @@ import java.time.Duration
 import java.util.Map.Entry
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.LongAdder
 
 class RatpackWeb extends ServerTpl {
@@ -45,55 +46,11 @@ class RatpackWeb extends ServerTpl {
     @EL(name = 'sys.starting')
     def start() {
         if (srv) throw new RuntimeException("$name is already running")
-//        TransportDetector.NioTransport.metaClass.invokeMethod = {String name, args
-//            println '======================'
-//        }
-
-        // 初始化请求执行控制器
-//        devourer = new Devourer(getClass().simpleName, exec)
-//        devourer.pause{
-//            // 判断线程池里面等待执行的任务是否过多(避免让线程池里面全是请求任务在执行)
-//            if (Utils.findMethod(exec.getClass(), "getWaitingCount").invoke(exec) >
-//                Math.min(Runtime.getRuntime().availableProcessors(), Utils.findMethod(exec.getClass(), "getCorePoolSize").invoke(exec) * 2)
-//            ) return true
-//            return false
-//        }
-
-        // 入口handler ratpack.server.internal.NettyHandlerAdapter
-//        srv = new DefaultRatpackServer({ srv ->
-//            srv.serverConfig({ builder ->
-//                builder.with {
-//                    port(attrs.port?:8080)
-//                    threads(1)
-//                    connectTimeoutMillis(1000 * 10)
-//                    idleTimeout(Duration.ofSeconds(10))
-//                    sysProps()
-//                    registerShutdownHook(false)
-//                    baseDir(BaseDir.find('static/'))
-//                    development(false)
-//                }
-//            })
-//            srv.handlers{initChain(it)}
-//        } as Action, Impositions.current()) {
-//            @Override
-//            protected NettyHandlerAdapter buildAdapter(DefaultRatpackServer.DefinitionBuild definition) throws Exception {
-//                serverRegistry = buildServerRegistry(definition.getServerConfig(), definition.getUserRegistryFactory())
-//
-//                Handler ratpackHandler = buildRatpackHandler(serverRegistry, definition.getHandlerFactory())
-//                ratpackHandler = decorateHandler(ratpackHandler, serverRegistry)
-//
-//                servicesGraph = new ServicesGraph(serverRegistry)
-//                servicesGraph.start(new DefaultEvent(serverRegistry, reloading))
-//                // new RatpackHander(RatpackWeb.this, serverRegistry, ratpackHandler)
-//                new NettyHandlerAdapter(serverRegistry, ratpackHandler)
-//            }
-//        }
-//        srv.start()
         srv = RatpackServer.start({ srv ->
             srv.serverConfig({ builder ->
                 builder.with {
                     port(Integer.valueOf(attrs.port?:8080))
-                    threads(1)
+                    threads(Integer.valueOf(attrs['thread']?:1))
                     connectTimeoutMillis(1000 * 10)
                     idleTimeout(Duration.ofSeconds(10))
                     sysProps()
@@ -137,11 +94,13 @@ class RatpackWeb extends ServerTpl {
                 void render(Context ctx, ApiResp resp) throws Exception {
                     ctx.response.contentType('application/json')
                     resp.seqNo = ctx.get(RequestId.TYPE).toString()
-                    resp.cus = ctx.request.queryParams.cus
+                    resp.cus = ctx.request.queryParams.cus // 原样返回的参数
                     def jsonStr = JSON.toJSONString(resp, SerializerFeature.WriteMapNullValue)
-                    ctx.response.send(jsonStr)
+                    ctx.response.send(jsonStr) // 返回给客户端
+
+                    // 接口超时监控
                     def spend = ctx.get(Clock).instant().minusMillis(ctx.request.timestamp.toEpochMilli()).toEpochMilli()
-                    if (spend > (Long.valueOf(attrs.warnRequestTime?:4500))) {
+                    if (spend > (Long.valueOf(attrs.warnRequestTime?:5000))) {
                         log.warn("End Request '" + resp.seqNo + "', path: " + ctx.request.uri + " , spend: " + spend + "ms, response: " + jsonStr)
                     } else {
                         log.debug("End Request '" + resp.seqNo + "', path: " + ctx.request.uri + " , spend: " + spend + "ms, response: " + jsonStr)
@@ -159,8 +118,12 @@ class RatpackWeb extends ServerTpl {
 
                 @Override
                 void error(Context ctx, Throwable ex) throws Exception {
-                    log.error("Request Error '" + ctx.get(RequestId.TYPE) + "', path: " + ctx.request.uri, ex)
-                    ctx.render ApiResp.fail(ex.getMessage())
+                    if (ex instanceof AccessControlException) {
+                        log.error("Request Error '" + ctx.get(RequestId.TYPE) + "', path: " + ctx.request.uri + ", " + ex.getMessage())
+                    } else {
+                        log.error("Request Error '" + ctx.get(RequestId.TYPE) + "', path: " + ctx.request.uri, ex)
+                    }
+                    ctx.render ApiResp.fail(ctx['respCode']?:'01', ex.getMessage()?:ex.getClass().simpleName)
                     // ctx.response.status(500).send()
                 }
             })
@@ -169,6 +132,7 @@ class RatpackWeb extends ServerTpl {
         def ignoreSuffix = new HashSet(['.js', '.css', '.html', '.png', '.ttf', '.woff', '.woff2', 'favicon.ico', '.js.map', *attrs.ignorePrintUrlSuffix?:[]])
         // 请求预处理
         chain.all({ctx ->
+            ctx.metaClass.propertyMissing = {String name -> null} // 随意访问不存在的属性不报错
             // 限流? TODO
             // 打印请求
             if (!ignoreSuffix.find{ctx.request.path.endsWith(it)}) {
@@ -178,36 +142,106 @@ class RatpackWeb extends ServerTpl {
             count()
             // session处理
             if (attrs.session?.enabled) session(ctx)
-            // 权限验证
-            ctx.metaClass.auth = {String lowestRole -> // 需要的最低角色
-                String uRoles = ctx.sData?.uRoles // 当前用户的角色. 例: role1,role2,role3
-                if (!uRoles) throw new AccessControlException('需要登录获取权限')
-                if (uRoles.contains(lowestRole)) return true
-                String lowestLevel // 对应最低需要角色的等级
-                Set<String> uLevels = new HashSet(7) // 当前用户所有角色的等级
-                attrs.role.each {Entry<String, Collection> e ->
-                    if (e.key.startsWith('level_')) {
-                        e.value.each {r ->
-                            if (r == lowestRole) lowestLevel = e.key
-                            if (uRoles.contains(r)) uLevels << e.key
-                        }
-                    }
-                }
-                // 如果当前用户的所有角色等级都没找到大于最低角色等级的就抛错
-                if (!uLevels.find {String uLevel ->
-                    Integer.valueOf(uLevel.replace('level_', '')) > Integer.valueOf(lowestLevel.replace('level_', ''))
-                }) {
-                    throw new AccessControlException('没有权限')
-                }
-            }
+            // 添加权限验证方法
+            ctx.metaClass.auth = {String lowestRole -> auth(ctx, lowestRole)}
             ctx.next()
         })
 
+        // 添加所有Controller层
         ctrls.each {ctrl ->
             ep.fire('inject', ctrl)
             ctrl.init(chain)
         }
     }
+
+
+    // 权限验证
+    def auth(Context ctx, String lowestRole) {
+        if (!lowestRole) throw new IllegalArgumentException('lowestRole is empty')
+        Set<String> uRoles = ctx.sData?.uRoles // 当前用户的角色. 例: role1,role2,role3
+        if (!uRoles) {ctx.metaClass['respCode'] = '100'; throw new AccessControlException('需要登录')}
+        if (uRoles.contains(lowestRole)) return true
+
+        // 递归查找
+        def recursiveList
+        def recursiveMap
+        recursiveList = {Collection root, String mathRole, AtomicInteger count = new AtomicInteger(0), Integer limit = 10 ->
+            if (!root) return null
+            if (count.getAndIncrement() >= limit) return null // 防止死递归
+            for (Iterator it = root.iterator(); it.hasNext(); ) {
+                def item = it.next()
+                if (mathRole == item) return item // 返回匹配的角色名
+                else if (item instanceof Map) return recursiveMap(item, mathRole, count, limit)
+                else if (item instanceof Collection) return recursiveList(item, mathRole, count, limit)
+            }
+            null
+        }
+        recursiveMap = {Map root, String mathRole, AtomicInteger count = new AtomicInteger(0), Integer limit = 10 ->
+            if (!root) return null
+            if (count.getAndIncrement() >= limit) return null // 防止死递归
+            for (Iterator it = root.iterator(); it.hasNext(); ) {
+                Entry e = it.next()
+                if (e.key == mathRole) return e.value
+                else if (e.value instanceof Collection) return recursiveList(e.value, mathRole, count, limit)
+                else if (e.value instanceof Map) return recursiveMap(e.value, mathRole, count, limit)
+            }
+        }
+
+        if (uRoles.find {uRole -> // 用户角色
+            ((Map) attrs['role'])?.find {e ->
+                if (uRole == e.key) {
+                    if (e.value instanceof Collection) {
+                        if (recursiveList(e.value, lowestRole)) return true
+                    } else if (e.value instanceof Map) {
+                        if (recursiveMap(e.value, lowestRole)) return true
+                    }
+                } else {
+                    if (e.value instanceof Collection) {
+                        def v = recursiveList(e.value, uRole)
+                        if (v instanceof Collection) {
+                            if (recursiveList(v, lowestRole)) return true
+                        } else if (v instanceof Map) {
+                            if (recursiveMap(v, lowestRole)) return true
+                        }
+                    } else if (e.value instanceof Map) {
+                        def v = recursiveMap(e.value, uRole)
+                        if (v instanceof Collection) {
+                            if (recursiveList(v, lowestRole)) return true
+                        } else if (v instanceof Map) {
+                            if (recursiveMap(v, lowestRole)) return true
+                        }
+                    }
+                }
+            }
+        }) {
+            uRoles.add(lowestRole) // 缓存被验证过的权限角色
+            return true
+        }
+        throw new AccessControlException('没有权限')
+    }
+
+
+//    def oldAuth(Context ctx, String lowestRole) {
+//        String uRoles = ctx.sData?.uRoles // 当前用户的角色. 例: role1,role2,role3
+//        if (!uRoles) throw new AccessControlException('需要登录获取权限')
+//        if (uRoles.contains(lowestRole)) return true
+//        String lowestLevel // 对应最低需要角色的等级
+//        Set<String> uLevels = new HashSet(7) // 当前用户所有角色的等级
+//        attrs.role.each {Entry<String, Collection> e ->
+//            if (e.key.startsWith('level_')) {
+//                e.value.each {r ->
+//                    if (r == lowestRole) lowestLevel = e.key
+//                    if (uRoles.contains(r)) uLevels << e.key
+//                }
+//            }
+//        }
+//        // 如果当前用户的所有角色等级都没找到大于最低角色等级的就抛错
+//        if (!uLevels.find {String uLevel ->
+//            Integer.valueOf(uLevel.replace('level_', '')) > Integer.valueOf(lowestLevel.replace('level_', ''))
+//        }) {
+//            throw new AccessControlException('没有权限')
+//        }
+//    }
 
 
     @Lazy RedisClient redis = bean(RedisClient)
@@ -239,11 +273,11 @@ class RatpackWeb extends ServerTpl {
                 }
             }
             ctx.metaClass.sData = sData
-            if (redis.exists("session:$sId")) {
+            if (sId && redis.exists("session:$sId")) {
                 sData.id = sId
             } else {
                 synchronized (this) {
-                    if (!redis.exists("session:$sId")) {
+                    if (!sId ||!redis.exists("session:$sId")) {
                         sData.id = sId = UUID.randomUUID().toString().replace('-', '')
                         log.info("New session '{}'", sId)
                     }
@@ -251,22 +285,20 @@ class RatpackWeb extends ServerTpl {
             }
         } else {// session的数据, 默认用ehcache 保存 session 数据
             if (ehcache == null) throw new RuntimeException('EhcacheSrv is not exist')
-            def sData = ehcache.get('session', sId)
-            if (sData != null) {
-                ctx.metaClass.sData = sData
-            } else {
+            def sData = (sId ? ehcache.get('session', sId) : null)
+            if (sData == null) {
                 synchronized (this) {
-                    sData = ehcache.get('session', sId)
+                    sData = (sId ? ehcache.get('session', sId) : null)
                     if (sData == null) {
                         sData = new ConcurrentHashMap()
                         sData.id = sId = UUID.randomUUID().toString().replace('-', '')
                         Cache cache = ehcache.getOrCreateCache('session', sessionExpire, Integer.valueOf(attrs.session?.maxLimit?:100000), null)
                         cache.put(sId, sData)
-                        ctx.metaClass.sData = sData
                         log.info("New session '{}'", sId)
                     }
                 }
             }
+            ctx.metaClass.sData = sData
         }
 
         ctx.metaClass.sId = sId
@@ -279,7 +311,7 @@ class RatpackWeb extends ServerTpl {
     protected Map<String, LongAdder> hourCount = new ConcurrentHashMap<>(3)
     // 请求统计
     protected def count() {
-        SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH")
+        SimpleDateFormat sdf = new SimpleDateFormat('MM-dd HH')
         boolean isNew = false
         String hStr = sdf.format(new Date())
         LongAdder count = hourCount.get(hStr)
@@ -299,7 +331,7 @@ class RatpackWeb extends ServerTpl {
             cal.add(Calendar.HOUR_OF_DAY, -1)
             String lastHour = sdf.format(cal.getTime())
             LongAdder c = hourCount.remove(lastHour)
-            if (c != null) log.info("{} 时共处理 http 请求: {} 个", lastHour, c)
+            if (c != null) log.info('{} 时共处理 http 请求: {} 个', lastHour, c)
         }
     }
 

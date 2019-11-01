@@ -13,11 +13,11 @@ import java.util.function.Function
 class RedisClient extends ServerTpl {
     protected JedisPool pool;
 
-    RedisClient() { super("redis") }
+    RedisClient() { super('redis') }
     RedisClient(String name) { super(name) }
 
 
-    @EL(name = "sys.starting")
+    @EL(name = 'sys.starting')
     def start() {
         if (pool) throw new RuntimeException("$name is already running")
         if (ep == null) {ep = new EP(); ep.addListenerSource(this)}

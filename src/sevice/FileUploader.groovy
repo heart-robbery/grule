@@ -6,7 +6,6 @@ import core.module.ServerTpl
 import ctrl.common.FileData
 
 import javax.annotation.Resource
-import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 class FileUploader extends ServerTpl {
@@ -26,7 +25,7 @@ class FileUploader extends ServerTpl {
     protected OkHttpSrv okHttp
 
 
-    @EL(name = "web.started", async = false)
+    @EL(name = 'web.started', async = false)
     protected def init() {
         localDir = attrs.localDir?:new URL('file:upload').getFile()
         File dir = new File(localDir); dir.mkdirs()
@@ -35,7 +34,7 @@ class FileUploader extends ServerTpl {
         accessUrlPrefix = URI.create(attrs.accessUrlPrefix?:("http://${ep.fire('http.hp')}/file/") + "/").normalize()
         log.info('access upload file url prefix: {}', accessUrlPrefix)
 
-        remoteUrl = attrs.remoteUrl
+        remoteUrl = attrs.remoteUrl?:''
         if (remoteUrl) {
             log.info('remote file server http url: {}', remoteUrl)
         }
@@ -75,7 +74,7 @@ class FileUploader extends ServerTpl {
     }
 
 
-    @EL(name = "deleteFile")
+    @EL(name = 'deleteFile')
     void delete(String fileName) {
         File f = new File(localDir + File.separator + fileName)
         if (f.exists()) f.delete()
@@ -109,14 +108,14 @@ class FileUploader extends ServerTpl {
                     int n
                     while (-1 != (n = fd.inputStream.read(bs))) {os.write(bs, 0, n)}
                 }
-                log.info("Saved file: {}, origin name: {}", f.absolutePath, fd.originName)
+                log.info('Saved file: {}, origin name: {}', f.absolutePath, fd.originName)
             }
             fd
         }
 
         // 并发上传
         if (fds.size() >= 2) {
-            ExecutorService execs
+            def execs
             try {
                 execs = Executors.newFixedThreadPool(fds.size() - 1)
                 def fs = fds.drop(1).collect {fd -> execs.submit(doSave(fd))}.collect()
