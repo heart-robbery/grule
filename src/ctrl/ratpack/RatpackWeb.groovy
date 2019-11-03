@@ -56,7 +56,7 @@ class RatpackWeb extends ServerTpl {
                     sysProps()
                     registerShutdownHook(false)
                     baseDir(BaseDir.find('static/'))
-                    development(false)
+                    development(Boolean.valueOf(attrs['development']?:false))
                 }
             })
             srv.handlers{initChain(it)}
@@ -65,7 +65,7 @@ class RatpackWeb extends ServerTpl {
     }
 
 
-    @EL(name = 'sys.stopping')
+    @EL(name = 'sys.stopping', async = false)
     def stop() { srv?.stop() }
 
 

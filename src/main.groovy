@@ -56,6 +56,7 @@ ctx.start() // 启动系统
 
 @EL(name = 'sys.started')
 def sysStarted() {
+    return
     TestService ts = ep.fire('bean.get', TestService.class)
     try {
         ts.authTest()

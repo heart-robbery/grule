@@ -27,6 +27,7 @@ fileUploader.localDir='e:/tmp/upload/gy'
 
 // web 配置
 web {
+    development=true
     session.enabled=true
     // session.type='redis'
     // session 过期时间

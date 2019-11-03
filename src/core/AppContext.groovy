@@ -60,9 +60,13 @@ class AppContext {
         ConfigObject config = cs.parse(Class.forName('config'))
         def ps = System.properties
         def profile = ps.getProperty('profile')
-        if (profile) {
-            def c = cs.parse(Class.forName("config-$profile"))
-            config.merge(c)
+        try {
+            if (profile) {
+                def c = cs.parse(Class.forName("config-$profile"))
+                config.merge(c)
+            }
+        } catch (ClassNotFoundException ex) {
+            println("$ex.class.simpleName:$ex.message")
         }
         config.merge(cs.parse(ps))
         config
