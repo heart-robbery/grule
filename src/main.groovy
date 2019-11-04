@@ -54,10 +54,11 @@ ctx.addSource(this)
 ctx.start() // 启动系统
 
 
+
 @EL(name = 'sys.started')
 def sysStarted() {
     return
-    TestService ts = ep.fire('bean.get', TestService.class)
+    TestService ts = ctx.bean(TestService)
     try {
         ts.authTest()
 

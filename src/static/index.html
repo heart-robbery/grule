@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="css/iview.4.0.0.css" type="text/css">
     <script src="js/jquery-3.4.1.js"></script>
     <script src="js/vue.js"></script>
+    <script src="js/httpVueLoader.js"></script>
     <script src="js/iview.min.4.0.0.js"></script>
     <script src='js/moment.min.js' async></script>
     <script src="js/components.js"></script>
@@ -56,6 +57,7 @@
 </head>
 <body>
 <div id="app" class="container-fluid">
+    <upload/>
     <!--Gy welcome index-->
     <!--<div>{{msg}}</div>-->
 
@@ -109,6 +111,9 @@
             ws: null, msg: '', addResult: null,
             optId:'', loading: false, list: [], keyword: '',
             showAddForm: false, addForm: {}
+        },
+        components: {
+            // upload: httpVueLoader('coms/Upload.vue')()
         },
         mounted: function () {
             // this.initWs();

@@ -79,7 +79,7 @@ class AppContext {
      */
     def start() {
         if (exec) throw new RuntimeException('App is running')
-        log.info('Starting Application on {} with PID {}' + (env.profile ? ", active profile: '$env.profile'" : ''), InetAddress.getLocalHost().getHostName(), pid())
+        log.info('Starting Application on {} with PID {}, active profile: ' + env['profile'], InetAddress.getLocalHost().getHostName(), pid())
         // 1. 初始化系统线程池
         initExecutor()
         // 2. 初始化事件中心
@@ -145,6 +145,15 @@ class AppContext {
             } catch (Exception e) { log.error("Inject Error!", e) }
         })
     }
+
+
+    /**
+     * 全局查找Bean
+     * @param type
+     * @param <T>
+     * @return
+     */
+    def <T> T bean(Class<T> type) { (T) ep.fire("bean.get", type) }
 
 
     /**

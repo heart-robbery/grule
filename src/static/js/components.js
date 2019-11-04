@@ -1,4 +1,3 @@
-var coms ={}
 //时间戳格式化组件
 Vue.component('date-item', {
     props: ['time', 'format'],
@@ -11,8 +10,14 @@ Vue.component('date-item', {
         }
     }
 });
-import Upload from 'coms/Upload'
-Vue.component(Upload)
+// Vue.component('Upload', httpVueLoader('coms/Upload.vue'))
+Vue.component('Upload', function (resolve, reject) {
+    httpVueLoader('coms/Upload.vue')().then(function (r) {
+        resolve(r)
+    })
+})
+// import Upload from 'coms/Upload'
+// Vue.component(Upload)
 // Vue.component('upload', function (resolve, reject) {
 //     $.ajax({
 //         url: '../coms/upload.html',

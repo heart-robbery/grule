@@ -1,4 +1,4 @@
-<style>
+<style scoped>
 
 </style>
 <template>
@@ -8,9 +8,14 @@
 </template>
 
 <script>
-    export default {
-        method: {
-            change(f) {
+    module.exports = {
+        data: function() {
+            return {
+                who: 'world'
+            }
+        },
+        methods: {
+            change: function(f) {
                 console.log(f)
             }
         }
