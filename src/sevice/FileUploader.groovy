@@ -6,6 +6,7 @@ import core.module.ServerTpl
 import ctrl.common.FileData
 
 import javax.annotation.Resource
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 class FileUploader extends ServerTpl {
@@ -27,7 +28,7 @@ class FileUploader extends ServerTpl {
 
     @EL(name = 'web.started', async = false)
     protected def init() {
-        localDir = attrs.localDir?:new URL('file:upload').getFile()
+        localDir = new URL('file:' + (attrs.localDir?:'../upload')).getFile()
         File dir = new File(localDir); dir.mkdirs()
         log.info('save upload file local dir: {}', dir.getAbsolutePath())
 
@@ -115,10 +116,10 @@ class FileUploader extends ServerTpl {
 
         // 并发上传
         if (fds.size() >= 2) {
-            def execs
+            ExecutorService execs
             try {
                 execs = Executors.newFixedThreadPool(fds.size() - 1)
-                def fs = fds.drop(1).collect {fd -> execs.submit(doSave(fd))}.collect()
+                def fs = fds.drop(1).collect {fd -> execs.submit{doSave(fd)}}.collect()
                 doSave(fds[0])
                 fs.each {f -> f.get()}
             } finally {

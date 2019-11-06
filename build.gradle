@@ -1,23 +1,24 @@
 repositories {
     mavenLocal()
-    maven {
-        url 'http://maven.aliyun.com/nexus/content/groups/public/'
-    }
+    maven { url 'http://maven.aliyun.com/nexus/content/groups/public/' }
+    // maven { url 'http://maven.aliyun.com/nexus/content/groups/public/' }
     mavenCentral()
     jcenter()
 }
 
-version = '1.0.1'
+version = '1.1.0'
 
-apply plugin: 'java'
+//apply plugin: 'java'
 apply plugin: 'groovy'
-//apply plugin: 'distribution'
 
 // 修改源目录
 sourceSets {
     main {
         groovy {
             srcDir 'src'
+        }
+        resources {
+            srcDir 'src/static'
         }
     }
 }
@@ -27,7 +28,7 @@ targetCompatibility = 1.8
 
 dependencies {
     compile fileTree(dir: 'sysLib', include: ['*.jar'])
-    // compile 'org.codehaus.groovy:groovy:2.5.6'
+    // compile 'org.codehaus.groovy:groovy:2.5.8'
     compile 'org.codehaus.groovy:groovy:3.0.0-rc-1'
     // compile ('org.codehaus.groovy:groovy-sql:2.5.6')
     // compile 'org.codehaus.groovy:groovy-templates:2.5.6'
@@ -65,49 +66,9 @@ dependencies {
 }
 
 
+// 依赖copy
 task deps(type: Copy) {
     new File('lib').deleteDir()
     from configurations.runtime
-    // from 'lib'
     into 'lib'
 }
-
-
-//// task 用来复制启动所依赖的jar包
-//task copyDep(type: Copy) {
-//    from configurations.runtime
-//    // from 'lib'
-//    into 'build/tar/lib'
-//}
-//
-//task copyBin(type: Copy) {
-//    from 'bin/'
-//    into 'build/tar/bin'
-//    fileMode 0744
-//}
-//
-//task copyConf(type: Copy) {
-//    from 'conf/'
-//    into 'build/tar/conf'
-//}
-//
-//task copySrc(type: Copy) {
-//    from 'src/main/groovy'
-//    from 'src/main/resources'
-//    into 'build/tar/src'
-//}
-//
-//task copyOther(type: Copy) {
-//    from 'start.sh'
-//    from 'start.bat'
-//    from '*.properties'
-//    into 'build/tar/'
-//}
-//
-//
-//task tar(dependsOn: ['copyDep', 'copyBin', 'copyConf', 'copySrc', 'copyOther'], type: Tar) {
-//    from "${buildDir}/tar"
-//    archiveName = "gy.tar"
-//    destinationDir = file("${buildDir}")
-//}
-

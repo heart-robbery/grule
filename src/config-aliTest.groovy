@@ -17,4 +17,7 @@ fileUploader {
     accessUrlPrefix="http://39.104.28.131/gy/file/"
 }
 
-log.path="$baseDir/log"
+log {
+    path="$baseDir/log"
+    appender='file'
+}

@@ -53,6 +53,7 @@ class RatpackWeb extends ServerTpl {
                     threads(Integer.valueOf(attrs['thread']?:1))
                     connectTimeoutMillis(1000 * 10)
                     idleTimeout(Duration.ofSeconds(10))
+                    maxContentLength(1024 * 1024 * 10) // 10M 文件上传大小限制
                     sysProps()
                     registerShutdownHook(false)
                     baseDir(BaseDir.find('static/'))
@@ -129,7 +130,7 @@ class RatpackWeb extends ServerTpl {
             })
         }
 
-        def ignoreSuffix = new HashSet(['.js', '.css', '.html', '.png', '.ttf', '.woff', '.woff2', 'favicon.ico', '.js.map', *attrs.ignorePrintUrlSuffix?:[]])
+        def ignoreSuffix = new HashSet(['.js', '.css', '.html', '.vue', '.png', '.ttf', '.woff', '.woff2', 'favicon.ico', '.js.map', *attrs.ignorePrintUrlSuffix?:[]])
         // 请求预处理
         chain.all({ctx ->
             ctx.metaClass.propertyMissing = {String name -> null} // 随意访问不存在的属性不报错

@@ -10,21 +10,8 @@ Vue.component('date-item', {
         }
     }
 });
-// Vue.component('Upload', httpVueLoader('coms/Upload.vue'))
 Vue.component('Upload', function (resolve, reject) {
     httpVueLoader('coms/Upload.vue')().then(function (r) {
         resolve(r)
     })
 })
-// import Upload from 'coms/Upload'
-// Vue.component(Upload)
-// Vue.component('upload', function (resolve, reject) {
-//     $.ajax({
-//         url: '../coms/upload.html',
-//         success: function (resp) {
-//             resolve($.extend({
-//                 template: $(resp).find('#tpl').html(),
-//             }, coms.upload))
-//         }
-//     })
-// })

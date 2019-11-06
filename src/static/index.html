@@ -57,7 +57,7 @@
 </head>
 <body>
 <div id="app" class="container-fluid">
-    <upload/>
+    <upload></upload>
     <!--Gy welcome index-->
     <!--<div>{{msg}}</div>-->
 
@@ -110,7 +110,8 @@
         data: {
             ws: null, msg: '', addResult: null,
             optId:'', loading: false, list: [], keyword: '',
-            showAddForm: false, addForm: {}
+            showAddForm: false, addForm: {},
+            files: []
         },
         components: {
             // upload: httpVueLoader('coms/Upload.vue')()
@@ -120,7 +121,10 @@
             this.search('')
         },
         watch: {
-            keyword: function (v) {this.search(v)}
+            keyword: function (v) {this.search(v)},
+            files: function (v) {
+                console.log('xxxxxxxxxxxxxxxxxxx: ', v)
+            }
         },
         methods: {
             addComponent: function() {

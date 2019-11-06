@@ -4,17 +4,18 @@ import ch.qos.logback.core.util.FileSize
 
 import java.nio.charset.Charset
 
-import static core.Utils.pid
 import static core.AppContext.env
+import static core.Utils.pid
 
-def appenders = []
 // 日志文件名
 def logFileName = 'sys'
 // 日志文件路径
-def logPath = (env.log?.path?:'e:/tmp/log/gy')
+def logPath = env.log?.path?:''
 // 去掉最后的 /
-if (logPath.endsWith('/')) logPath = logPath.substring(0, logPath.length() - 2)
+if (logPath.endsWith('/')) logPath = logPath.substring(0, logPath.length() - 1)
 
+
+def appenders = []
 appender('console', ConsoleAppender) {
     appenders << 'console'
     encoder(PatternLayoutEncoder) {
@@ -23,9 +24,10 @@ appender('console', ConsoleAppender) {
     }
 }
 
-if (logPath) {
+
+if (logPath) { // 有日志输出目录配置
+    appenders << 'file'
     appender('file', RollingFileAppender) {
-        appenders << 'file'
         encoder(PatternLayoutEncoder) {
             delegate.pattern = "%d{yyyy-MM-dd HH:mm:ss.SSS} [%-7thread] [${pid()}] [%-5level] [%-50.50C :%-3L] => %m%n"
             delegate.charset = Charset.forName("utf8")
@@ -43,8 +45,6 @@ if (logPath) {
 
 root(INFO, appenders)
 logger('ch.qos.logback', WARN)
-//logger('core.module.EhcacheSrv', TRACE)
-//logger('org.hibernate', DEBUG)
 
 env.log?.level?.flatten().each {String k, v ->
     if (v !instanceof Level) {

@@ -9,7 +9,7 @@ jpa {
     }
     ds {
         // url='jdbc:h2:e:/tmp/h2/gy;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
-        jdbcUrl=url='jdbc:h2:e:/tmp/h2/gy'
+        jdbcUrl=url='jdbc:h2:../h2/data'
         username='root'
         password='root'
         minimumIdle = minIdle='1'
@@ -20,7 +20,7 @@ jpa {
 }
 
 //  文件上传本地存放目录
-fileUploader.localDir='e:/tmp/upload/gy'
+//fileUploader.localDir='e:/tmp/upload/'
 
 //ep.track = ['bean.get']
 
@@ -66,4 +66,5 @@ redis {
     database=5
 }
 
-
+// 日志目录
+// log.path='../log'

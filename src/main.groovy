@@ -36,9 +36,9 @@ import java.time.Duration
 //return
 
 
-@Field Logger log = LoggerFactory.getLogger(getClass())
+@Field final Logger log = LoggerFactory.getLogger(getClass())
 @Resource @Field EP ep
-@Field AppContext ctx = new AppContext()
+@Field final AppContext ctx = new AppContext()
 
 
 // 系统功能添加区
@@ -80,23 +80,3 @@ def sysStarted() {
         // ep.fire('sched.after', EC.of(this).args(Duration.ofSeconds(5), {System.exit(0)}).completeFn({ec -> if (ec.noListener) System.exit(0) }))
     }
 }
-
-
-@EL(name = 'sys.stopping')
-def stop() {
-    // sql?.close()
-}
-
-
-
-
-//def sqlTest() {
-//    sql.execute('''
-//      create table if not exists test (
-//          name varchar(20),
-//          age int(10)
-//      )
-//    ''')
-//    sql.executeInsert("insert into test values(?, ?)", ["xxxx" + System.currentTimeMillis(), 1111])
-//    println sql.firstRow("select count(*) as num from test").num
-//}

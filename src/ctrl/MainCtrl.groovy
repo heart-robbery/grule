@@ -50,10 +50,10 @@ class MainCtrl extends CtrlTpl {
     }
 
 
-    // vue 文件
+    // vue 组件文件
     def coms(Chain chain) {
         chain.get("coms/:fName") { ctx ->
-            ctx.response.cookie('Cache-Control', "max-age=60")
+            // ctx.response.cookie('Cache-Control', "max-age=60")
             ctx.render ctx.file("static/coms/$ctx.pathTokens.fName")
         }
     }
