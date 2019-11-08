@@ -22,20 +22,6 @@ import javax.annotation.Resource
 import java.text.SimpleDateFormat
 import java.time.Duration
 
-//def f = new File('e:/tmp/code.txt')
-//f.setText('', 'utf-8')
-//new File('E:\\code_repo\\锦程消费金融\\thrall\\src\\main\\java\\com\\jccfc\\thrall').eachFileRecurse(FileType.FILES) {
-//    if (it.name.endsWith('.java')) {
-//        it.eachLine {l ->
-//            if (l.trim().isEmpty() || l.containsIgnoreCase('@author') || l.containsIgnoreCase('@create')) return
-//            f << l + '\n'
-//        }
-//        f << '\n\n'
-//    }
-//}
-//return
-
-
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Resource @Field EP ep
 @Field final AppContext ctx = new AppContext()

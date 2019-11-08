@@ -9,7 +9,7 @@
 
 <template>
     <div id="upload">
-        <input type="file" multiple @change="change">
+        <input type="file" multiple @change="change"/>
         <br/>
         <ul v-if="fs.length > 0">
             <li v-for="f in fs">

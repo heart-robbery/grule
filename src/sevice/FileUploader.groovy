@@ -29,7 +29,7 @@ class FileUploader extends ServerTpl {
     @EL(name = 'web.started', async = false)
     protected def init() {
         localDir = new URL('file:' + (attrs.localDir?:'../upload')).getFile()
-        File dir = new File(localDir); dir.mkdirs()
+        File dir = new File(localDir)
         log.info('save upload file local dir: {}', dir.getAbsolutePath())
 
         accessUrlPrefix = URI.create(attrs.accessUrlPrefix?:("http://${ep.fire('http.hp')}/file/") + "/").normalize()
@@ -102,6 +102,7 @@ class FileUploader extends ServerTpl {
                 // 2. 个人http文件服务器例子
                 if (remoteUrl) okHttp?.post(remoteUrl).fileStream('file', fd.generatedName, fd.inputStream).execute()
             } else {
+                new File(localDir).mkdirs() // 确保文件夹在
                 // 创建本地文件并写入
                 def f = new File(localDir + File.separator + fd.generatedName)
                 f.withOutputStream {os ->

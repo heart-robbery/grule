@@ -15,32 +15,43 @@ def logPath = env.log?.path?:''
 if (logPath.endsWith('/')) logPath = logPath.substring(0, logPath.length() - 1)
 
 
-def appenders = []
-appender('console', ConsoleAppender) {
-    appenders << 'console'
-    encoder(PatternLayoutEncoder) {
-        delegate.pattern = "%d{yyyy-MM-dd HH:mm:ss.SSS} [%-7thread] [%-5level] [%-50.50C :%-3L] => %m%n"
-        delegate.charset = Charset.forName("utf8")
+// 默认只输出:标准输出,文件
+def appenders = env['log']['appender']?:['console', 'file']
+if (appenders instanceof String) {
+    appender = appenders.split(',').collect {it.trim()}.findAll {String s ->
+        if (s) return true
+        else false
+    }
+} else if (appenders !instanceof Collection) throw new RuntimeException('log.appenders 配置错误')
+
+
+if (appenders.contains('console')) {
+    appender('console', ConsoleAppender) {
+        encoder(PatternLayoutEncoder) {
+            delegate.pattern = "%d{yyyy-MM-dd HH:mm:ss.SSS} [%-7thread] [%-5level] [%-50.50C :%-3L] => %m%n"
+            delegate.charset = Charset.forName("utf8")
+        }
     }
 }
 
 
 if (logPath) { // 有日志输出目录配置
-    appenders << 'file'
-    appender('file', RollingFileAppender) {
-        encoder(PatternLayoutEncoder) {
-            delegate.pattern = "%d{yyyy-MM-dd HH:mm:ss.SSS} [%-7thread] [${pid()}] [%-5level] [%-50.50C :%-3L] => %m%n"
-            delegate.charset = Charset.forName("utf8")
-        }
-        file = "$logPath/${logFileName}.log"
-        rollingPolicy(SizeAndTimeBasedRollingPolicy) {
-            delegate.fileNamePattern = "${logPath}/${logFileName}.%d{yyyy-MM-dd}.log.%i"
-            delegate.maxFileSize = FileSize.valueOf('7MB')
-            delegate.maxHistory = 100
-            delegate.totalSizeCap = FileSize.valueOf('5GB')
+    if (appenders.contains('file')) {
+        appender('file', RollingFileAppender) {
+            encoder(PatternLayoutEncoder) {
+                delegate.pattern = "%d{yyyy-MM-dd HH:mm:ss.SSS} [%-7thread] [${pid()}] [%-5level] [%-50.50C :%-3L] => %m%n"
+                delegate.charset = Charset.forName("utf8")
+            }
+            file = "$logPath/${logFileName}.log"
+            rollingPolicy(SizeAndTimeBasedRollingPolicy) {
+                delegate.fileNamePattern = "${logPath}/${logFileName}.%d{yyyy-MM-dd}.log.%i"
+                delegate.maxFileSize = FileSize.valueOf('7MB')
+                delegate.maxHistory = 100
+                delegate.totalSizeCap = FileSize.valueOf('5GB')
+            }
         }
     }
-}
+} else appenders.remove('file')
 
 
 root(INFO, appenders)
