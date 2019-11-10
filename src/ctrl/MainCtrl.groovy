@@ -62,9 +62,12 @@ class MainCtrl extends CtrlTpl {
     // css 文件
     def css(Chain chain) {
         chain.get("css/:fName") {ctx ->
-            println("$ctx.pathTokens.fName")
             ctx.response.cookie('Cache-Control', "max-age=60")
             ctx.render ctx.file("static/css/$ctx.pathTokens.fName")
+        }
+        chain.get("css/fonts/:fName") {ctx ->
+            ctx.response.cookie('Cache-Control', "max-age=120")
+            ctx.render ctx.file("static/css/fonts/$ctx.pathTokens.fName")
         }
     }
 

@@ -111,10 +111,10 @@ class AppContext {
     ) {
         if (!source || !name) throw new IllegalArgumentException('source and name must be not empty')
         if ("sys".equalsIgnoreCase(name) || "env".equalsIgnoreCase(name) || "log".equalsIgnoreCase(name)) {
-            log.warn("Name property cannot equal 'sys', 'env' or 'log' . source: {}", source); return
+            log.error("Name property cannot equal 'sys', 'env' or 'log' . source: {}", source); return
         }
         if (sourceMap.containsKey(name)) {
-            log.warn("Name property '{}' already exist in source: {}", name, sourceMap.get(name)); return
+            log.error("Name property '{}' already exist in source: {}", name, sourceMap.get(name)); return
         }
         sourceMap.put(name, source)
         if (ep) { inject(source); ep.addListenerSource(source) }

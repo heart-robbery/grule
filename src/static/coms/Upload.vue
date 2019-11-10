@@ -1,16 +1,37 @@
 <style scoped>
     #upload {
         border: solid 1px #192e25;
+        padding-left: 1vw;
     }
     #upload ul {
-
+        list-style: none;
+    }
+    .file{
+        position: relative;
+        height: 6vh;
+    }
+    .file input,.file button{
+        position: absolute;
+        left: 0;
+        top: 1vh;
+        height: 4vh;
+        width: 4vw;
+        outline: none;
+        margin-bottom: 4vh;
+    }
+    .file input{
+        opacity: 0;
+        z-index: 2;
     }
 </style>
 
 <template>
     <div id="upload">
-        <input type="file" multiple @change="change"/>
-        <br/>
+        <div class="file">
+            <input type="file" multiple @change="change"/>
+            <button>点击上传</button>
+        </div>
+
         <ul v-if="fs.length > 0">
             <li v-for="f in fs">
                 <img v-if="f.data" :src="f.data" height="50px" width="60px"/>

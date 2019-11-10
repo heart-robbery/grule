@@ -11,7 +11,7 @@ import java.time.Duration
 import java.util.function.Function
 
 class RedisClient extends ServerTpl {
-    protected JedisPool pool;
+    protected JedisPool pool
 
     RedisClient() { super('redis') }
     RedisClient(String name) { super(name) }

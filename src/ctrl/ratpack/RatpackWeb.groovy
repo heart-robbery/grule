@@ -53,7 +53,7 @@ class RatpackWeb extends ServerTpl {
                     threads(Integer.valueOf(attrs['thread']?:1))
                     connectTimeoutMillis(1000 * 10)
                     idleTimeout(Duration.ofSeconds(10))
-                    maxContentLength(1024 * 1024 * 10) // 10M 文件上传大小限制
+                    maxContentLength(Integer.valueOf(attrs.maxContentLength?:(1024 * 1024 * 10))) // 10M 文件上传大小限制
                     sysProps()
                     registerShutdownHook(false)
                     baseDir(BaseDir.find('static/'))
@@ -97,7 +97,6 @@ class RatpackWeb extends ServerTpl {
                     resp.seqNo = ctx.get(RequestId.TYPE).toString()
                     resp.cus = ctx.request.queryParams.cus // 原样返回的参数
                     def jsonStr = JSON.toJSONString(resp, SerializerFeature.WriteMapNullValue)
-                    ctx.response.send(jsonStr) // 返回给客户端
 
                     // 接口超时监控
                     def spend = ctx.get(Clock).instant().minusMillis(ctx.request.timestamp.toEpochMilli()).toEpochMilli()
@@ -106,6 +105,8 @@ class RatpackWeb extends ServerTpl {
                     } else {
                         log.debug("End Request '" + resp.seqNo + "', path: " + ctx.request.uri + " , spend: " + spend + "ms, response: " + jsonStr)
                     }
+
+                    ctx.response.send(jsonStr) // 返回给客户端
                 }
             })
 
@@ -277,27 +278,18 @@ class RatpackWeb extends ServerTpl {
             if (sId && redis.exists("session:$sId")) {
                 sData.id = sId
             } else {
-                synchronized (this) {
-                    if (!sId ||!redis.exists("session:$sId")) {
-                        sData.id = sId = UUID.randomUUID().toString().replace('-', '')
-                        log.info("New session '{}'", sId)
-                    }
-                }
+                sData.id = sId = UUID.randomUUID().toString().replace('-', '')
+                log.info("New session '{}'", sId)
             }
         } else {// session的数据, 默认用ehcache 保存 session 数据
             if (ehcache == null) throw new RuntimeException('EhcacheSrv is not exist')
             def sData = (sId ? ehcache.get('session', sId) : null)
             if (sData == null) {
-                synchronized (this) {
-                    sData = (sId ? ehcache.get('session', sId) : null)
-                    if (sData == null) {
-                        sData = new ConcurrentHashMap()
-                        sData.id = sId = UUID.randomUUID().toString().replace('-', '')
-                        Cache cache = ehcache.getOrCreateCache('session', sessionExpire, Integer.valueOf(attrs.session?.maxLimit?:100000), null)
-                        cache.put(sId, sData)
-                        log.info("New session '{}'", sId)
-                    }
-                }
+                sData = new ConcurrentHashMap()
+                sData.id = sId = UUID.randomUUID().toString().replace('-', '')
+                Cache cache = ehcache.getOrCreateCache('session', sessionExpire, Integer.valueOf(attrs.session?.maxLimit?:100000), null)
+                cache.put(sId, sData)
+                log.info("New session '{}'", sId)
             }
             ctx.metaClass.sData = sData
         }

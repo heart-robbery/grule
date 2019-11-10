@@ -22,6 +22,7 @@ import javax.annotation.Resource
 import java.text.SimpleDateFormat
 import java.time.Duration
 
+
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Resource @Field EP ep
 @Field final AppContext ctx = new AppContext()
