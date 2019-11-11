@@ -18,7 +18,7 @@ if (logPath.endsWith('/')) logPath = logPath.substring(0, logPath.length() - 1)
 // 默认只输出:标准输出,文件
 def appenders = env['log']['appender']?:['console', 'file']
 if (appenders instanceof String) {
-    appender = appenders.split(',').collect {it.trim()}.findAll {String s ->
+    appenders = appenders.split(',').collect {it.trim()}.findAll {String s ->
         if (s) return true
         else false
     }
