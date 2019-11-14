@@ -196,9 +196,11 @@ class AppContext {
      */
     protected void initExecutor() {
         exec = new ThreadPoolExecutor(
-            env.sys.exec.corePoolSize?:8, env.sys.exec.maximumPoolSize?:8, env.sys.exec.keepAliveTime?:30, TimeUnit.MINUTES, new LinkedBlockingQueue<>(),
+            Integer.valueOf(env.sys.exec.corePoolSize?:8), Integer.valueOf(env.sys.exec.maximumPoolSize?:8),
+            Long.valueOf(env.sys.exec.keepAliveTime?:30), TimeUnit.MINUTES,
+            new LinkedBlockingQueue<>(),
             new ThreadFactory() {
-                final AtomicInteger i = new AtomicInteger(1);
+                final AtomicInteger i = new AtomicInteger(1)
                 @Override
                 Thread newThread(Runnable r) {
                     return new Thread(r, "sys-" + i.getAndIncrement())
@@ -239,7 +241,12 @@ class AppContext {
             @Override
             String toString() { "coreEp" }
         }
-        ep.addTrackEvent(env.ep.track as String[])
+        // 添加 ep 跟踪事件
+        def track = env.ep.track
+        if (track instanceof String) {
+            track = Arrays.stream(track.split(',')).filter{it?true:false}.map{it.trim()}.filter{it?true:false}.toArray()
+        }
+        ep.addTrackEvent(track as String[])
     }
 
 

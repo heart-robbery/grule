@@ -76,7 +76,7 @@ class Utils {
      * 构建一个 http 请求, 支持 get, post. 文件上传.
      * @return
      */
-    static Http http() { return new Http(); }
+    static Http http() { return new Http() }
 
 
     static class Http {
@@ -166,7 +166,7 @@ class Utils {
                 if (contentType) conn.setRequestProperty('Content-Type', "$contentType;charset=UTF-8")
                 // conn.setRequestProperty("Connection", "close")
                 // conn.setRequestProperty("Connection", "keep-alive")
-                // conn.setRequestProperty("User-Agent", "gy-http-client")
+                // conn.setRequestProperty("http_user_agent", "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.26 Safari/537.36 Core/1.63.6726.400 QQBrowser/10.2.2265.400")
                 headers?.each {conn.setRequestProperty(it.key, it.value)}
 
                 String boundary = null
@@ -243,8 +243,7 @@ class Utils {
                 }
 
                 // 取结果
-                if (respCode == 200) ret = conn.getInputStream().getText('utf-8')
-                else throw new RuntimeException("http error status: $respCode")
+                ret = conn.getInputStream().getText('utf-8')
             } finally {
                 conn?.disconnect()
             }

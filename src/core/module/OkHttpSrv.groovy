@@ -196,7 +196,7 @@ class OkHttpSrv extends ServerTpl {
                 })
             } else { // 同步请求
                 def resp = call.execute()
-                if (200 != resp.code()) throw new RuntimeException("Http error code: ${resp.code()}, url: $urlStr")
+                // if (200 != resp.code()) throw new RuntimeException("Http error code: ${resp.code()}, url: $urlStr")
                 resp.body().string()
             }
         }
