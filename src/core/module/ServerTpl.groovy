@@ -102,4 +102,16 @@ class ServerTpl {
         }
         this
     }
+
+
+    Long getLong(String name, Long defaultValue) { Long.valueOf(attrs[(name)]?:defaultValue) }
+
+
+    Integer getInteger(String name, Integer defaultValue) { Integer.valueOf(attrs[(name)]?:defaultValue) }
+
+
+    String getStr(String name, String defaultValue) { Objects.toString(attrs.get(name), defaultValue) }
+
+
+    Boolean getBoolean(String name, Boolean defaultValue) { Boolean.valueOf(attrs[(name)], defaultValue) }
 }
