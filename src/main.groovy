@@ -44,6 +44,7 @@ ctx.start() // 启动系统
 
 @EL(name = 'sys.started')
 def sysStarted() {
+    ctx.bean(HibernateSrv).repo = null
     return
     TestService ts = ctx.bean(TestService)
     try {

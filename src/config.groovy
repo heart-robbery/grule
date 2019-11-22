@@ -22,7 +22,7 @@ jpa {
 //  文件上传本地存放目录
 //fileUploader.localDir='e:/tmp/upload/'
 
-//ep.track = ['bean.get']
+//ep.track = ['bean.get', 'sys.started']
 
 
 // web 配置

@@ -4,6 +4,7 @@ import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import core.module.ServerTpl
+import groovy.text.GStringTemplateEngine
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -22,7 +23,7 @@ class AppContext {
     /**
      * 系统名字. 用于多个系统启动区别
      */
-    protected final String             name         = env.sys.name
+    protected final String             name         = env.sys.name?:null
     /**
      * 系统运行线程池. {@link #initExecutor()}}*/
     protected       ThreadPoolExecutor exec
@@ -79,7 +80,7 @@ class AppContext {
      */
     def start() {
         if (exec) throw new RuntimeException('App is running')
-        log.info('Starting Application on {} with PID {}, active profile: ' + env['profile'], InetAddress.getLocalHost().getHostName(), pid())
+        log.info('Starting Application on {} with PID {}, active profile: ' + (env['profile']?:''), InetAddress.getLocalHost().getHostName(), pid())
         // 1. 初始化系统线程池
         initExecutor()
         // 2. 初始化事件中心
@@ -128,21 +129,46 @@ class AppContext {
     @EL(name = "inject", async = false)
     protected def inject(Object o) {
         iterateField(o.getClass(), {f ->
-            Resource r = f.getAnnotation(Resource.class);
-            if (r == null) return
-            try {
-                f.setAccessible(true)
-                Object v = f.get(o)
-                if (v) return // 已经存在值则不需要再注入
+            Resource aR = f.getAnnotation(Resource.class)
+            if (aR) {
+                try {
+                    f.setAccessible(true)
+                    Object v = f.get(o)
+                    if (v) return // 已经存在值则不需要再注入
 
-                // 取值
-                if (EP.class.isAssignableFrom(f.getType())) v = wrapEpForSource(o)
-                else v = ep.fire("bean.get", EC.of(this).sync().args(f.getType(), r.name())) // 全局获取bean对象
+                    // 取值
+                    if (EP.class.isAssignableFrom(f.getType())) v = wrapEpForSource(o)
+                    else v = ep.fire("bean.get", EC.of(this).sync().args(f.type, aR.name())) // 全局获取bean对象
 
-                if (v == null) return
-                f.set(o, v)
-                log.trace("Inject @Resource field '{}' for object '{}'", f.getName(), o)
-            } catch (Exception e) { log.error("Inject Error!", e) }
+                    if (v == null) return
+                    f.set(o, v)
+                    log.trace("Inject @Resource field '{}' for object '{}'", f.name, o)
+                } catch (Exception e) { log.error("Inject @Resource field '" + f.name + "' Error!", e) }
+            }
+            Value vR = f.getAnnotation(Value)
+            if (vR) {
+                try {
+                    f.setAccessible(true)
+                    Object v = f.get(o) // 默认值
+                    if (v == null) {
+                        v = new GStringTemplateEngine().createTemplate(vR).make(env).toString()
+                    } else {
+                        String s = new GStringTemplateEngine().createTemplate(vR).make(env).toString()
+                        if (s != null) v = s
+                    }
+                    if (f.type == Integer || f.type == int.class) f.set(o, Integer.valueOf(v))
+                    else if (f.type == Long || f.type == long.class) f.set(o, Long.valueOf(v))
+                    else if (f.type == Boolean || f.type == boolean.class) f.set(o, Boolean.valueOf(v))
+                    else if (f.type == Float || f.type == float.class) f.set(o, Float.valueOf(v))
+                    else if (f.type == Double || f.type == double.class) f.set(o, Double.valueOf(v))
+                    else if (f.type == Double || f.type == double.class) f.set(o, Double.valueOf(v))
+                    else if (f.type == BigDecimal) f.set(o, BigDecimal.valueOf(v))
+                    else if (f.type == BigInteger) f.set(o, BigInteger.valueOf(v))
+                    else if (f.type == URI && v instanceof String) f.set(o, URI.create(v))
+                    else if (f.type == URL && v instanceof String) f.set(o, new URL(v))
+                    else f.set(o, v)
+                } catch(Exception ex) {log.error("Inject @Value field '" + f.name + "' Error!", ex)}
+            }
         })
     }
 

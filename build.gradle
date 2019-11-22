@@ -30,8 +30,8 @@ dependencies {
     compile fileTree(dir: 'sysLib', include: ['*.jar'])
     // compile 'org.codehaus.groovy:groovy:2.5.8'
     compile 'org.codehaus.groovy:groovy:3.0.0-rc-1'
+    compile 'org.codehaus.groovy:groovy-templates:3.0.0-rc-1'
     // compile ('org.codehaus.groovy:groovy-sql:2.5.6')
-    // compile 'org.codehaus.groovy:groovy-templates:2.5.6'
 
     compile 'com.alibaba:fastjson:1.2.61'
     compile 'ch.qos.logback:logback-classic:1.2.3'
@@ -71,4 +71,21 @@ task deps(type: Copy) {
     new File('lib').deleteDir()
     from configurations.runtime
     into 'lib'
+}
+
+
+task tar(dependsOn: ['deps'], type: Tar) {
+    new File("${buildDir}/corp.tar").deleteOnExit()
+
+    into("bin") {from("bin")}
+    into("conf") {from "conf"}
+    into("src") {from("src")}
+    into("lib") {from "lib"}
+    from "build.gradle"
+    from "start.bat"
+    from("start.sh")
+
+    archiveFileName = "gy.tgz"
+    compression(Compression.GZIP)
+    destinationDirectory = file("${buildDir}")
 }

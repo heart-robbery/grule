@@ -110,8 +110,8 @@ class ServerTpl {
     Integer getInteger(String name, Integer defaultValue) { Integer.valueOf(attrs[(name)]?:defaultValue) }
 
 
-    String getStr(String name, String defaultValue) { Objects.toString(attrs.get(name), defaultValue) }
+    String getStr(String name, String defaultValue) { Objects.toString(attrs[(name)]?:defaultValue) }
 
 
-    Boolean getBoolean(String name, Boolean defaultValue) { Boolean.valueOf(attrs[(name)], defaultValue) }
+    Boolean getBoolean(String name, Boolean defaultValue) { Boolean.valueOf(attrs[(name)]?:defaultValue) }
 }

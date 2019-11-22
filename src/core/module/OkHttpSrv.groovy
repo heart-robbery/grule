@@ -93,6 +93,7 @@ class OkHttpSrv extends ServerTpl {
         protected       Map<String, Object>                       cookies
         protected       String                                    contentType
         protected       String                                    jsonBodyStr
+        protected       boolean                                   print
 
         protected OkHttp(OkHttpSrv parent, String urlStr, Request.Builder builder) {
             if (builder == null) throw new NullPointerException('builder == null')
@@ -138,6 +139,7 @@ class OkHttpSrv extends ServerTpl {
             builder.addHeader(name, value.toString())
             this
         }
+        OkHttp print() {this.print = true; this}
         // 请求执行
         def execute(Consumer<String> okFn = null, Consumer<Exception> failFn = {throw it}) {
             if ('GET' == builder.method) { // get 请求拼装参数
@@ -181,7 +183,7 @@ class OkHttpSrv extends ServerTpl {
                 cookies.each { ls.add(Cookie.parse(url, "$it.key=$it.value")) }
             }
 
-            parent.log.info('Send http: {}, params: {}', urlStr, params?:jsonBodyStr)
+            if (print) parent.log.info('Send http: {}, params: {}', urlStr, params?:jsonBodyStr)
             // 发送请求
             def call =  parent.client.newCall(builder.url(url).build())
             if (okFn) { // 异步请求

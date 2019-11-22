@@ -45,9 +45,9 @@ if (logPath) { // 有日志输出目录配置
             file = "$logPath/${logFileName}.log"
             rollingPolicy(SizeAndTimeBasedRollingPolicy) {
                 delegate.fileNamePattern = "${logPath}/${logFileName}.%d{yyyy-MM-dd}.log.%i"
-                delegate.maxFileSize = FileSize.valueOf('7MB')
-                delegate.maxHistory = 100
-                delegate.totalSizeCap = FileSize.valueOf('5GB')
+                delegate.maxFileSize = FileSize.valueOf('10MB')
+                delegate.maxHistory = 1000
+                delegate.totalSizeCap = FileSize.valueOf('100GB')
             }
         }
     }

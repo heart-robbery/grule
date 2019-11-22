@@ -1,7 +1,9 @@
 @cd %~dp0
 
-@echo copy dependencies jar
-@call ./gradle-embed/bin/gradle clean deps
+@if exist ./gradle-embed/ (
+    @echo copy dependencies jar
+    @call ./gradle-embed/bin/gradle clean deps
+)
 
 @echo start ...
 cd src/

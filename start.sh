@@ -1,7 +1,10 @@
 #!/bin/sh
 cd `dirname $0`
-./gradle-embed/bin/gradle clean deps
+if [ -d "./gradle-embed" ]; then
+  echo copy dependencies jar
+  sh ./gradle-embed/bin/gradle clean deps
+fi
 
 echo start...
-cd src 
-../bin/groovy $@ main.groovy
+cd src
+sh ../bin/groovy $@ main.groovy
