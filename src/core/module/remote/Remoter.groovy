@@ -1,4 +1,4 @@
-package core.module.remoter
+package core.module.remote
 
 import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
@@ -145,7 +145,7 @@ class Remoter extends ServerTpl {
      * @param data 数据
      * @param reply 响应回调(传参为响应的数据)
      */
-    protected void receiveEventReq(JSONObject data, Consumer<Object> reply) {
+    protected void receiveEventReq(JSONObject data, Consumer<String> reply) {
         log.debug("Receive event request: {}", data);
         boolean fReply = Boolean.TRUE.equals(data.getBoolean("reply")); // 是否需要响应
         try {

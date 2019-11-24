@@ -301,7 +301,7 @@ class RatpackWeb extends ServerTpl {
 
 
     // 每小时统计请求的次数
-    protected Map<String, LongAdder> hourCount = new ConcurrentHashMap<>(3)
+    protected final Map<String, LongAdder> hourCount = new ConcurrentHashMap<>(3)
     // 请求统计
     protected def count() {
         SimpleDateFormat sdf = new SimpleDateFormat('MM-dd HH')
@@ -319,12 +319,12 @@ class RatpackWeb extends ServerTpl {
         }
         count.increment()
         if (isNew) {
-            final Calendar cal = Calendar.getInstance();
+            final Calendar cal = Calendar.getInstance()
             cal.setTime(new Date())
             cal.add(Calendar.HOUR_OF_DAY, -1)
             String lastHour = sdf.format(cal.getTime())
             LongAdder c = hourCount.remove(lastHour)
-            if (c != null) log.info('{} 时共处理 http 请求: {} 个', lastHour, c)
+            if (c) log.info('{} 时共处理 http 请求: {} 个', lastHour, c)
         }
     }
 

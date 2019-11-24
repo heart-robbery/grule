@@ -110,6 +110,9 @@ class ServerTpl {
     Integer getInteger(String name, Integer defaultValue) { Integer.valueOf(attrs[(name)]?:defaultValue) }
 
 
+    Double getDouble(String name, Double defaultValue) { Double.valueOf(attrs[(name)]?:defaultValue) }
+
+
     String getStr(String name, String defaultValue) { Objects.toString(attrs[(name)]?:defaultValue) }
 
 

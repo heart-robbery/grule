@@ -22,6 +22,16 @@ class Utils {
 
 
     /**
+     * 判断系统是否为 linux 系统
+     * 判断方法来源 {@link io.netty.channel.epoll.Native#loadNativeLibrary()}
+     * @return
+     */
+    static boolean isLinux() {
+        System.getProperty("os.name").toLowerCase(Locale.UK).trim().startsWith("linux")
+    }
+
+
+    /**
      * 查找方法
      * @param clz
      * @param mName

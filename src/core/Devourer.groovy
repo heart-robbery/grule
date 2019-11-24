@@ -95,17 +95,17 @@ class Devourer {
      * 排对个数
      * @return
      */
-    int getWaitingCount() { return waiting.size() }
+    int getWaitingCount() { waiting.size() }
 
 
 
     def shutdown() {
-        if (exec instanceof ExecutorService) ((ExecutorService) exec).shutdown();
+        if (exec instanceof ExecutorService) ((ExecutorService) exec).shutdown()
     }
 
 
     @Override
     String toString() {
-        return "running: " + running + ", waiting count: " + waiting.size();
+        return "running: " + running + ", waiting count: " + waiting.size()
     }
 }

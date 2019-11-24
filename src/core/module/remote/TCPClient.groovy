@@ -1,7 +1,6 @@
-package core.module.remoter
+package core.module.remote
 
 import cn.xnatural.enet.event.EL
-import cn.xnatural.enet.event.EP
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONException
 import com.alibaba.fastjson.JSONObject
@@ -9,7 +8,6 @@ import core.Value
 import core.module.ServerTpl
 import io.netty.bootstrap.Bootstrap
 import io.netty.buffer.ByteBuf
-import io.netty.buffer.Unpooled
 import io.netty.channel.Channel
 import io.netty.channel.ChannelFuture
 import io.netty.channel.ChannelHandlerContext
@@ -38,7 +36,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import java.util.function.Consumer
 import java.util.stream.Collectors
 
-import static java.util.concurrent.TimeUnit.SECONDS
 import static java.util.concurrent.TimeUnit.SECONDS
 
 class TCPClient extends ServerTpl {
@@ -292,7 +289,7 @@ class TCPClient extends ServerTpl {
      * 创建 tcp(netty) 客户端
      */
     protected void create() {
-        String loopType = getStr("loopType", (remoter.isLinux() ? "epoll" : "nio"));
+        String loopType = getStr("loopType", (isLinux() ? "epoll" : "nio"));
         Class ch = null;
         if ("epoll".equalsIgnoreCase(loopType)) {
             boos = new EpollEventLoopGroup(getInteger("threads-boos", 1), exec);

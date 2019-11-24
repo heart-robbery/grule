@@ -18,18 +18,23 @@ import static core.Utils.pid
 import static java.util.Collections.emptyList
 
 class AppContext {
-    static final    ConfigObject       env          = initEnv()
-    protected final Logger             log          = LoggerFactory.getLogger(AppContext.class)
+    static final    ConfigObject        env          = initEnv()
+    protected final Logger              log          = LoggerFactory.getLogger(AppContext.class)
     /**
      * 系统名字. 用于多个系统启动区别
      */
-    protected final String             name         = env.sys.name?:null
+    final           String              name         = env.sys.name ?: null
+    /**
+     * 实例Id
+     * NOTE: 保证唯一
+     */
+    final           String              id           = env.sys.id ?: (UUID.randomUUID().toString().replace('-', ''))
     /**
      * 系统运行线程池. {@link #initExecutor()}}*/
-    protected       ThreadPoolExecutor exec
+    protected       ThreadPoolExecutor  exec
     /**
      * 事件中心 {@link #initEp()}}*/
-    protected       EP                 ep
+    protected       EP                  ep
     /**
      * 服务对象源
      */
@@ -37,11 +42,11 @@ class AppContext {
     /**
      * 启动时间
      */
-    protected final Date                startup      = new Date()
+    final           Date                startup      = new Date()
     /**
      * jvm关闭钩子
      */
-    protected final Thread             shutdownHook = new Thread({
+    protected final Thread              shutdownHook = new Thread({
         // 通知各个模块服务关闭
         ep.fire("sys.stopping", EC.of(this).async(false).completeFn({ ec ->
             exec.shutdown()
