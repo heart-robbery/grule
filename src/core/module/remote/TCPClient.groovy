@@ -4,17 +4,11 @@ import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONException
 import com.alibaba.fastjson.JSONObject
-import core.Value
 import core.module.ServerTpl
 import io.netty.bootstrap.Bootstrap
 import io.netty.buffer.ByteBuf
-import io.netty.channel.Channel
-import io.netty.channel.ChannelFuture
-import io.netty.channel.ChannelHandlerContext
-import io.netty.channel.ChannelInboundHandlerAdapter
-import io.netty.channel.ChannelInitializer
-import io.netty.channel.ChannelOption
-import io.netty.channel.EventLoopGroup
+import io.netty.buffer.Unpooled
+import io.netty.channel.*
 import io.netty.channel.epoll.EpollEventLoopGroup
 import io.netty.channel.epoll.EpollSocketChannel
 import io.netty.channel.nio.NioEventLoopGroup
@@ -23,6 +17,7 @@ import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.codec.DelimiterBasedFrameDecoder
 import io.netty.util.AttributeKey
 import io.netty.util.ReferenceCountUtil
+import org.h2.server.TcpServer
 import org.slf4j.event.Level
 
 import javax.annotation.Resource
@@ -36,28 +31,25 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import java.util.function.Consumer
 import java.util.stream.Collectors
 
+import static core.Utils.linux
 import static java.util.concurrent.TimeUnit.SECONDS
 
 class TCPClient extends ServerTpl {
     @Resource
-    protected       Executor             exec;
-    protected       Map<String, AppInfo> appInfoMap = new ConcurrentHashMap<>();
-    protected       EventLoopGroup       boos;
-    protected       Bootstrap            boot;
+    protected       Executor             exec
+    @Resource
+    protected       TcpServer   tcpServer
+    protected       Map<String, AppInfo> appInfoMap = new ConcurrentHashMap<>()
+    protected       EventLoopGroup       boos
+    protected       Bootstrap            boot
     /**
      * 服务中心系统名字.
      * 会把 appName指向的系统 当作自己的服务注册服务. 并向 appName指向的系统注册自己
      */
-    protected       String               rcAppName;
-    /**
-     * 客户端id
-     */
-    protected       String               id
-    /**
-     * 系统名字(标识)
-     */
-    @Value('$sys.name')
-    protected       String          sysName
+    protected       String               rcAppName
+    @Lazy
+    final           String                                 delimiter  = getStr('delimiter', '')
+    final Map<String, Consumer<String>> completeFnMap = new ConcurrentHashMap<>()
 
 
     TCPClient() { super("tcp-client") }
@@ -65,28 +57,27 @@ class TCPClient extends ServerTpl {
 
     @EL(name = 'sys.starting')
     def start() {
-        rcAppName = getStr("registrationCenterAppName", "rc")
+        rcAppName = getStr("masterAppName", "master")
         // 连接注册中心的的是大连接数:默认1个
-        if (!attrs.containsKey(rcAppName + ".maxConnectionPerHp")) attr(rcAppName + ".maxConnectionPerHp", 1);
-        id = getStr("id", sysName + "_" + UUID.randomUUID().toString()); // NOTE: 在整个集群中唯一
-        if (!id) throw new IllegalArgumentException(getName() + ".id can not must be empty");
-        attrs.forEach((k, v) -> {
+        if (!attrs.containsKey(rcAppName + ".maxConnectionPerHp")) attr(rcAppName + ".maxConnectionPerHp", 1)
+        attrs.forEach{String k, v ->
             if (k.endsWith(".hosts")) { // 例: app1.hosts=ip1:8201,ip2:8202,ip2:8203
-                String appName = k.split("\\.")[0].trim();
+                String appName = k.split("\\.")[0].trim()
                 for (String hp : ((String) v).split(",")) {
-                    String[] arr = hp.trim().split(":");
-                    appInfoMap.computeIfAbsent(appName, (s) -> new AppInfo(s)).hps.add(arr[0].trim() + ":" + Integer.valueOf(arr[1].trim()));
+                    String[] arr = hp.trim().split(":")
+                    appInfoMap.computeIfAbsent(appName, (s) -> new AppInfo(s)).hps.add(arr[0].trim() + ":" + Integer.valueOf(arr[1].trim()))
                 }
             }
-        });
-        create();
+        }
+        create()
     }
 
 
+    @EL(name = 'sys.stopping')
     protected void stop() {
-        if (boos != null) boos.shutdownGracefully();
-        boot = null;
-        appInfoMap.clear();
+        boos?.shutdownGracefully()
+        boot = null
+        appInfoMap.clear()
     }
 
 
@@ -94,7 +85,14 @@ class TCPClient extends ServerTpl {
     protected void sysStarted() {
         // 注册自己到自己
         if (getBoolean("registerSelf", true)) {
-            synchronized (remoter.tcpServer.appInfoMap) {
+            tcpServer?.upDevourer.offer{
+                JSONObject d
+                try { d = jo.getJSONObject("data"); appUp(d, ctx) }
+                catch (Exception ex) {
+                    log.error("Register up error!. data: " + d, ex)
+                }
+            }
+            synchronized (tcpServer.appInfoMap) {
                 JSONObject d = collectData();
                 if (isNotEmpty(d)) {
                     d.put("_time", System.currentTimeMillis());
@@ -147,8 +145,9 @@ class TCPClient extends ServerTpl {
      * @param data app信息.例: {"tcp":"192.168.56.1:8001","name":"rc","http":"localhost:8000","id":"rc_b70d18d5-2269-4512-91ea-6380325e2a84"}
      */
     @EL(name = "updateAppInfo")
-    protected void updateAppInfo(JSONObject data) {
+    def updateAppInfo(final JSONObject data) {
         log.trace("Update app info: {}", data);
+        if (data == null) return
         if (Objects.equals(id, data.getString("id"))) return; // 不把系统本身的信息放进去
         String appName = data.getString("name");
         AppInfo app = Optional.ofNullable(appInfoMap.get(appName)).orElseGet(() -> {
@@ -186,22 +185,47 @@ class TCPClient extends ServerTpl {
 
 
     /**
+     * 发送数据到host:port
+     * @param host 主机地址
+     * @param port 端口
+     * @param data 要发送的数据
+     */
+    def send(String host, Integer port, String data) {
+        log.debug("Send data to '{}:{}'. data: " + data, host, port)
+        ChannelFuture cf = boot.connect(host, port)
+        cf.await(3000L)
+        cf.channel().writeAndFlush(toByteBuf(data))
+    }
+
+
+    /**
+     * 向app发送数据
+     * @param appName 应用名
+     * @param data
+     */
+    def send(String appName, String data) {
+
+    }
+
+
+
+    /**
      * 发送数据 到 app
      * @param appName 向哪个应用发数据
      * @param data 要发送的数据
      * @param completeFn 发送完成后回调函数
      */
-    public void send(String appName, Object data, Consumer<Throwable> completeFn) {
-        log.trace("Send data to app '{}'. data: {}", appName, data);
-        Channel ch = channel(appName);
+    def send(String appName, String data, Consumer<Throwable> completeFn) {
+        log.trace("Send data to app '{}'. data: {}", appName, data)
+        Channel ch = channel(appName)
         ch.writeAndFlush(remoter.toByteBuf(data)).addListener(f -> {
             exec.execute(() -> {
                 LinkedList<Long> record = appInfoMap.get(appName).hpErrorRecord.get(ch.attr(AttributeKey.valueOf("hp")).get());
                 if (f.isSuccess() && !record.isEmpty()) record.clear();
-                else if (f.cause() != null) record.addFirst(System.currentTimeMillis());
-                if (completeFn != null) completeFn.accept(f.cause());
-            });
-        });
+                else if (f.cause() != null) record.addFirst(System.currentTimeMillis())
+                if (completeFn != null) completeFn.accept(f.cause())
+            })
+        })
     }
 
 
@@ -288,44 +312,44 @@ class TCPClient extends ServerTpl {
     /**
      * 创建 tcp(netty) 客户端
      */
-    protected void create() {
-        String loopType = getStr("loopType", (isLinux() ? "epoll" : "nio"));
-        Class ch = null;
+    protected def create() {
+        String loopType = getStr("loopType", (isLinux() ? "epoll" : "nio"))
+        Class chClz
         if ("epoll".equalsIgnoreCase(loopType)) {
-            boos = new EpollEventLoopGroup(getInteger("threads-boos", 1), exec);
-            ch = EpollSocketChannel.class;
+            boos = new EpollEventLoopGroup(getInteger("threads-boos", 1), exec)
+            chClz = EpollSocketChannel.class
         } else if ("nio".equalsIgnoreCase(loopType)) {
-            boos = new NioEventLoopGroup(getInteger("threads-boos", 1), exec);
-            ch = NioSocketChannel.class;
+            boos = new NioEventLoopGroup(getInteger("threads-boos", 1), exec)
+            chClz = NioSocketChannel.class
         }
-        boot = new Bootstrap().group(boos).channel(ch)
+        boot = new Bootstrap().group(boos).channel(chClz)
                 .option(ChannelOption.SO_KEEPALIVE, true)
                 .option(ChannelOption.TCP_NODELAY, true)
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel ch) throws Exception {
-                        ch.pipeline().addLast(new DelimiterBasedFrameDecoder(remoter.getInteger("maxFrameLength", 1024 * 1024), remoter.delimiter));
+                        ch.pipeline().addLast(new DelimiterBasedFrameDecoder(getInteger("maxFrameLength", 1024 * 1024), Unpooled.copiedBuffer(delimiter.getBytes("utf-8"))));
                         ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
                             @Override
-                            public void channelUnregistered(ChannelHandlerContext ctx) throws Exception {
-                                removeChannel(ch);
+                            void channelUnregistered(ChannelHandlerContext ctx) throws Exception {
+                                removeChannel(ch)
                             }
                             @Override
-                            public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-                                log.error(cause, getName() + " error");
+                            void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+                                log.error(name + " error", cause)
                             }
                             @Override
-                            public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                                ByteBuf buf = (ByteBuf) msg;
-                                String str = null;
+                            void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                                ByteBuf buf = (ByteBuf) msg
+                                String str = null
                                 try {
-                                    str = buf.toString(Charset.forName("utf-8"));
-                                    receiveReply(ctx, str);
+                                    str = buf.toString(Charset.forName("utf-8"))
+                                    receiveReply(ctx, str)
                                 } catch (JSONException ex) {
                                     log.error("Received Error Data from '{}'. data: {}, errMsg: {}", ctx.channel().remoteAddress(), str, ex.getMessage());
-                                    ctx.close();
+                                    ctx.close()
                                 } finally {
-                                    ReferenceCountUtil.release(msg);
+                                    ReferenceCountUtil.release(msg)
                                 }
                             }
                         });
@@ -425,54 +449,53 @@ class TCPClient extends ServerTpl {
 
 
     /**
-     * 收集本系统信息
-     * 例: {"tcp":"192.168.56.1:8001","name":"rc","http":"localhost:8000","id":"rc_b70d18d5-2269-4512-91ea-6380325e2a84"}
-     * @return
+     * 自己的信息
+     * 例: {"id":"rc_b70d18d5-2269-4512-91ea-6380325e2a84", "name":"rc", "tcp":"192.168.56.1:8001", "http":"localhost:8000"}
      */
-    protected JSONObject collectData() {
-        JSONObject data = new JSONObject(3);
-        // 例: localhost:8080
-        Optional.ofNullable(ep.fire("http.getHp")).filter(o -> isNotEmpty((String) o)).ifPresent(hp -> data.put("http", hp));
-        Optional.ofNullable(remoter.tcpServer.port).ifPresent(port -> {
-            Set<String> addrs = remoter.tcpServer.boundAddrs;
-            if (isNotEmpty(addrs)) {
-                data.put("tcp", addrs.stream().map(s -> s + ":" + port).collect(Collectors.joining(",")));
-            }
-        });
-        if (!data.isEmpty()) {
-            data.fluentPut("name", remoter.sysName).fluentPut("id", id);
-        }
-        return data;
+    def getSelfInfo() {
+        JSONObject data = new JSONObject(4)
+        data.put("id", app.id)
+        data.put("name", app.name)
+        Optional.ofNullable(ep.fire("http.getHp")).ifPresent{ data.put("http", it) }
+        data.put("tcp", hps)
+
+        if (!data.containsKey('tcp') && !data.containsKey('http')) return null
+        return data
     }
 
 
+    ByteBuf toByteBuf(String data) { Unpooled.copiedBuffer((data + delimiter).getBytes('utf-8')) }
+
+
+
+
     protected class AppInfo {
-        protected String                        name;
+        protected String                        name
         /**
          * app 连接配置信息
          * hp(host:port)
          */
-        protected Set<String>                   hps            = ConcurrentHashMap.newKeySet();
+        protected Set<String>                   hps            = ConcurrentHashMap.newKeySet()
         /**
          * {@link #chs} 读写锁
          */
-        protected ReadWriteLock rwLock         = new ReentrantReadWriteLock();
+        protected ReadWriteLock rwLock         = new ReentrantReadWriteLock()
         /**
          * list Channel
          */
-        protected List<Channel>                 chs            = new ArrayList(7);
+        protected List<Channel>                 chs            = new ArrayList(7)
         /**
          * hp(host:port) -> list Channel
          */
-        protected Map<String, AtomicInteger>    hpChannelCount = new ConcurrentHashMap<>();
+        protected Map<String, AtomicInteger>    hpChannelCount = new ConcurrentHashMap<>()
         /**
          * hp(host:port) -> 连接异常时间
          */
-        protected Map<String, LinkedList<Long>> hpErrorRecord  = new ConcurrentHashMap<>();
+        protected Map<String, LinkedList<Long>> hpErrorRecord  = new ConcurrentHashMap<>()
 
         public AppInfo(String name) {
-            if (isEmpty(name)) throw new IllegalArgumentException("name must not be empty");
-            this.name = name;
+            if (isEmpty(name)) throw new IllegalArgumentException("name must not be empty")
+            this.name = name
         }
     }
 }

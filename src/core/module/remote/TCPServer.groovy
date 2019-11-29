@@ -10,6 +10,7 @@ import core.Devourer
 import core.Utils
 import core.Value
 import core.module.ServerTpl
+import groovy.transform.PackageScope
 import io.netty.bootstrap.ServerBootstrap
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
@@ -42,10 +43,8 @@ import static java.util.concurrent.TimeUnit.SECONDS
 class TCPServer extends ServerTpl {
     @Lazy
     protected       Remoter                                remoter    = bean(Remoter)
-    @Lazy
-    protected       TCPClient                              tcpClient    = bean(TCPClient)
     @Resource
-    protected  AppContext app
+    protected       AppContext                             app
     @Resource
     protected       Executor                               exec
     @Lazy
@@ -61,7 +60,6 @@ class TCPServer extends ServerTpl {
      * 保存 app info 的属性信息
      */
     protected final Map<String, List<Map<String, Object>>> appInfoMap = new ConcurrentHashMap<>()
-    @Lazy
     protected final Devourer                               upDevourer = new Devourer("registerUp", exec)
 
 
@@ -80,9 +78,10 @@ class TCPServer extends ServerTpl {
     @EL(name = 'sys.stopping')
     def stop() {
         log.info("Close '{}'", name)
-        this.@boos?.shutdownGracefully()
-        this.@$upDevourer?.shutdown()
+        boos?.shutdownGracefully()
+        upDevourer?.shutdown()
     }
+
 
 
     /**
@@ -189,7 +188,7 @@ class TCPServer extends ServerTpl {
             }
         } else if ("cmd-log" == t) { // telnet 命令行设置日志等级
             // telnet localhost 8001
-            // 例: {"type":"cmd-log", "source": "xxx", "data": "cn.xnatural.enet.server.remote: debug"}$_$
+            // 例: {"type":"cmd-log", "source": "xxx", "data": "core.module.remote: debug"}$_$
             exec.execute{
                 String[] arr = jo.getString("data").split(":")
                 // Log.setLevel(arr[0].trim(), arr[1].trim())
@@ -229,7 +228,8 @@ class TCPServer extends ServerTpl {
      * @param data
      * @param ctx
      */
-    protected void appUp(JSONObject data, ChannelHandlerContext ctx) {
+    @PackageScope
+    def appUp(final JSONObject data, ChannelHandlerContext ctx) {
         if (!data) { log.warn("Register data is empty"); return}
         log.debug("Receive register up: {}", data)
         if (!data['name'] || !data['id']) { // 数据验证
@@ -262,12 +262,12 @@ class TCPServer extends ServerTpl {
         }
 
         //3. 同步注册信息
-        ep.fire("updateAppInfo", data) // 同步信息给本服务器的tcp-client
+        if (data['id'] != app.id) ep.fire("updateAppInfo", data) // 同步信息给本服务器的tcp-client
         appInfoMap.each {e ->
             e.value.each {d ->
                 // 返回所有的注册信息给当前来注册的客户端
                 if (d["id"] != data["id"]) {
-                    ctx.writeAndFlush(Unpooled.copiedBuffer(new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", d).toString() + delimiter))
+                    ctx?.writeAndFlush(Unpooled.copiedBuffer(new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", d).toString() + delimiter))
                 }
                 // 如果是新系统上线, 则主动通知其它系统
                 if (isNew && d['id'] != data['id'] && d['id'] != app.id) {
@@ -305,7 +305,7 @@ class TCPServer extends ServerTpl {
             cal.add(Calendar.HOUR_OF_DAY, -1)
             String lastHour = sdf.format(cal.getTime())
             LongAdder c = hourCount.remove(lastHour)
-            if (c) log.info("{} 时共处理 tcp 数据包: {} 个", lastHour, c)
+            if (c != null) log.info("{} 时共处理 tcp 数据包: {} 个", lastHour, c)
         }
     }
 }

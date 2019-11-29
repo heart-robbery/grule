@@ -28,12 +28,14 @@ class AppContext {
      * 实例Id
      * NOTE: 保证唯一
      */
-    final           String              id           = env.sys.id ?: (UUID.randomUUID().toString().replace('-', ''))
+    final           String              id           = env.sys.id ?: (name + '_' + UUID.randomUUID().toString().replace('-', ''))
     /**
-     * 系统运行线程池. {@link #initExecutor()}}*/
+     * 系统运行线程池. {@link #initExecutor()}}
+     */
     protected       ThreadPoolExecutor  exec
     /**
-     * 事件中心 {@link #initEp()}}*/
+     * 事件中心 {@link #initEp()}}
+     */
     protected       EP                  ep
     /**
      * 服务对象源
@@ -113,7 +115,7 @@ class AppContext {
      */
     def addSource(
         Object source,
-        String name = source instanceof ServerTpl ? source.name : (source?.class.simpleName.uncapitalize())
+        String name = source instanceof ServerTpl ? source['name'] : (source?.class.simpleName.uncapitalize())
     ) {
         if (!source || !name) throw new IllegalArgumentException('source and name must be not empty')
         if ("sys".equalsIgnoreCase(name) || "env".equalsIgnoreCase(name) || "log".equalsIgnoreCase(name)) {
@@ -181,10 +183,11 @@ class AppContext {
     /**
      * 全局查找Bean
      * @param type
+     * @param name
      * @param <T>
      * @return
      */
-    def <T> T bean(Class<T> type) { (T) ep.fire("bean.get", type) }
+    def <T> T bean(Class<T> type, String name = null) { (T) ep.fire("bean.get", type, name) }
 
 
     /**

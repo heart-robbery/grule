@@ -2,6 +2,7 @@ package ctrl.ratpack
 
 
 import core.Utils
+import groovy.transform.PackageScope
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.http.DefaultHttpResponse
 import io.netty.handler.codec.http.HttpRequest
@@ -12,6 +13,7 @@ import ratpack.server.internal.NettyHandlerAdapter
 
 import static io.netty.handler.codec.http.HttpResponseStatus.SERVICE_UNAVAILABLE
 
+@PackageScope
 class RatpackHander extends NettyHandlerAdapter {
     RatpackWeb rw
 

@@ -82,10 +82,11 @@ class ServerTpl {
     /**
      * 全局查找Bean
      * @param type
+     * @param name
      * @param <T>
      * @return
      */
-    protected <T> T bean(Class<T> type) { (T) ep.fire("bean.get", type) }
+    protected <T> T bean(Class<T> type, String name = null) { (T) ep.fire("bean.get", type, name) }
 
 
 
