@@ -98,6 +98,8 @@ class TCPServer extends ServerTpl {
             chClz = NioServerSocketChannel.class
         }
         ServerBootstrap sb = new ServerBootstrap()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, getInteger('connectTimeout', 5000))
+                .option(ChannelOption.SO_TIMEOUT, getInteger("soTimeout", 10000))
                 .group(boos).channel(chClz)
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override

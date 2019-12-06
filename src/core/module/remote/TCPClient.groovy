@@ -4,6 +4,7 @@ import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONException
 import com.alibaba.fastjson.JSONObject
+import core.AppContext
 import core.module.ServerTpl
 import io.netty.bootstrap.Bootstrap
 import io.netty.buffer.ByteBuf
@@ -36,39 +37,47 @@ import static java.util.concurrent.TimeUnit.SECONDS
 
 class TCPClient extends ServerTpl {
     @Resource
-    protected       Executor             exec
+    protected Remoter              remoter
     @Resource
-    protected       TcpServer   tcpServer
-    protected       Map<String, AppInfo> appInfoMap = new ConcurrentHashMap<>()
-    protected       EventLoopGroup       boos
-    protected       Bootstrap            boot
+    protected AppContext                  app
+    @Resource
+    protected Executor                    exec
+    @Resource
+    protected TcpServer                   tcpServer
+    protected Map<String, AppInfo>        appInfoMap    = new ConcurrentHashMap<>()
+    protected final Map<String, AppGroup> apps          = new ConcurrentHashMap<>()
+    protected EventLoopGroup              boos
+    protected Bootstrap                   boot
     /**
      * 服务中心系统名字.
      * 会把 appName指向的系统 当作自己的服务注册服务. 并向 appName指向的系统注册自己
      */
-    protected       String               rcAppName
     @Lazy
-    final           String                                 delimiter  = getStr('delimiter', '')
-    final Map<String, Consumer<String>> completeFnMap = new ConcurrentHashMap<>()
+    protected String                      masterAppName = getStr("masterAppName", "master")
+    @Lazy
+    protected String                      masterHps = getStr("masterHps", "")
+    @Lazy
+    final     String                      delimiter     = getStr('delimiter', '')
 
 
     TCPClient() { super("tcp-client") }
+    TCPClient(String name) { super(name) }
 
 
     @EL(name = 'sys.starting')
     def start() {
-        rcAppName = getStr("masterAppName", "master")
         // 连接注册中心的的是大连接数:默认1个
-        if (!attrs.containsKey(rcAppName + ".maxConnectionPerHp")) attr(rcAppName + ".maxConnectionPerHp", 1)
-        attrs.forEach{String k, v ->
-            if (k.endsWith(".hosts")) { // 例: app1.hosts=ip1:8201,ip2:8202,ip2:8203
-                String appName = k.split("\\.")[0].trim()
-                for (String hp : ((String) v).split(",")) {
-                    String[] arr = hp.trim().split(":")
-                    appInfoMap.computeIfAbsent(appName, (s) -> new AppInfo(s)).hps.add(arr[0].trim() + ":" + Integer.valueOf(arr[1].trim()))
-                }
-            }
-        }
+//        if (!attrs.containsKey(masterAppName + ".maxConnectionPerHp")) attr(masterAppName + ".maxConnectionPerHp", 1)
+//        attrs.forEach{String k, v ->
+//            if (k.endsWith(".hosts")) { // 例: app1.hosts=ip1:8201,ip2:8202,ip2:8203
+//                String appName = k.split("\\.")[0].trim()
+//                for (String hp : ((String) v).split(",")) {
+//                    String[] arr = hp.trim().split(":")
+//                    apps.computeIfAbsent(appName, {new AppGroup(name: appName)}).addNode()
+//                    appInfoMap.computeIfAbsent(appName, (s) -> new AppInfo(s)).hps.add(arr[0].trim() + ":" + Integer.valueOf(arr[1].trim()))
+//                }
+//            }
+//        }
         create()
     }
 
@@ -77,6 +86,7 @@ class TCPClient extends ServerTpl {
     protected void stop() {
         boos?.shutdownGracefully()
         boot = null
+        apps.clear()
         appInfoMap.clear()
     }
 
@@ -109,10 +119,10 @@ class TCPClient extends ServerTpl {
      */
     protected void register() {
         Runnable loopFn = new Runnable() {
-            boolean printInfo = true; // 是否用 INFO日志等级打印注册成功信息
+            boolean printInfo = true // 是否用 INFO日志等级打印注册成功信息
             @Override
             void run() {
-                AppInfo ai = appInfoMap.get(rcAppName); // 查找自己的注册中心服务
+                AppInfo ai = appInfoMap.get(masterAppName); // 查找自己的注册中心服务
                 if (ai == null) return;
                 JSONObject data = collectData();
                 if (isEmpty(data)) return;
@@ -142,14 +152,14 @@ class TCPClient extends ServerTpl {
 
     /**
      * 更新 app 信息
-     * @param data app信息.例: {"tcp":"192.168.56.1:8001","name":"rc","http":"localhost:8000","id":"rc_b70d18d5-2269-4512-91ea-6380325e2a84"}
+     * @param data app信息.例: {"name":"rc", "id":"rc_b70d18d5-2269-4512-91ea-6380325e2a84", "tcp":"192.168.56.1:8001","http":"localhost:8000"}
      */
     @EL(name = "updateAppInfo")
     def updateAppInfo(final JSONObject data) {
-        log.trace("Update app info: {}", data);
+        log.trace("Update app info: {}", data)
         if (data == null) return
-        if (Objects.equals(id, data.getString("id"))) return; // 不把系统本身的信息放进去
-        String appName = data.getString("name");
+        if (app.id == data.getString("id")) return // 不把系统本身的信息放进去
+        String appName = data.getString("name")
         AppInfo app = Optional.ofNullable(appInfoMap.get(appName)).orElseGet(() -> {
             AppInfo o;
             synchronized (appInfoMap) {
@@ -192,21 +202,25 @@ class TCPClient extends ServerTpl {
      */
     def send(String host, Integer port, String data) {
         log.debug("Send data to '{}:{}'. data: " + data, host, port)
-        ChannelFuture cf = boot.connect(host, port)
-        cf.await(3000L)
-        cf.channel().writeAndFlush(toByteBuf(data))
+        boot.connect(host, port).addListener{ChannelFuture f ->
+            if (f.cause() != null) {
+                f.channel().writeAndFlush(toByteBuf(data))
+            } else log.error("连接失败. '{}:{}'", host, port)
+        }
     }
+
 
 
     /**
      * 向app发送数据
      * @param appName 应用名
-     * @param data
+     * @param data 要发送的数据
      */
     def send(String appName, String data) {
-
+        def group = apps.get(appName)
+        if (group == null) throw new RuntimeException("Not found app $appName")
+        group.sendToAny(data)
     }
-
 
 
     /**
@@ -325,10 +339,13 @@ class TCPClient extends ServerTpl {
         boot = new Bootstrap().group(boos).channel(chClz)
                 .option(ChannelOption.SO_KEEPALIVE, true)
                 .option(ChannelOption.TCP_NODELAY, true)
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, getInteger('connectTimeout', 5000))
+                .option(ChannelOption.SO_TIMEOUT, getInteger("soTimeout", 10000))
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel ch) throws Exception {
-                        ch.pipeline().addLast(new DelimiterBasedFrameDecoder(getInteger("maxFrameLength", 1024 * 1024), Unpooled.copiedBuffer(delimiter.getBytes("utf-8"))));
+                        // ch.pipeline().addLast(new IdleStateHandler(getLong("readerIdleTime", 12 * 60 * 60L), getLong("writerIdleTime", 10L), getLong("allIdleTime", 0L), SECONDS))
+                        ch.pipeline().addLast(new DelimiterBasedFrameDecoder(getInteger("maxFrameLength", 1024 * 1024), Unpooled.copiedBuffer(delimiter.getBytes("utf-8"))))
                         ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
                             @Override
                             void channelUnregistered(ChannelHandlerContext ctx) throws Exception {
@@ -346,15 +363,15 @@ class TCPClient extends ServerTpl {
                                     str = buf.toString(Charset.forName("utf-8"))
                                     receiveReply(ctx, str)
                                 } catch (JSONException ex) {
-                                    log.error("Received Error Data from '{}'. data: {}, errMsg: {}", ctx.channel().remoteAddress(), str, ex.getMessage());
+                                    log.error("Received Error Data from '{}'. data: {}, errMsg: {}", ctx.channel().remoteAddress(), str, ex.getMessage())
                                     ctx.close()
                                 } finally {
                                     ReferenceCountUtil.release(msg)
                                 }
                             }
-                        });
+                        })
                     }
-                });
+                })
     }
 
 
@@ -367,14 +384,14 @@ class TCPClient extends ServerTpl {
         log.trace("Receive reply from '{}': {}", ctx.channel().remoteAddress(), dataStr);
         JSONObject jo = JSON.parseObject(dataStr);
         String type = jo.getString("type");
-        if ("event".equals(type)) {
-            exec.execute(() -> remoter.receiveEventResp(jo.getJSONObject("data")));
-        } else if ("updateAppInfo".equals(type)) {
+        if ("event"== type) {
+            exec.execute(() -> remoter?.receiveEventResp(jo.getJSONObject("data")))
+        } else if ("updateAppInfo" == type) {
             exec.execute(() -> {
-                JSONObject d = null;
-                try { d = jo.getJSONObject("data"); updateAppInfo(d); }
+                JSONObject d
+                try { d = jo.getJSONObject("data"); updateAppInfo(d) }
                 catch (Exception ex) {
-                    log.error(ex, "updateAppInfo error. data: {}", d);
+                    log.error("updateAppInfo error. data: " + d, ex)
                 }
             });
         }
@@ -386,19 +403,19 @@ class TCPClient extends ServerTpl {
      * @param ch
      */
     protected void removeChannel(Channel ch) {
-        AppInfo app = (AppInfo) ch.attr(AttributeKey.valueOf("app")).get();
-        if (app == null) return;
-        String hp = (String) ch.attr(AttributeKey.valueOf("hp")).get();
+        AppInfo app = (AppInfo) ch.attr(AttributeKey.valueOf("app")).get()
+        if (app == null) return
+        String hp = (String) ch.attr(AttributeKey.valueOf("hp")).get()
         try {
-            app.rwLock.writeLock().lock();
+            app.rwLock.writeLock().lock()
             for (Iterator<Channel> it = app.chs.iterator(); it.hasNext(); ) {
-                if (it.next().equals(ch)) {it.remove(); break;}
+                if (it.next()== ch) {it.remove(); break}
             }
         } finally {
-            app.rwLock.writeLock().unlock();
+            app.rwLock.writeLock().unlock()
         }
-        AtomicInteger count = app.hpChannelCount.get(hp); count.decrementAndGet();
-        log.info("Remove TCP Connection to '{}'[{}]. left count: {}", app.name, hp, count);
+        AtomicInteger count = app.hpChannelCount.get(hp); count.decrementAndGet()
+        log.info("Remove TCP Connection to '{}'[{}]. left count: {}", app.name, hp, count)
     }
 
 
@@ -408,7 +425,7 @@ class TCPClient extends ServerTpl {
      * @param hp
      */
     protected void redeem(AppInfo appInfo, String hp) {
-        LinkedList<Integer> pass = new LinkedList<>();
+        LinkedList<Integer> pass = new LinkedList<>()
         for (String s : getStr("redeemFrequency", "5, 10, 5, 10, 20, 35, 40, 45, 50, 60, 90, 120, 90, 120, 90, 60, 90, 60, 90, 60, 90, 120, 300, 120, 600, 300").split(",")) {
             try {
                 pass.add(Integer.valueOf(s.trim()));
@@ -464,9 +481,138 @@ class TCPClient extends ServerTpl {
     }
 
 
+    // 字符串 转换成 ByteBuf
     ByteBuf toByteBuf(String data) { Unpooled.copiedBuffer((data + delimiter).getBytes('utf-8')) }
 
 
+
+    // 应用组
+    protected class AppGroup {
+        String name
+        final List<Node> nodes = new LinkedList<>()
+        final Map<String, Node> nodeMap =  new ConcurrentHashMap<>()
+
+        // 添加应用节点
+        def addNode(String id, String tcpHp, String httpHp) {
+            def n = new Node(id: id, group: this, tcpHp: tcpHp, httpHp: httpHp)
+            if (id) {nodeMap.put(id, n)}
+            else nodes << n
+        }
+
+        // 随机选择一个节点发送数据
+        def sendToAny(String data) {
+            if (nodes.size() == 0) {
+                throw new RuntimeException("Not found any node for $name")
+            } else if (nodes.size()== 1) {
+                nodes.find {true}.value.send(data)
+            } else if (nodes.size() > 1) {
+                String[] arr = nodes.keySet().toArray()
+                nodes.get(arr[new Random().nextInt(arr.length)]).send(data)
+            }
+        }
+    }
+
+
+    // 实例节点
+    protected class Node {
+        AppGroup          group
+        String            id
+        String            tcpHp
+        String            httpHp
+        final ChannelPool tcpPool = new ChannelPool()
+
+
+        def setTcpHp(String hp) {
+            this.tcpHp = hp
+            def arr = hp.split(":")
+            tcpPool.host = arr[0].trim()
+            tcpPool.port = Integer.valueOf(arr[1].trim())
+            tcpPool.node = this
+            tcpPool.create(false) // 默认创建一个
+        }
+
+        // 发送数据
+        def send(String data) {
+            def ch = tcpPool.get()
+            ch.writeAndFlush(toByteBuf(data)).addListener{ChannelFuture cf ->
+                if (cf.cause() != null) {
+                    // TODO
+                    log.error("Send data fail. app: {}, tcpHp: {}. errMsg: " + cf.cause().message, group.name, tcpHp)
+                }
+            }
+        }
+    }
+
+
+    // netty Channel 连接池
+    protected class ChannelPool {
+        Node node
+        String host
+        Integer port
+        final ReadWriteLock rwLock = new ReentrantReadWriteLock()
+        final List<Channel> chs = new ArrayList<>(7)
+
+        // 获取连接Channel
+        def get(boolean sync = true) {
+            if (chs.size() == 0) create(sync)
+            if (!sync) return null// 非同步,则立即返回
+            if (chs.size() == 0) {
+                // TODO
+                throw new RuntimeException("Not found available Channel for $node.group.name, $node.id, ${host+':'+port}")
+            }
+            try {
+                rwLock.readLock().lock()
+                if (chs.size() == 1) {
+                    return chs.get(0)
+                } else {
+                    return chs.get(new Random().nextInt(chs.size())) // 随机选择连接
+                }
+            } finally {
+                rwLock.readLock().unlock()
+            }
+        }
+
+        // 创建新连接Channel
+        def create(boolean sync = true) {
+            try {
+                rwLock.writeLock().lock()
+                def f = boot.connect(host, port)
+                if (sync) { // 同步获取
+                    def ch = f.sync().channel()
+                    ch.attr(AttributeKey.valueOf("app"), node.group.name)
+                    ch.attr(AttributeKey.valueOf("id"), node.id)
+                    chs.add(ch)
+                } else {
+                    f.addListener{ChannelFuture cf ->
+                        if (cf.cause() == null) {
+                            def ch = cf.channel()
+                            ch.attr(AttributeKey.valueOf("app"), node.group.name)
+                            ch.attr(AttributeKey.valueOf("id"), node.id)
+                            chs.add(ch)
+                            log.info("New TCP Connection to '{}'[{}]. total count: " + chs.size(), node.group.name, (host+":"+port))
+                        }
+                        else log.error("连接失败. '{}:{}'", host, port)
+                    }
+                }
+            } finally {
+                rwLock.writeLock().unlock()
+            }
+        }
+
+        // 删除 连接Channel
+        def remove(Channel ch) {
+            try {
+                rwLock.writeLock().lock()
+                for (def it = chs.iterator(); it.hasNext(); ) {
+                    if (it.next() == ch) {
+                        it.remove(); break
+                    }
+                }
+            } finally {
+                rwLock.writeLock().unlock()
+            }
+        }
+    }
 
 
     protected class AppInfo {
@@ -493,8 +639,8 @@ class TCPClient extends ServerTpl {
          */
         protected Map<String, LinkedList<Long>> hpErrorRecord  = new ConcurrentHashMap<>()
 
-        public AppInfo(String name) {
-            if (isEmpty(name)) throw new IllegalArgumentException("name must not be empty")
+        AppInfo(String name) {
+            if (!name) throw new IllegalArgumentException("name must not be empty")
             this.name = name
         }
     }
