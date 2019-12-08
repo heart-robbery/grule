@@ -36,6 +36,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.LongAdder
+import java.util.function.Consumer
 
 import static core.Utils.linux
 import static java.util.concurrent.TimeUnit.SECONDS
@@ -48,7 +49,7 @@ class TCPServer extends ServerTpl {
     @Resource
     protected       Executor                               exec
     @Lazy
-    final           String                                 hps        = getStr('hps', null)
+    final           String                                 hp        = getStr('hp', '')
     @Lazy
     final           String                                 delimiter  = getStr('delimiter', '')
     protected       EventLoopGroup                         boos
@@ -61,6 +62,7 @@ class TCPServer extends ServerTpl {
      */
     protected final Map<String, List<Map<String, Object>>> appInfoMap = new ConcurrentHashMap<>()
     protected final Devourer                               upDevourer = new Devourer("registerUp", exec)
+    final List<Consumer<JSONObject>> handlers = new LinkedList<>()
 
 
     TCPServer() { super("tcp-server") }
@@ -69,7 +71,7 @@ class TCPServer extends ServerTpl {
     @EL(name = 'sys.starting')
     def start() {
         if (boos) throw new RuntimeException("$name is already running")
-        if (!hps) throw new RuntimeException("'${name}.hps' not config. format is 'host:port,host:port'")
+        if (!hp) throw new RuntimeException("'${name}.hp' not config. format is '[host]:port'")
         create()
         ep.fire("${name}.started")
     }
@@ -156,11 +158,10 @@ class TCPServer extends ServerTpl {
                 })
                 .childOption(ChannelOption.SO_KEEPALIVE, true)
 
-        hps.split(",").each{hp ->
-            String[] arr = hp.trim().split(':')
-            sb.bind(arr[0], arr[1]).sync()
-        }
-        log.info("Start listen TCP {}, type: {}", hps, loopType)
+        def arr = hp.trim().split(":")
+        if (arr[0]) sb.bind(arr[0], arr[1]).sync()
+        else sb.bind(Integer.valueOf(arr[1]))
+        log.info("Start listen TCP {}, type: {}", hp, loopType)
     }
 
 
@@ -174,11 +175,12 @@ class TCPServer extends ServerTpl {
         count() // 统计
 
         JSONObject jo = JSON.parseObject(dataStr)
+        handlers.each {it.accept(jo)}
 
         String t = jo.getString("type")
         if ("event" == t) { // 远程事件请求
             exec.execute{
-                remoter?.receiveEventReq(jo.getJSONObject("data"), {o -> ctx.writeAndFlush(Unpooled.copiedBuffer((o + delimiter).getBytes('utf-8')))})
+                remoter?.receiveEventReq(jo.getJSONObject("data"), {o -> ctx.writeAndFlush(Unpooled.copiedBuffer((o + (delimiter?:'')).getBytes('utf-8')))})
             }
         } else if ("up" == t) { // 应用注册在线通知
             upDevourer.offer{

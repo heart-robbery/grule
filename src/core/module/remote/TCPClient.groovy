@@ -37,27 +37,18 @@ import static java.util.concurrent.TimeUnit.SECONDS
 
 class TCPClient extends ServerTpl {
     @Resource
-    protected Remoter              remoter
+    protected       Remoter               remoter
     @Resource
-    protected AppContext                  app
+    protected       Executor              exec
     @Resource
-    protected Executor                    exec
-    @Resource
-    protected TcpServer                   tcpServer
-    protected Map<String, AppInfo>        appInfoMap    = new ConcurrentHashMap<>()
-    protected final Map<String, AppGroup> apps          = new ConcurrentHashMap<>()
-    protected EventLoopGroup              boos
-    protected Bootstrap                   boot
-    /**
-     * 服务中心系统名字.
-     * 会把 appName指向的系统 当作自己的服务注册服务. 并向 appName指向的系统注册自己
-     */
+    protected       TcpServer             tcpServer
+    protected final Map<String, Node>     hpNodes   = new ConcurrentHashMap<>()
+    protected final Map<String, AppGroup> apps      = new ConcurrentHashMap<>()
+    protected       EventLoopGroup        boos
+    protected       Bootstrap             boot
     @Lazy
-    protected String                      masterAppName = getStr("masterAppName", "master")
-    @Lazy
-    protected String                      masterHps = getStr("masterHps", "")
-    @Lazy
-    final     String                      delimiter     = getStr('delimiter', '')
+    final           String                delimiter = getStr('delimiter', '')
+    final List<Consumer<JSONObject>> handlers = new LinkedList<>()
 
 
     TCPClient() { super("tcp-client") }
@@ -66,19 +57,19 @@ class TCPClient extends ServerTpl {
 
     @EL(name = 'sys.starting')
     def start() {
-        // 连接注册中心的的是大连接数:默认1个
-//        if (!attrs.containsKey(masterAppName + ".maxConnectionPerHp")) attr(masterAppName + ".maxConnectionPerHp", 1)
-//        attrs.forEach{String k, v ->
-//            if (k.endsWith(".hosts")) { // 例: app1.hosts=ip1:8201,ip2:8202,ip2:8203
-//                String appName = k.split("\\.")[0].trim()
-//                for (String hp : ((String) v).split(",")) {
-//                    String[] arr = hp.trim().split(":")
-//                    apps.computeIfAbsent(appName, {new AppGroup(name: appName)}).addNode()
-//                    appInfoMap.computeIfAbsent(appName, (s) -> new AppInfo(s)).hps.add(arr[0].trim() + ":" + Integer.valueOf(arr[1].trim()))
-//                }
-//            }
-//        }
         create()
+        handlers.add{jo ->
+            if ("updateAppInfo" == jo['type']) {
+                exec.execute(() -> {
+                    JSONObject d
+                    try { d = jo.getJSONObject("data"); updateAppInfo(d) }
+                    catch (Exception ex) {
+                        log.error("updateAppInfo error. data: " + d, ex)
+                    }
+                })
+            }
+        }
+        ep.fire("${name}.started")
     }
 
 
@@ -87,7 +78,6 @@ class TCPClient extends ServerTpl {
         boos?.shutdownGracefully()
         boot = null
         apps.clear()
-        appInfoMap.clear()
     }
 
 
@@ -110,7 +100,7 @@ class TCPClient extends ServerTpl {
                 }
             }
         }
-        register();
+        register()
     }
 
 
@@ -158,40 +148,12 @@ class TCPClient extends ServerTpl {
     def updateAppInfo(final JSONObject data) {
         log.trace("Update app info: {}", data)
         if (data == null) return
-        if (app.id == data.getString("id")) return // 不把系统本身的信息放进去
-        String appName = data.getString("name")
-        AppInfo app = Optional.ofNullable(appInfoMap.get(appName)).orElseGet(() -> {
-            AppInfo o;
-            synchronized (appInfoMap) {
-                o = appInfoMap.get(appName);
-                if (o == null) {
-                    o = new AppInfo(appName); appInfoMap.put(appName, o);
-                }
-            }
-            return o;
-        });
+        if (app.id == data["id"]) return // 不把系统本身的信息放进去
 
-        // 更新tcp连接配置的信息
-        String tcpHps = data.getString("tcp");
-        if (isNotEmpty(tcpHps)) {
-            Set<String> add = Arrays.stream(tcpHps.split(","))
-                    .filter(hp -> hp != null).map(hp -> hp.trim())
-                    .filter(hp -> !hp.isEmpty() && !app.hps.contains(hp))
-                    .filter(hp -> !collectData().getString("tcp").contains(hp)) // 不要和本系统的tcp相同的配置
-                    .collect(Collectors.toSet());
-            if (!add.isEmpty()) {
-                try {
-                    app.rwLock.writeLock().lock();
-                    app.hps.addAll(add);
-                    log.info("New TCP config '{}'{} added", appName, add);
-                } finally {
-                    app.rwLock.writeLock().unlock();
-                }
-            }
-        }
-
-        // TODO 更新http连接信息
+        apps.computeIfAbsent(data["name"], {s -> new AppGroup(name: s)})
+                .setNode(data['id'], data['tcp'], data['http'])
     }
+
 
 
     /**
@@ -202,11 +164,7 @@ class TCPClient extends ServerTpl {
      */
     def send(String host, Integer port, String data) {
         log.debug("Send data to '{}:{}'. data: " + data, host, port)
-        boot.connect(host, port).addListener{ChannelFuture f ->
-            if (f.cause() != null) {
-                f.channel().writeAndFlush(toByteBuf(data))
-            } else log.error("连接失败. '{}:{}'", host, port)
-        }
+        hpNodes.computeIfAbsent("$host+':'+$port", {s -> new Node(tcpHp: s)}).send(data)
     }
 
 
@@ -381,20 +339,8 @@ class TCPClient extends ServerTpl {
      * @param dataStr
      */
     protected void receiveReply(ChannelHandlerContext ctx, String dataStr) {
-        log.trace("Receive reply from '{}': {}", ctx.channel().remoteAddress(), dataStr);
-        JSONObject jo = JSON.parseObject(dataStr);
-        String type = jo.getString("type");
-        if ("event"== type) {
-            exec.execute(() -> remoter?.receiveEventResp(jo.getJSONObject("data")))
-        } else if ("updateAppInfo" == type) {
-            exec.execute(() -> {
-                JSONObject d
-                try { d = jo.getJSONObject("data"); updateAppInfo(d) }
-                catch (Exception ex) {
-                    log.error("updateAppInfo error. data: " + d, ex)
-                }
-            });
-        }
+        log.trace("Receive reply from '{}': {}", ctx.channel().remoteAddress(), dataStr)
+        handlers.each {it.accept(JSON.parseObject(dataStr))}
     }
 
 
@@ -465,38 +411,29 @@ class TCPClient extends ServerTpl {
     }
 
 
-    /**
-     * 自己的信息
-     * 例: {"id":"rc_b70d18d5-2269-4512-91ea-6380325e2a84", "name":"rc", "tcp":"192.168.56.1:8001", "http":"localhost:8000"}
-     */
-    def getSelfInfo() {
-        JSONObject data = new JSONObject(4)
-        data.put("id", app.id)
-        data.put("name", app.name)
-        Optional.ofNullable(ep.fire("http.getHp")).ifPresent{ data.put("http", it) }
-        data.put("tcp", hps)
-
-        if (!data.containsKey('tcp') && !data.containsKey('http')) return null
-        return data
-    }
-
 
     // 字符串 转换成 ByteBuf
-    ByteBuf toByteBuf(String data) { Unpooled.copiedBuffer((data + delimiter).getBytes('utf-8')) }
-
+    ByteBuf toByteBuf(String data) { Unpooled.copiedBuffer((data + (delimiter?:'')).getBytes('utf-8')) }
 
 
     // 应用组
     protected class AppGroup {
         String name
-        final List<Node> nodes = new LinkedList<>()
-        final Map<String, Node> nodeMap =  new ConcurrentHashMap<>()
+        final Map<String, Node> nodes =  new ConcurrentHashMap<>()
 
-        // 添加应用节点
-        def addNode(String id, String tcpHp, String httpHp) {
-            def n = new Node(id: id, group: this, tcpHp: tcpHp, httpHp: httpHp)
-            if (id) {nodeMap.put(id, n)}
-            else nodes << n
+        // 添加/更新应用节点
+        def setNode(String id, String tcpHp, String httpHp) {
+            if (!id || !tcpHp || !httpHp) {
+                throw new IllegalArgumentException("Node illegal error. $id, $tcpHp, $httpHp")
+            }
+            def n = nodes.get(id)
+            if (n) { // 更新
+                n.tcpHp = tcpHp
+                n.httpHp = httpHp
+            } else {
+                n = new Node(id: id, group: this, httpHp: httpHp, tcpHp: tcpHp)
+                nodes.put(id, n)
+            }
         }
 
         // 随机选择一个节点发送数据
@@ -521,14 +458,17 @@ class TCPClient extends ServerTpl {
         String            httpHp
         final ChannelPool tcpPool = new ChannelPool()
 
-
         def setTcpHp(String hp) {
-            this.tcpHp = hp
-            def arr = hp.split(":")
-            tcpPool.host = arr[0].trim()
-            tcpPool.port = Integer.valueOf(arr[1].trim())
-            tcpPool.node = this
-            tcpPool.create(false) // 默认创建一个
+            if (tcpHp == null) {
+                this.tcpHp = hp
+                def arr = hp.split(":")
+                tcpPool.host = arr[0].trim()
+                tcpPool.port = Integer.valueOf(arr[1].trim())
+                tcpPool.node = this
+                tcpPool.create(false) // 默认创建一个
+            } else {
+                // TODO
+            }
         }
 
         // 发送数据
@@ -537,7 +477,7 @@ class TCPClient extends ServerTpl {
             ch.writeAndFlush(toByteBuf(data)).addListener{ChannelFuture cf ->
                 if (cf.cause() != null) {
                     // TODO
-                    log.error("Send data fail. app: {}, tcpHp: {}. errMsg: " + cf.cause().message, group.name, tcpHp)
+                    log.error("Send data fail. app: {}, tcpHp: {}. errMsg: " + cf.cause().message, group?.name, tcpHp)
                 }
             }
         }
@@ -558,7 +498,7 @@ class TCPClient extends ServerTpl {
             if (!sync) return null// 非同步,则立即返回
             if (chs.size() == 0) {
                 // TODO
-                throw new RuntimeException("Not found available Channel for $node.group.name, $node.id, ${host+':'+port}")
+                throw new RuntimeException("Not found available Channel for ${node?.group?.name}, $node.id, ${host+':'+port}")
             }
             try {
                 rwLock.readLock().lock()
@@ -591,7 +531,7 @@ class TCPClient extends ServerTpl {
                             chs.add(ch)
                             log.info("New TCP Connection to '{}'[{}]. total count: " + chs.size(), node.group.name, (host+":"+port))
                         }
-                        else log.error("连接失败. '{}:{}'", host, port)
+                        else log.error("连接失败. '{}:{}', errMsg: " + cf.cause().message, host, port)
                     }
                 }
             } finally {

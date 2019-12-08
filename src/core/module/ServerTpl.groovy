@@ -54,9 +54,9 @@ class ServerTpl {
      */
     protected Map<Object, Object> beanCtx
     @EL(name = ["bean.get", '${name}.bean.get'], async = false)
-    protected def findLocalBean(EC ec, Class beanType, String beanName) {
+    protected <T> T findLocalBean(EC ec, Class<T> beanType, String beanName) {
         //  已经找到结果了, 就直接返回
-        if (!beanCtx || ec.result) return ec.result
+        if (!beanCtx || ec?.result) return ec?.result
 
         Object bean = null
         if (!beanName && !beanType) {
