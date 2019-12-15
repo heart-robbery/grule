@@ -72,9 +72,9 @@ redis {
 
 remoter {
     // 集群的服务中心地址
-    master: 'localhost:8001,127.0.0.1:8001'
+    master: 'localhost:9001'
 }
 tcp-server {
     // ':9001' or 'localhost:9001'
-    hp=':9001'
+    hp=':8001'
 }

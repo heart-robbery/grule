@@ -6,6 +6,7 @@ import core.module.OkHttpSrv
 import core.module.RedisClient
 import core.module.SchedSrv
 import core.module.jpa.HibernateSrv
+import core.module.remote.Remoter
 import ctrl.MainCtrl
 import ctrl.TestCtrl
 import ctrl.ratpack.RatpackWeb
@@ -33,6 +34,7 @@ ctx.addSource(new EhcacheSrv())
 ctx.addSource(new SchedSrv())
 ctx.addSource(new RedisClient())
 ctx.addSource(new OkHttpSrv())
+ctx.addSource(new Remoter())
 ctx.addSource(new HibernateSrv().entities(Test, UploadFile, Component))
 ctx.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl))
 ctx.addSource(new FileUploader())

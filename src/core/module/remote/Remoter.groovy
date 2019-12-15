@@ -6,9 +6,8 @@ import cn.xnatural.enet.event.EP
 import com.alibaba.fastjson.JSONArray
 import com.alibaba.fastjson.JSONObject
 import core.AppContext
-import core.Value
+import core.module.SchedSrv
 import core.module.ServerTpl
-import org.h2.server.TcpServer
 
 import javax.annotation.Resource
 import java.time.Duration
@@ -17,26 +16,25 @@ import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.function.Consumer
+import java.util.stream.Collectors
+import java.util.stream.Stream
 
 class Remoter extends ServerTpl {
     @Resource
-    protected AppContext app
+    protected       AppContext      app
     @Resource
-    protected       Executor exec
+    protected       SchedSrv        sched
+    @Resource
+    protected       Executor        exec
     /**
      * ecId -> EC
      */
-    protected   final     Map<String, EC> ecMap   = new ConcurrentHashMap<>()
-    /**
-     * 系统名字(标识)
-     */
-    @Value('$sys.name')
-    protected       String          sysName
+    protected final Map<String, EC> ecMap  = new ConcurrentHashMap<>()
     protected       TCPClient       tcpClient
     protected       TCPServer       tcpServer
     // 集群的服务中心地址 host:port,host1:port2
     @Lazy
-    protected final String master = getStr('master', null)
+    protected       String          master = getStr('master', null)
 
 
     Remoter() { super("remote") }
@@ -45,11 +43,11 @@ class Remoter extends ServerTpl {
     @EL(name = "sys.starting")
     def start() {
         if (tcpClient || tcpServer) throw new RuntimeException("$name is already running")
+        if (sched == null) throw new RuntimeException("Need sched Server!")
         if (exec == null) exec = Executors.newFixedThreadPool(2)
         if (ep == null) {ep = new EP(exec); ep.addListenerSource(this)}
 
-        if (!ep.exist("sched.after")) throw new RuntimeException("Need sched Server!")
-
+        // 如果系统中没有TCPClient, 则创建
         tcpClient = bean(TCPClient)
         if (tcpClient == null) {
             tcpClient = new TCPClient()
@@ -57,13 +55,19 @@ class Remoter extends ServerTpl {
             tcpClient.start()
         }
 
-        tcpServer = bean(TcpServer)
+        // 如果系统中没有TCPServer, 则创建
+        tcpServer = bean(TCPServer)
         if (tcpServer == null) {
             tcpServer = new TCPServer()
             exposeBean(tcpServer)
             tcpServer.start()
         }
 
+        tcpClient.handlers.add{jo ->
+            if ("event"== jo['type']) {
+                exec.execute{receiveEventResp(jo.getJSONObject("data"))}
+            }
+        }
         ep.fire("${name}.started")
     }
 
@@ -77,12 +81,11 @@ class Remoter extends ServerTpl {
 
 
     @EL(name = 'sys.started')
-    def init() {
-        tcpClient.handlers.add{jo ->
-            if ("event"== jo['type']) {
-                exec.execute(() -> receiveEventResp(jo.getJSONObject("data")))
-            }
+    def started() {
+        tcpServer.upDevourer.offer{
+            tcpServer.appUp(selfInfo, null)
         }
+        registerFn.run()
     }
 
 
@@ -97,16 +100,16 @@ class Remoter extends ServerTpl {
      * @param remoteMethodArgs 远程事件监听方法的参数
      */
     @EL(name = "remote")
-    protected void sendEvent(EC ec, String appName, String eName, Object[] remoteMethodArgs) {
-        if (tcpClient == null) throw new RuntimeException("$name not is running")
-        if (appName == null) throw new IllegalArgumentException("appName is empty")
+    protected def sendEvent(EC ec, String appName, String eName, Object[] remoteMethodArgs) {
+        if (tcpClient == null) throw new RuntimeException("$tcpClient.name not is running")
+        if (app.name == null) throw new IllegalArgumentException("app.name is empty")
         ec.suspend()
         JSONObject params = new JSONObject(4)
         try {
             if (ec.id() == null) {ec.id(UUID.randomUUID().toString())}
             params.put("eId", ec.id())
             // 是否需要远程响应执行结果(有完成回调函数就需要远程响应调用结果)
-            boolean reply = ec.completeFn() != null
+            boolean reply = (ec.completeFn() != null)
             params.put("reply", reply)
             params.put("eName", eName)
             if (remoteMethodArgs != null) {
@@ -120,15 +123,23 @@ class Remoter extends ServerTpl {
             if (reply) ecMap.put(ec.id(), ec)
 
             // 发送请求给远程应用appName执行. 消息类型为: 'event'
-            JSONObject data = new JSONObject(3).fluentPut("type", "event").fluentPut("source", sysName).fluentPut("data", params)
-            tcpClient.send(appName, data)
+            JSONObject data = new JSONObject(3)
+                    .fluentPut("type", "event")
+                    .fluentPut("source", new JSONObject(2).fluentPut('name', app.name).fluentPut('id', app.id))
+                    .fluentPut("data", params)
+            if (ec.getAttr('toAll', Boolean.class, false)) {
+                tcpClient.send(appName, data.toString(), 'all')
+            } else {
+                // 默认 toAny
+                tcpClient.send(appName, data.toString())
+            }
             if (reply) { // 数据发送成功. 如果需要响应, 则添加等待响应超时处理
-                ep.fire("sched.after", Duration.ofSeconds(getInteger("eventTimeout", 20)), {
-                    ecMap.remove(ec.id())?.errMsg("'" + eName + "' Timeout").resume().tryFinish()
+                sched.after(Duration.ofSeconds(getInteger("eventTimeout.$eName", getInteger("eventTimeout", 20))), {
+                    ecMap.remove(ec.id())?.errMsg("'$eName' Timeout").resume().tryFinish()
                 })
             }
         } catch (Throwable ex) {
-            log.error(ex, "Error fire remote event to '{}'. params: {}", appName, params)
+            log.error("Error fire remote event to '" +appName+ "'. params: " + params, ex)
             ecMap.remove(ec.id())
             ec.ex(ex).resume()
         }
@@ -139,10 +150,10 @@ class Remoter extends ServerTpl {
      * 接收远程事件返回的数据. 和 {@link #sendEvent(EC, String, String, Object[])} 对应
      * @param data
      */
-    protected void receiveEventResp(JSONObject data) {
+    def receiveEventResp(JSONObject data) {
         log.debug("Receive event response: {}", data)
         EC ec = ecMap.remove(data.getString("eId"))
-        if (ec != null) ec.errMsg(data.getString("exMsg")).result(data.get("result")).resume().tryFinish()
+        if (ec != null) ec.errMsg(data.getString("exMsg")).result(data["result"]).resume().tryFinish()
     }
 
 
@@ -151,7 +162,7 @@ class Remoter extends ServerTpl {
      * @param data 数据
      * @param reply 响应回调(传参为响应的数据)
      */
-    protected void receiveEventReq(JSONObject data, Consumer<String> reply) {
+    def receiveEventReq(JSONObject data, Consumer<String> reply) {
         log.debug("Receive event request: {}", data);
         boolean fReply = (Boolean.TRUE == data.getBoolean("reply")) // 是否需要响应
         try {
@@ -192,10 +203,61 @@ class Remoter extends ServerTpl {
                 r.put("eId", data.getString("eId"))
                 r.put("success", false)
                 r.put("result", null)
-                r.put("exMsg", ex.getMessage() ? ex.getMessage(): ex.getClass().name)
-                reply.accept(new JSONObject(3).fluentPut("type", "event").fluentPut("source", sysName).fluentPut("data", r))
+                r.put("exMsg", ex.message ? ex.message: ex.getClass().name)
+                reply.accept(new JSONObject(3)
+                        .fluentPut("type", "event")
+                        .fluentPut("source", new JSONObject(2).fluentPut('name', app.name).fluentPut('id', app.id))
+                        .fluentPut("data", r)
+                )
             }
             log.error("invoke event error. data: " + data, ex)
+        }
+    }
+
+
+    // 注册自己到 服务中心 即 配置的master
+    @Lazy
+    def registerFn = new Runnable() {
+        // 是否需要循环注册
+        boolean needLoop
+        @Override
+        void run() {
+            try {
+                if (!master) return
+                def info = selfInfo
+                if (!info) return
+
+                def ls = Stream.of(master.split(",")).map{
+                    def arr = it.split(":")
+                    Tuple.tuple(arr[0].trim(), Integer.valueOf(arr[1].trim()))
+                }.collect(Collectors.toList())
+                if (ls.size() < 1) {
+                    log.error("master not config right. {}", master)
+                    return
+                }
+                needLoop = true
+
+                // 上传的数据格式
+                JSONObject data = new JSONObject(3)
+                data.put("type", 'appUp') // 数据类型 appUp
+                data.put("source", new JSONObject(2).fluentPut('name', app.name).fluentPut('id', app.id)) // 表明来源
+                data.put("data", info)
+
+                if (ls.size() == 1) {
+                    tcpClient.send(ls.get(0).v1, ls.get(0).v2, data.toString())
+                } else {
+                    def hp = ls.get(new Random().nextInt(ls.size()))
+                    tcpClient.send(hp.v1, hp.v2, data.toString())
+                }
+
+                log.debug("register up success. {}", data)
+            } catch(Throwable th) {
+                log.error("register error", th)
+            } finally {
+                if (needLoop) {
+                    sched.after(Duration.ofSeconds(120), registerFn)
+                }
+            }
         }
     }
 
@@ -209,7 +271,9 @@ class Remoter extends ServerTpl {
         data.put("id", app.id)
         data.put("name", app.name)
         Optional.ofNullable(ep.fire("http.getHp")).ifPresent{ data.put("http", it) }
-        data.put("tcp", tcpServer.hp)
+
+        if (tcpServer.hp.split(":")[0]) data.put("tcp", tcpServer.hp)
+        else data.put("tcp", resolveLocalIp() + tcpServer.hp)
 
         if (!data.containsKey('tcp') && !data.containsKey('http')) return null
         return data
@@ -221,18 +285,16 @@ class Remoter extends ServerTpl {
      * @return
      */
     protected String resolveLocalIp() {
-        try {
-            for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
-                NetworkInterface current = en.nextElement()
-                if (!current.isUp() || current.isLoopback() || current.isVirtual()) continue
-                Enumeration<InetAddress> addresses = current.getInetAddresses()
-                while (addresses.hasMoreElements()) {
-                    InetAddress addr = addresses.nextElement()
-                    if (addr.isLoopbackAddress()) continue
-                    return addr.getHostAddress()
-                }
+        for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
+            NetworkInterface current = en.nextElement()
+            if (!current.isUp() || current.isLoopback() || current.isVirtual()) continue
+            Enumeration<InetAddress> addresses = current.getInetAddresses()
+            while (addresses.hasMoreElements()) {
+                InetAddress addr = addresses.nextElement()
+                if (addr.isLoopbackAddress()) continue
+                return addr.getHostAddress()
             }
-        } catch (SocketException e) { log.error('', e) }
-        return ""
+        }
+        ''
     }
 }

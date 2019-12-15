@@ -7,18 +7,12 @@ import com.alibaba.fastjson.JSONException
 import com.alibaba.fastjson.JSONObject
 import core.AppContext
 import core.Devourer
-import core.Utils
-import core.Value
 import core.module.ServerTpl
 import groovy.transform.PackageScope
 import io.netty.bootstrap.ServerBootstrap
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
-import io.netty.channel.ChannelHandlerContext
-import io.netty.channel.ChannelInboundHandlerAdapter
-import io.netty.channel.ChannelInitializer
-import io.netty.channel.ChannelOption
-import io.netty.channel.EventLoopGroup
+import io.netty.channel.*
 import io.netty.channel.epoll.EpollEventLoopGroup
 import io.netty.channel.epoll.EpollServerSocketChannel
 import io.netty.channel.nio.NioEventLoopGroup
@@ -49,9 +43,9 @@ class TCPServer extends ServerTpl {
     @Resource
     protected       Executor                               exec
     @Lazy
-    final           String                                 hp        = getStr('hp', '')
+    protected       String                                 hp         = getStr('hp', '')
     @Lazy
-    final           String                                 delimiter  = getStr('delimiter', '')
+    protected       String                                 delimiter  = getStr('delimiter', '')
     protected       EventLoopGroup                         boos
     /**
      * 当前连接数
@@ -61,8 +55,8 @@ class TCPServer extends ServerTpl {
      * 保存 app info 的属性信息
      */
     protected final Map<String, List<Map<String, Object>>> appInfoMap = new ConcurrentHashMap<>()
-    protected final Devourer                               upDevourer = new Devourer("registerUp", exec)
-    final List<Consumer<JSONObject>> handlers = new LinkedList<>()
+    final           Devourer                               upDevourer = new Devourer("registerUp", exec)
+    final           List<Consumer<JSONObject>>             handlers   = new LinkedList<>()
 
 
     TCPServer() { super("tcp-server") }
@@ -125,7 +119,7 @@ class TCPServer extends ServerTpl {
                         ch.pipeline().addLast(new IdleStateHandler(getLong("readerIdleTime", 10 * 60L), getLong("writerIdleTime", 0L), getLong("allIdleTime", 0L), SECONDS))
                         ch.pipeline().addLast(new DelimiterBasedFrameDecoder(
                                 getInteger("maxFrameLength", 1024 * 1024),
-                                Unpooled.copiedBuffer(delimiter.getBytes("utf-8"))
+                                Unpooled.copiedBuffer((delimiter?:'').getBytes("utf-8"))
                         ))
                         ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
                             @Override
@@ -170,7 +164,7 @@ class TCPServer extends ServerTpl {
      * @param ctx
      * @param dataStr 客户端发送过来的字符串
      */
-    protected void handleReceive(ChannelHandlerContext ctx, String dataStr) {
+    protected def handleReceive(ChannelHandlerContext ctx, String dataStr) {
         log.trace("Receive client '{}' data: {}", ctx.channel().remoteAddress(), dataStr)
         count() // 统计
 
@@ -182,7 +176,7 @@ class TCPServer extends ServerTpl {
             exec.execute{
                 remoter?.receiveEventReq(jo.getJSONObject("data"), {o -> ctx.writeAndFlush(Unpooled.copiedBuffer((o + (delimiter?:'')).getBytes('utf-8')))})
             }
-        } else if ("up" == t) { // 应用注册在线通知
+        } else if ("appUp" == t) { // 应用注册在线通知
             upDevourer.offer{
                 JSONObject d
                 try { d = jo.getJSONObject("data"); appUp(d, ctx) }
@@ -228,12 +222,12 @@ class TCPServer extends ServerTpl {
     /**
      * 应用上线通知
      * NOTE: 此方法线程已安全
-     * 例: {"name": "应用名", "id": "应用实例id", "tcp":"localhost:8001,localhost8002", "http":"localhost:8080", "udp": "localhost:11111"}
+     * 例: {"name": "应用名", "id": "应用实例id", "tcp":"localhost:8001", "http":"localhost:8080", "udp": "localhost:11111"}
      * @param data
      * @param ctx
      */
     @PackageScope
-    def appUp(final JSONObject data, ChannelHandlerContext ctx) {
+    def appUp(final JSONObject data, final ChannelHandlerContext ctx) {
         if (!data) { log.warn("Register data is empty"); return}
         log.debug("Receive register up: {}", data)
         if (!data['name'] || !data['id']) { // 数据验证
@@ -248,7 +242,7 @@ class TCPServer extends ServerTpl {
             if (it.next()["id"] == data["id"]) {it.remove(); isNew = false; break}
         }
         apps << data
-        if (isNew) log.info("New app '{}' online. {}", data["name"], data)
+        if (isNew && data['id'] != app.id) log.info("New app '{}' online. {}", data["name"], data)
 
         //2. 遍历所有的数据,删除不必要的数据
         for (Iterator<Map.Entry<String, List<Map<String, Object>>>> it = appInfoMap.entrySet().iterator(); it.hasNext(); ) {
@@ -271,11 +265,11 @@ class TCPServer extends ServerTpl {
             e.value.each {d ->
                 // 返回所有的注册信息给当前来注册的客户端
                 if (d["id"] != data["id"]) {
-                    ctx?.writeAndFlush(Unpooled.copiedBuffer(new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", d).toString() + delimiter))
+                    ctx?.writeAndFlush(Unpooled.copiedBuffer(new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", d).toString() + (delimiter?:'')))
                 }
                 // 如果是新系统上线, 则主动通知其它系统
                 if (isNew && d['id'] != data['id'] && d['id'] != app.id) {
-                    ep.fire("remote", e.key, "updateAppInfo", new Object[]{data})
+                    ep.fire("remote", EC.of(this).attr('toAll', true).args(e.key, "updateAppInfo", new Object[]{data}))
                 }
             }
         }
