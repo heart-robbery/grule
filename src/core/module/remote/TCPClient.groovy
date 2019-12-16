@@ -5,6 +5,7 @@ import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONException
 import com.alibaba.fastjson.JSONObject
 import core.AppContext
+import core.module.SchedSrv
 import core.module.ServerTpl
 import io.netty.bootstrap.Bootstrap
 import io.netty.buffer.ByteBuf
@@ -21,6 +22,7 @@ import io.netty.util.ReferenceCountUtil
 
 import javax.annotation.Resource
 import java.nio.charset.Charset
+import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
 import java.util.concurrent.locks.ReadWriteLock
@@ -33,6 +35,8 @@ class TCPClient extends ServerTpl {
     @Resource
     protected AppContext                 app
     @Resource
+    protected SchedSrv  sched
+    @Resource
     protected Executor                   exec
     final     Map<String, Node>          hpNodes   = new ConcurrentHashMap<>()
     final     Map<String, AppGroup>      apps      = new ConcurrentHashMap<>()
@@ -43,7 +47,7 @@ class TCPClient extends ServerTpl {
     final     List<Consumer<JSONObject>> handlers  = new LinkedList<>()
 
 
-    TCPClient() { super("tcp-client") }
+    TCPClient() { super("tcpClient") }
     TCPClient(String name) { super(name) }
 
 
@@ -90,9 +94,9 @@ class TCPClient extends ServerTpl {
      */
     def send(String host, Integer port, String data, Consumer<Throwable> failFn = null) {
         log.debug("Send data to '{}:{}'. data: " + data, host, port)
-        hpNodes.computeIfAbsent("$host+':'+$port", {s ->
+        hpNodes.computeIfAbsent("$host:$port", {s ->
             def n = new Node(tcpHp: s)
-            log.info("New Node added. {}", n.id + "," + n.tcpHp)
+            log.info("New Node added. tcpHp: {}", n.tcpHp)
             n
         }).send(data, failFn)
     }
@@ -135,7 +139,7 @@ class TCPClient extends ServerTpl {
                 .option(ChannelOption.SO_KEEPALIVE, true)
                 .option(ChannelOption.TCP_NODELAY, true)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, getInteger('connectTimeout', 5000))
-                .option(ChannelOption.SO_TIMEOUT, getInteger("soTimeout", 10000))
+                // .option(ChannelOption.SO_TIMEOUT, getInteger("soTimeout", 10000))
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     void channelUnregistered(ChannelHandlerContext ctx) throws Exception {
@@ -146,7 +150,11 @@ class TCPClient extends ServerTpl {
                     @Override
                     protected void initChannel(SocketChannel ch) throws Exception {
                         // ch.pipeline().addLast(new IdleStateHandler(getLong("readerIdleTime", 12 * 60 * 60L), getLong("writerIdleTime", 10L), getLong("allIdleTime", 0L), SECONDS))
-                        ch.pipeline().addLast(new DelimiterBasedFrameDecoder(getInteger("maxFrameLength", 1024 * 1024), Unpooled.copiedBuffer((delimiter?:'').getBytes("utf-8"))))
+                        if (delimiter) {
+                            ch.pipeline().addLast(
+                                    new DelimiterBasedFrameDecoder(getInteger("maxFrameLength", 1024 * 1024), Unpooled.copiedBuffer(delimiter.getBytes("utf-8")))
+                            )
+                        }
                         ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
                             @Override
                             void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
@@ -215,24 +223,26 @@ class TCPClient extends ServerTpl {
             } else {
                 n = new Node(id: id, group: this, httpHp: httpHp, tcpHp: tcpHp)
                 nodes.put(id, n)
-                log.info("New Node added. {}", name + "," + n.id + "," + n.tcpHp)
+                log.info("New Node added. appName: " + name + ", nodeId: " + n.id + ", tcpHp: " + n.tcpHp + ", httpHp: " + httpHp)
             }
         }
 
         // 随机选择一个节点发送数据
         def sendToAny(final String data) {
             if (nodes.size() == 0) {
-                throw new RuntimeException("Not found any node for $name")
+                throw new RuntimeException("Not found available node for $name")
             } else if (nodes.size()== 1) {
                 nodes.find {true}.value.send(data)
             } else if (nodes.size() > 1) {
-                String[] arr = nodes.keySet().toArray()
-                nodes.get(arr[new Random().nextInt(arr.length)]).send(data)
+                Node[] ns = nodes.values().stream().filter{!it.freeze}.toArray()
+                if (ns.size() == 0) nodes.iterator().next().value.send(data) // 证明只有一个而且是冻结的
+                else if (ns.size() == 1) ns[0].send(data)
+                else ns[new Random().nextInt(ns.length)].send(data)
             }
         }
 
         def setName(String name) {
-            if (this.name != null) throw new RuntimeException("'name' not Allow change")
+            if (this.name != null) throw new RuntimeException("'name' not allow change")
             this.name = name
         }
     }
@@ -241,6 +251,8 @@ class TCPClient extends ServerTpl {
     // 实例节点
     class Node {
         AppGroup          group
+        // 冻结(暂不可用)
+        boolean freeze
         String            id
         String            tcpHp
         String            httpHp
@@ -263,6 +275,7 @@ class TCPClient extends ServerTpl {
         // 发送数据
         def send(final String data, Consumer<Throwable> failFn = null) {
             def ch = tcpPool.get()
+            if (ch == null) throw new RuntimeException("Not found available connection")
             ch.writeAndFlush(toByteBuf(data)).addListener{ChannelFuture cf ->
                 if (cf.cause() != null) {
                     // TODO
@@ -292,7 +305,7 @@ class TCPClient extends ServerTpl {
         // 获取连接Channel
         def get(boolean sync = true) {
             if (chs.size() == 0) create(sync)
-            if (!sync) return null// 非同步,则立即返回
+            if (!sync) return null // 非同步,则立即返回
             if (chs.size() == 0) {
                 // TODO
                 throw new RuntimeException("Not found available Channel for ${node?.group?.name}, $node.id, ${host+':'+port}")
@@ -307,6 +320,7 @@ class TCPClient extends ServerTpl {
             } finally {
                 rwLock.readLock().unlock()
             }
+            null
         }
 
         // 创建新连接Channel
@@ -318,17 +332,20 @@ class TCPClient extends ServerTpl {
                     def ch = f.sync().channel()
                     ch.attr(AttributeKey.valueOf("removeFn")).set({remove(ch)} as Runnable)
                     chs.add(ch)
+                    node.freeze = false
                 } else {
                     f.addListener{ChannelFuture cf ->
                         if (cf.cause() == null) {
                             def ch = cf.channel()
                             ch.attr(AttributeKey.valueOf("removeFn")).set({remove(ch)} as Runnable)
                             chs.add(ch)
+                            node.freeze = false
                             log.info("New TCP Connection to '{}'[{}]. total count: " + chs.size(), node.group.name, (host+":"+port))
                         }
-                        else log.error("连接失败. '{}:{}', errMsg: " + cf.cause().message, host, port)
                     }
                 }
+            } catch (Throwable th) {
+                log.error("连接失败. '{}:{}', errMsg: " + th.message, host, port)
             } finally {
                 rwLock.writeLock().unlock()
             }
@@ -346,6 +363,47 @@ class TCPClient extends ServerTpl {
             } finally {
                 rwLock.writeLock().unlock()
             }
+            if (chs.size() < 1) {
+                node.freeze = true
+                redeem()
+            }
+        }
+
+        // 尝试挽回
+        redeem() {
+            LinkedList<Integer> pass = new LinkedList<>()
+            for (String s : getStr("redeemFrequency", "10, 10, 20, 10, 30, 35, 40, 45, 50, 60, 90, 120, 90, 120, 90, 60, 90, 60, 90, 60, 90, 120, 300, 120, 600, 300").split(",")) {
+                try {
+                    pass.add(Integer.valueOf(s.trim()));
+                } catch (Exception ex) {
+                    log.warn("Config error property '{}'. {}", name + ".redeemFrequency", ex.message)
+                }
+            }
+            Runnable fn = new Runnable() {
+                @Override
+                void run() {
+                    try {
+                        create()
+                        if (chs.size() > 0) {
+                            node.freeze = false
+                            log.info("'{}'[{}] redeem success", node.group?.name, node.tcpHp)
+                        }
+                    } catch (Exception e) {
+                        if (pass.isEmpty()) {
+                            log.warn("'{}'[{}] can't redeem", appInfo.name, hp); appInfo.hpErrorRecord.get(hp).removeLast();
+                        }
+                        else {
+                            if (appInfo.hps.contains(hp)) {// 又被加入到配置里面去了,停止redeem
+                                log.info("Stop redeem '{}'[{}]", appInfo.name, hp); appInfo.hpErrorRecord.get(hp).removeLast();
+                            } else {
+                                log.warn("'{}'[{}] try redeem fail", appInfo.name, hp);
+                                ep.fire("sched.after", Duration.ofSeconds(pass.removeFirst()), this);
+                            }
+                        }
+                    }
+                }
+            }
+            sched?.after(Duration.ofSeconds(pass.removeFirst()), fn)
         }
     }
 }

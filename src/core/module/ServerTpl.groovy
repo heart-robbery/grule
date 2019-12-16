@@ -105,17 +105,17 @@ class ServerTpl {
     }
 
 
-    Long getLong(String name, Long defaultValue) { Long.valueOf(attrs[(name)]?:defaultValue) }
+    Long getLong(String name, Long defaultValue) { attrs.containsKey(name) ? Long.valueOf(attrs[(name)]) : defaultValue}
 
 
-    Integer getInteger(String name, Integer defaultValue) { Integer.valueOf(attrs[(name)]?:defaultValue) }
+    Integer getInteger(String name, Integer defaultValue) { attrs.containsKey(name) ? Integer.valueOf(attrs[(name)]) : defaultValue }
 
 
-    Double getDouble(String name, Double defaultValue) { Double.valueOf(attrs[(name)]?:defaultValue) }
+    Double getDouble(String name, Double defaultValue) { attrs.containsKey(name)? Double.valueOf(attrs[(name)]) : defaultValue}
 
 
-    String getStr(String name, String defaultValue) { Objects.toString(attrs[(name)]?:defaultValue) }
+    String getStr(String name, String defaultValue) { attrs.containsKey(name) ? attrs[(name)] : defaultValue}
 
 
-    Boolean getBoolean(String name, Boolean defaultValue) { Boolean.valueOf(attrs[(name)]?:defaultValue) }
+    Boolean getBoolean(String name, Boolean defaultValue) { attrs.containsKey(name) ? Boolean.valueOf(attrs[(name)]) : defaultValue}
 }

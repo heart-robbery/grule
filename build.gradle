@@ -63,6 +63,9 @@ dependencies {
     // excel
     // compile 'org.apache.poi:poi:4.1.0'
     // compile 'org.apache.poi:poi-ooxml:4.1.0'
+
+    // 异步sql
+    // compile 'com.github.jasync-sql:jasync-mysql:1.0.12'
 }
 
 
@@ -74,8 +77,8 @@ task deps(type: Copy) {
 }
 
 
-task tar(dependsOn: ['deps'], type: Tar) {
-    new File("${buildDir}/corp.tar").deleteOnExit()
+task tgz(dependsOn: ['deps'], type: Tar) {
+    new File("${buildDir}/gy.tgz").deleteOnExit()
 
     into("bin") {from("bin")}
     into("conf") {from "conf"}

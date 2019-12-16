@@ -55,11 +55,12 @@ class TCPServer extends ServerTpl {
      * 保存 app info 的属性信息
      */
     protected final Map<String, List<Map<String, Object>>> appInfoMap = new ConcurrentHashMap<>()
-    final           Devourer                               upDevourer = new Devourer("registerUp", exec)
+    @Lazy
+    Devourer                                               upDevourer = new Devourer("registerUp", exec)
     final           List<Consumer<JSONObject>>             handlers   = new LinkedList<>()
 
 
-    TCPServer() { super("tcp-server") }
+    TCPServer() { super("tcpServer") }
 
 
     @EL(name = 'sys.starting')
@@ -95,7 +96,7 @@ class TCPServer extends ServerTpl {
         }
         ServerBootstrap sb = new ServerBootstrap()
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, getInteger('connectTimeout', 5000))
-                .option(ChannelOption.SO_TIMEOUT, getInteger("soTimeout", 10000))
+                // .option(ChannelOption.SO_TIMEOUT, getInteger("soTimeout", 10000))
                 .group(boos).channel(chClz)
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
@@ -117,10 +118,14 @@ class TCPServer extends ServerTpl {
                         })
                         // 最好是将IdleStateHandler放在入站的开头，并且重写userEventTriggered这个方法的handler必须在其后面。否则无法触发这个事件。
                         ch.pipeline().addLast(new IdleStateHandler(getLong("readerIdleTime", 10 * 60L), getLong("writerIdleTime", 0L), getLong("allIdleTime", 0L), SECONDS))
-                        ch.pipeline().addLast(new DelimiterBasedFrameDecoder(
-                                getInteger("maxFrameLength", 1024 * 1024),
-                                Unpooled.copiedBuffer((delimiter?:'').getBytes("utf-8"))
-                        ))
+                        if (delimiter) {
+                            ch.pipeline().addLast(
+                                    new DelimiterBasedFrameDecoder(
+                                            getInteger("maxFrameLength", 1024 * 1024),
+                                            Unpooled.copiedBuffer(delimiter.getBytes("utf-8"))
+                                    )
+                            )
+                        }
                         ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
                             @Override
                             void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {

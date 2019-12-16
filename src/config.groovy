@@ -27,7 +27,7 @@ jpa {
 
 // web 配置
 web {
-    development=true
+    development=false
     session.enabled=true
     // session.type='redis'
     // session 过期时间
@@ -72,9 +72,10 @@ redis {
 
 remoter {
     // 集群的服务中心地址
-    master: 'localhost:9001'
+    // master='localhost:9001'
 }
-tcp-server {
+
+tcpServer {
     // ':9001' or 'localhost:9001'
     hp=':8001'
 }

@@ -37,7 +37,7 @@ class Remoter extends ServerTpl {
     protected       String          master = getStr('master', null)
 
 
-    Remoter() { super("remote") }
+    Remoter() { super("remoter") }
 
 
     @EL(name = "sys.starting")
@@ -51,6 +51,7 @@ class Remoter extends ServerTpl {
         tcpClient = bean(TCPClient)
         if (tcpClient == null) {
             tcpClient = new TCPClient()
+            ep.fire("inject", tcpClient); tcpClient.attrs.putAll(AppContext.env.(tcpClient.name))
             exposeBean(tcpClient)
             tcpClient.start()
         }
@@ -59,6 +60,7 @@ class Remoter extends ServerTpl {
         tcpServer = bean(TCPServer)
         if (tcpServer == null) {
             tcpServer = new TCPServer()
+            ep.fire("inject", tcpServer); tcpServer.attrs.putAll(AppContext.env.(tcpServer.name))
             exposeBean(tcpServer)
             tcpServer.start()
         }
@@ -252,7 +254,7 @@ class Remoter extends ServerTpl {
 
                 log.debug("register up success. {}", data)
             } catch(Throwable th) {
-                log.error("register error", th)
+                log.error("register up error", th)
             } finally {
                 if (needLoop) {
                     sched.after(Duration.ofSeconds(120), registerFn)
@@ -270,7 +272,7 @@ class Remoter extends ServerTpl {
         JSONObject data = new JSONObject(4)
         data.put("id", app.id)
         data.put("name", app.name)
-        Optional.ofNullable(ep.fire("http.getHp")).ifPresent{ data.put("http", it) }
+        Optional.ofNullable(ep.fire("http.hp")).ifPresent{ data.put("http", it) }
 
         if (tcpServer.hp.split(":")[0]) data.put("tcp", tcpServer.hp)
         else data.put("tcp", resolveLocalIp() + tcpServer.hp)

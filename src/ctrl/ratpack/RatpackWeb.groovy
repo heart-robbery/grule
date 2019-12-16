@@ -53,11 +53,11 @@ class RatpackWeb extends ServerTpl {
                     threads(Integer.valueOf(attrs['thread']?:1))
                     connectTimeoutMillis(1000 * 10)
                     idleTimeout(Duration.ofSeconds(10))
-                    maxContentLength(Integer.valueOf(attrs.maxContentLength?:(1024 * 1024 * 10))) // 10M 文件上传大小限制
+                    maxContentLength(getInteger('maxContentLength', 1024 * 1024 * 10)) // 10M 文件上传大小限制
                     sysProps()
                     registerShutdownHook(false)
                     baseDir(BaseDir.find('static/'))
-                    development(Boolean.valueOf(attrs['development']?:false))
+                    development(getBoolean('development', false))
                 }
             })
             srv.handlers{initChain(it)}
