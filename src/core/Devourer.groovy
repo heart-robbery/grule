@@ -11,23 +11,23 @@ import java.util.function.Consumer
 import java.util.function.Supplier
 
 class Devourer {
-    protected final Logger              log     = LoggerFactory.getLogger(getClass())
-    protected final Executor            exec
-    protected final AtomicBoolean       running = new AtomicBoolean(false)
-    protected final Queue<Runnable>     waiting = new ConcurrentLinkedQueue<>()
-    protected final Object              key
+    protected static final Logger              log     = LoggerFactory.getLogger(Devourer)
+    protected final        Executor            exec
+    protected final        AtomicBoolean       running = new AtomicBoolean(false)
+    protected final        Queue<Runnable>     waiting = new ConcurrentLinkedQueue<>()
+    protected final        Object              key
     /**
      * 是否应该熔断: 暂停执行
      */
-    protected       Supplier<Boolean>   pause   = { Boolean.FALSE }
+    protected              Supplier<Boolean>   pause   = { Boolean.FALSE }
     /**
      * 是否应该熔断: 丢弃
      */
-    protected       Supplier<Boolean>   fusing  = { Boolean.FALSE }
+    protected              Supplier<Boolean>   fusing  = { Boolean.FALSE }
     /**
      * 异常处理
      */
-    protected       Consumer<Throwable> exConsumer
+    protected              Consumer<Throwable> exConsumer
 
 
     Devourer(Object key, Executor exec) {

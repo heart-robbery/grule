@@ -1,6 +1,8 @@
 package core
 
 import com.alibaba.fastjson.JSON
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
@@ -12,8 +14,11 @@ import java.lang.reflect.Method
 import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
 import java.util.function.Consumer
+import java.util.function.Function
 
 class Utils {
+    static Logger log = LoggerFactory.getLogger(Utils)
+
     /**
      * 得到jvm进程号
      * @return
@@ -274,5 +279,76 @@ class Utils {
         if (!urlStr.endsWith("?")) sb.append("?")
         params.each { sb.append(it.key).append("=").append(URLEncoder.encode(it.value.toString(), 'utf-8')).append("&") }
         return sb.toString()
+    }
+
+
+    /**
+     * 文件内容监控器(类linux tail)
+     * @return
+     */
+    static Tailer tailer() {new Tailer()}
+
+    static class Tailer {
+        private Thread                    th
+        private boolean                   stopFlag
+        private Function<String, Boolean> lineFn
+
+        // 处理输出行
+        Tailer handle(Function<String, Boolean> lineFn) {this.lineFn = lineFn; this}
+
+        def stop() {this.stopFlag = true}
+
+        /**
+         * tail 文件内容监控
+         * @param file 文件全路径
+         * @param follow 从最后第几行开始
+         * @return
+         */
+        Tailer tail(String file, Integer follow = 10) {
+            th = new Thread({run(file, (follow == null ? 0 : follow))}, "Tailer-$file")
+            th.setDaemon(true)
+            th.start()
+            this
+        }
+
+        private def run(String file, Integer follow) {
+            if (lineFn == null) throw new IllegalArgumentException("没有行处理函数")
+            RandomAccessFile raf = new RandomAccessFile(file, "r")
+            Queue<String> buffer = new LinkedList<>() // 用来保存最后几行(follow)数据
+
+            // 当前第一次到达文件结尾时,设为true
+            boolean firstEnd
+            String line
+            while (!stopFlag) {
+                try {
+                    line = raf.readLine()
+                    if (line == null) { // 当读到文件结尾时
+                        if (firstEnd) Thread.sleep(1000L)
+                        else { // 第一次到达结尾后, 清理buffer数据
+                            firstEnd = true
+                            do {
+                                line = buffer.poll()
+                                if (line) stopFlag = lineFn.apply(line)
+                            } while (line)
+                            buffer = null
+                        }
+                    } else {
+                        if (firstEnd) { // 直接处理行字符串
+                            stopFlag = lineFn.apply(line)
+                            Thread.sleep(200L)
+                        } else {
+                            if (follow > 0) {
+                                buffer.offer(line)
+                                if (buffer.size() >= follow) buffer.poll()
+                            }
+                        }
+                    }
+                } catch (Throwable ex) {
+                    stopFlag = true
+                    log.error("tail file '" + file + "' error", ex)
+                }
+            }
+            raf?.close()
+        }
     }
 }

@@ -25,6 +25,7 @@ import java.nio.charset.Charset
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReadWriteLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import java.util.function.Consumer
@@ -241,6 +242,7 @@ class TCPClient extends ServerTpl {
             }
         }
 
+
         def setName(String name) {
             if (this.name != null) throw new RuntimeException("'name' not allow change")
             this.name = name
@@ -291,16 +293,21 @@ class TCPClient extends ServerTpl {
             if (this.id != null) throw new RuntimeException("'id' not Allow change")
             this.id = id
         }
+
+        @Override
+        String toString() {
+        }
     }
 
 
     // netty Channel 连接池
     protected class ChannelPool {
-        Node node
-        String host
-        Integer port
+              Node          node
+              String        host
+              Integer       port
         final ReadWriteLock rwLock = new ReentrantReadWriteLock()
         final List<Channel> chs = new ArrayList<>(7)
+              AtomicBoolean redeem = new AtomicBoolean(false)
 
         // 获取连接Channel
         def get(boolean sync = true) {
@@ -345,7 +352,9 @@ class TCPClient extends ServerTpl {
                     }
                 }
             } catch (Throwable th) {
+                node.freeze = true
                 log.error("连接失败. '{}:{}', errMsg: " + th.message, host, port)
+                exec.execute{redeem()}
             } finally {
                 rwLock.writeLock().unlock()
             }
@@ -357,24 +366,22 @@ class TCPClient extends ServerTpl {
                 rwLock.writeLock().lock()
                 for (def it = chs.iterator(); it.hasNext(); ) {
                     if (it.next() == ch) {
+                        log.info("Remove TCP connection '{}'[{}]. left count: " + chs.size(), node.group?.name, node.tcpHp)
                         it.remove(); break
                     }
                 }
             } finally {
                 rwLock.writeLock().unlock()
             }
-            if (chs.size() < 1) {
-                node.freeze = true
-                redeem()
-            }
         }
 
         // 尝试挽回
-        redeem() {
+        def redeem() {
+            if (!redeem.compareAndSet(false, true)) return
             LinkedList<Integer> pass = new LinkedList<>()
-            for (String s : getStr("redeemFrequency", "10, 10, 20, 10, 30, 35, 40, 45, 50, 60, 90, 120, 90, 120, 90, 60, 90, 60, 90, 60, 90, 120, 300, 120, 600, 300").split(",")) {
+            for (String s : getStr("redeemFrequency", "10, 10, 20, 10, 30, 60, 40, 45, 60, 60, 90, 120, 90, 120, 90, 60, 90, 60, 90, 60, 90, 120, 300, 120, 600, 300").split(",")) {
                 try {
-                    pass.add(Integer.valueOf(s.trim()));
+                    pass.add(Integer.valueOf(s.trim()))
                 } catch (Exception ex) {
                     log.warn("Config error property '{}'. {}", name + ".redeemFrequency", ex.message)
                 }
@@ -386,11 +393,14 @@ class TCPClient extends ServerTpl {
                         create()
                         if (chs.size() > 0) {
                             node.freeze = false
+                            redeem.set(false)
                             log.info("'{}'[{}] redeem success", node.group?.name, node.tcpHp)
                         }
                     } catch (Exception e) {
                         if (pass.isEmpty()) {
-                            log.warn("'{}'[{}] can't redeem", appInfo.name, hp); appInfo.hpErrorRecord.get(hp).removeLast();
+                            if (node.id) node.group?.nodes?.remove(node.id)
+                            else hpNodes.remove(node.tcpHp)
+                            log.warn("'{}'[{}] can't redeem. removed", node.group?.name, node.tcpHp)
                         }
                         else {
                             if (appInfo.hps.contains(hp)) {// 又被加入到配置里面去了,停止redeem

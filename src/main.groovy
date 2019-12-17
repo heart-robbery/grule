@@ -1,6 +1,7 @@
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import core.AppContext
+import core.Utils
 import core.module.EhcacheSrv
 import core.module.OkHttpSrv
 import core.module.RedisClient
@@ -22,6 +23,13 @@ import sevice.TestService
 import javax.annotation.Resource
 import java.text.SimpleDateFormat
 import java.time.Duration
+
+
+
+Utils.tailer().handle{println(it); true}.tail('d:/tmp/1.json', 0)
+Thread.sleep(1000L * 60 * 3)
+// new File('d:/tmp/1.json') << 'rrrrrxxx\n'
+return
 
 
 @Field final Logger log = LoggerFactory.getLogger(getClass())
@@ -46,7 +54,6 @@ ctx.start() // 启动系统
 
 @EL(name = 'sys.started')
 def sysStarted() {
-    ctx.bean(HibernateSrv).repo = null
     return
     TestService ts = ctx.bean(TestService)
     try {
