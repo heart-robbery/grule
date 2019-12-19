@@ -72,7 +72,7 @@ redis {
 
 remoter {
     // 集群的服务中心地址
-    // master='localhost:9001'
+    master='localhost:9001'
 }
 
 tcpServer {

@@ -21,6 +21,7 @@ import io.netty.util.AttributeKey
 import io.netty.util.ReferenceCountUtil
 
 import javax.annotation.Resource
+import java.nio.channels.ClosedChannelException
 import java.nio.charset.Charset
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
@@ -85,7 +86,6 @@ class TCPClient extends ServerTpl {
     }
 
 
-
     /**
      * 发送数据到host:port
      * @param host 主机地址
@@ -103,7 +103,6 @@ class TCPClient extends ServerTpl {
     }
 
 
-
     /**
      * 向app发送数据
      * @param appName 应用名
@@ -116,7 +115,7 @@ class TCPClient extends ServerTpl {
         if ('any' == target) {
             group.sendToAny(data)
         } else if ('all' == target) {
-            group.nodes.values().each {it.send(data)}
+            group.nodes.values().each {if (!it.freeze) it.send(data)}
         } else {
             throw new IllegalArgumentException("Not support target '$target'")
         }
@@ -148,12 +147,16 @@ class TCPClient extends ServerTpl {
                         super.channelUnregistered(ctx)
                     }
 
+
                     @Override
                     protected void initChannel(SocketChannel ch) throws Exception {
                         // ch.pipeline().addLast(new IdleStateHandler(getLong("readerIdleTime", 12 * 60 * 60L), getLong("writerIdleTime", 10L), getLong("allIdleTime", 0L), SECONDS))
                         if (delimiter) {
                             ch.pipeline().addLast(
-                                    new DelimiterBasedFrameDecoder(getInteger("maxFrameLength", 1024 * 1024), Unpooled.copiedBuffer(delimiter.getBytes("utf-8")))
+                                    new DelimiterBasedFrameDecoder(
+                                            getInteger("maxFrameLength", 1024 * 1024),
+                                            Unpooled.copiedBuffer(delimiter.getBytes("utf-8"))
+                                    )
                             )
                         }
                         ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
@@ -209,6 +212,7 @@ class TCPClient extends ServerTpl {
     // 应用组
     class AppGroup {
         String name
+        // 节点 id -> 节点
         final Map<String, Node> nodes =  new ConcurrentHashMap<>()
 
         // 更新/添加应用节点
@@ -236,7 +240,7 @@ class TCPClient extends ServerTpl {
                 nodes.find {true}.value.send(data)
             } else if (nodes.size() > 1) {
                 Node[] ns = nodes.values().stream().filter{!it.freeze}.toArray()
-                if (ns.size() == 0) nodes.iterator().next().value.send(data) // 证明只有一个而且是冻结的
+                if (ns.size() == 0) nodes.iterator().next().value.send(data) // 证明只有一个而且是冻结不可用的
                 else if (ns.size() == 1) ns[0].send(data)
                 else ns[new Random().nextInt(ns.length)].send(data)
             }
@@ -280,6 +284,11 @@ class TCPClient extends ServerTpl {
             if (ch == null) throw new RuntimeException("Not found available connection")
             ch.writeAndFlush(toByteBuf(data)).addListener{ChannelFuture cf ->
                 if (cf.cause() != null) {
+                    if (cf.cause() instanceof ClosedChannelException) {
+                        tcpPool.remove(ch)
+                        send(data, failFn)
+                        return
+                    }
                     // TODO
                     if (failFn != null) failFn.accept(cf.cause())
                     else {
@@ -296,6 +305,7 @@ class TCPClient extends ServerTpl {
 
         @Override
         String toString() {
+            (id ? "id: $id, " : '') + ("freeze: $freeze, ") + ("tcpHp: $tcpHp, ") + (httpHp ? "httpHp: $httpHp, " : '') + ("poolSize: ${tcpPool.chs.size()}")
         }
     }
 
@@ -315,7 +325,7 @@ class TCPClient extends ServerTpl {
             if (!sync) return null // 非同步,则立即返回
             if (chs.size() == 0) {
                 // TODO
-                throw new RuntimeException("Not found available Channel for ${node?.group?.name}, $node.id, ${host+':'+port}")
+                throw new RuntimeException("Not found available Channel for ${node.group ? node.group.name : node.tcpHp}")
             }
             try {
                 rwLock.readLock().lock()
@@ -347,7 +357,7 @@ class TCPClient extends ServerTpl {
                             ch.attr(AttributeKey.valueOf("removeFn")).set({remove(ch)} as Runnable)
                             chs.add(ch)
                             node.freeze = false
-                            log.info("New TCP Connection to '{}'[{}]. total count: " + chs.size(), node.group.name, (host+":"+port))
+                            log.info("New TCP Connection to '{}'[{}]. total count: " + chs.size(), (node.group?.name?:''), (host+":"+port))
                         }
                     }
                 }
@@ -366,7 +376,7 @@ class TCPClient extends ServerTpl {
                 rwLock.writeLock().lock()
                 for (def it = chs.iterator(); it.hasNext(); ) {
                     if (it.next() == ch) {
-                        log.info("Remove TCP connection '{}'[{}]. left count: " + chs.size(), node.group?.name, node.tcpHp)
+                        log.info("Remove TCP connection '{}'[{}]. left count: " + chs.size(), (node.group?.name?:''), node.tcpHp)
                         it.remove(); break
                     }
                 }
@@ -379,7 +389,7 @@ class TCPClient extends ServerTpl {
         def redeem() {
             if (!redeem.compareAndSet(false, true)) return
             LinkedList<Integer> pass = new LinkedList<>()
-            for (String s : getStr("redeemFrequency", "10, 10, 20, 10, 30, 60, 40, 45, 60, 60, 90, 120, 90, 120, 90, 60, 90, 60, 90, 60, 90, 120, 300, 120, 600, 300").split(",")) {
+            for (String s : getStr("redeemFrequency", "10, 10, 20, 10, 30, 60, 90, 120, 90, 120, 90, 90, 120, 300, 120, 600, 300").split(",")) {
                 try {
                     pass.add(Integer.valueOf(s.trim()))
                 } catch (Exception ex) {
@@ -394,21 +404,17 @@ class TCPClient extends ServerTpl {
                         if (chs.size() > 0) {
                             node.freeze = false
                             redeem.set(false)
-                            log.info("'{}'[{}] redeem success", node.group?.name, node.tcpHp)
+                            log.info("node '{}' redeem success", node)
                         }
-                    } catch (Exception e) {
+                    } catch (Throwable e) {
                         if (pass.isEmpty()) {
                             if (node.id) node.group?.nodes?.remove(node.id)
                             else hpNodes.remove(node.tcpHp)
-                            log.warn("'{}'[{}] can't redeem. removed", node.group?.name, node.tcpHp)
+                            log.warn("node '{}' can't redeem. removed", node)
                         }
                         else {
-                            if (appInfo.hps.contains(hp)) {// 又被加入到配置里面去了,停止redeem
-                                log.info("Stop redeem '{}'[{}]", appInfo.name, hp); appInfo.hpErrorRecord.get(hp).removeLast();
-                            } else {
-                                log.warn("'{}'[{}] try redeem fail", appInfo.name, hp);
-                                ep.fire("sched.after", Duration.ofSeconds(pass.removeFirst()), this);
-                            }
+                            log.warn("node '{}' try redeem fail", node)
+                            sched?.after(Duration.ofSeconds(pass.removeFirst()), this)
                         }
                     }
                 }

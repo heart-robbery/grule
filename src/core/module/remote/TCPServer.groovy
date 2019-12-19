@@ -129,7 +129,7 @@ class TCPServer extends ServerTpl {
                         ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
                             @Override
                             void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-                                log.error("server side error", cause)
+                                log.error("server side error. ", cause)
                             }
                             @Override
                             void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
@@ -270,7 +270,9 @@ class TCPServer extends ServerTpl {
             e.value.each {d ->
                 // 返回所有的注册信息给当前来注册的客户端
                 if (d["id"] != data["id"]) {
-                    ctx?.writeAndFlush(Unpooled.copiedBuffer(new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", d).toString() + (delimiter?:'')))
+                    ctx?.writeAndFlush(Unpooled.copiedBuffer(
+                            (new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", d).toString() + (delimiter?:'')).getBytes('utf-8')
+                    ))
                 }
                 // 如果是新系统上线, 则主动通知其它系统
                 if (isNew && d['id'] != data['id'] && d['id'] != app.id) {

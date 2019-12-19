@@ -47,11 +47,13 @@ class Remoter extends ServerTpl {
         if (exec == null) exec = Executors.newFixedThreadPool(2)
         if (ep == null) {ep = new EP(exec); ep.addListenerSource(this)}
 
+        String delimiter = getStr('delimiter', '$_$')
         // 如果系统中没有TCPClient, 则创建
         tcpClient = bean(TCPClient)
         if (tcpClient == null) {
             tcpClient = new TCPClient()
             ep.fire("inject", tcpClient); tcpClient.attrs.putAll(AppContext.env.(tcpClient.name))
+            tcpClient.attr("delimiter", delimiter)
             exposeBean(tcpClient)
             tcpClient.start()
         }
@@ -61,15 +63,16 @@ class Remoter extends ServerTpl {
         if (tcpServer == null) {
             tcpServer = new TCPServer()
             ep.fire("inject", tcpServer); tcpServer.attrs.putAll(AppContext.env.(tcpServer.name))
+            tcpServer.attr("delimiter", delimiter)
             exposeBean(tcpServer)
             tcpServer.start()
         }
 
-        tcpClient.handlers.add{jo ->
+        tcpClient.handlers.add({jo ->
             if ("event"== jo['type']) {
                 exec.execute{receiveEventResp(jo.getJSONObject("data"))}
             }
-        }
+        } as Consumer)
         ep.fire("${name}.started")
     }
 
@@ -257,7 +260,7 @@ class Remoter extends ServerTpl {
                 log.error("register up error", th)
             } finally {
                 if (needLoop) {
-                    sched.after(Duration.ofSeconds(120), registerFn)
+                    sched.after(Duration.ofSeconds(getInteger('registerUpInterval', 120) + new Random().nextInt(60)), registerFn)
                 }
             }
         }
