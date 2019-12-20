@@ -4,7 +4,6 @@ import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import core.module.ServerTpl
-import groovy.text.GStringTemplateEngine
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -151,30 +150,6 @@ class AppContext {
                     f.set(o, v)
                     log.trace("Inject @Resource field '{}' for object '{}'", f.name, o)
                 } catch (Exception e) { log.error("Inject @Resource field '" + f.name + "' Error!", e) }
-            }
-            Value vR = f.getAnnotation(Value)
-            if (vR) {
-                try {
-                    f.setAccessible(true)
-                    Object v = f.get(o) // 默认值
-                    if (v == null) {
-                        v = new GStringTemplateEngine().createTemplate(vR).make(env).toString()
-                    } else {
-                        String s = new GStringTemplateEngine().createTemplate(vR).make(env).toString()
-                        if (s != null) v = s
-                    }
-                    if (f.type == Integer || f.type == int.class) f.set(o, Integer.valueOf(v))
-                    else if (f.type == Long || f.type == long.class) f.set(o, Long.valueOf(v))
-                    else if (f.type == Boolean || f.type == boolean.class) f.set(o, Boolean.valueOf(v))
-                    else if (f.type == Float || f.type == float.class) f.set(o, Float.valueOf(v))
-                    else if (f.type == Double || f.type == double.class) f.set(o, Double.valueOf(v))
-                    else if (f.type == Double || f.type == double.class) f.set(o, Double.valueOf(v))
-                    else if (f.type == BigDecimal) f.set(o, BigDecimal.valueOf(v))
-                    else if (f.type == BigInteger) f.set(o, BigInteger.valueOf(v))
-                    else if (f.type == URI && v instanceof String) f.set(o, URI.create(v))
-                    else if (f.type == URL && v instanceof String) f.set(o, new URL(v))
-                    else f.set(o, v)
-                } catch(Exception ex) {log.error("Inject @Value field '" + f.name + "' Error!", ex)}
             }
         })
     }

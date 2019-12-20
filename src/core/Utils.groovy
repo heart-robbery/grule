@@ -1,6 +1,7 @@
 package core
 
 import com.alibaba.fastjson.JSON
+import org.codehaus.groovy.runtime.InvokerHelper
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -13,11 +14,14 @@ import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
+import java.util.concurrent.ConcurrentHashMap
 import java.util.function.Consumer
 import java.util.function.Function
 
 class Utils {
     static Logger log = LoggerFactory.getLogger(Utils)
+
+    static final GroovyClassLoader  gcl = new GroovyClassLoader()
 
     /**
      * 得到jvm进程号
@@ -279,6 +283,20 @@ class Utils {
         if (!urlStr.endsWith("?")) sb.append("?")
         params.each { sb.append(it.key).append("=").append(URLEncoder.encode(it.value.toString(), 'utf-8')).append("&") }
         return sb.toString()
+    }
+
+
+    // 脚本类缓存
+    static final Map<String, Script> scriptCache = new ConcurrentHashMap<>()
+    /**
+     * 执行一段groovy脚本
+     * @param scriptText
+     * @param ctx
+     * @return
+     */
+    static Object eval(String scriptText, Map ctx = new HashMap()) {
+        Script script = scriptCache.computeIfAbsent(scriptText {InvokerHelper.createScript(gcl.parseClass(scriptText), new Binding(ctx))})
+        return script.run()
     }
 
 

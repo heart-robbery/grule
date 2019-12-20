@@ -30,7 +30,7 @@ dependencies {
     compile fileTree(dir: 'sysLib', include: ['*.jar'])
     // compile 'org.codehaus.groovy:groovy:2.5.8'
     compile 'org.codehaus.groovy:groovy:3.0.0-rc-1'
-    compile 'org.codehaus.groovy:groovy-templates:3.0.0-rc-1'
+    // compile 'org.codehaus.groovy:groovy-templates:3.0.0-rc-1'
     // compile ('org.codehaus.groovy:groovy-sql:2.5.6')
 
     compile 'com.alibaba:fastjson:1.2.61'

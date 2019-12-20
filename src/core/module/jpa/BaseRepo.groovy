@@ -100,6 +100,24 @@ class BaseRepo {
     }
 
 
+    /**
+     * 查询
+     * @param eType 实体类型
+     * @param spec 条件
+     * @return <T> 实体对象
+     */
+    def <T extends IEntity> T find(Class<T> eType, CriteriaSpec spec) {
+        trans{s ->
+            CriteriaBuilder cb = s.getCriteriaBuilder()
+            CriteriaQuery<T> query = cb.createQuery(eType)
+            Root<T> root = query.from(eType)
+            Object p = spec?.toPredicate(root, query, cb)
+            if (p instanceof Predicate) query.where(p)
+            List<T> ls = s.createQuery(query).setMaxResults(1).list()
+            return (ls.size() == 1 ? ls.get(0) : null)
+        } as T
+    }
+
 
     /**
      * 删实体

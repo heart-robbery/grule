@@ -32,9 +32,9 @@ class OkHttpSrv extends ServerTpl {
         if (client) throw new RuntimeException("$name is already running")
         if (ep == null) {ep = new EP(); ep.addListenerSource(this)}
         client = new OkHttpClient.Builder()
-                .connectTimeout(Duration.ofSeconds(Long.valueOf(attrs.connectTimeout?:8)))
-                .readTimeout(Duration.ofSeconds(Long.valueOf(attrs.readTimeout?:16)))
-                .writeTimeout(Duration.ofSeconds(Long.valueOf(attrs.writeTimeout?:30)))
+                .connectTimeout(Duration.ofSeconds(getLong('connectTimeout', 8)))
+                .readTimeout(Duration.ofSeconds(getLong('readTimeout', 16)))
+                .writeTimeout(Duration.ofSeconds(getLong('writeTimeout', 32)))
                 .dispatcher(new Dispatcher(exec))
                 .cookieJar(new CookieJar() {// 共享cookie
                     @Override
@@ -80,7 +80,6 @@ class OkHttpSrv extends ServerTpl {
 
 
     OkHttpClient client() {client}
-
 
     class OkHttp {
         // 宿主
@@ -196,10 +195,11 @@ class OkHttpSrv extends ServerTpl {
                         okFn?.accept(resp.body().string())
                     }
                 })
+                null
             } else { // 同步请求
                 def resp = call.execute()
                 // if (200 != resp.code()) throw new RuntimeException("Http error code: ${resp.code()}, url: $urlStr")
-                resp.body().string()
+                return resp.body().string()
             }
         }
     }
