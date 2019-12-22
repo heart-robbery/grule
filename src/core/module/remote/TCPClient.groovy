@@ -242,7 +242,10 @@ class TCPClient extends ServerTpl {
                 Node[] ns = nodes.values().stream().filter{!it.freeze}.toArray()
                 if (ns.size() == 0) nodes.iterator().next().value.send(data) // 证明只有一个而且是冻结不可用的
                 else if (ns.size() == 1) ns[0].send(data)
-                else ns[new Random().nextInt(ns.length)].send(data)
+                else {
+                    def n = ns[new Random().nextInt(ns.length)]
+                    n.send(data)
+                }
             }
         }
 
@@ -281,13 +284,15 @@ class TCPClient extends ServerTpl {
         // 发送数据
         def send(final String data, Consumer<Throwable> failFn = null) {
             def ch = tcpPool.get()
-            if (ch == null) throw new RuntimeException("Not found available connection")
+            if (ch == null) {
+                def ex = new RuntimeException("Not found available connection")
+                if (failFn) failFn.accept(ex)
+                else throw ex
+            }
             ch.writeAndFlush(toByteBuf(data)).addListener{ChannelFuture cf ->
                 if (cf.cause() != null) {
                     if (cf.cause() instanceof ClosedChannelException) {
                         tcpPool.remove(ch)
-                        send(data, failFn)
-                        return
                     }
                     // TODO
                     if (failFn != null) failFn.accept(cf.cause())
@@ -362,8 +367,9 @@ class TCPClient extends ServerTpl {
                     }
                 }
             } catch (Throwable th) {
-                node.freeze = true
-                log.error("连接失败. '{}:{}', errMsg: " + th.message, host, port)
+                if (!node.freeze) {
+                    log.error("连接失败. '{}:{}', errMsg: " + th.message, host, port)
+                }
                 exec.execute{redeem()}
             } finally {
                 rwLock.writeLock().unlock()
@@ -388,6 +394,8 @@ class TCPClient extends ServerTpl {
         // 尝试挽回
         def redeem() {
             if (!redeem.compareAndSet(false, true)) return
+            node.freeze = true
+
             LinkedList<Integer> pass = new LinkedList<>()
             for (String s : getStr("redeemFrequency", "10, 10, 20, 10, 30, 60, 90, 120, 90, 120, 90, 90, 120, 300, 120, 600, 300").split(",")) {
                 try {
@@ -411,8 +419,7 @@ class TCPClient extends ServerTpl {
                             if (node.id) node.group?.nodes?.remove(node.id)
                             else hpNodes.remove(node.tcpHp)
                             log.warn("node '{}' can't redeem. removed", node)
-                        }
-                        else {
+                        } else {
                             log.warn("node '{}' try redeem fail", node)
                             sched?.after(Duration.ofSeconds(pass.removeFirst()), this)
                         }
