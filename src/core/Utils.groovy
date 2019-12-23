@@ -295,6 +295,7 @@ class Utils {
      * @return
      */
     static Object eval(String scriptText, Map ctx = new HashMap()) {
+        if (scriptText == null || scriptText.isEmpty()) throw new IllegalArgumentException("scriptText must not be empty")
         Script script = scriptCache.computeIfAbsent(scriptText {InvokerHelper.createScript(gcl.parseClass(scriptText), new Binding(ctx))})
         return script.run()
     }

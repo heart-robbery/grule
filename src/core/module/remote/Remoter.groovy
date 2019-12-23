@@ -260,7 +260,7 @@ class Remoter extends ServerTpl {
                 log.error("register up error", th)
             } finally {
                 if (needLoop) {
-                    sched.after(Duration.ofSeconds(getInteger('registerUpInterval', 120) + new Random().nextInt(60)), registerFn)
+                    sched.after(Duration.ofSeconds(getInteger('upInterval', 180) + new Random().nextInt(60)), registerFn)
                 }
             }
         }

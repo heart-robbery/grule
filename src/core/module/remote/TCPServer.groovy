@@ -257,7 +257,7 @@ class TCPServer extends ServerTpl {
                 Map<String, Object> cur = it2.next()
                 if (!cur) {it2.remove(); continue} // 删除空的坏数据
                 // 删除一段时间未活动的注册信息, dropAppTimeout 单位: 分钟
-                if ((System.currentTimeMillis() - (Long) cur.getOrDefault("_time", System.currentTimeMillis()) > getInteger("dropAppTimeout", 30) * 60 * 1000) && (cur["id"] != app.id)) {
+                if ((System.currentTimeMillis() - (Long) cur.getOrDefault("_time", System.currentTimeMillis()) > getInteger("dropAppTimeout", 10) * 60 * 1000) && (cur["id"] != app.id)) {
                     it2.remove()
                     log.warn("Drop timeout app register info: {}", cur)
                 }
