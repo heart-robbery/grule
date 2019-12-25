@@ -54,11 +54,13 @@ dependencies {
     }
     compile 'redis.clients:jedis:3.1.0'
 
+    // web 相关
     compile ('io.ratpack:ratpack-core:1.7.3') {
         exclude group: 'io.netty'
         // exclude group: 'com.fasterxml.jackson.core'
         exclude group: 'io.ratpack', module: 'ratpack-guice'
     }
+    //compile('com.bladejava:blade-mvc:2.0.15.BETA')
 
     // excel
     // compile 'org.apache.poi:poi:4.1.0'

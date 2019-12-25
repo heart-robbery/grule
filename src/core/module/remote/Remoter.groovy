@@ -35,6 +35,9 @@ class Remoter extends ServerTpl {
     // 集群的服务中心地址 host:port,host1:port2
     @Lazy
     protected       String          master = getStr('master', null)
+    // 集群的服务中心应用名
+    @Lazy
+    protected       String          masterName = getStr('masterName', null)
 
 
     Remoter() { super("remoter") }
@@ -47,13 +50,14 @@ class Remoter extends ServerTpl {
         if (exec == null) exec = Executors.newFixedThreadPool(2)
         if (ep == null) {ep = new EP(exec); ep.addListenerSource(this)}
 
+        // 设置默认tcp折包粘包的分割
         String delimiter = getStr('delimiter', '$_$')
         // 如果系统中没有TCPClient, 则创建
         tcpClient = bean(TCPClient)
         if (tcpClient == null) {
             tcpClient = new TCPClient()
-            ep.fire("inject", tcpClient); tcpClient.attrs.putAll(AppContext.env.(tcpClient.name))
-            tcpClient.attr("delimiter", delimiter)
+            ep.addListenerSource(tcpClient); ep.fire("inject", tcpClient)
+            tcpClient.attrs.putAll(AppContext.env.(tcpClient.name)); tcpClient.attr("delimiter", delimiter)
             exposeBean(tcpClient)
             tcpClient.start()
         }
@@ -62,8 +66,8 @@ class Remoter extends ServerTpl {
         tcpServer = bean(TCPServer)
         if (tcpServer == null) {
             tcpServer = new TCPServer()
-            ep.fire("inject", tcpServer); tcpServer.attrs.putAll(AppContext.env.(tcpServer.name))
-            tcpServer.attr("delimiter", delimiter)
+            ep.addListenerSource(tcpServer); ep.fire("inject", tcpServer)
+            tcpServer.attrs.putAll(AppContext.env.(tcpServer.name)); tcpServer.attr("delimiter", delimiter)
             exposeBean(tcpServer)
             tcpServer.start()
         }
@@ -227,7 +231,10 @@ class Remoter extends ServerTpl {
         boolean needLoop
         @Override
         void run() {
+            Throwable ex
             try {
+                // 当tcpClient 中存在相应的 masterName 时, 则用masterName 作为服务中心
+                String mName = masterName ? (tcpClient.apps.containsKey(masterName) ? masterName : null) : null
                 if (!master) return
                 def info = selfInfo
                 if (!info) return
@@ -257,10 +264,15 @@ class Remoter extends ServerTpl {
 
                 log.debug("register up success. {}", data)
             } catch(Throwable th) {
-                log.error("register up error", th)
-            } finally {
-                if (needLoop) {
-                    sched.after(Duration.ofSeconds(getInteger('upInterval', 180) + new Random().nextInt(60)), registerFn)
+                ex = th
+            }
+            if (needLoop) {
+                if (ex) {
+                    log.error("register up error", ex)
+                    // 发生错误,则缩短同步间隔时间
+                    sched?.after(Duration.ofSeconds(getInteger('upInterval', 30) + new Random().nextInt(60)), registerFn)
+                } else {
+                    sched?.after(Duration.ofSeconds(getInteger('upInterval', 180) + new Random().nextInt(60)), registerFn)
                 }
             }
         }

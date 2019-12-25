@@ -27,6 +27,7 @@ import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReadWriteLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import java.util.function.Consumer
@@ -77,7 +78,7 @@ class TCPClient extends ServerTpl {
     @EL(name = "updateAppInfo")
     def updateAppInfo(final JSONObject data) {
         log.trace("Update app info: {}", data)
-        if (data == null) return
+        if (data == null || data.isEmpty()) return
         if (app.id == data["id"]) return // 不把系统本身的信息放进去
 
         apps.computeIfAbsent(data["name"], {s -> {
@@ -112,7 +113,7 @@ class TCPClient extends ServerTpl {
      */
     def send(String appName, String data, String target = 'any') {
         def group = apps.get(appName)
-        if (group == null) throw new RuntimeException("Not found app $appName Systom online")
+        if (group == null) throw new RuntimeException("Not found app '$appName' system online")
         if ('any' == target) {
             group.sendToAny(data)
         } else if ('all' == target) {
@@ -153,7 +154,6 @@ class TCPClient extends ServerTpl {
                         ((Runnable) ctx.channel().attr(AttributeKey.valueOf("removeFn")).get()).run()
                         super.channelUnregistered(ctx)
                     }
-
 
                     @Override
                     protected void initChannel(SocketChannel ch) throws Exception {
@@ -230,7 +230,9 @@ class TCPClient extends ServerTpl {
             }
             def n = nodes.get(id)
             if (n) { // 更新
-                n.tcpHp = tcpHp
+                if (n.tcpHp != tcpHp) {
+
+                }
                 n.httpHp = httpHp
             } else {
                 n = new Node(id: id, group: this, httpHp: httpHp, tcpHp: tcpHp)
@@ -244,7 +246,7 @@ class TCPClient extends ServerTpl {
             List<Node> ns = new LinkedList<>()
             nodes.each {ns.add(it.value)}
             if (ns.size() == 0) {
-                throw new RuntimeException("Not found available node for $name")
+                throw new RuntimeException("Not found available node for '$name'")
             }
             randomStrategy(ns, data)
         }
@@ -293,14 +295,18 @@ class TCPClient extends ServerTpl {
         }
 
         // 发送数据
-        def send(final String data, Consumer<Throwable> failFn = null) {
+        def send(final String data, Consumer<Throwable> failFn = null, AtomicInteger limit = new AtomicInteger(0)) {
             try {
                 def ch = tcpPool.get()
                 ch.writeAndFlush(toByteBuf(data)).addListener{ChannelFuture cf ->
                     if (cf.cause() != null) {
                         if (cf.cause() instanceof ClosedChannelException) {
                             tcpPool.remove(ch)
-                            send(data, failFn)
+                            if (limit.get() < 3) {
+                                limit.incrementAndGet()
+                                send(data, failFn, limit) // 重试
+                                return
+                            }
                         }
                         if (failFn != null) failFn.accept(cf.cause())
                         else {
@@ -321,7 +327,7 @@ class TCPClient extends ServerTpl {
 
         @Override
         String toString() {
-            (group ? "name: $group.name," : '') + (id ? "id: $id," : '') + ("tcpHp: $tcpHp,") + (httpHp ? "httpHp: $httpHp," : '') + ("poolSize: ${tcpPool.chs.size()}")
+            (group ? "name:$group.name, " : '') + (id ? "id:$id, " : '') + ("tcpHp:$tcpHp, ") + (httpHp ? "httpHp:$httpHp, " : '') + ("poolSize:${tcpPool.chs.size()}")
         }
     }
 
@@ -359,10 +365,9 @@ class TCPClient extends ServerTpl {
             try { // 连接
                 ch = boot.connect(host, port).sync().channel()
                 ch.attr(AttributeKey.valueOf("removeFn")).set({ remove(ch) } as Runnable)
-                log.info("New TCP Connection to '{}'", node)
             } catch (Throwable th) {
                 log.error("Create TCP Connection error. node: '{}'. errMsg: {}", node, (th.message ?: th.class.simpleName))
-                if (node.group?.nodes.size() > 1) { // 删除连接不上的节点, 但保留一个
+                if (node.group && node.group.nodes.size() > 1) { // 删除连接不上的节点, 但保留一个
                     node.group?.nodes.remove(node.id)
                 }
             }
@@ -370,6 +375,7 @@ class TCPClient extends ServerTpl {
                 try { // 添加连接
                     rwLock.writeLock().lock()
                     chs.add(ch)
+                    log.info("New TCP Connection to '{}'", node)
                 } finally {
                     rwLock.writeLock().unlock()
                 }
@@ -377,7 +383,7 @@ class TCPClient extends ServerTpl {
             ch
         }
 
-        // 删除 连接Channel
+        // 删除连接Channel
         def remove(final Channel ch) {
             try {
                 rwLock.writeLock().lock()

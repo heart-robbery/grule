@@ -96,7 +96,7 @@ class AppContext {
         ep.fire('sys.starting', EC.of(this).completeFn({ ec ->
             if (shutdownHook) Runtime.getRuntime().addShutdownHook(shutdownHook)
             sourceMap.each{s, o -> inject(o)} // 自动注入
-            log.info("Started Application "+ (name ? '\'' + name + '\'' : '') +" in {} seconds (JVM running for {})",
+            log.info("Started Application "+ (name ? ('\'' + name + (id ? ':' + id : '') + '\'') : '') +" in {} seconds (JVM running for {})",
                 (System.currentTimeMillis() - startup.getTime()) / 1000.0,
                 ManagementFactory.getRuntimeMXBean().getUptime() / 1000.0
             )

@@ -79,3 +79,11 @@ tcpServer {
     // ':9001' or 'localhost:9001'
     hp=':8001'
 }
+
+tcpClient {
+    node = [{ // 手动添加节点
+        name="master" // 节点名字
+        id="master_1" // 节点id
+        tcpHp="localhost:9001"
+    }]
+}
