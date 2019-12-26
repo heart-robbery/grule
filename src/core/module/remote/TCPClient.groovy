@@ -23,15 +23,12 @@ import io.netty.util.ReferenceCountUtil
 import javax.annotation.Resource
 import java.nio.channels.ClosedChannelException
 import java.nio.charset.Charset
-import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReadWriteLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import java.util.function.Consumer
-import java.util.stream.Collectors
 
 import static core.Utils.linux
 
@@ -39,7 +36,7 @@ class TCPClient extends ServerTpl {
     @Resource
     protected AppContext                 app
     @Resource
-    protected SchedSrv  sched
+    protected SchedSrv                   sched
     @Resource
     protected Executor                   exec
     final     Map<String, Node>          hpNodes   = new ConcurrentHashMap<>()
@@ -57,8 +54,9 @@ class TCPClient extends ServerTpl {
 
     @EL(name = 'sys.starting')
     def start() {
+        def node = getStr('node', null)
+        if (node) JSON.parseArray(node).each {JSONObject it -> updateAppInfo(it) }
         create()
-
         ep.fire("${name}.started")
     }
 
@@ -219,24 +217,21 @@ class TCPClient extends ServerTpl {
     // 应用组
     class AppGroup {
         String name
-        // 节点 id -> 节点
+        // 节点 tcpHp -> 节点
         final Map<String, Node> nodes =  new ConcurrentHashMap<>()
 
         // 更新/添加应用节点
         def updateNode(final JSONObject data) {
-            def (String id, tcpHp, httpHp) = [data['id'], data['tcp'], data['http']]
-            if (!id || !tcpHp || !httpHp) {
-                throw new IllegalArgumentException("Node illegal error. $id, $tcpHp, $httpHp")
+            def (tcpHp, httpHp) = [data['tcp'], data['http']]
+            if (!tcpHp) { // tcpHp 不能为空
+                throw new IllegalArgumentException("Node illegal error. $tcpHp, $httpHp")
             }
-            def n = nodes.get(id)
+            def n = nodes.get(tcpHp)
             if (n) { // 更新
-                if (n.tcpHp != tcpHp) {
-
-                }
                 n.httpHp = httpHp
             } else {
-                n = new Node(id: id, group: this, httpHp: httpHp, tcpHp: tcpHp)
-                nodes.put(id, n)
+                n = new Node(group: this, httpHp: httpHp, tcpHp: tcpHp)
+                nodes.put(tcpHp, n)
                 log.info("New Node added. Node: '{}'", n)
             }
         }
@@ -273,25 +268,20 @@ class TCPClient extends ServerTpl {
 
 
     // 实例节点
-    class Node {
+    protected class Node {
         AppGroup          group
-        String            id
         String            tcpHp
         String            httpHp
         final ChannelPool tcpPool = new ChannelPool()
 
         def setTcpHp(String hp) {
-            if (tcpHp == null) {
-                this.tcpHp = hp
-                def arr = hp.split(":")
-                tcpPool.host = arr[0].trim()
-                tcpPool.port = Integer.valueOf(arr[1].trim())
-                tcpPool.node = this
-                exec.execute{tcpPool.create()} // 默认创建一个
-            } else if (tcpHp != hp) {
-                // TODO 更新
-                throw new RuntimeException("tcpHp not match")
-            }
+            if (!hp) throw new IllegalArgumentException("Node tcpHp must not be empty")
+            this.tcpHp = hp
+            def arr = hp.split(":")
+            tcpPool.host = arr[0].trim()
+            tcpPool.port = Integer.valueOf(arr[1].trim())
+            tcpPool.node = this
+            exec.execute{tcpPool.create()} // 默认创建一个
         }
 
         // 发送数据
@@ -320,14 +310,9 @@ class TCPClient extends ServerTpl {
             }
         }
 
-        def setId(String id) {
-            if (this.id != null) throw new RuntimeException("'id' not Allow change")
-            this.id = id
-        }
-
         @Override
         String toString() {
-            (group ? "name:$group.name, " : '') + (id ? "id:$id, " : '') + ("tcpHp:$tcpHp, ") + (httpHp ? "httpHp:$httpHp, " : '') + ("poolSize:${tcpPool.chs.size()}")
+            (group ? "name:$group.name, " : '') + ("tcpHp:$tcpHp, ") + (httpHp ? "httpHp:$httpHp, " : '') + ("poolSize:${tcpPool.chs.size()}")
         }
     }
 

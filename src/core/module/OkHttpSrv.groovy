@@ -39,7 +39,7 @@ class OkHttpSrv extends ServerTpl {
                 .cookieJar(new CookieJar() {// 共享cookie
                     @Override
                     void saveFromResponse(HttpUrl url, List<Cookie> cookies) {
-                        cookieStore.put("$url.host:$url.port", new ArrayList<Cookie>(cookies)) // 可更改
+                        cookieStore.put("$url.host:$url.port", new LinkedList<Cookie>()) // 可更改
                     }
                     @Override
                     List<Cookie> loadForRequest(HttpUrl url) {
@@ -178,7 +178,7 @@ class OkHttpSrv extends ServerTpl {
             HttpUrl url = HttpUrl.get(urlStr)
             // 添加cookie
             if (cookies) {
-                def ls = cookieStore.computeIfAbsent("$url.host:$url.port", {new ArrayList<Cookie>(7)})
+                def ls = cookieStore.computeIfAbsent("$url.host:$url.port", {new LinkedList<Cookie>()})
                 cookies.each { ls.add(Cookie.parse(url, "$it.key=$it.value")) }
             }
 
@@ -198,7 +198,7 @@ class OkHttpSrv extends ServerTpl {
                 null
             } else { // 同步请求
                 def resp = call.execute()
-                // if (200 != resp.code()) throw new RuntimeException("Http error code: ${resp.code()}, url: $urlStr")
+                if (200 != resp.code()) throw new RuntimeException("Http error code: ${resp.code()}, url: $urlStr, resp: ${resp.body().string()}")
                 return resp.body().string()
             }
         }

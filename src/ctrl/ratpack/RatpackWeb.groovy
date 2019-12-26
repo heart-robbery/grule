@@ -330,7 +330,23 @@ class RatpackWeb extends ServerTpl {
 
 
     @EL(name = ['http.hp', 'web.hp'], async = false)
-    def getHp() { srv.bindHost + ':' + srv.bindPort }
+    def getHp() {
+        String ip = srv.bindHost
+        if (ip == 'localhost') {
+            l: for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
+                NetworkInterface current = en.nextElement()
+                if (!current.isUp() || current.isLoopback() || current.isVirtual()) continue
+                Enumeration<InetAddress> addresses = current.getInetAddresses()
+                while (addresses.hasMoreElements()) {
+                    InetAddress addr = addresses.nextElement()
+                    if (addr.isLoopbackAddress()) continue
+                    ip = addr.getHostAddress()
+                    break l
+                }
+            }
+        }
+        ip + ':' + srv.bindPort
+    }
 
 
     @EL(name = 'web.sessionExpire', async = false)

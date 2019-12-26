@@ -29,15 +29,15 @@ class Remoter extends ServerTpl {
     /**
      * ecId -> EC
      */
-    protected final Map<String, EC> ecMap  = new ConcurrentHashMap<>()
+    protected final Map<String, EC> ecMap     = new ConcurrentHashMap<>()
     protected       TCPClient       tcpClient
     protected       TCPServer       tcpServer
     // 集群的服务中心地址 host:port,host1:port2
     @Lazy
-    protected       String          master = getStr('master', null)
+    protected       String          master    = getStr('master', null)
     // 集群的服务中心应用名
     @Lazy
-    protected       String          masterName = getStr('masterName', null)
+    protected       String          masterApp = getStr('masterApp', null)
 
 
     Remoter() { super("remoter") }
@@ -233,21 +233,11 @@ class Remoter extends ServerTpl {
         void run() {
             Throwable ex
             try {
-                // 当tcpClient 中存在相应的 masterName 时, 则用masterName 作为服务中心
-                String mName = masterName ? (tcpClient.apps.containsKey(masterName) ? masterName : null) : null
-                if (!master) return
+                // 当tcpClient 中存在相应的 masterApp 时, 则用masterApp 作为服务中心
+                String mName = masterApp ? (tcpClient.apps.containsKey(masterApp) ? masterApp : null) : null
+                if (!master && !mName) return
                 def info = selfInfo
                 if (!info) return
-
-                def ls = Stream.of(master.split(",")).map{
-                    def arr = it.split(":")
-                    Tuple.tuple(arr[0].trim(), Integer.valueOf(arr[1].trim()))
-                }.collect(Collectors.toList())
-                if (ls.size() < 1) {
-                    log.error("master not config right. {}", master)
-                    return
-                }
-                needLoop = true
 
                 // 上传的数据格式
                 JSONObject data = new JSONObject(3)
@@ -255,11 +245,25 @@ class Remoter extends ServerTpl {
                 data.put("source", new JSONObject(2).fluentPut('name', app.name).fluentPut('id', app.id)) // 表明来源
                 data.put("data", info)
 
-                if (ls.size() == 1) {
-                    tcpClient.send(ls.get(0).v1, ls.get(0).v2, data.toString())
+                if (mName) { // 应用名
+                    tcpClient.send(mName, data.toString())
                 } else {
-                    def hp = ls.get(new Random().nextInt(ls.size()))
-                    tcpClient.send(hp.v1, hp.v2, data.toString())
+                    def ls = Stream.of(master.split(",")).map{
+                        def arr = it.split(":")
+                        Tuple.tuple(arr[0].trim(), Integer.valueOf(arr[1].trim()))
+                    }.collect(Collectors.toList())
+                    if (ls.size() < 1) {
+                        log.error("master not config right. {}", master)
+                        return
+                    }
+                    needLoop = true
+
+                    if (ls.size() == 1) {
+                        tcpClient.send(ls.get(0).v1, ls.get(0).v2, data.toString())
+                    } else {
+                        def hp = ls.get(new Random().nextInt(ls.size()))
+                        tcpClient.send(hp.v1, hp.v2, data.toString())
+                    }
                 }
 
                 log.debug("register up success. {}", data)
@@ -292,7 +296,7 @@ class Remoter extends ServerTpl {
         if (tcpServer.hp.split(":")[0]) data.put("tcp", tcpServer.hp)
         else data.put("tcp", resolveLocalIp() + tcpServer.hp)
 
-        if (!data.containsKey('tcp') && !data.containsKey('http')) return null
+        if (!data.containsKey('tcp')) return null
         return data
     }
 
