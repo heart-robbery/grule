@@ -11,7 +11,7 @@ groovy 快速开发代码
 前端文件 src/static
 
 ratpackweb, sched(quartz), cache(ehcache), 
-redis, jpa(hibernate), OkHttpClient
+redis, jpa(hibernate), OkHttpClient, remoter(多应用tcp通信)
 
 
 #### 安装教程
