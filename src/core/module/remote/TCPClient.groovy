@@ -36,6 +36,8 @@ class TCPClient extends ServerTpl {
     @Resource
     protected AppContext                 app
     @Resource
+    protected Remoter remoter
+    @Resource
     protected SchedSrv                   sched
     @Resource
     protected Executor                   exec
@@ -54,8 +56,6 @@ class TCPClient extends ServerTpl {
 
     @EL(name = 'sys.starting')
     def start() {
-        def node = getStr('node', null)
-        if (node) JSON.parseArray(node).each {JSONObject it -> updateAppInfo(it) }
         create()
         ep.fire("${name}.started")
     }
@@ -68,6 +68,13 @@ class TCPClient extends ServerTpl {
     }
 
 
+    @EL(name = 'sys.started', async = false)
+    def started() {
+        def node = getStr('node', null)
+        if (node) JSON.parseArray(node).each {JSONObject it -> updateAppInfo(it) }
+    }
+
+
     /**
      * 更新 app 信息
      * @param data app node信息
@@ -77,7 +84,7 @@ class TCPClient extends ServerTpl {
     def updateAppInfo(final JSONObject data) {
         log.trace("Update app info: {}", data)
         if (data == null || data.isEmpty()) return
-        if (app.id == data["id"]) return // 不把系统本身的信息放进去
+        if (app.id == data["id"] || remoter.selfInfo?['tcp'] == data['tcp']) return // 不把系统本身的信息放进去
 
         apps.computeIfAbsent(data["name"], {s -> {
             log.info("New app group '{}'", s)
@@ -148,12 +155,6 @@ class TCPClient extends ServerTpl {
                 // .option(ChannelOption.SO_TIMEOUT, getInteger("soTimeout", 10000))
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
-                    void channelUnregistered(ChannelHandlerContext ctx) throws Exception {
-                        ((Runnable) ctx.channel().attr(AttributeKey.valueOf("removeFn")).get()).run()
-                        super.channelUnregistered(ctx)
-                    }
-
-                    @Override
                     protected void initChannel(SocketChannel ch) throws Exception {
                         // ch.pipeline().addLast(new IdleStateHandler(getLong("readerIdleTime", 12 * 60 * 60L), getLong("writerIdleTime", 10L), getLong("allIdleTime", 0L), SECONDS))
                         if (delimiter) {
@@ -165,6 +166,12 @@ class TCPClient extends ServerTpl {
                             )
                         }
                         ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                            @Override
+                            void channelUnregistered(ChannelHandlerContext ctx) throws Exception {
+                                ((Runnable) ctx.channel().attr(AttributeKey.valueOf("removeFn")).get())?.run()
+                                super.channelUnregistered(ctx)
+                            }
+
                             @Override
                             void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
                                 log.error(name + " error", cause)
@@ -246,7 +253,6 @@ class TCPClient extends ServerTpl {
             randomStrategy(ns, data)
         }
 
-
         // 随机节点策略
         def randomStrategy(List<Node> ns, String data) {
             if (ns.size() == 1) ns[0].send(data)
@@ -258,7 +264,6 @@ class TCPClient extends ServerTpl {
                 })
             }
         }
-
 
         def setName(String name) {
             if (this.name != null) throw new RuntimeException("'name' not allow change")
@@ -374,8 +379,9 @@ class TCPClient extends ServerTpl {
                 rwLock.writeLock().lock()
                 for (def it = chs.iterator(); it.hasNext();) {
                     if (it.next() == ch) {
+                        it.remove()
                         log.info("Remove TCP connection for Node '{}'", node)
-                        it.remove(); break
+                        break
                     }
                 }
             } finally {

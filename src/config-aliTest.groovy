@@ -17,6 +17,10 @@ fileUploader {
     accessUrlPrefix="http://39.104.28.131/gy/file/"
 }
 
+remoter {
+    exposeTcp="39.104.28.131:8001"
+}
+
 log {
     path="$baseDir/log"
     appender='file'

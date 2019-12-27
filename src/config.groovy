@@ -22,7 +22,7 @@ jpa {
 //  文件上传本地存放目录
 //fileUploader.localDir='e:/tmp/upload/'
 
-//ep.track = ['bean.get', 'sys.started']
+//ep.track = ['sys.started']
 
 
 // web 配置
@@ -72,13 +72,13 @@ redis {
 
 remoter {
     // 集群的服务中心地址
-    // master='localhost:9001'
+    // masterHps='localhost:9001'
     // 集群的服务中心应用名
-    masterApp='gy'
+    master='gy'
 }
 
 tcpServer {
-    // ':9001' or 'localhost:9001'
+    // ':8001' or 'localhost:8001'
     hp=':8001'
 }
 

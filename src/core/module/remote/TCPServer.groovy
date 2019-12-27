@@ -235,7 +235,7 @@ class TCPServer extends ServerTpl {
     def appUp(final JSONObject data, final ChannelHandlerContext ctx) {
         if (!data) { log.warn("Register data is empty"); return}
         log.debug("Receive register up: {}", data)
-        if (!data['name'] || !data['id']) { // 数据验证
+        if (!data['name'] || !data['tcp']) { // 数据验证
             throw new IllegalArgumentException("app register up info bad data: " + data)
         }
         data["_time"] = System.currentTimeMillis()
@@ -269,6 +269,7 @@ class TCPServer extends ServerTpl {
         appInfoMap.each {e ->
             e.value.each {d ->
                 // 返回所有的注册信息给当前来注册的客户端
+                println(d.toString() + "========" + data.toString())
                 if (d["id"] != data["id"]) {
                     ctx?.writeAndFlush(Unpooled.copiedBuffer(
                             (new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", d).toString() + (delimiter?:'')).getBytes('utf-8')

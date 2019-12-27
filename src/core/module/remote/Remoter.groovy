@@ -34,10 +34,10 @@ class Remoter extends ServerTpl {
     protected       TCPServer       tcpServer
     // 集群的服务中心地址 host:port,host1:port2
     @Lazy
-    protected       String          master    = getStr('master', null)
+    protected       String          masterHps = getStr('masterHps', null)
     // 集群的服务中心应用名
     @Lazy
-    protected       String          masterApp = getStr('masterApp', null)
+    protected       String          master    = getStr('master', null)
 
 
     Remoter() { super("remoter") }
@@ -234,8 +234,8 @@ class Remoter extends ServerTpl {
             Throwable ex
             try {
                 // 当tcpClient 中存在相应的 masterApp 时, 则用masterApp 作为服务中心
-                String mName = masterApp ? (tcpClient.apps.containsKey(masterApp) ? masterApp : null) : null
-                if (!master && !mName) return
+                String mName = master ? (tcpClient.apps.containsKey(master) ? master : null) : null
+                if (!masterHps && !mName) return
                 def info = selfInfo
                 if (!info) return
 
@@ -248,12 +248,12 @@ class Remoter extends ServerTpl {
                 if (mName) { // 应用名
                     tcpClient.send(mName, data.toString())
                 } else {
-                    def ls = Stream.of(master.split(",")).map{
+                    def ls = Stream.of(masterHps.split(",")).map{
                         def arr = it.split(":")
                         Tuple.tuple(arr[0].trim(), Integer.valueOf(arr[1].trim()))
                     }.collect(Collectors.toList())
                     if (ls.size() < 1) {
-                        log.error("master not config right. {}", master)
+                        log.error("master not config right. {}", masterHps)
                         return
                     }
                     needLoop = true
@@ -293,7 +293,9 @@ class Remoter extends ServerTpl {
         data.put("name", app.name)
         Optional.ofNullable(ep.fire("http.hp")).ifPresent{ data.put("http", it) }
 
-        if (tcpServer.hp.split(":")[0]) data.put("tcp", tcpServer.hp)
+        def exposeTcp = getStr('exposeTcp', null) // 配置暴露的tcp
+        if (exposeTcp) data.put("tcp", exposeTcp)
+        else if (tcpServer.hp.split(":")[0]) data.put("tcp", tcpServer.hp)
         else data.put("tcp", resolveLocalIp() + tcpServer.hp)
 
         if (!data.containsKey('tcp')) return null
