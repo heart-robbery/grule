@@ -269,7 +269,6 @@ class TCPServer extends ServerTpl {
         appInfoMap.each {e ->
             e.value.each {d ->
                 // 返回所有的注册信息给当前来注册的客户端
-                println(d.toString() + "========" + data.toString())
                 if (d["id"] != data["id"]) {
                     ctx?.writeAndFlush(Unpooled.copiedBuffer(
                             (new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", d).toString() + (delimiter?:'')).getBytes('utf-8')

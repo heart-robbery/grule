@@ -23,6 +23,16 @@ import javax.annotation.Resource
 import java.text.SimpleDateFormat
 import java.time.Duration
 
+given:
+    def x = 1
+    def y = 2
+when:
+    println(x)
+then:
+    println(y)
+
+
+return
 
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Resource @Field EP ep

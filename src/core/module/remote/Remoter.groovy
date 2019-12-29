@@ -225,15 +225,14 @@ class Remoter extends ServerTpl {
 
 
     // 注册自己到 服务中心 即 配置的master
-    @Lazy
-    def registerFn = new Runnable() {
+    final def registerFn = new Runnable() {
         // 是否需要循环注册
         boolean needLoop
         @Override
         void run() {
             Throwable ex
             try {
-                // 当tcpClient 中存在相应的 masterApp 时, 则用masterApp 作为服务中心
+                // 当tcpClient 中存在相应的 master 时, 则用master 作为服务中心
                 String mName = master ? (tcpClient.apps.containsKey(master) ? master : null) : null
                 if (!masterHps && !mName) return
                 def info = selfInfo
