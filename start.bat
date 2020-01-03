@@ -1,8 +1,12 @@
 @cd %~dp0
 
-@if exist ./gradle-embed/ (
+@if not exist ./lib/ (
     @echo copy dependencies jar
-    @call ./gradle-embed/bin/gradle clean deps
+    @if exist ./gradle-embed/ (
+        @call ./gradle-embed/bin/gradle clean deps
+    ) else (
+        @call gradle clean deps
+    )
 )
 
 @echo start ...

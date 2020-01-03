@@ -28,7 +28,7 @@ jpa {
 // web 配置
 web {
     development=false
-    session.enabled=true
+    session.enabled=false
     // session.type='redis'
     // session 过期时间
     session.expire=Duration.ofMinutes(30)

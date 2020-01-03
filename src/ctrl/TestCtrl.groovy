@@ -1,5 +1,6 @@
 package ctrl
 
+import com.alibaba.fastjson.JSONObject
 import core.module.jpa.BaseRepo
 import core.Page
 import ctrl.common.FileData
@@ -208,6 +209,13 @@ class TestCtrl extends CtrlTpl {
         chain.get('auth') {ctx ->
             ctx.auth(ctx.request.queryParams['role'])
             ctx.render ok(ctx.sData)
+        }
+    }
+
+
+    def test(Chain chain) {
+        chain.post('cus') {ctx ->
+            ctx.render new JSONObject().fluentPut("code", "0000")
         }
     }
 }
