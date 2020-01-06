@@ -10,4 +10,4 @@ cd src
 sh ../bin/groovy $@ main.groovy
 
 
-# sh start.sh -Dlog.path="`pwd`/log" > /dev/null 2>&1 &
+# nohup sh start.sh -Dlog.path="`pwd`/log" > /dev/null 2>&1 &

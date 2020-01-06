@@ -30,8 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.LongAdder
 
 class RatpackWeb extends ServerTpl {
-    @Resource
-    Executor                      exec
+    @Resource Executor            exec
     RatpackServer                 srv
     @Lazy protected List<CtrlTpl> ctrls = new LinkedList<>()
     /**
@@ -87,7 +86,7 @@ class RatpackWeb extends ServerTpl {
 
 
     // 初始化Chain, 注册handler
-    def initChain(Chain chain) {
+    protected initChain(Chain chain) {
         chain.register{rs ->
             // 接口返回json格式
             rs.add(new RendererSupport<ApiResp>() {
@@ -249,7 +248,7 @@ class RatpackWeb extends ServerTpl {
     @Lazy RedisClient redis = bean(RedisClient)
     @Lazy EhcacheSrv ehcache = bean(EhcacheSrv)
     // 处理session
-    def session(Context ctx) {
+    protected session(Context ctx) {
         def sId = ctx.request.oneCookie('sId')
 
         if ('redis' == attrs.session?.type) { // session的数据, 用redis 保存 session 数据

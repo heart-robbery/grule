@@ -215,7 +215,7 @@ class TestCtrl extends CtrlTpl {
 
     def test(Chain chain) {
         chain.post('cus') {ctx ->
-            ctx.render new JSONObject().fluentPut("code", "0000")
+            ctx.render new JSONObject().fluentPut("code", "0000").toString()
         }
     }
 }
