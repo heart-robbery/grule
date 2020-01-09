@@ -24,7 +24,7 @@ class OkHttpSrv extends ServerTpl {
 
     @Resource ExecutorService exec
     protected OkHttpClient client
-    protected final Map<String, List<Cookie>> cookieStore = new ConcurrentHashMap<>()
+    final Map<String, List<Cookie>> cookieStore = new ConcurrentHashMap<>()
 
 
     @EL(name = 'sys.starting')
@@ -39,11 +39,26 @@ class OkHttpSrv extends ServerTpl {
                 .cookieJar(new CookieJar() {// 共享cookie
                     @Override
                     void saveFromResponse(HttpUrl url, List<Cookie> cookies) {
-                        cookieStore.put("$url.host:$url.port", new LinkedList<Cookie>()) // 可更改
+                        String k = "$url.host:$url.port".toString()
+                        def cs = cookieStore.get(k)
+                        if (cs == null) {
+                            cookieStore.put(k, new LinkedList<Cookie>(cookies)) // 可更改
+                        } else {// 更新cookie
+                            for (def it = cs.iterator(); it.hasNext(); ) {
+                                Cookie coo = it.next()
+                                for (Cookie c: cookies) {
+                                    if (c.name() == coo.name()) {
+                                        it.remove()
+                                        break
+                                    }
+                                }
+                            }
+                            cs.addAll(cookies)
+                        }
                     }
                     @Override
                     List<Cookie> loadForRequest(HttpUrl url) {
-                        List<Cookie> cookies = cookieStore.get("$url.host:$url.port")
+                        List<Cookie> cookies = cookieStore.get("$url.host:$url.port".toString())
                         return cookies != null ? cookies : emptyList()
                     }
                 }).build()
