@@ -24,30 +24,9 @@ import javax.annotation.Resource
 import java.text.SimpleDateFormat
 import java.time.Duration
 
-
-//class Test {
-//     def x = 30
-//    def y = 40
-//
-//    def run() {
-//        def data = [ x: 10, y: 20 ]
-//        def cl = { y = x + y }
-//        cl.delegate = data
-//         cl.resolveStrategy = Closure.DELEGATE_FIRST
-//        // cl.resolveStrategy = Closure.OWNER_ONLY
-//        cl()
-//        println x
-//        println y
-//        println data
-//    }
-//}
-//new Test().run()
-//return
-
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Resource @Field EP ep
 @Field final AppContext ctx = new AppContext()
-
 
 // 系统功能添加区
 ctx.addSource(new EhcacheSrv())
@@ -64,15 +43,11 @@ ctx.addSource(this)
 ctx.start() // 启动系统
 
 
-
 @EL(name = 'sys.started')
 def sysStarted() {
-    ctx.bean(EmailSrv).email {
-        from = 'xinagxb@jccfc.com'
-        to = ['111@qq.com']
-        subject = 'a test email'
-        body = 'xxxxxxxxx'
-    }
+    ctx.bean(SchedSrv)?.after(Duration.ofSeconds(2), {
+        log.info ctx.env['redis'].toString()
+    })
     return
     TestService ts = ctx.bean(TestService)
     try {

@@ -22,7 +22,7 @@ redis, jpa(hibernate), OkHttpClient, remoter(多应用tcp通信)
 
 只需两步骤:下载即用
 1. git clone https://gitee.com/xnat/gy.git
-2. ./start [-Dprofile=xxx]
+2. nohup sh start.sh -Dlog.path="`pwd`/log" > /dev/null 2>&1 &
 
 
 #### 参与贡献

@@ -60,22 +60,33 @@ class AppContext {
     // 初始化环境属性
     private static initEnv() {
         if (env != null) return env
-        // 执行两次
+        // TODO 解决执行了两次
         // println 'env =========== ' + env
         // 加载配置文件
         def cs = new ConfigSlurper()
-        ConfigObject config = cs.parse(Class.forName('config'))
-        def ps = System.properties
-        def profile = ps.getProperty('profile')
+        ConfigObject config = new ConfigObject()
         try {
-            if (profile) {
-                def c = cs.parse(Class.forName("config-$profile"))
-                config.merge(c)
+            def ps = System.properties
+
+            def f = new File("../conf/app.conf")
+            if (f.exists()) {
+                def s = f.getText('utf-8')
+                if (s) config.merge(cs.parse(s))
             }
+
+            def profile = ps.containsKey('profile') ? ps.getProperty('profile') : config.getProperty('profile')
+            if (profile) {
+                f = new File("../conf/app-${profile}.conf")
+                if (f.exists()) {
+                    def s = f.getText('utf-8')
+                    if (s) config.merge(cs.parse(s))
+                }
+            }
+
+            config.merge(cs.parse(ps))
         } catch (ClassNotFoundException ex) {
             println("$ex.class.simpleName:$ex.message")
         }
-        config.merge(cs.parse(ps))
         config
     }
 

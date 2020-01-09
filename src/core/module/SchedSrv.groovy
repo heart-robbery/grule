@@ -25,7 +25,7 @@ class SchedSrv extends ServerTpl {
     @EL(name = "sys.starting")
     def start() {
         if (scheduler) throw new RuntimeException("$name is already running")
-        if (ep == null) {ep = new EP(exec) ep.addListenerSource(this)}
+        if (ep == null) {ep = new EP(exec); ep.addListenerSource(this)}
 
         StdSchedulerFactory f = new StdSchedulerFactory()
         Properties p = new Properties(); p.putAll(attrs)

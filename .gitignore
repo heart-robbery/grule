@@ -12,7 +12,6 @@ gradlew
 gradlew.bat
 config/
 upload/
-data/
 log/
 lib/
 h2/
