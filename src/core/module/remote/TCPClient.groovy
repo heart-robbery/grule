@@ -45,8 +45,7 @@ class TCPClient extends ServerTpl {
     final     Map<String, AppGroup>      apps      = new ConcurrentHashMap<>()
     protected EventLoopGroup             boos
     protected Bootstrap                  boot
-    @Lazy
-    protected String                     delimiter = getStr('delimiter', '')
+    @Lazy String                         delimiter = getStr('delimiter', '')
     final     List<Consumer<JSONObject>> handlers  = new LinkedList<>()
 
 
@@ -286,7 +285,7 @@ class TCPClient extends ServerTpl {
             tcpPool.host = arr[0].trim()
             tcpPool.port = Integer.valueOf(arr[1].trim())
             tcpPool.node = this
-            exec.execute{tcpPool.create()} // 默认创建一个
+            // exec.execute{try {tcpPool.create()} catch (Exception ex) {log.error('', ex)}} // 默认创建一个
         }
 
         // 发送数据
@@ -317,7 +316,7 @@ class TCPClient extends ServerTpl {
 
         @Override
         String toString() {
-            (group ? "name:$group.name, " : '') + ("tcpHp:$tcpHp, ") + (httpHp ? "httpHp:$httpHp, " : '') + ("poolSize:${tcpPool.chs.size()}")
+            '[' + (group ? "name:$group.name, " : '') + ("tcpHp:$tcpHp, ") + (httpHp ? "httpHp:$httpHp, " : '') + ("poolSize:${tcpPool.chs.size()}") + ']'
         }
     }
 
@@ -356,10 +355,11 @@ class TCPClient extends ServerTpl {
                 ch = boot.connect(host, port).sync().channel()
                 ch.attr(AttributeKey.valueOf("removeFn")).set({ remove(ch) } as Runnable)
             } catch (Throwable th) {
-                log.error("Create TCP Connection error. node: '{}'. errMsg: {}", node, (th.message ?: th.class.simpleName))
+                // log.error("Create TCP Connection error. node: '{}'. errMsg: {}", node, (th.message ?: th.class.simpleName))
                 if (node.group && node.group.nodes.size() > 1) { // 删除连接不上的节点, 但保留一个
-                    node.group?.nodes.remove(node.id)
+                    node.group?.nodes.remove(node.tcpHp)
                 }
+                throw new RuntimeException("Create TCP Connection error. node: '${node}'. errMsg: ${(th.message ?: th.class.simpleName)}", th)
             }
             if (ch != null) {
                 try { // 添加连接

@@ -30,7 +30,7 @@ class FileUploader extends ServerTpl {
     protected def init() {
         localDir = new URL('file:' + (attrs.localDir?:'../upload')).getFile()
         File dir = new File(localDir)
-        log.info('save upload file local dir: {}', dir.getAbsolutePath())
+        log.info('save upload file local dir: {}', dir.canonicalPath)
 
         accessUrlPrefix = URI.create(attrs.accessUrlPrefix?:("http://${ep.fire('http.hp')}/file/") + "/").normalize()
         log.info('access upload file url prefix: {}', accessUrlPrefix)

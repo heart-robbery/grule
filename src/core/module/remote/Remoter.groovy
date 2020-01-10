@@ -33,11 +33,9 @@ class Remoter extends ServerTpl {
     protected       TCPClient       tcpClient
     protected       TCPServer       tcpServer
     // 集群的服务中心地址 host:port,host1:port2
-    @Lazy
-    protected       String          masterHps = getStr('masterHps', null)
+    @Lazy String          masterHps = getStr('masterHps', null)
     // 集群的服务中心应用名
-    @Lazy
-    protected       String          master    = getStr('master', null)
+    @Lazy String          master    = getStr('master', null)
 
 
     Remoter() { super("remoter") }
@@ -91,9 +89,7 @@ class Remoter extends ServerTpl {
 
     @EL(name = 'sys.started')
     def started() {
-        tcpServer.upDevourer.offer{
-            tcpServer.appUp(selfInfo, null)
-        }
+        tcpServer.upDevourer.offer{ tcpServer.appUp(selfInfo, null) }
         registerFn.run()
     }
 
@@ -225,7 +221,7 @@ class Remoter extends ServerTpl {
 
 
     // 注册自己到 服务中心 即 配置的master
-    final def registerFn = new Runnable() {
+    @Lazy def registerFn = new Runnable() {
         // 是否需要循环注册
         boolean needLoop
         @Override
@@ -245,6 +241,7 @@ class Remoter extends ServerTpl {
                 data.put("data", info)
 
                 if (mName) { // 应用名
+                    needLoop = true
                     tcpClient.send(mName, data.toString())
                 } else {
                     def ls = Stream.of(masterHps.split(",")).map{
@@ -268,11 +265,10 @@ class Remoter extends ServerTpl {
                 log.debug("register up success. {}", data)
             } catch(Throwable th) {
                 ex = th
+                log.error("register up error. " + ex.message)
             }
             if (needLoop) {
-                if (ex) {
-                    log.error("register up error", ex)
-                    // 发生错误,则缩短同步间隔时间
+                if (ex) { // 发生错误,则缩短同步间隔时间
                     sched?.after(Duration.ofSeconds(getInteger('upInterval', 30) + new Random().nextInt(60)), registerFn)
                 } else {
                     sched?.after(Duration.ofSeconds(getInteger('upInterval', 180) + new Random().nextInt(60)), registerFn)

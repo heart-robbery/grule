@@ -45,9 +45,6 @@ ctx.start() // 启动系统
 
 @EL(name = 'sys.started')
 def sysStarted() {
-    ctx.bean(SchedSrv)?.after(Duration.ofSeconds(2), {
-        log.info ctx.env['redis'].toString()
-    })
     return
     TestService ts = ctx.bean(TestService)
     try {
