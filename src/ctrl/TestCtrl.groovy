@@ -213,8 +213,9 @@ class TestCtrl extends CtrlTpl {
     }
 
 
-    def test(Chain chain) {
-        chain.post('cus') {ctx ->
+    // 测试自定义返回
+    def cus(Chain chain) {
+        chain.path('cus') {ctx ->
             ctx.render new JSONObject().fluentPut("code", "0000").toString()
         }
     }

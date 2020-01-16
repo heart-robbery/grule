@@ -48,8 +48,8 @@ class RatpackWeb extends ServerTpl {
         srv = RatpackServer.start({ srv ->
             srv.serverConfig({ builder ->
                 builder.with {
-                    port(Integer.valueOf(attrs.port?:8080))
-                    threads(Integer.valueOf(attrs['thread']?:1))
+                    port(getInteger('port', 8080))
+                    threads(getInteger('thread', 1))
                     connectTimeoutMillis(1000 * 10)
                     idleTimeout(Duration.ofSeconds(10))
                     maxContentLength(getInteger('maxContentLength', 1024 * 1024 * 10)) // 10M 文件上传大小限制

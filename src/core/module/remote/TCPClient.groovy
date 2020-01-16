@@ -19,6 +19,7 @@ import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.codec.DelimiterBasedFrameDecoder
 import io.netty.util.AttributeKey
 import io.netty.util.ReferenceCountUtil
+import sun.net.util.IPAddressUtil
 
 import javax.annotation.Resource
 import java.nio.channels.ClosedChannelException
@@ -61,7 +62,7 @@ class TCPClient extends ServerTpl {
 
 
     @EL(name = 'sys.stopping')
-    protected void stop() {
+    def stop() {
         boos?.shutdownGracefully()
         boot = null
     }
@@ -137,7 +138,7 @@ class TCPClient extends ServerTpl {
     /**
      * 创建 tcp(netty) 客户端
      */
-    protected def create() {
+    protected create() {
         String loopType = getStr("loopType", (isLinux() ? "epoll" : "nio"))
         Class chClz
         if ("epoll".equalsIgnoreCase(loopType)) {
@@ -200,7 +201,7 @@ class TCPClient extends ServerTpl {
      * @param ctx
      * @param dataStr
      */
-    protected def receiveReply(ChannelHandlerContext ctx, String dataStr) {
+    protected receiveReply(ChannelHandlerContext ctx, String dataStr) {
         log.trace("Receive reply from '{}': {}", ctx.channel().remoteAddress(), dataStr)
         def jo = JSON.parseObject(dataStr)
         if ("updateAppInfo" == jo['type']) {
@@ -218,6 +219,35 @@ class TCPClient extends ServerTpl {
 
     // 字符串 转换成 ByteBuf
     ByteBuf toByteBuf(String data) { Unpooled.copiedBuffer((data + (delimiter?:'')).getBytes('utf-8')) }
+
+
+    /**
+     * 提供dns 解析服务
+     * 根据appName 转换 成 ip
+     * @param hostname
+     * @return
+     */
+    @EL(name = "dns", async = false)
+    InetAddress dns(String hostname) {
+        def ip = ((Node) apps.get(hostname).nodes.find()?.value)?.tcpHp?.split(":")?[0]
+        if(ip) {
+            if ("localhost" == ip) ip = "127.0.0.1"
+            return InetAddress.getByAddress(hostname, IPAddressUtil.textToNumericFormatV4(ip))
+        }
+        null
+    }
+
+
+    /**
+     * 提供http 解析服务
+     * 根据appName 转换 成 http的 ip:port
+     * @param appName
+     * @return
+     */
+    @EL(name = "resolveHttp", async = false)
+    String resolveHttp(String appName) {
+        return ((Node) apps.get(appName).nodes.find()?.value)?.httpHp
+    }
 
 
     // 应用组

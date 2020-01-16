@@ -36,28 +36,18 @@ import static core.Utils.linux
 import static java.util.concurrent.TimeUnit.SECONDS
 
 class TCPServer extends ServerTpl {
-    @Lazy
-    protected       Remoter                                remoter    = bean(Remoter)
-    @Resource
-    protected       AppContext                             app
-    @Resource
-    protected       Executor                               exec
-    @Lazy
-    protected       String                                 hp         = getStr('hp', '')
-    @Lazy
-    protected       String                                 delimiter  = getStr('delimiter', '')
-    protected       EventLoopGroup                         boos
-    /**
-     * 当前连接数
-     */
-    protected final AtomicInteger                          connCount  = new AtomicInteger(0)
-    /**
-     * 保存 app info 的属性信息
-     */
+    @Lazy Remoter remoter    = bean(Remoter)
+    @Resource protected AppContext app
+    @Resource protected Executor exec
+    @Lazy String hp = getStr('hp', '')
+    @Lazy String delimiter = getStr('delimiter', '')
+    protected EventLoopGroup boos
+    // 当前连接数
+    protected final AtomicInteger connCount = new AtomicInteger(0)
+    // 保存 app info 的属性信息
     protected final Map<String, List<Map<String, Object>>> appInfoMap = new ConcurrentHashMap<>()
-    @Lazy
-    Devourer                                               upDevourer = new Devourer("registerUp", exec)
-    final           List<Consumer<JSONObject>>             handlers   = new LinkedList<>()
+    @Lazy Devourer upDevourer = new Devourer("registerUp", exec)
+    final List<Consumer<JSONObject>> handlers = new LinkedList<>()
 
 
     TCPServer() { super("tcpServer") }
@@ -84,7 +74,7 @@ class TCPServer extends ServerTpl {
     /**
      * 创建tcp(netty)服务端
      */
-    protected def create() {
+    protected create() {
         String loopType = getStr("loopType", (isLinux() ? "epoll" : "nio"))
         Class chClz
         if ("epoll".equalsIgnoreCase(loopType)) {
@@ -169,7 +159,7 @@ class TCPServer extends ServerTpl {
      * @param ctx
      * @param dataStr 客户端发送过来的字符串
      */
-    protected def handleReceive(ChannelHandlerContext ctx, String dataStr) {
+    protected handleReceive(ChannelHandlerContext ctx, String dataStr) {
         log.trace("Receive client '{}' data: {}", ctx.channel().remoteAddress(), dataStr)
         count() // 统计
 

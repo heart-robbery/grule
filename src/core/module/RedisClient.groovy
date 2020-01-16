@@ -48,13 +48,33 @@ class RedisClient extends ServerTpl {
         pool?.close(); pool = null
     }
 
+    @EL(name = '${name}.get')
+    String get(String key) {
+        log.trace(name + ".get. key: {}", key)
+        exec{it.get(key)}
+    }
+
+
+    @EL(name = '${name}.set')
+    def set(String key, String value, Integer seconds) {
+        log.trace(name + ".set. key: {}, value: {}, seconds: " + seconds, key, value)
+        if (value != null) {
+            exec{c ->
+                c.set(key, value)
+                c.expire(seconds == null ? getExpire(key).seconds.intValue() : seconds)
+            }
+        }
+    }
+
 
     @EL(name = '${name}.hset')
-    def hset(String cName, String key, Object value, Integer seconds) {
+    def hset(String cName, String key, String value, Integer seconds) {
         log.trace(name + ".hset. cName: "+ cName +", key: {}, value: {}, seconds: " + seconds, key, value)
-        exec{c ->
-            c.hset(cName, key, value.toString())
-            c.expire(cName, seconds == null ? getExpire(cName).seconds.intValue() : seconds)
+        if (value != null) {
+            exec{c ->
+                c.hset(cName, key, value)
+                c.expire(cName, seconds == null ? getExpire(cName).seconds.intValue() : seconds)
+            }
         }
     }
 
@@ -79,9 +99,9 @@ class RedisClient extends ServerTpl {
 
 
     @EL(name = '${name}.del')
-    def del(String cName) {
-        log.info("{}.del. cName: {}", name, cName)
-        exec{it.del(cName)}
+    def del(String key) {
+        log.info("{}.del. key: {}", name, key)
+        exec{it.del(key)}
     }
 
 

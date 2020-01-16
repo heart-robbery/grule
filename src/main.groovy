@@ -16,7 +16,6 @@ import dao.entity.UploadFile
 import groovy.transform.Field
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import sevice.EmailSrv
 import sevice.FileUploader
 import sevice.TestService
 
@@ -36,7 +35,6 @@ ctx.addSource(new OkHttpSrv())
 ctx.addSource(new Remoter())
 //ctx.addSource(new HibernateSrv().entities(Test, UploadFile, Component))
 ctx.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl))
-ctx.addSource(new EmailSrv())
 ctx.addSource(new FileUploader())
 ctx.addSource(new TestService())
 ctx.addSource(this)
@@ -45,6 +43,7 @@ ctx.start() // 启动系统
 
 @EL(name = 'sys.started')
 def sysStarted() {
+    println ctx.bean(OkHttpSrv).post("http://gy/test/cus?x=2").execute()
     return
     TestService ts = ctx.bean(TestService)
     try {
