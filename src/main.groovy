@@ -3,38 +3,35 @@ import cn.xnatural.enet.event.EP
 import core.AppContext
 import core.module.EhcacheSrv
 import core.module.OkHttpSrv
-import core.module.RedisClient
 import core.module.SchedSrv
-import core.module.jpa.HibernateSrv
-import core.module.remote.Remoter
 import ctrl.MainCtrl
 import ctrl.TestCtrl
 import ctrl.ratpack.RatpackWeb
-import dao.entity.Component
-import dao.entity.Test
-import dao.entity.UploadFile
 import groovy.transform.Field
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import sevice.FileUploader
 import sevice.TestService
+import sevice.rule.RuleSrv
 
 import javax.annotation.Resource
 import java.text.SimpleDateFormat
 import java.time.Duration
+import java.util.concurrent.Executor
 
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Resource @Field EP ep
 @Field final AppContext ctx = new AppContext()
 
 // 系统功能添加区
-ctx.addSource(new EhcacheSrv())
-ctx.addSource(new SchedSrv())
+//ctx.addSource(new EhcacheSrv())
+//ctx.addSource(new SchedSrv())
 //ctx.addSource(new RedisClient())
 ctx.addSource(new OkHttpSrv())
-ctx.addSource(new Remoter())
+//ctx.addSource(new Remoter())
 //ctx.addSource(new HibernateSrv().entities(Test, UploadFile, Component))
-ctx.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl))
+//ctx.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl))
+//ctx.addSource(new RuleSrv())
 ctx.addSource(new FileUploader())
 ctx.addSource(new TestService())
 ctx.addSource(this)
@@ -43,9 +40,10 @@ ctx.start() // 启动系统
 
 @EL(name = 'sys.started')
 def sysStarted() {
-    println ctx.bean(OkHttpSrv).post("http://gy/test/cus?x=2").execute()
-    return
     TestService ts = ctx.bean(TestService)
+    // ts.testObjBuilder()
+    ts.testPipe()
+    return
     try {
         ts.authTest()
 

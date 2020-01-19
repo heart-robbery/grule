@@ -3,32 +3,31 @@ package sevice
 import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
-import core.AppContext
 import core.Page
+import core.mode.builder.ObjBuilder
+import core.mode.pipeline.Pipeline
+import core.mode.task.TaskContext
+import core.mode.task.TaskWrapper
 import core.module.OkHttpSrv
 import core.module.ServerTpl
 import core.module.jpa.BaseRepo
 import ctrl.common.FileData
 import dao.entity.Test
 import dao.entity.UploadFile
-import groovy.transform.Field
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
-import org.hibernate.transform.Transformers
 
 import javax.annotation.Resource
 import java.text.SimpleDateFormat
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Consumer
 
 class TestService extends ServerTpl {
-    @Resource
-    BaseRepo  repo
-    @Resource
-    OkHttpSrv okHttp
+    @Resource BaseRepo  repo
+    @Resource OkHttpSrv okHttp
 
 
     Page findTestData() {
@@ -139,6 +138,30 @@ class TestService extends ServerTpl {
             log.info("testLogin(): " + okHttp.get("http://$hp/test/testLogin?role=").execute())
             log.info("auth(admin): " + okHttp.get("http://$hp/test/auth?role=admin").execute())
         }
+    }
+
+
+    def taskTest() {
+        new TaskContext(executor: bean(Executor), key: "testTaskCTX")
+            .inWaitingQueue(TaskWrapper.of{log.info("执行任务....")}.suspendNext())
+            .inWaitingQueue(new TaskWrapper() {
+                @Override
+                protected process() {
+                    log.info(logPrefix + "执行任务")
+                    ctx().inWaitingQueue(TaskWrapper.of({log.info(logPrefix + "执行衍生任务....")}))
+                }
+            })
+            .start()
+    }
+
+
+    def testObjBuilder() {
+        println ObjBuilder.of(Map).add("a", {"b"}).build()
+    }
+
+
+    def testPipe() {
+        println new Pipeline(key: 'test pipe').add({ i -> i + "xxx"}).run("qqq")
     }
 
 

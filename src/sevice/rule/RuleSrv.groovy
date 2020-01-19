@@ -6,81 +6,57 @@ import groovy.transform.ToString
 
 import java.util.function.Function
 
-class RuleSev extends ServerTpl {
+class RuleSrv extends ServerTpl {
 
 
     @EL(name = 'sys.starting')
     def start() {
-        return
-//        rule {
-//            id = 'r1'
-//            name = "测试$id"
-//
-//            condition {
+//        new RuleChain(
+//            id: 'r1',
+//            name: "测试r1",
+//            condition: {
 //                gt('age', 18) and lt('age', 60)
 //                or {
 //                    prefix('name', 'x') or suffix('name', 'n')
 //                }
-//            }
-//            process = {true}
-//            trueNext {
+//            },
+//            process: {
+//                println("process $id")
+//            },
+//            trueNext: {
 //                id = 'r2'
-//                name = "测试$id"
-//
+//                name = "测试r2"
+//                process = {
+//                    println("process")
+//                }
+//            },
+//            falseNext: {
+//                process = {false}
 //            }
-//
-//            falseNext {
-//
-//            }
-//        } run(new RuleContext([name: 'xxb', 'age': 18]))
+//        ).run new RuleContext([name: 'xxb', 'age': 18])
     }
 
+//    RuleChain rule(@DelegatesTo(value = RuleChain, strategy = Closure.DELEGATE_ONLY) Closure cl) {
+//        RuleChain rule = new RuleChain()
+//        def code = cl.rehydrate(rule, rule, rule)
+//        // cl.resolveStrategy = Closure.DELEGATE_ONLY
+//        code()
+//    }
 
-    RuleChain rule(@DelegatesTo(RuleChain) Closure cl) {
-        RuleChain rule = new RuleChain()
-        def code = cl.rehydrate(rule, rule, rule)
-        cl.resolveStrategy = Closure.DELEGATE_ONLY
-        code()
-    }
+
+    RuleChain rule() {new RuleChain()}
 
 
     class RuleChain {
-                String                         id
-                String                         name
-        private ConditionChain                 condition
-        private Function<RuleContext, Boolean> process
-        private RuleChain                      trueNext
-        private RuleChain                      falseNext
-
-        RuleChain condition(@DelegatesTo(ConditionChain) Closure cl) {
-            condition = new ConditionChain()
-            def code = cl.rehydrate(condition, condition, condition)
-            // cl.resolveStrategy = Closure.DELEGATE_ONLY
-            code()
-            this
-        }
-
-        RuleChain process(Function<RuleContext, Boolean> fn) {
-            this.process = fn; this
-        }
-
-        RuleChain trueNext(@DelegatesTo(RuleChain) Closure cl) {
-            trueNext = new RuleChain()
-            def code = cl.rehydrate(trueNext, trueNext, trueNext)
-            // cl.resolveStrategy = Closure.DELEGATE_ONLY
-            code()
-            trueNext
-        }
-
-        RuleChain falseNext(@DelegatesTo(RuleChain) Closure cl) {
-            falseNext = new RuleChain()
-            def code = cl.rehydrate(falseNext, falseNext, falseNext)
-            // cl.resolveStrategy = Closure.DELEGATE_ONLY
-            code()
-            falseNext
-        }
+        String                         id
+        String                         name
+        ConditionChain                 condition
+        Function<RuleContext, Boolean> process
+        RuleChain                      trueNext
+        RuleChain                      falseNext
 
         boolean run(RuleContext ctx) {
+            if (!id) throw new IllegalArgumentException("Rule id is empty")
             if (condition?.eval(ctx)) {
                 def f = process?.apply(ctx)
                 if (trueNext == null || !f) return f
@@ -88,6 +64,15 @@ class RuleSev extends ServerTpl {
             } else {
                 return falseNext?.run(ctx)
             }
+        }
+
+        boolean run(Map attr) {
+            run(new RuleContext(attr: attr))
+        }
+
+        ConditionChain condition() {
+            condition = new ConditionChain()
+            condition
         }
     }
 
@@ -138,20 +123,14 @@ class RuleSev extends ServerTpl {
         private ConditionChain next
         private String         nextOp
 
-        ConditionChain and(@DelegatesTo(ConditionChain) Closure cl) {
-            next = new ConditionChain()
-            def code = cl.rehydrate(next, this, this)
-            cl.resolveStrategy = Closure.DELEGATE_ONLY
-            code()
+        ConditionChain and(ConditionChain andCon) {
+            next = andCon
             nextOp = "and"
             return next
         }
 
-        ConditionChain or(@DelegatesTo(ConditionChain) Closure cl) {
-            next = new ConditionChain()
-            def code = cl.rehydrate(next, this, this)
-            cl.resolveStrategy = Closure.DELEGATE_ONLY
-            code()
+        ConditionChain or(ConditionChain orCon) {
+            next = orCon
             nextOp = "or"
             return next
         }
@@ -214,5 +193,4 @@ class RuleSev extends ServerTpl {
             new ConditionChain(property: field, op: "suffix", value: value)
         }
     }
-
 }
