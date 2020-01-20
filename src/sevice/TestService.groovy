@@ -4,13 +4,14 @@ import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
 import core.Page
-import core.mode.builder.ObjBuilder
-import core.mode.pipeline.Pipeline
-import core.mode.task.TaskContext
-import core.mode.task.TaskWrapper
 import core.module.OkHttpSrv
 import core.module.ServerTpl
 import core.module.jpa.BaseRepo
+import core.mode.pipeline.Pipeline
+import core.mode.task.TaskContext
+import core.mode.task.TaskWrapper
+import core.mode.v.VChain
+import core.mode.v.VProcessor
 import ctrl.common.FileData
 import dao.entity.Test
 import dao.entity.UploadFile
@@ -27,7 +28,7 @@ import java.util.function.Consumer
 
 class TestService extends ServerTpl {
     @Resource BaseRepo  repo
-    @Resource OkHttpSrv okHttp
+    @Resource OkHttpSrv http
 
 
     Page findTestData() {
@@ -76,7 +77,7 @@ class TestService extends ServerTpl {
 
 
     def wsClientTest() {
-        okHttp.client().newWebSocket(new Request.Builder().url("ws://rl.cnxnu.com:9659/ppf/ar/6.0").build(), new WebSocketListener() {
+        http.client().newWebSocket(new Request.Builder().url("ws://rl.cnxnu.com:9659/ppf/ar/6.0").build(), new WebSocketListener() {
             @Override
             void onOpen(WebSocket webSocket, Response resp) {
                 println "webSocket onOpen: ${resp.body().string()}"
@@ -99,11 +100,11 @@ class TestService extends ServerTpl {
         // hp = '39.104.28.131/gy'
         if (hp) {
             // log.info '接口访问xxx: ' + okHttp.http().get("http://$hp/test/xxx").execute()
-            log.info '接口访问dao: ' + okHttp.get("http://$hp/test/dao").cookie('sId', '222').param('type', 'file').execute()
-            log.info '接口访问form: ' + okHttp.post("http://$hp/test/form?sss=22").param('p1', '中文').execute()
-            log.info '接口访问json: ' + okHttp.post("http://$hp/test/json").contentType('application/json').param('p1', '中文 123').execute()
-            log.info '接口访问json: ' + okHttp.post("http://$hp/test/json").jsonBody(JSON.toJSONString([a:'1', b:2])).execute()
-            okHttp.post("http://$hp/test/upload?cus=11111").param('p2', 'abc 怎么')
+            log.info '接口访问dao: ' + http.get("http://$hp/test/dao").cookie('sId', '222').param('type', 'file').execute()
+            log.info '接口访问form: ' + http.post("http://$hp/test/form?sss=22").param('p1', '中文').execute()
+            log.info '接口访问json: ' + http.post("http://$hp/test/json").contentType('application/json').param('p1', '中文 123').execute()
+            log.info '接口访问json: ' + http.post("http://$hp/test/json").jsonBody(JSON.toJSONString([a:'1', b:2])).execute()
+            http.post("http://$hp/test/upload?cus=11111").param('p2', 'abc 怎么')
                 .param('f1', new File('C:\\Users\\xiangxb\\Desktop\\新建文本文档.txt'))
                 .execute({log.info '接口访问upload: ' + it})
         }
@@ -114,35 +115,35 @@ class TestService extends ServerTpl {
     def authTest() {
         def hp = ep.fire('http.hp')
         if (hp) {
-            log.info("testLogin(admin): " + okHttp.get("http://$hp/test/testLogin?role=admin").execute())
-            log.info("auth(admin): " + okHttp.get("http://$hp/test/auth?role=admin").execute())
+            log.info("testLogin(admin): " + http.get("http://$hp/test/testLogin?role=admin").execute())
+            log.info("auth(admin): " + http.get("http://$hp/test/auth?role=admin").execute())
 
-            log.info("testLogin(admin): " + okHttp.get("http://$hp/test/testLogin?role=admin").execute())
-            log.info("auth(login): " + okHttp.get("http://$hp/test/auth?role=login").execute())
+            log.info("testLogin(admin): " + http.get("http://$hp/test/testLogin?role=admin").execute())
+            log.info("auth(login): " + http.get("http://$hp/test/auth?role=login").execute())
 
-            log.info("testLogin(role3): " + okHttp.get("http://$hp/test/testLogin?role=role3").execute())
-            log.info("auth(role2_1_1): " + okHttp.get("http://$hp/test/auth?role=role2_1_1").execute())
+            log.info("testLogin(role3): " + http.get("http://$hp/test/testLogin?role=role3").execute())
+            log.info("auth(role2_1_1): " + http.get("http://$hp/test/auth?role=role2_1_1").execute())
 
-            log.info("testLogin(role4): " + okHttp.get("http://$hp/test/testLogin?role=role4").execute())
-            log.info("auth(role4_1_1_1): " + okHttp.get("http://$hp/test/auth?role=role4_1_1_1").execute())
+            log.info("testLogin(role4): " + http.get("http://$hp/test/testLogin?role=role4").execute())
+            log.info("auth(role4_1_1_1): " + http.get("http://$hp/test/auth?role=role4_1_1_1").execute())
 
-            log.info("testLogin(admin): " + okHttp.get("http://$hp/test/testLogin?role=admin").execute())
-            log.info("auth(未知角色名): " + okHttp.get("http://$hp/test/auth?role=未知角色名").execute())
+            log.info("testLogin(admin): " + http.get("http://$hp/test/testLogin?role=admin").execute())
+            log.info("auth(未知角色名): " + http.get("http://$hp/test/auth?role=未知角色名").execute())
 
-            log.info("testLogin(admin): " + okHttp.get("http://$hp/test/testLogin?role=admin").execute())
-            log.info("auth(role2): " + okHttp.get("http://$hp/test/auth?role=role2").execute())
+            log.info("testLogin(admin): " + http.get("http://$hp/test/testLogin?role=admin").execute())
+            log.info("auth(role2): " + http.get("http://$hp/test/auth?role=role2").execute())
 
-            log.info("testLogin(role2_1): " + okHttp.get("http://$hp/test/testLogin?role=role2_1").execute())
-            log.info("auth(role2_1_1): " + okHttp.get("http://$hp/test/auth?role=role2_1_1").execute())
+            log.info("testLogin(role2_1): " + http.get("http://$hp/test/testLogin?role=role2_1").execute())
+            log.info("auth(role2_1_1): " + http.get("http://$hp/test/auth?role=role2_1_1").execute())
 
-            log.info("testLogin(): " + okHttp.get("http://$hp/test/testLogin?role=").execute())
-            log.info("auth(admin): " + okHttp.get("http://$hp/test/auth?role=admin").execute())
+            log.info("testLogin(): " + http.get("http://$hp/test/testLogin?role=").execute())
+            log.info("auth(admin): " + http.get("http://$hp/test/auth?role=admin").execute())
         }
     }
 
 
     def taskTest() {
-        new TaskContext(executor: bean(Executor), key: "testTaskCTX")
+        new TaskContext<>(executor: bean(Executor), key: "testTaskCTX")
             .inWaitingQueue(TaskWrapper.of{log.info("执行任务....")}.suspendNext())
             .inWaitingQueue(new TaskWrapper() {
                 @Override
@@ -162,6 +163,31 @@ class TestService extends ServerTpl {
 
     def testPipe() {
         println new Pipeline(key: 'test pipe').add({ i -> i + "xxx"}).run("qqq")
+    }
+
+
+    def testVChain() {
+        new VChain().add(new VProcessor() {
+            @Override
+            def down(Map ctx) {
+                log.info('down1')
+            }
+
+            @Override
+            def up(Map ctx) {
+                log.info('up1')
+            }
+        }).add(new VProcessor() {
+            @Override
+            def down(Map ctx) {
+                log.info('down2')
+            }
+
+            @Override
+            def up(Map ctx) {
+                log.info('up2')
+            }
+        }).run()
     }
 
 

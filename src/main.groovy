@@ -42,7 +42,7 @@ ctx.start() // 启动系统
 def sysStarted() {
     TestService ts = ctx.bean(TestService)
     // ts.testObjBuilder()
-    ts.testPipe()
+    ts.testVChain()
     return
     try {
         ts.authTest()
