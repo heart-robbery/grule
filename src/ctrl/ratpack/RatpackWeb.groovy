@@ -30,9 +30,9 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.LongAdder
 
 class RatpackWeb extends ServerTpl {
-    @Resource Executor            exec
-    RatpackServer                 srv
-    @Lazy protected List<CtrlTpl> ctrls = new LinkedList<>()
+    @Lazy Executor exec = bean(Executor)
+    protected RatpackServer srv
+    protected final List<CtrlTpl> ctrls = new LinkedList<>()
     /**
      * 吞噬器.请求执行控制器
      */
@@ -302,7 +302,7 @@ class RatpackWeb extends ServerTpl {
     // 每小时统计请求的次数
     protected final Map<String, LongAdder> hourCount = new ConcurrentHashMap<>(3)
     // 请求统计
-    protected def count() {
+    protected count() {
         SimpleDateFormat sdf = new SimpleDateFormat('MM-dd HH')
         boolean isNew = false
         String hStr = sdf.format(new Date())

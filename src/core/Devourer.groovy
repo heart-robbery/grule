@@ -49,7 +49,7 @@ class Devourer {
     /**
      * 不断的从 {@link #waiting} 对列中取出执行
      */
-    protected def trigger() {
+    protected trigger() {
         if (waiting.isEmpty() || pause.get()) return
         // TODO 会有 cas aba 问题?
         if (!running.compareAndSet(false, true)) return

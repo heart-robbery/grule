@@ -27,8 +27,7 @@ class ServerTpl {
      * 1. 当此服务被加入核心时, 此值会自动设置为核心的EP.
      * 2. 如果要服务独立运行时, 请手动设置
      */
-    @Resource
-    protected       EP           ep
+    @Resource EP ep
 
 
     ServerTpl(String name) {

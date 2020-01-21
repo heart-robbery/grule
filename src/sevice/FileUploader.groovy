@@ -5,7 +5,6 @@ import core.module.OkHttpSrv
 import core.module.ServerTpl
 import ctrl.common.FileData
 
-import javax.annotation.Resource
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -13,21 +12,20 @@ class FileUploader extends ServerTpl {
     /**
      * 文件上传的 本地保存目录
      */
-    private   String    localDir
+    private   String localDir
     /**
      * 文件上传 的访问url前缀
      */
-    private   URI       accessUrlPrefix
+    private   URI    accessUrlPrefix
     /**
      * 远程文件服务器url地址
      */
-    protected String    remoteUrl
-    @Resource
-    protected OkHttpSrv okHttp
+    protected String remoteUrl
+    @Lazy OkHttpSrv  http = bean(OkHttpSrv)
 
 
     @EL(name = 'web.started', async = false)
-    protected def init() {
+    protected init() {
         localDir = new URL('file:' + (attrs.localDir?:'../upload')).getFile()
         File dir = new File(localDir)
         log.info('save upload file local dir: {}', dir.canonicalPath)
@@ -76,7 +74,7 @@ class FileUploader extends ServerTpl {
 
 
     @EL(name = 'deleteFile')
-    void delete(String fileName) {
+    def delete(String fileName) {
         File f = new File(localDir + File.separator + fileName)
         if (f.exists()) f.delete()
         else log.warn("delete file '{}' not exists", fileName)
@@ -100,7 +98,7 @@ class FileUploader extends ServerTpl {
                 // oss.putObject('path', fd.generatedName, fd.inputStream)
 
                 // 2. 个人http文件服务器例子
-                if (remoteUrl) okHttp?.post(remoteUrl).fileStream('file', fd.generatedName, fd.inputStream).execute()
+                if (remoteUrl) http?.post(remoteUrl).fileStream('file', fd.generatedName, fd.inputStream).execute()
             } else {
                 new File(localDir).mkdirs() // 确保文件夹在
                 // 创建本地文件并写入

@@ -80,7 +80,7 @@ class HibernateSrv extends ServerTpl {
      * 初始化数据源
      * @return
      */
-    protected def initDataSource() {
+    protected initDataSource() {
         if (ds) throw new RuntimeException('DataSource already exist')
         Map<String, Object> dsAttr = attrs.ds
         log.debug('Create dataSource properties: {}', dsAttr)

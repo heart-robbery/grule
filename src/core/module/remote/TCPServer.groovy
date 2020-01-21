@@ -36,9 +36,9 @@ import static core.Utils.linux
 import static java.util.concurrent.TimeUnit.SECONDS
 
 class TCPServer extends ServerTpl {
-    @Lazy Remoter remoter    = bean(Remoter)
-    @Resource protected AppContext app
-    @Resource protected Executor exec
+    @Lazy Remoter remoter = bean(Remoter)
+    @Lazy AppContext app = bean(AppContext)
+    @Lazy Executor exec = bean(Executor)
     @Lazy String hp = getStr('hp', '')
     @Lazy String delimiter = getStr('delimiter', '')
     protected EventLoopGroup boos

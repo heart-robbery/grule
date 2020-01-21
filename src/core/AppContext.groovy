@@ -144,7 +144,7 @@ class AppContext {
      * @param o
      */
     @EL(name = "inject", async = false)
-    protected def inject(Object o) {
+    protected inject(Object o) {
         iterateField(o.getClass(), {f ->
             Resource aR = f.getAnnotation(Resource.class)
             if (aR) {
@@ -183,8 +183,8 @@ class AppContext {
      * @param beanName bean 名字
      * @return bean 对象
      */
-    @EL(name = ['bean.get', 'sys.bean.get'], async = false, order = 1f)
-    protected def findLocalBean(EC ec, Class beanType, String beanName) {
+    @EL(name = ['bean.get', 'sys.bean.get'], async = false, order = -1f)
+    protected findLocalBean(EC ec, Class beanType, String beanName) {
         if (ec.result != null) return ec.result // 已经找到结果了, 就直接返回
 
         Object bean
@@ -197,6 +197,7 @@ class AppContext {
             if (Executor.isAssignableFrom(beanType) || ExecutorService.isAssignableFrom(beanType)) bean = wrapExecForSource(ec.source())
             else if (AppContext.isAssignableFrom(beanType)) bean = this
             else if (ConfigObject.isAssignableFrom(beanType)) bean = env
+            else if (EP.isAssignableFrom(beanType)) bean = wrapEpForSource(ec.source())
             else {
                 for (Map.Entry<String, Object> entry : sourceMap.entrySet()) {
                     if (beanType.isAssignableFrom(entry.getValue().getClass())) {
@@ -246,7 +247,7 @@ class AppContext {
      * 初始化 EP
      * @return
      */
-    protected def initEp() {
+    protected initEp() {
         ep = new EP(exec, LoggerFactory.getLogger(EP.class)) {
             @Override
             protected Object doPublish(String eName, EC ec) {

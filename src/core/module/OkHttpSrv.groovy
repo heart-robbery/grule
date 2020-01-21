@@ -4,6 +4,7 @@ import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import com.alibaba.fastjson.JSON
+import core.mode.http.Httper
 import okhttp3.*
 
 import javax.annotation.Resource
@@ -23,7 +24,7 @@ import static java.util.Collections.emptyList
  */
 class OkHttpSrv extends ServerTpl {
 
-    @Resource ExecutorService exec
+    @Lazy ExecutorService exec = bean(ExecutorService)
     protected OkHttpClient client
     final Map<String, List<Cookie>> cookieStore = new ConcurrentHashMap<>()
     final Map<String, Set<String>> shareCookie = new ConcurrentHashMap<>()

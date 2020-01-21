@@ -14,8 +14,7 @@ import java.util.concurrent.ExecutorService
 
 class SchedSrv extends ServerTpl {
     static final F_NAME  = 'sched'
-    @Resource
-    protected Executor exec
+    @Lazy Executor exec = bean(Executor)
     protected Scheduler scheduler
     
     

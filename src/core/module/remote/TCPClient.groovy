@@ -34,14 +34,10 @@ import java.util.function.Consumer
 import static core.Utils.linux
 
 class TCPClient extends ServerTpl {
-    @Resource
-    protected AppContext                 app
-    @Resource
-    protected Remoter remoter
-    @Resource
-    protected SchedSrv                   sched
-    @Resource
-    protected Executor                   exec
+    @Lazy AppContext app = bean(AppContext)
+    @Lazy Remoter remoter = bean(Remoter)
+    @Lazy SchedSrv sched = bean(SchedSrv)
+    @Lazy Executor exec = bean(Executor)
     final     Map<String, Node>          hpNodes   = new ConcurrentHashMap<>()
     final     Map<String, AppGroup>      apps      = new ConcurrentHashMap<>()
     protected EventLoopGroup             boos

@@ -20,12 +20,9 @@ import java.util.stream.Collectors
 import java.util.stream.Stream
 
 class Remoter extends ServerTpl {
-    @Resource
-    protected       AppContext      app
-    @Resource
-    protected       SchedSrv        sched
-    @Resource
-    protected       Executor        exec
+    @Lazy AppContext      app = bean(AppContext)
+    @Lazy SchedSrv        sched = bean(SchedSrv)
+    @Lazy Executor        exec = bean(Executor)
     /**
      * ecId -> EC
      */
@@ -105,7 +102,7 @@ class Remoter extends ServerTpl {
      * @param remoteMethodArgs 远程事件监听方法的参数
      */
     @EL(name = "remote")
-    protected def sendEvent(EC ec, String appName, String eName, Object[] remoteMethodArgs) {
+    protected sendEvent(EC ec, String appName, String eName, Object[] remoteMethodArgs) {
         if (tcpClient == null) throw new RuntimeException("$tcpClient.name not is running")
         if (app.name == null) throw new IllegalArgumentException("app.name is empty")
         ec.suspend()
