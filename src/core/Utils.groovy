@@ -15,6 +15,7 @@ import java.lang.reflect.Method
 import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Consumer
 import java.util.function.Function
 
@@ -280,24 +281,32 @@ class Utils {
     static String buildUrl(String urlStr, Map<String, Object> params) {
         if (!params) return urlStr
         StringBuilder sb = new StringBuilder(urlStr)
-        if (!urlStr.endsWith("?")) sb.append("?")
-        params.each { sb.append(it.key).append("=").append(URLEncoder.encode(it.value.toString(), 'utf-8')).append("&") }
+        params.each {
+            if (it.value != null) {
+                if (urlStr.endsWith('?')) urlStr += (it.key + '=' + it.value + '&')
+                else if (urlStr.endsWith('&')) urlStr += (it.key + '=' + it.value + '&')
+                else if (urlStr.contains("?")) urlStr += ("&" + it.key + '=' + it.value + '&')
+                else urlStr += ('?' + it.key + '=' + it.value + '&')
+            }
+        }
         return sb.toString()
     }
 
 
     // 脚本类缓存
-    static final Map<String, Script> scriptCache = new ConcurrentHashMap<>()
+    protected static final Map<String, Script> scriptCache  = new ConcurrentHashMap<>()
+    // 类名计数
+    protected static final AtomicInteger       clzNameCount = new AtomicInteger(0)
     /**
      * 执行一段groovy脚本
+     * 避免OOM: java.lang.ClassLoader#getClassLoadingLock (只增不减的map)
      * @param scriptText
      * @param ctx
      * @return
      */
-    static Object eval(String scriptText, Map ctx = new HashMap()) {
+    static Object eval(String scriptText, Map ctx = new LinkedHashMap()) {
         if (scriptText == null || scriptText.isEmpty()) throw new IllegalArgumentException("scriptText must not be empty")
-        Script script = scriptCache.computeIfAbsent(scriptText {InvokerHelper.createScript(gcl.parseClass(scriptText), new Binding(ctx))})
-        return script.run()
+        scriptCache.computeIfAbsent(scriptText {InvokerHelper.createScript(gcl.parseClass(scriptText, "GroovyDynClz_${clzNameCount.getAndIncrement()}"), new Binding(ctx))}).run()
     }
 
 

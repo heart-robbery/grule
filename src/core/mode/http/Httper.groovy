@@ -13,6 +13,10 @@ class Httper {
     protected       String                                    contentType
     protected       String                                    jsonBodyStr
     protected       boolean                                   print
+    // 请求执行函数
+    protected       Runnable                                  doRequestFn
+    protected       Consumer<String> okFn
+    protected       Consumer<Throwable> failFn
 
 
     static Httper get(String url) { new Httper(urlStr: url, method: 'GET') }
@@ -22,8 +26,10 @@ class Httper {
 
 
     // 请求执行
-    def execute() {
-
+    def execute(Consumer<String> okFn = null, Consumer<Throwable> failFn = {throw it}) {
+        this.okFn = okFn
+        this.failFn = failFn
+        doRequestFn.run()
     }
 
 

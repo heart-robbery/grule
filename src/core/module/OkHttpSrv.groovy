@@ -4,6 +4,7 @@ import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import com.alibaba.fastjson.JSON
+import core.Utils
 import core.mode.http.Httper
 import okhttp3.*
 
@@ -179,11 +180,7 @@ class OkHttpSrv extends ServerTpl {
         // 请求执行
         def execute(Consumer<String> okFn = null, Consumer<Exception> failFn = {throw it}) {
             if ('GET' == builder.method) { // get 请求拼装参数
-                params?.each {
-                    if (urlStr.endsWith('?')) urlStr += (it.key + '=' + (it.value == null ? '' : it.value).toString() + '&')
-                    else if (urlStr.endsWith('&')) urlStr += (it.key + '=' + (it.value == null ? '': it.value).toString() + '&')
-                    else urlStr += ('?' + it.key + '=' + (it.value == null ? '': it.value).toString() + '&')
-                }
+                urlStr = Utils.buildUrl(urlStr, params)
                 builder.get()
             } else if ('POST' == builder.method) {
                 if (contentType && contentType.containsIgnoreCase('application/json')) {
