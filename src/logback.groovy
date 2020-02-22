@@ -28,7 +28,7 @@ if (appenders instanceof String) {
 if (appenders.contains('console')) {
     appender('console', ConsoleAppender) {
         encoder(PatternLayoutEncoder) {
-            delegate.pattern = "%d{yyyy-MM-dd HH:mm:ss.SSS} [%-7thread] [%-5level] [%-45.45C :%-3L] => %m%n"
+            delegate.pattern = "%d{yyyy-MM-dd HH:mm:ss.SSS} [%-7thread] [%-5level] [%-40.40C :%-3L] => %m%n"
             delegate.charset = Charset.forName("utf8")
         }
     }
@@ -39,7 +39,7 @@ if (logPath) { // 有日志输出目录配置
     if (appenders.contains('file')) {
         appender('file', RollingFileAppender) {
             encoder(PatternLayoutEncoder) {
-                delegate.pattern = "%d{yyyy-MM-dd HH:mm:ss.SSS} [%-7thread] [${pid()}] [%-5level] [%-45.45C :%-3L] => %m%n"
+                delegate.pattern = "%d{yyyy-MM-dd HH:mm:ss.SSS} [%-7thread] [${pid()}] [%-5level] [%-40.40C :%-3L] => %m%n"
                 delegate.charset = Charset.forName("utf8")
             }
             file = "$logPath/${logFileName}.log"

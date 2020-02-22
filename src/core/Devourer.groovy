@@ -7,8 +7,6 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.function.Consumer
-import java.util.function.Supplier
 
 class Devourer {
     protected static final Logger              log     = LoggerFactory.getLogger(Devourer)
@@ -16,18 +14,6 @@ class Devourer {
     protected final        AtomicBoolean       running = new AtomicBoolean(false)
     protected final        Queue<Runnable>     waiting = new ConcurrentLinkedQueue<>()
     protected final        Object              key
-    /**
-     * 是否应该熔断: 暂停执行
-     */
-    protected              Supplier<Boolean>   pause   = { Boolean.FALSE }
-    /**
-     * 是否应该熔断: 丢弃
-     */
-    protected              Supplier<Boolean>   fusing  = { Boolean.FALSE }
-    /**
-     * 异常处理
-     */
-    protected              Consumer<Throwable> exConsumer
 
 
     Devourer(Object key, Executor exec) {
@@ -39,7 +25,7 @@ class Devourer {
 
 
     Devourer offer(Runnable fn) {
-        if (fn == null || fusing.get()) return this
+        if (fn == null) return this
         waiting.offer(fn)
         trigger()
         return this
@@ -50,7 +36,7 @@ class Devourer {
      * 不断的从 {@link #waiting} 对列中取出执行
      */
     protected trigger() {
-        if (waiting.isEmpty() || pause.get()) return
+        if (waiting.isEmpty()) return
         // TODO 会有 cas aba 问题?
         if (!running.compareAndSet(false, true)) return
         // 1.必须保证这里只有一个线程被执行
@@ -61,33 +47,12 @@ class Devourer {
                 Runnable t = waiting.poll()
                 if (t != null) t.run()
             } catch (Throwable t) {
-                if (exConsumer == null) log.error(getClass().simpleName + ":" + key, t)
-                else exConsumer.accept(t)
+                log.error(getClass().simpleName + ":" + key, t)
             } finally {
                 running.set(false)
                 if (!waiting.isEmpty()) trigger()
             }
         }
-    }
-
-
-    Devourer pause(Supplier<Boolean> pause) {
-        if (pause == null) throw new IllegalArgumentException("pause Supplier can not be null")
-        this.pause = pause
-        return this
-    }
-
-
-    Devourer fusing(Supplier<Boolean> fusing) {
-        if (fusing == null) throw new IllegalArgumentException("fusing Supplier can not be null")
-        this.fusing = fusing
-        return this
-    }
-
-
-    Devourer exConsumer(Consumer<Throwable> exConsumer) {
-        this.exConsumer = exConsumer
-        return this
     }
 
 

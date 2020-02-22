@@ -9,6 +9,8 @@ import core.module.RedisClient
 import core.module.ServerTpl
 import ctrl.CtrlTpl
 import ctrl.common.ApiResp
+import io.netty.handler.ssl.SslContextBuilder
+import io.netty.handler.ssl.util.SelfSignedCertificate
 import org.ehcache.Cache
 import ratpack.error.internal.ErrorHandler
 import ratpack.handling.Chain
@@ -17,9 +19,25 @@ import ratpack.handling.RequestId
 import ratpack.render.RendererSupport
 import ratpack.server.BaseDir
 import ratpack.server.RatpackServer
+import ratpack.ssl.SSLContexts
+import sun.security.x509.AlgorithmId
+import sun.security.x509.CertificateAlgorithmId
+import sun.security.x509.CertificateIssuerName
+import sun.security.x509.CertificateSerialNumber
+import sun.security.x509.CertificateSubjectName
+import sun.security.x509.CertificateValidity
+import sun.security.x509.CertificateVersion
+import sun.security.x509.CertificateX509Key
+import sun.security.x509.X500Name
+import sun.security.x509.X509CertImpl
+import sun.security.x509.X509CertInfo
 
-import javax.annotation.Resource
 import java.security.AccessControlException
+import java.security.KeyPairGenerator
+import java.security.PrivateKey
+import java.security.SecureRandom
+import java.security.cert.CertificateException
+import java.security.cert.X509Certificate
 import java.text.SimpleDateFormat
 import java.time.Clock
 import java.time.Duration
@@ -33,6 +51,8 @@ class RatpackWeb extends ServerTpl {
     @Lazy Executor exec = bean(Executor)
     protected RatpackServer srv
     protected final List<CtrlTpl> ctrls = new LinkedList<>()
+    // 是否可用
+    boolean enabled = false
     /**
      * 吞噬器.请求执行控制器
      */
@@ -48,15 +68,23 @@ class RatpackWeb extends ServerTpl {
         srv = RatpackServer.start({ srv ->
             srv.serverConfig({ builder ->
                 builder.with {
-                    port(getInteger('port', 8080))
                     threads(getInteger('thread', 1))
                     connectTimeoutMillis(1000 * 10)
-                    idleTimeout(Duration.ofSeconds(10))
+                    // idleTimeout(Duration.ofSeconds(10)) websocket 是长连接
                     maxContentLength(getInteger('maxContentLength', 1024 * 1024 * 10)) // 10M 文件上传大小限制
                     sysProps()
                     registerShutdownHook(false)
                     baseDir(BaseDir.find('static/'))
                     development(getBoolean('development', false))
+
+                    if (getBoolean("secure", false) || getBoolean("ssl", false)) {
+                        def se = security()
+                        log.info("publicKey: " + Base64.encoder.encodeToString(se.v2.publicKey.encoded))
+                        ssl(SslContextBuilder.forServer(se.v1, se.v2).build())
+                        port(getInteger('port', 8443))
+                    } else {
+                        port(getInteger('port', 8080))
+                    }
                 }
             })
             srv.handlers{initChain(it)}
@@ -70,7 +98,7 @@ class RatpackWeb extends ServerTpl {
 
 
     @EL(name = 'sys.started')
-    def started() { ctrls.each {ep.fire('inject', it)} }
+    def started() { ctrls.each {ep.fire('inject', it)}; enabled = true }
 
 
     /**
@@ -124,7 +152,7 @@ class RatpackWeb extends ServerTpl {
                     } else {
                         log.error("Request Error '" + ctx.get(RequestId.TYPE) + "', path: " + ctx.request.uri, ex)
                     }
-                    ctx.render ApiResp.fail(ctx['respCode']?:'01', ex.getMessage()?:ex.getClass().simpleName)
+                    ctx.render ApiResp.of(ctx['respCode']?:'01', (ex.class.name + (ex.message ? ": $ex.message" : '')))
                     // ctx.response.status(500).send()
                 }
             })
@@ -133,6 +161,10 @@ class RatpackWeb extends ServerTpl {
         def ignoreSuffix = new HashSet(['.js', '.css', '.html', '.vue', '.png', '.ttf', '.woff', '.woff2', 'favicon.ico', '.js.map', *attrs.ignorePrintUrlSuffix?:[]])
         // 请求预处理
         chain.all({ctx ->
+            if (!enabled) {
+                ctx.response.status(503).send("请稍后再试")
+                return
+            }
             ctx.metaClass.propertyMissing = {String name -> null} // 随意访问不存在的属性不报错
             // 限流? TODO
             // 打印请求
@@ -150,6 +182,7 @@ class RatpackWeb extends ServerTpl {
 
         // 添加所有Controller层
         ctrls.each {ctrl ->
+            ep.addListenerSource(ctrl)
             ep.fire('inject', ctrl)
             ctrl.init(chain)
         }
@@ -220,29 +253,6 @@ class RatpackWeb extends ServerTpl {
         }
         throw new AccessControlException('没有权限')
     }
-
-
-//    def oldAuth(Context ctx, String lowestRole) {
-//        String uRoles = ctx.sData?.uRoles // 当前用户的角色. 例: role1,role2,role3
-//        if (!uRoles) throw new AccessControlException('需要登录获取权限')
-//        if (uRoles.contains(lowestRole)) return true
-//        String lowestLevel // 对应最低需要角色的等级
-//        Set<String> uLevels = new HashSet(7) // 当前用户所有角色的等级
-//        attrs.role.each {Entry<String, Collection> e ->
-//            if (e.key.startsWith('level_')) {
-//                e.value.each {r ->
-//                    if (r == lowestRole) lowestLevel = e.key
-//                    if (uRoles.contains(r)) uLevels << e.key
-//                }
-//            }
-//        }
-//        // 如果当前用户的所有角色等级都没找到大于最低角色等级的就抛错
-//        if (!uLevels.find {String uLevel ->
-//            Integer.valueOf(uLevel.replace('level_', '')) > Integer.valueOf(lowestLevel.replace('level_', ''))
-//        }) {
-//            throw new AccessControlException('没有权限')
-//        }
-//    }
 
 
     @Lazy RedisClient redis = bean(RedisClient)
@@ -353,5 +363,46 @@ class RatpackWeb extends ServerTpl {
         if (attrs.session?.expire instanceof Duration) return attrs.session?.expire
         else if (attrs.session?.expire instanceof Number || attrs.session?.expire instanceof String) return Duration.ofMinutes(Long.valueOf(attrs.session?.expire))
         Duration.ofMinutes(30) // 默认session 30分钟
+    }
+
+
+    protected Tuple2<PrivateKey, X509Certificate> security() {
+        SecureRandom random = new SecureRandom()
+        def gen = KeyPairGenerator.getInstance("RSA")
+        gen.initialize(2048, random)
+        def pair = gen.genKeyPair()
+
+        X509CertInfo info = new X509CertInfo()
+        X500Name owner = new X500Name("C=x,ST=x,L=x,O=x,OU=x,CN=x")
+        info.set(X509CertInfo.VERSION, new CertificateVersion(CertificateVersion.V3))
+        info.set(X509CertInfo.SERIAL_NUMBER, new CertificateSerialNumber(new BigInteger(64, random)))
+        try {
+            info.set(X509CertInfo.SUBJECT, new CertificateSubjectName(owner))
+        } catch (CertificateException ignore) {
+            info.set(X509CertInfo.SUBJECT, owner)
+        }
+        try {
+            info.set(X509CertInfo.ISSUER, new CertificateIssuerName(owner));
+        } catch (CertificateException ignore) {
+            info.set(X509CertInfo.ISSUER, owner);
+        }
+        info.set(X509CertInfo.VALIDITY, new CertificateValidity(
+            new Date(System.currentTimeMillis() - 86400000L * 365),
+            new Date(253402300799000L))
+        )
+        info.set(X509CertInfo.KEY, new CertificateX509Key(pair.getPublic()));
+        info.set(X509CertInfo.ALGORITHM_ID, new CertificateAlgorithmId(new AlgorithmId(AlgorithmId.sha256WithRSAEncryption_oid)));
+
+        // Sign the cert to identify the algorithm that's used.
+        X509CertImpl cert = new X509CertImpl(info)
+        cert.sign(pair.private, "SHA256withRSA");
+
+        // Update the algorithm and sign again.
+        info.set(CertificateAlgorithmId.NAME + '.' + CertificateAlgorithmId.ALGORITHM, cert.get(X509CertImpl.SIG_ALG));
+        cert = new X509CertImpl(info);
+        cert.sign(pair.private, "SHA256withRSA");
+        cert.verify(pair.public)
+
+        return Tuple.tuple(pair.private, cert)
     }
 }

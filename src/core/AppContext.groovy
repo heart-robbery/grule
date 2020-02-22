@@ -218,7 +218,7 @@ class AppContext {
     protected void initExecutor() {
         exec = new ThreadPoolExecutor(
             Integer.valueOf(env.sys.exec.corePoolSize?:8), Integer.valueOf(env.sys.exec.maximumPoolSize?:8),
-            Long.valueOf(env.sys.exec.keepAliveTime?:30), TimeUnit.MINUTES,
+            Long.valueOf(env.sys.exec.keepAliveTime?:120), TimeUnit.MINUTES,
             new LinkedBlockingQueue<>(),
             new ThreadFactory() {
                 final AtomicInteger i = new AtomicInteger(1)
@@ -235,7 +235,7 @@ class AppContext {
                 } catch (RejectedExecutionException ex) {
                     log.warn("Thread pool rejected new task very heavy load. {}", exec)
                 } catch (Throwable t) {
-                    log.error("Task happen unknown error", t)
+                    log.error("Task Error", t)
                 }
             }
         };

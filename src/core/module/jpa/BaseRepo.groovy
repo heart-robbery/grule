@@ -146,24 +146,24 @@ class BaseRepo {
     /**
      * 分页查询
      * @param eType
-     * @param pageIndex
+     * @param page 从1开始
      * @param pageSize
      * @param spec
      * @return
      */
-    def <E extends IEntity> Page<E> findPage(Class<E> eType, Integer pageIndex, Integer pageSize, CriteriaSpec spec) {
+    def <E extends IEntity> Page<E> findPage(Class<E> eType, Integer page, Integer pageSize, CriteriaSpec spec = null) {
         if (eType == null) throw new IllegalArgumentException('eType must not be null')
-        if (pageIndex == null || pageIndex < 0) throw new IllegalArgumentException("pageIndex: $pageIndex")
+        if (page == null || page < 1) throw new IllegalArgumentException("page: $page")
         if (pageSize == null || pageSize < 0) throw new IllegalArgumentException("pageSize: $pageSize")
         trans{s ->
             CriteriaBuilder cb = s.getCriteriaBuilder()
             CriteriaQuery<E> query = cb.createQuery(eType)
             Root<E> root = query.from(eType)
-            Object p = spec?.toPredicate(root, query, cb)
+            def p = spec?.toPredicate(root, query, cb)
             if (p instanceof Predicate) query.where(p)
             new Page<E>(
-                pageIndex: pageIndex, pageSize: pageSize,
-                list: s.createQuery(query).setFirstResult(pageIndex * pageSize).setMaxResults(pageSize).list(),
+                page: page, pageSize: pageSize,
+                list: s.createQuery(query).setFirstResult((page - 1) * pageSize).setMaxResults(pageSize).list(),
                 totalRow: count(eType, spec)
             )
         }

@@ -5,10 +5,8 @@ import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import com.alibaba.fastjson.JSON
 import core.Utils
-import core.mode.http.Httper
 import okhttp3.*
 
-import javax.annotation.Resource
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
@@ -38,53 +36,53 @@ class OkHttpSrv extends ServerTpl {
         if (client) throw new RuntimeException("$name is already running")
         if (ep == null) {ep = new EP(); ep.addListenerSource(this)}
         client = new OkHttpClient.Builder()
-                .connectTimeout(Duration.ofSeconds(getLong('connectTimeout', 8)))
-                .readTimeout(Duration.ofSeconds(getLong('readTimeout', 16)))
-                .writeTimeout(Duration.ofSeconds(getLong('writeTimeout', 32)))
-                .dispatcher(new Dispatcher(exec))
-                .dns({String hostname ->
-                    try {
-                        List<InetAddress> addrs = Dns.SYSTEM.lookup(hostname)
-                        if (addrs) return addrs
-                    } catch(Exception ex) {}
-                    def addr = ep.fire("dns", new EC().async(false).args(hostname)) // 自定义dns 解析
-                    if (addr instanceof InetAddress) return [addr]
-                    else if (addr instanceof List) return addr
-                    throw new UnknownHostException("[$hostname]")
-                })
-                .cookieJar(new CookieJar() {// 共享cookie
-                    @Override
-                    void saveFromResponse(HttpUrl url, List<Cookie> cookies) {
-                        def cs = cookieStore.get(url.host)
-                        if (cs == null) {
-                            cookieStore.put(url.host, new LinkedList<Cookie>(cookies)) // 可更改
-                        } else {// 更新cookie
-                            for (def it = cs.iterator(); it.hasNext(); ) {
-                                Cookie coo = it.next()
-                                for (Cookie c: cookies) {
-                                    if (c.name() == coo.name()) {
-                                        it.remove()
-                                        break
-                                    }
+            .connectTimeout(Duration.ofSeconds(getLong('connectTimeout', 8)))
+            .readTimeout(Duration.ofSeconds(getLong('readTimeout', 16)))
+            .writeTimeout(Duration.ofSeconds(getLong('writeTimeout', 32)))
+            .dispatcher(new Dispatcher(exec))
+            .dns({String hostname ->
+                try {
+                    List<InetAddress> addrs = Dns.SYSTEM.lookup(hostname)
+                    if (addrs) return addrs
+                } catch(Exception ex) {}
+                def addr = ep.fire("dns", new EC().async(false).args(hostname)) // 自定义dns 解析
+                if (addr instanceof InetAddress) return [addr]
+                else if (addr instanceof List) return addr
+                throw new UnknownHostException("[$hostname]")
+            })
+            .cookieJar(new CookieJar() {// 共享cookie
+                @Override
+                void saveFromResponse(HttpUrl url, List<Cookie> cookies) {
+                    def cs = cookieStore.get(url.host)
+                    if (cs == null) {
+                        cookieStore.put(url.host, new LinkedList<Cookie>(cookies)) // 可更改
+                    } else {// 更新cookie
+                        for (def it = cs.iterator(); it.hasNext(); ) {
+                            Cookie coo = it.next()
+                            for (Cookie c: cookies) {
+                                if (c.name() == coo.name()) {
+                                    it.remove()
+                                    break
                                 }
                             }
-                            cs.addAll(cookies)
                         }
+                        cs.addAll(cookies)
                     }
-                    @Override
-                    List<Cookie> loadForRequest(HttpUrl url) {
-                        List<Cookie> cookies = cookieStore.get(url.host)
-                        if (shareCookie[(url.host)]) {
-                            def rLs = new LinkedList<>((cookies?:emptyList()))
-                            shareCookie[(url.host)].each {
-                                rLs.addAll(cookieStore.get(it)?:emptyList())
-                            }
-                            return rLs
-                        } else {
-                            return cookies?:emptyList()
+                }
+                @Override
+                List<Cookie> loadForRequest(HttpUrl url) {
+                    List<Cookie> cookies = cookieStore.get(url.host)
+                    if (shareCookie[(url.host)]) {
+                        def rLs = new LinkedList<>((cookies?:emptyList()))
+                        shareCookie[(url.host)].each {
+                            rLs.addAll(cookieStore.get(it)?:emptyList())
                         }
+                        return rLs
+                    } else {
+                        return cookies?:emptyList()
                     }
-                }).build()
+                }
+            }).build()
         exposeBean(client)
     }
 
@@ -97,7 +95,7 @@ class OkHttpSrv extends ServerTpl {
     OkHttp get(String urlStr) {
         if (!urlStr) throw new IllegalArgumentException('url must not be empty')
         def b = new Request.Builder()
-        def h = new OkHttp(this, urlStr, b)
+        def h = new OkHttp(urlStr, b)
         b.method = 'GET'
         h
     }
@@ -111,7 +109,7 @@ class OkHttpSrv extends ServerTpl {
     OkHttp post(String urlStr) {
         if (!urlStr) throw new IllegalArgumentException('url must not be empty')
         def b = new Request.Builder()
-        def h = new OkHttp(this, urlStr, b)
+        def h = new OkHttp(urlStr, b)
         b.method = 'POST'
         h
     }
@@ -121,7 +119,6 @@ class OkHttpSrv extends ServerTpl {
 
     class OkHttp {
         // 宿主
-        protected final OkHttpSrv                                 parent
         protected final Request.Builder                           builder
         protected       String                                    urlStr
         protected       Map<String, Object>                       params
@@ -132,11 +129,9 @@ class OkHttpSrv extends ServerTpl {
         protected       String                                    jsonBodyStr
         protected       boolean                                   print
 
-        protected OkHttp(OkHttpSrv parent, String urlStr, Request.Builder builder) {
+        protected OkHttp(String urlStr, Request.Builder builder) {
             if (builder == null) throw new NullPointerException('builder == null')
-            if (parent == null) throw new NullPointerException('parent == null')
             this.builder = builder
-            this.parent = parent
             this.urlStr = urlStr
         }
         OkHttp param(String pName, Object pValue) {
@@ -214,7 +209,7 @@ class OkHttpSrv extends ServerTpl {
             def addrs
             try {
                 addrs = Dns.SYSTEM.lookup(uri.host)
-            } catch (UnknownHostException ex) {}
+            } catch (UnknownHostException t) {}
             if (!addrs) {
                 String hp = ep.fire("resolveHttp", uri.host)
                 if (hp) {
@@ -234,25 +229,53 @@ class OkHttpSrv extends ServerTpl {
                 cookies.each { ls.add(Cookie.parse(url, "$it.key=$it.value")) }
             }
 
-            if (print) parent.log.info('Send http: {}, params: {}', urlStr, params?:jsonBodyStr)
-            // 发送请求
-            def call =  parent.client.newCall(builder.url(url).build())
-            if (okFn) { // 异步请求
-                call.enqueue(new Callback() {
-                    @Override
-                    void onFailure(Call c, IOException e) {failFn?.accept(e) }
+            def result
+            def ex
+            try {
+                // 发送请求
+                def call =  client.newCall(builder.url(url).build())
+                if (okFn) { // 异步请求
+                    call.enqueue(new Callback() {
+                        @Override
+                        void onFailure(Call c, IOException e) {
+                            if (print) log.error('Send http: {}, params: {}', urlStr, params?:jsonBodyStr)
+                            failFn?.accept(e)
+                        }
 
-                    @Override
-                    void onResponse(Call c, Response resp) throws IOException {
-                        okFn?.accept(resp.body().string())
+                        @Override
+                        void onResponse(Call c, Response resp) throws IOException {
+                            result = resp.body()?.string()
+                            if (200 != resp.code()) {
+                                log.error('Send http: {}, params: {}, result: ' + Objects.toString(result, ''), urlStr, params?:jsonBodyStr)
+                                if (failFn) {
+                                    failFn.accept(new RuntimeException("Http error. code: ${resp.code()}, url: $urlStr, resp: ${Objects.toString(result, '')}"))
+                                }
+                            } else {
+                                log.info('Send http: {}, params: {}, result: ' + Objects.toString(result, ''), urlStr, params?:jsonBodyStr)
+                                okFn?.accept(result)
+                            }
+                        }
+                    })
+                    null
+                } else { // 同步请求
+                    def resp = call.execute()
+                    result = resp.body()?.string()
+                    if (200 != resp.code()) {
+                        throw new RuntimeException("Http error. code: ${resp.code()}, url: $urlStr, resp: ${Objects.toString(result, '')}")
                     }
-                })
-                null
-            } else { // 同步请求
-                def resp = call.execute()
-                if (200 != resp.code()) throw new RuntimeException("Http error. code: ${resp.code()}, url: $urlStr, resp: ${resp.body().string()}")
-                return resp.body().string()
+                }
+            } catch(Throwable t) {
+                ex = t
             }
+            if (print) {
+                if (ex) {
+                    log.error('Send http: {}, params: {}', urlStr, params?:jsonBodyStr)
+                } else {
+                    log.info('Send http: {}, params: {}, result: ' + Objects.toString(result, ''), urlStr, params?:jsonBodyStr)
+                }
+            }
+            if (ex) throw ex
+            return result
         }
     }
 }

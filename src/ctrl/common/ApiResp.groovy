@@ -34,15 +34,15 @@ class ApiResp<T> implements Serializable {
     static <T> ApiResp ok(T data) { new ApiResp(code: '00', data: data) }
 
 
+    static <T> ApiResp of(String code, Object errMsg) { new ApiResp(code: code, desc: Objects.toString(errMsg, null)) }
+
+
+    static <T> ApiResp fail(Object errMsg) { new ApiResp(code: '01', desc: Objects.toString(errMsg, null)) }
+
+
     static ApiResp<LinkedHashMap<String, Object>> ok(String aName, Object aValue) {
         new ApiResp(code: '00', data: [(aName): aValue] as LinkedHashMap)
     }
-
-
-    static <T> ApiResp fail(String errMsg) { new ApiResp(code: '01', desc: errMsg) }
-
-
-    static <T> ApiResp fail(String code, String errMsg) { new ApiResp(code: code, desc: errMsg) }
 
 
     /**
@@ -62,4 +62,7 @@ class ApiResp<T> implements Serializable {
         ((Map) data).put(attrName, attrValue)
         this
     }
+
+
+    ApiResp desc(Object desc) {this.desc = Objects.toString(desc, null); this}
 }

@@ -9,6 +9,8 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 import javax.annotation.Resource
+import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
 
 class ServerTpl {
     protected final Logger       log = LoggerFactory.getLogger(getClass())
@@ -28,6 +30,7 @@ class ServerTpl {
      * 2. 如果要服务独立运行时, 请手动设置
      */
     @Resource EP ep
+    @Lazy def exec = bean(ExecutorService)
 
 
     ServerTpl(String name) {
@@ -75,6 +78,20 @@ class ServerTpl {
             }
         }
         bean
+    }
+
+
+    /**
+     * 异步执行. 拦截异常
+     * @param fn
+     * @return
+     */
+    def async(Runnable fn) {
+        exec.execute{
+            try {fn.run()} catch(Throwable ex) {
+                log.error("Async Error", ex)
+            }
+        }
     }
 
 

@@ -1,5 +1,6 @@
 package ctrl
 
+import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSONObject
 import core.module.jpa.BaseRepo
 import core.Page
@@ -27,11 +28,18 @@ import static ctrl.common.ApiResp.ok
 
 class TestCtrl extends CtrlTpl {
 
-    TestCtrl() { prefix = 'test' }
+    final Set<WebSocket> wss = ConcurrentHashMap.newKeySet()
 
+    TestCtrl() { prefix = 'test' }
 
     @Lazy exec = bean(Executor)
     @Lazy repo = bean(BaseRepo)
+
+
+    @EL(name = 'testWsMsg')
+    def wsMsg(String msg) {
+        wss.each {ws -> ws.send(msg)}
+    }
 
 
     // 预处理
@@ -77,7 +85,6 @@ class TestCtrl extends CtrlTpl {
 
     // websocket
     def ws(Chain chain) {
-        Set<WebSocket> wss = ConcurrentHashMap.newKeySet()
         chain.get('ws') {ctx ->
             WebSockets.websocket(ctx, new WebSocketHandler<WebSocket>() {
                 @Override
@@ -89,21 +96,19 @@ class TestCtrl extends CtrlTpl {
 
                 @Override
                 void onClose(WebSocketClose<WebSocket> close) throws Exception {
-                    close.getOpenResult().close()
+                    // ratpack.websocket.internal.DefaultWebSocket.close(int, java.lang.String)
                     wss.remove(close.getOpenResult())
-                    log.info('ws closed. {}', ctx.request.remoteAddress)
+                    log.info('ws closed. {}' + close.fromClient + ', fromServer: ' + close.fromServer, ctx.request.remoteAddress)
                 }
 
                 @Override
                 void onMessage(WebSocketMessage<WebSocket> frame) throws Exception {
-                    log.info('receive ws msg: {}', frame.text)
+                    log.info('test ws receive client msg: {}', frame.text)
                 }
             })
         }
         ep.fire('sched.cron', '0/30 * * * * ?', {
-            wss.each {ws ->
-                ws.send(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date()))
-            }
+            wsMsg(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date()))
         })
     }
 

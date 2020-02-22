@@ -109,7 +109,7 @@ class Utils {
         private Map<String, String>         headers
         private int                         connectTimeout = 5000
         private int                         readTimeout = 15000
-        private int respCode
+        private int                         respCode
         private Consumer<HttpURLConnection> preFn
 
         Http get(String url) { this.urlStr = url; this.method = 'GET'; return this }
@@ -180,10 +180,10 @@ class Utils {
                 conn.setReadTimeout(readTimeout)
 
                 // header 设置
-                conn.setRequestProperty('Accept', '*/*') // 必加
-                conn.setRequestProperty('Charset', 'UTF-8')
-                conn.setRequestProperty('Accept-Charset', 'UTF-8')
-                if (contentType) conn.setRequestProperty('Content-Type', "$contentType;charset=UTF-8")
+                conn.setRequestProperty("Accept", "*/*") // 必加
+                conn.setRequestProperty("Charset", "UTF-8")
+                conn.setRequestProperty("Accept-Charset", "UTF-8")
+                if (contentType) conn.setRequestProperty("Content-Type", "$contentType;charset=UTF-8")
                 // conn.setRequestProperty("Connection", "close")
                 // conn.setRequestProperty("Connection", "keep-alive")
                 // conn.setRequestProperty("http_user_agent", "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.26 Safari/537.36 Core/1.63.6726.400 QQBrowser/10.2.2265.400")
@@ -215,10 +215,10 @@ class Utils {
                 conn.connect()  // 连接
 
                 if ('POST' == method) {
-                    DataOutputStream os = new DataOutputStream(conn.getOutputStream());
+                    DataOutputStream os = new DataOutputStream(conn.getOutputStream())
                     if ('application/json' == contentType && (params || jsonBody)) {
                         if (jsonBody == null) os.write(JSON.toJSONString(params).getBytes())
-                        else os.write(jsonBody.getBytes('utf-8'))
+                        else os.write(jsonBody.getBytes("utf-8"))
                         os.flush(); os.close()
                     } else if (isMulti && params) {
                         String end = "\r\n"
@@ -238,7 +238,7 @@ class Utils {
                                 os.write(("Content-Disposition: form-data; name=\"$e.key\"" + end).getBytes("utf-8"))
                                 os.writeBytes(end)
                                 os.write(e.value.toString().getBytes('utf-8'))
-                            } else throw new IllegalArgumentException('not support parameter')
+                            } else throw new IllegalArgumentException("not support parameter")
                             os.writeBytes(end)
                         }
                         os.writeBytes(twoHyphens + boundary + twoHyphens + end)
@@ -263,7 +263,10 @@ class Utils {
                 }
 
                 // 取结果
-                ret = conn.getInputStream().getText('utf-8')
+                ret = conn.getInputStream().getText("utf-8")
+                if (200 != responseCode) {
+                    throw new RuntimeException("Http error. code: ${responseCode}, url: $urlStr, resp: ${Objects.toString(ret, "")}")
+                }
             } finally {
                 conn?.disconnect()
             }
@@ -306,7 +309,10 @@ class Utils {
      */
     static Object eval(String scriptText, Map ctx = new LinkedHashMap()) {
         if (scriptText == null || scriptText.isEmpty()) throw new IllegalArgumentException("scriptText must not be empty")
-        scriptCache.computeIfAbsent(scriptText {InvokerHelper.createScript(gcl.parseClass(scriptText, "GroovyDynClz_${clzNameCount.getAndIncrement()}"), new Binding(ctx))}).run()
+        scriptCache.computeIfAbsent(
+            scriptText,
+            {InvokerHelper.createScript(gcl.parseClass(scriptText, "GroovyDynClz_${clzNameCount.getAndIncrement()}"), new Binding(ctx))}
+        ).run()
     }
 
 
@@ -377,6 +383,72 @@ class Utils {
                 }
             }
             raf?.close()
+        }
+    }
+
+
+    /**
+     * 把一个bean 转换成 一个map
+     * @param bean
+     * @return
+     */
+    static <T> ToMap toMapper(T bean) { return new ToMap(bean) }
+
+
+    static class ToMap<T> {
+        private T                     bean
+        private Map<String, String>   propAlias
+        private Set<String>           ignore
+        private Map<String, Function> valueConverter
+        private boolean               showClassProp
+        private boolean               ignoreNull = true// 默认忽略空值属性
+        private Comparator<String>    comparator
+
+        ToMap(T bean) { this.bean = bean }
+        ToMap<T> aliasProp(String originPropName, String aliasName) {
+            if (propAlias == null) propAlias = new HashMap<>(7)
+            propAlias.put(originPropName, aliasName)
+            return this
+        }
+        ToMap<T> showClassProp() { showClassProp = true; return this }
+        ToMap<T> ignoreNull(ignoreNull = true) { this.ignoreNull = ignoreNull; return this }
+        ToMap<T> sort(Comparator<String> comparator = Comparator.naturalOrder()) { this.comparator = comparator; return this }
+        ToMap<T> ignore(String... propNames) {
+            if (propNames == null) return this
+            if (ignore == null) ignore = new HashSet<>(7)
+            Collections.addAll(ignore, propNames)
+            return this
+        }
+        ToMap<T> addConverter(String propName, Function converter) {
+            if (valueConverter == null) valueConverter = new HashMap<>(7)
+            valueConverter.put(propName, converter)
+            return this
+        }
+        Map build() {
+            Map map = comparator ? new TreeMap<>(comparator) : new LinkedHashMap()
+            if (bean == null) return map
+            bean.metaPropertyValues.each {pv ->
+                try {
+                    String propName = pv.getName()
+                    if ((ignore != null && ignore.contains(propName)) || (!showClassProp && "class".equals(propName))) return
+                    String aliasName = null
+                    if (propAlias != null && propAlias.containsKey(propName)) aliasName = propAlias.get(propName)
+                    String resultName = (aliasName == null ? propName : aliasName)
+
+                    Object value = pv.value
+                    if (valueConverter != null) {
+                        if (valueConverter.containsKey(propName)) value = valueConverter.get(propName).apply(value)
+                        else if (aliasName != null && valueConverter.containsKey(aliasName)) {
+                            value = valueConverter.get(aliasName).apply(value)
+                        }
+                    }
+                    if (ignoreNull && value != null) map.put(resultName, value)
+                    else if (!ignoreNull) map.put(resultName, value)
+                } catch (Exception e) {
+                    // ignore
+                }
+            }
+            return map
         }
     }
 }
