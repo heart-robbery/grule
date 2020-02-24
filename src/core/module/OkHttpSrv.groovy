@@ -9,7 +9,6 @@ import okhttp3.*
 
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ExecutorService
 import java.util.function.Consumer
 
 import static java.util.Collections.emptyList
@@ -23,7 +22,6 @@ import static java.util.Collections.emptyList
  */
 class OkHttpSrv extends ServerTpl {
 
-    @Lazy ExecutorService exec = bean(ExecutorService)
     protected OkHttpClient client
     final Map<String, List<Cookie>> cookieStore = new ConcurrentHashMap<>()
     final Map<String, Set<String>> shareCookie = new ConcurrentHashMap<>()
@@ -171,7 +169,7 @@ class OkHttpSrv extends ServerTpl {
             builder.addHeader(name, value.toString())
             this
         }
-        OkHttp print() {this.debug = true; this}
+        OkHttp debug() {this.debug = true; this}
         // 请求执行
         def execute(Consumer<String> okFn = null, Consumer<Exception> failFn = {throw it}) {
             if ('GET' == builder.method) { // get 请求拼装参数

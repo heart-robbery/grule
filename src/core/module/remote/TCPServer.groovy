@@ -36,9 +36,7 @@ import static core.Utils.linux
 import static java.util.concurrent.TimeUnit.SECONDS
 
 class TCPServer extends ServerTpl {
-    @Lazy Remoter remoter = bean(Remoter)
-    @Lazy AppContext app = bean(AppContext)
-    @Lazy Executor exec = bean(Executor)
+    @Lazy def remoter = bean(Remoter)
     @Lazy String hp = getStr('hp', '')
     @Lazy String delimiter = getStr('delimiter', '')
     protected EventLoopGroup boos
@@ -167,7 +165,7 @@ class TCPServer extends ServerTpl {
 
         String t = jo.getString("type")
         if ("event" == t) { // 远程事件请求
-            exec.execute{
+            async{
                 remoter?.receiveEventReq(jo.getJSONObject("data"), {o -> ctx.writeAndFlush(Unpooled.copiedBuffer((o + (delimiter?:'')).getBytes('utf-8')))})
             }
         } else if ("appUp" == t) { // 应用注册在线通知
@@ -181,7 +179,7 @@ class TCPServer extends ServerTpl {
         } else if ("cmd-log" == t) { // telnet 命令行设置日志等级
             // telnet localhost 8001
             // 例: {"type":"cmd-log", "source": "xxx", "data": "core.module.remote: debug"}$_$
-            exec.execute{
+            async{
                 String[] arr = jo.getString("data").split(":")
                 // Log.setLevel(arr[0].trim(), arr[1].trim())
                 ctx.writeAndFlush(Unpooled.copiedBuffer("set log level success", Charset.forName("utf-8")))

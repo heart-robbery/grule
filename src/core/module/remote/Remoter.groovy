@@ -5,24 +5,18 @@ import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import com.alibaba.fastjson.JSONArray
 import com.alibaba.fastjson.JSONObject
-import core.AppContext
 import core.module.SchedSrv
 import core.module.ServerTpl
 
-import javax.annotation.Resource
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executor
-import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.function.Consumer
 import java.util.stream.Collectors
 import java.util.stream.Stream
 
 class Remoter extends ServerTpl {
-    @Lazy AppContext      app = bean(AppContext)
-    @Lazy SchedSrv        sched = bean(SchedSrv)
-    @Lazy Executor        exec = bean(Executor)
+    @Lazy def         sched = bean(SchedSrv)
     /**
      * ecId -> EC
      */
@@ -69,7 +63,7 @@ class Remoter extends ServerTpl {
 
         tcpClient.handlers.add({jo ->
             if ("event"== jo['type']) {
-                exec.execute{receiveEventResp(jo.getJSONObject("data"))}
+                async{receiveEventResp(jo.getJSONObject("data"))}
             }
         } as Consumer)
         ep.fire("${name}.started")
@@ -80,7 +74,6 @@ class Remoter extends ServerTpl {
     def stop() {
         findLocalBean(null, TCPClient, null)?.stop()
         findLocalBean(null, TCPServer, null)?.stop()
-        if (exec instanceof ExecutorService) ((ExecutorService) exec).shutdown()
     }
 
 

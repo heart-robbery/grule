@@ -4,8 +4,6 @@ import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONException
 import com.alibaba.fastjson.JSONObject
-import core.AppContext
-import core.module.SchedSrv
 import core.module.ServerTpl
 import io.netty.bootstrap.Bootstrap
 import io.netty.buffer.ByteBuf
@@ -21,11 +19,9 @@ import io.netty.util.AttributeKey
 import io.netty.util.ReferenceCountUtil
 import sun.net.util.IPAddressUtil
 
-import javax.annotation.Resource
 import java.nio.channels.ClosedChannelException
 import java.nio.charset.Charset
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReadWriteLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
@@ -34,10 +30,7 @@ import java.util.function.Consumer
 import static core.Utils.linux
 
 class TCPClient extends ServerTpl {
-    @Lazy AppContext app = bean(AppContext)
-    @Lazy Remoter remoter = bean(Remoter)
-    @Lazy SchedSrv sched = bean(SchedSrv)
-    @Lazy Executor exec = bean(Executor)
+    @Lazy def remoter = bean(Remoter)
     final     Map<String, Node>          hpNodes   = new ConcurrentHashMap<>()
     final     Map<String, AppGroup>      apps      = new ConcurrentHashMap<>()
     protected EventLoopGroup             boos
@@ -201,7 +194,7 @@ class TCPClient extends ServerTpl {
         log.trace("Receive reply from '{}': {}", ctx.channel().remoteAddress(), dataStr)
         def jo = JSON.parseObject(dataStr)
         if ("updateAppInfo" == jo['type']) {
-            exec.execute{
+            async{
                 JSONObject d
                 try { d = jo.getJSONObject("data"); updateAppInfo(d) }
                 catch (Throwable ex) {
@@ -311,7 +304,7 @@ class TCPClient extends ServerTpl {
             tcpPool.host = arr[0].trim()
             tcpPool.port = Integer.valueOf(arr[1].trim())
             tcpPool.node = this
-            // exec.execute{try {tcpPool.create()} catch (Exception ex) {log.error('', ex)}} // 默认创建一个
+            // async{try {tcpPool.create()} catch (Exception ex) {log.error('', ex)}} // 默认创建一个
         }
 
         // 发送数据

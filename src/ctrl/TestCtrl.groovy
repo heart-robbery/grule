@@ -32,7 +32,6 @@ class TestCtrl extends CtrlTpl {
 
     TestCtrl() { prefix = 'test' }
 
-    @Lazy exec = bean(Executor)
     @Lazy repo = bean(BaseRepo)
 
 
@@ -190,7 +189,7 @@ class TestCtrl extends CtrlTpl {
     def async(Chain chain) {
         chain.get('async') {ctx ->
             ctx.render Promise.async{down ->
-                exec.execute{
+                async{
                     Thread.sleep(3000)
                     down.success(ok('date', new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())))
                 }

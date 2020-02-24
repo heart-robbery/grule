@@ -6,15 +6,13 @@ import org.quartz.*
 import org.quartz.impl.StdSchedulerFactory
 import org.quartz.spi.ThreadPool
 
-import javax.annotation.Resource
 import java.text.SimpleDateFormat
 import java.time.Duration
 import java.util.concurrent.Executor
-import java.util.concurrent.ExecutorService
 
 class SchedSrv extends ServerTpl {
     static final F_NAME  = 'sched'
-    @Lazy Executor exec = bean(Executor)
+    private static final KEY_FN = "fn"
     protected Scheduler scheduler
     
     
@@ -44,7 +42,6 @@ class SchedSrv extends ServerTpl {
         log.debug("Shutdown '{}'(Quartz) Server", name)
         scheduler?.shutdown(); scheduler = null
         AgentThreadPool.exec = null
-        if (exec instanceof ExecutorService) ((ExecutorService) exec).shutdown()
     }
 
 
@@ -58,7 +55,7 @@ class SchedSrv extends ServerTpl {
         if (!scheduler) throw new RuntimeException("$name is not running")
         if (!cron || !fn) throw new IllegalArgumentException("'cron' and 'fn' must not be empty")
         JobDataMap data = new JobDataMap()
-        data.put("fn", fn)
+        data.put(KEY_FN, fn)
         String id = cron + "_" + System.currentTimeMillis()
         Date d = scheduler.scheduleJob(
             JobBuilder.newJob(JopTpl.class).withIdentity(id).setJobData(data).build(),
@@ -81,7 +78,7 @@ class SchedSrv extends ServerTpl {
         if (!scheduler) throw new RuntimeException("$name is not running")
         if (!time || !fn) throw new IllegalArgumentException("'time', 'unit' and 'fn' must not be null")
         JobDataMap data = new JobDataMap()
-        data.put("fn", fn)
+        data.put(KEY_FN, fn)
         String id = time.toMillis() + "_" + UUID.randomUUID().toString()
         SimpleDateFormat sdf = new SimpleDateFormat("ss mm HH dd MM ? yyyy")
         String cron = sdf.format(new Date(new Date().getTime() + time.toMillis()))
@@ -106,7 +103,7 @@ class SchedSrv extends ServerTpl {
         if (scheduler) throw new RuntimeException(getName() + " is not running")
         if (!time || !fn) throw new IllegalArgumentException("'time' and 'fn' must not be null")
         JobDataMap data = new JobDataMap()
-        data.put("fn", fn)
+        data.put(KEY_FN, fn)
         String id = time + "_" + UUID.randomUUID().toString()
         SimpleDateFormat sdf = new SimpleDateFormat("ss mm HH dd MM ? yyyy")
         String cron = sdf.format(time)
@@ -124,7 +121,7 @@ class SchedSrv extends ServerTpl {
     static class JopTpl implements Job {
         @Override
         void execute(JobExecutionContext ctx) throws JobExecutionException {
-            ((Runnable) ctx.getMergedJobDataMap().get("fn")).run()
+            ((Runnable) ctx.getMergedJobDataMap().get(KEY_FN)).run()
         }
     }
 

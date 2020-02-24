@@ -48,7 +48,6 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.LongAdder
 
 class RatpackWeb extends ServerTpl {
-    @Lazy Executor exec = bean(Executor)
     protected RatpackServer srv
     protected final List<CtrlTpl> ctrls = new LinkedList<>()
     // 是否可用
