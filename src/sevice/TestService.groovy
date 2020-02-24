@@ -4,14 +4,14 @@ import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
 import core.Page
-import core.module.OkHttpSrv
-import core.module.ServerTpl
-import core.module.jpa.BaseRepo
 import core.mode.pipeline.Pipeline
 import core.mode.task.TaskContext
 import core.mode.task.TaskWrapper
 import core.mode.v.VChain
 import core.mode.v.VProcessor
+import core.module.OkHttpSrv
+import core.module.ServerTpl
+import core.module.jpa.BaseRepo
 import ctrl.common.FileData
 import dao.entity.Test
 import dao.entity.UploadFile
@@ -20,15 +20,14 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 
-import javax.annotation.Resource
 import java.text.SimpleDateFormat
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Consumer
 
 class TestService extends ServerTpl {
-    @Resource BaseRepo  repo
-    @Resource OkHttpSrv http
+    @Lazy def repo = bean(BaseRepo)
+    @Lazy def http = bean(OkHttpSrv)
 
 
     Page findTestData() {

@@ -28,9 +28,7 @@ targetCompatibility = 1.8
 
 dependencies {
     compile fileTree(dir: 'sysLib', include: ['*.jar'])
-    // compile 'org.codehaus.groovy:groovy:2.5.8'
-    compile 'org.codehaus.groovy:groovy:3.0.0-rc-1'
-    // compile 'org.codehaus.groovy:groovy-templates:3.0.0-rc-1'
+    compile 'org.codehaus.groovy:groovy:3.0.1'
     // compile ('org.codehaus.groovy:groovy-sql:2.5.6')
 
     compile 'com.alibaba:fastjson:1.2.61'
@@ -56,7 +54,7 @@ dependencies {
     compile 'redis.clients:jedis:3.1.0'
 
     // web 相关
-    compile ('io.ratpack:ratpack-core:1.7.3') {
+    compile ('io.ratpack:ratpack-core:1.7.6') {
         exclude group: 'io.netty'
         exclude group: 'io.ratpack', module: 'ratpack-guice'
         //exclude group: 'com.google.guava'

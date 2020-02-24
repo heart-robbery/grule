@@ -127,7 +127,7 @@ class RatpackWeb extends ServerTpl {
 
                     // 接口超时监控
                     def spend = ctx.get(Clock).instant().minusMillis(ctx.request.timestamp.toEpochMilli()).toEpochMilli()
-                    if (spend > (Long.valueOf(attrs.warnRequestTime?:5000))) {
+                    if (spend > getLong("warnRequestTime", 5000)) {
                         log.warn("End Request '" + resp.seqNo + "', path: " + ctx.request.uri + " , spend: " + spend + "ms, response: " + jsonStr)
                     } else {
                         log.debug("End Request '" + resp.seqNo + "', path: " + ctx.request.uri + " , spend: " + spend + "ms, response: " + jsonStr)
@@ -158,7 +158,7 @@ class RatpackWeb extends ServerTpl {
             })
         }
 
-        def ignoreSuffix = new HashSet(['.js', '.css', '.html', '.vue', '.png', '.ttf', '.woff', '.woff2', 'favicon.ico', '.js.map', *attrs.ignorePrintUrlSuffix?:[]])
+        def ignoreSuffix = new HashSet(['.js', '.css', '.html', '.vue', '.png', '.ttf', '.woff', '.woff2', 'favicon.ico', '.js.map', *attrs()['ignorePrintUrlSuffix']?:[]])
         // 请求预处理
         chain.all({ctx ->
             if (!enabled) {
@@ -174,7 +174,7 @@ class RatpackWeb extends ServerTpl {
             // 统计
             count()
             // session处理
-            if (attrs.session?.enabled) session(ctx)
+            if (attrs().session?.enabled) session(ctx)
             // 添加权限验证方法
             ctx.metaClass.auth = {String lowestRole -> auth(ctx, lowestRole)}
             ctx.next()
@@ -261,7 +261,7 @@ class RatpackWeb extends ServerTpl {
     protected session(Context ctx) {
         def sId = ctx.request.oneCookie('sId')
 
-        if ('redis' == attrs.session?.type) { // session的数据, 用redis 保存 session 数据
+        if ('redis' == attrs()['session']['type']) { // session的数据, 用redis 保存 session 数据
             if (redis == null) throw new RuntimeException('RedisClient is not exist')
             def sData = new Expando(new ConcurrentHashMap()) {
                 @Override
@@ -296,7 +296,7 @@ class RatpackWeb extends ServerTpl {
             if (sData == null) {
                 sData = new ConcurrentHashMap()
                 sData.id = sId = UUID.randomUUID().toString().replace('-', '')
-                Cache cache = ehcache.getOrCreateCache('session', sessionExpire, Integer.valueOf(attrs.session?.maxLimit?:100000), null)
+                Cache cache = ehcache.getOrCreateCache('session', sessionExpire, Integer.valueOf(attrs()['session']['maxLimit']?:100000), null)
                 cache.put(sId, sData)
                 log.info("New session '{}'", sId)
             }
@@ -360,8 +360,8 @@ class RatpackWeb extends ServerTpl {
 
     @EL(name = 'web.sessionExpire', async = false)
     Duration getSessionExpire() {
-        if (attrs.session?.expire instanceof Duration) return attrs.session?.expire
-        else if (attrs.session?.expire instanceof Number || attrs.session?.expire instanceof String) return Duration.ofMinutes(Long.valueOf(attrs.session?.expire))
+        if (attrs().session?.expire instanceof Duration) return attrs().session?.expire
+        else if (attrs().session?.expire instanceof Number || attrs().session?.expire instanceof String) return Duration.ofMinutes(Long.valueOf(attrs().session?.expire))
         Duration.ofMinutes(30) // 默认session 30分钟
     }
 

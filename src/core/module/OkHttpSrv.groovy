@@ -44,7 +44,7 @@ class OkHttpSrv extends ServerTpl {
                 try {
                     List<InetAddress> addrs = Dns.SYSTEM.lookup(hostname)
                     if (addrs) return addrs
-                } catch(Exception ex) {}
+                } catch(UnknownHostException ex) {}
                 def addr = ep.fire("dns", new EC().async(false).args(hostname)) // 自定义dns 解析
                 if (addr instanceof InetAddress) return [addr]
                 else if (addr instanceof List) return addr
@@ -127,7 +127,7 @@ class OkHttpSrv extends ServerTpl {
         protected       Map<String, Object>                       cookies
         protected       String                                    contentType
         protected       String                                    jsonBodyStr
-        protected       boolean                                   print
+        protected       boolean                                   debug
 
         protected OkHttp(String urlStr, Request.Builder builder) {
             if (builder == null) throw new NullPointerException('builder == null')
@@ -171,7 +171,7 @@ class OkHttpSrv extends ServerTpl {
             builder.addHeader(name, value.toString())
             this
         }
-        OkHttp print() {this.print = true; this}
+        OkHttp print() {this.debug = true; this}
         // 请求执行
         def execute(Consumer<String> okFn = null, Consumer<Exception> failFn = {throw it}) {
             if ('GET' == builder.method) { // get 请求拼装参数
@@ -238,7 +238,7 @@ class OkHttpSrv extends ServerTpl {
                     call.enqueue(new Callback() {
                         @Override
                         void onFailure(Call c, IOException e) {
-                            if (print) log.error('Send http: {}, params: {}', urlStr, params?:jsonBodyStr)
+                            if (debug) log.error('Send http: {}, params: {}', urlStr, params?:jsonBodyStr)
                             failFn?.accept(e)
                         }
 
@@ -267,7 +267,7 @@ class OkHttpSrv extends ServerTpl {
             } catch(Throwable t) {
                 ex = t
             }
-            if (print) {
+            if (debug) {
                 if (ex) {
                     log.error('Send http: {}, params: {}', urlStr, params?:jsonBodyStr)
                 } else {

@@ -1,6 +1,7 @@
 package core.module.jpa
 
 import core.Page
+import core.module.ServerTpl
 import org.hibernate.Session
 import org.hibernate.SessionFactory
 import org.hibernate.Transaction
@@ -18,10 +19,9 @@ import java.util.function.Function
 /**
  * hibernate 基本操作方法集
  */
-class BaseRepo {
+class BaseRepo extends ServerTpl {
     protected final Logger         log = LoggerFactory.getLogger(getClass())
     protected final SessionFactory sf
-    protected       ConfigObject   attrs
 
     // 传过来 不能注入(@Resource注入多数据源有问题)
     BaseRepo(SessionFactory sf) { this.sf = sf }
@@ -59,6 +59,7 @@ class BaseRepo {
             }
         }
     }
+
 
     /**
      * 根据实体类, 查表名字

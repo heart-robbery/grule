@@ -14,9 +14,8 @@ import javax.sql.DataSource
 
 class HibernateSrv extends ServerTpl {
     SessionFactory        sf
-    BaseRepo              repo
     protected DataSource  ds
-    protected List<Class> entities = new LinkedList<>()
+    @Lazy protected List<Class> entities = new LinkedList<>()
     
     
     HibernateSrv() { super('jpa') }
@@ -35,7 +34,7 @@ class HibernateSrv extends ServerTpl {
         props.put('hibernate.implicit_naming_strategy', ImplicitNaming.class.name)
         props.put('hibernate.current_session_context_class', 'thread')
         props.put('hibernate.temp.use_jdbc_metadata_defaults', 'true') // 自动探测连接的数据库信息,该用哪个Dialect
-        props.putAll(attrs.hibernate.flatten())
+        props.putAll(attrs()['hibernate'].flatten())
 
         initDataSource()
         MetadataSources ms = new MetadataSources(
@@ -45,10 +44,11 @@ class HibernateSrv extends ServerTpl {
         )
         entities.each {ms.addAnnotatedClass(it)}
         sf = ms.buildMetadata().buildSessionFactory()
-        // exposeBean(sf, ['sessionFactory', 'entityManagerFactory'])
+        exposeBean(sf, ["${name}_sessionFactory", "${name}_entityManagerFactory"])
 
         // 创建hibernate的公共查询
-        repo = new BaseRepo(sf); repo.attrs = attrs.repo; ep.fire('inject', repo)
+        BaseRepo repo = new BaseRepo(sf) {Map attrs() { HibernateSrv.this.attrs()['repo'] }}
+        ep.fire('inject', repo)
         exposeBean(repo, ["${name}_repo"])
 
         log.info('Created {}(Hibernate) client', name)
@@ -82,7 +82,7 @@ class HibernateSrv extends ServerTpl {
      */
     protected initDataSource() {
         if (ds) throw new RuntimeException('DataSource already exist')
-        Map<String, Object> dsAttr = attrs.ds
+        Map<String, Object> dsAttr = attrs().ds
         log.debug('Create dataSource properties: {}', dsAttr)
 
         // Hikari 数据源

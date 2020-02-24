@@ -17,37 +17,37 @@ import static core.Utils.pid
 import static java.util.Collections.emptyList
 
 class AppContext {
-    static final    ConfigObject        env          = initEnv()
-    protected final Logger              log          = LoggerFactory.getLogger(AppContext.class)
+    protected final Logger log = LoggerFactory.getLogger(AppContext.class)
+    @Lazy ConfigObject env = initEnv()
     /**
      * 系统名字. 用于多个系统启动区别
      */
-    final           String              name         = env.sys.name ?: null
+    @Lazy String name = env['sys']['name'] ?: null
     /**
      * 实例Id
      * NOTE: 保证唯一
      */
-    final           String              id           = env.sys.id ?: (name + '_' + UUID.randomUUID().toString().replace('-', ''))
+    @Lazy String id = env['sys']["id"] ?: ((name ? name + "_" : '') + UUID.randomUUID().toString().replace('-', ''))
     /**
      * 系统运行线程池. {@link #initExecutor()}}
      */
-    protected       ThreadPoolExecutor  exec
+    protected ThreadPoolExecutor exec
     /**
      * 事件中心 {@link #initEp()}}
      */
-    protected       EP                  ep
+    protected EP ep
     /**
      * 服务对象源
      */
-    protected final Map<String, Object> sourceMap    = new ConcurrentHashMap<>()
+    protected final Map<String, Object> sourceMap = new ConcurrentHashMap<>()
     /**
      * 启动时间
      */
-    final           Date                startup      = new Date()
+    final Date startup = new Date()
     /**
      * jvm关闭钩子
      */
-    protected final Thread              shutdownHook = new Thread({
+    @Lazy protected Thread shutdownHook = new Thread({
         // 通知各个模块服务关闭
         ep.fire("sys.stopping", EC.of(this).async(false).completeFn({ ec ->
             exec.shutdown()
@@ -58,16 +58,14 @@ class AppContext {
 
 
     // 初始化环境属性
-    private static initEnv() {
-        if (env != null) return env
-        // TODO 解决执行了两次
-        // println 'env =========== ' + env
+    protected ConfigObject initEnv() {
         // 加载配置文件
         def cs = new ConfigSlurper()
         ConfigObject config = new ConfigObject()
         try {
             def ps = System.properties
 
+            // 首先加载 app.conf
             def f = new File("../conf/app.conf")
             if (f.exists()) {
                 def s = f.getText('utf-8')
@@ -85,25 +83,24 @@ class AppContext {
 
             config.merge(cs.parse(ps))
         } catch (ClassNotFoundException ex) {
-            println("$ex.class.simpleName:$ex.message")
+            log.error("$ex.class.simpleName:$ex.message".toString())
         }
         config
     }
 
 
     /**
-     * start
-     * @return
+     * 启动
      */
     def start() {
         if (exec) throw new RuntimeException('App is running')
         log.info('Starting Application on {} with PID {}, active profile: ' + (env['profile']?:''), InetAddress.getLocalHost().getHostName(), pid())
-        // 1. 初始化系统线程池
+        // 1. 初始化
         initExecutor()
-        // 2. 初始化事件中心
-        initEp(); ep.addListenerSource(this)
-        sourceMap.each({k, v -> inject(v); ep.addListenerSource(v) })
-        // 3. 通知所有服务启动
+        initEp()
+        ep.addListenerSource(this)
+        sourceMap.each{k, v -> inject(v); ep.addListenerSource(v) }
+        // 2. 通知所有服务启动
         ep.fire('sys.starting', EC.of(this).completeFn({ ec ->
             if (shutdownHook) Runtime.getRuntime().addShutdownHook(shutdownHook)
             sourceMap.each{s, o -> inject(o)} // 自动注入
@@ -215,7 +212,8 @@ class AppContext {
      * NOTE: 如果线程池在不停的创建线程, 有可能是因为 提交的 Runnable 的异常没有被处理.
      * see:  {@link java.util.concurrent.ThreadPoolExecutor#runWorker(java.util.concurrent.ThreadPoolExecutor.Worker)} 这里面当有异常抛出时 1128行代码 {@link java.util.concurrent.ThreadPoolExecutor#processWorkerExit(java.util.concurrent.ThreadPoolExecutor.Worker, boolean)}
      */
-    protected void initExecutor() {
+    protected initExecutor() {
+        log.debug("init sys executor ... ")
         exec = new ThreadPoolExecutor(
             Integer.valueOf(env.sys.exec.corePoolSize?:8), Integer.valueOf(env.sys.exec.maximumPoolSize?:8),
             Long.valueOf(env.sys.exec.keepAliveTime?:120), TimeUnit.MINUTES,
@@ -248,6 +246,7 @@ class AppContext {
      * @return
      */
     protected initEp() {
+        log.debug("init ep")
         ep = new EP(exec, LoggerFactory.getLogger(EP.class)) {
             @Override
             protected Object doPublish(String eName, EC ec) {
@@ -277,6 +276,7 @@ class AppContext {
      * @return {@link Executor}
      */
     protected Executor wrapExecForSource(Object source) {
+        log.trace("wrapExecForSource: {}", source)
         return new ExecutorService() {
             @Override
             void shutdown() {}
@@ -326,6 +326,7 @@ class AppContext {
      * @return {@link EP}
      */
     protected EP wrapEpForSource(Object source) {
+        log.trace("wrapEpForSource: {}", source)
         return new EP() {
             @Override
             protected void init(Executor exec, Logger log) {}

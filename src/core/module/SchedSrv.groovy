@@ -27,7 +27,7 @@ class SchedSrv extends ServerTpl {
         if (ep == null) {ep = new EP(exec); ep.addListenerSource(this)}
 
         StdSchedulerFactory f = new StdSchedulerFactory()
-        Properties p = new Properties(); p.putAll(attrs)
+        Properties p = new Properties(); p.putAll(attrs())
         p.setProperty(StdSchedulerFactory.PROP_THREAD_POOL_CLASS, AgentThreadPool.class.getName())
         f.initialize(p)
         AgentThreadPool.exec = exec

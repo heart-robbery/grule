@@ -24,16 +24,16 @@ class RedisClient extends ServerTpl {
 
         // 连接池配置
         JedisPoolConfig poolCfg = new JedisPoolConfig(
-            minIdle: Integer.valueOf(attrs.minIdle?:1), maxIdle: Integer.valueOf(attrs.maxIdle?:5),
-            maxTotal: Integer.valueOf(attrs.maxTotal?:7), maxWaitMillis: Integer.valueOf(attrs.maxWaitMillis?:5000)
+            minIdle: getInteger("minIdle", 1), maxIdle: getInteger("maxIdle", 5),
+            maxTotal: getInteger("maxTotal", 7), maxWaitMillis: getInteger("maxWaitMillis", 5000)
         )
         pool = new JedisPool(
-            poolCfg, attrs.host?:'localhost', Integer.valueOf(attrs.port?:6379),
-            Integer.valueOf(attrs.connectionTimeout?:3000),
-            Integer.valueOf(attrs.soTimeout?:7000),
-            attrs.password?:null,
-            Integer.valueOf(attrs.database?:Protocol.DEFAULT_DATABASE),
-            attrs.clientName?:null
+            poolCfg, getStr("host", "localhost"), getInteger("port", 6379),
+            getInteger("connectionTimeout", 3000),
+            getInteger("soTimeout", 7000),
+            getStr("password", null),
+            getInteger("database", Protocol.DEFAULT_DATABASE),
+            getStr("clientName", null)
         )
 
         exposeBean(pool)
@@ -112,11 +112,11 @@ class RedisClient extends ServerTpl {
 
 
     protected Duration getExpire(String cName) {
-        if (attrs.expire?.(cName) instanceof Duration) return attrs.expire?.(cName)
-        else if (attrs.expire?.(cName) instanceof Number || attrs.expire?.(cName) instanceof String) return Duration.ofMinutes(Long.valueOf(attrs.expire?.(cName)))
+        if (attrs().expire?.(cName) instanceof Duration) return attrs().expire?.(cName)
+        else if (attrs().expire?.(cName) instanceof Number || attrs().expire?.(cName) instanceof String) return Duration.ofMinutes(Long.valueOf(attrs().expire?.(cName)))
 
-        if (attrs.defaultExpire instanceof Duration) return attrs.defaultExpire
-        else if (attrs.defaultExpire instanceof Number || attrs.defaultExpire instanceof String) return Duration.ofMinutes(Long.valueOf(attrs.defaultExpire))
+        if (attrs().defaultExpire instanceof Duration) return attrs().defaultExpire
+        else if (attrs().defaultExpire instanceof Number || attrs().defaultExpire instanceof String) return Duration.ofMinutes(Long.valueOf(attrs().defaultExpire))
 
         Duration.ofHours(12) // 默认12小时过期
     }

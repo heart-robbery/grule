@@ -48,7 +48,7 @@ class EhcacheSrv extends ServerTpl {
                 cache = cm.getCache(cName, Object.class, Object.class) // 不同线程同时进来, cache为null
                 if (cache == null) {
                     if (heapOfEntries != null && heapOfMB != null) throw new IllegalArgumentException("heapOfEntries 和 heapOfMB 不能同时设置")
-                    if (heapOfEntries == null && heapOfMB == null) {heapOfEntries = Integer.valueOf(attrs.heapOfEntries?.(cName)?:attrs.defaultHeapOfEntries?:10000)}
+                    if (heapOfEntries == null && heapOfMB == null) {heapOfEntries = Integer.valueOf(attrs().heapOfEntries?.(cName)?:getInteger("defaultHeapOfEntries", 10000))}
                     if (expire == null) expire = getExpire(cName)
                     ResourcePoolsBuilder b = newResourcePoolsBuilder()
                     if (heapOfEntries != null) b = b.heap(heapOfEntries, ENTRIES)
@@ -97,11 +97,11 @@ class EhcacheSrv extends ServerTpl {
      * @return
      */
     protected Duration getExpire(String cName) {
-        if (attrs.expire?.(cName) instanceof Duration) return attrs.expire?.(cName)
-        else if (attrs.expire?.(cName) instanceof Number || attrs.expire?.(cName) instanceof String) return Duration.ofMinutes(Long.valueOf(attrs.expire?.(cName)))
+        if (attrs().expire?.(cName) instanceof Duration) return attrs().expire?.(cName)
+        else if (attrs().expire?.(cName) instanceof Number || attrs().expire?.(cName) instanceof String) return Duration.ofMinutes(Long.valueOf(attrs().expire?.(cName)))
 
-        if (attrs.defaultExpire instanceof Duration) return attrs.defaultExpire
-        else if (attrs.defaultExpire instanceof Number || attrs.defaultExpire instanceof String) return Duration.ofMinutes(Long.valueOf(attrs.defaultExpire))
+        if (attrs().defaultExpire instanceof Duration) return attrs().defaultExpire
+        else if (attrs().defaultExpire instanceof Number || attrs().defaultExpire instanceof String) return Duration.ofMinutes(Long.valueOf(attrs().defaultExpire))
 
         Duration.ofHours(12) // 默认12小时过期
     }

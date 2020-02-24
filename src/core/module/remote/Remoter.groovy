@@ -52,7 +52,7 @@ class Remoter extends ServerTpl {
         if (tcpClient == null) {
             tcpClient = new TCPClient()
             ep.addListenerSource(tcpClient); ep.fire("inject", tcpClient)
-            tcpClient.attrs.putAll(AppContext.env.(tcpClient.name)); tcpClient.attr("delimiter", delimiter)
+            tcpClient.attr("delimiter", delimiter)
             exposeBean(tcpClient)
             tcpClient.start()
         }
@@ -62,7 +62,7 @@ class Remoter extends ServerTpl {
         if (tcpServer == null) {
             tcpServer = new TCPServer()
             ep.addListenerSource(tcpServer); ep.fire("inject", tcpServer)
-            tcpServer.attrs.putAll(AppContext.env.(tcpServer.name)); tcpServer.attr("delimiter", delimiter)
+            tcpServer.attr("delimiter", delimiter)
             exposeBean(tcpServer)
             tcpServer.start()
         }

@@ -26,14 +26,14 @@ class FileUploader extends ServerTpl {
 
     @EL(name = 'web.started', async = false)
     protected init() {
-        localDir = new URL('file:' + (attrs.localDir?:'../upload')).getFile()
+        localDir = new URL('file:' + (getStr("localDir", '../upload'))).getFile()
         File dir = new File(localDir)
         log.info('save upload file local dir: {}', dir.canonicalPath)
 
-        accessUrlPrefix = URI.create(attrs.accessUrlPrefix?:("http://${ep.fire('http.hp')}/file/") + "/").normalize()
+        accessUrlPrefix = URI.create(getStr("accessUrlPrefix", ("http://${ep.fire('http.hp')}/file/")) + "/").normalize()
         log.info('access upload file url prefix: {}', accessUrlPrefix)
 
-        remoteUrl = attrs.remoteUrl?:''
+        remoteUrl = getStr("remoteUrl", '')
         if (remoteUrl) {
             log.info('remote file server http url: {}', remoteUrl)
         }

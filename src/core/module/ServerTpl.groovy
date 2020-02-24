@@ -22,32 +22,20 @@ class ServerTpl {
      */
     final           String       name
     /**
-     * 可配置属性集.
-     */
-    protected final ConfigObject attrs
-    /**
      * 1. 当此服务被加入核心时, 此值会自动设置为核心的EP.
      * 2. 如果要服务独立运行时, 请手动设置
      */
     @Resource EP ep
+    @Lazy def app = bean(AppContext)
     @Lazy def exec = bean(ExecutorService)
 
 
     ServerTpl(String name) {
         if (!name) throw new IllegalArgumentException('name must not allow empty')
         this.name = name
-        attrs = AppContext.env.(name)
     }
     ServerTpl() {
         this.name = getClass().getSimpleName().uncapitalize()
-        attrs = AppContext.env.(name)
-    }
-
-
-    // 设置属性
-    ServerTpl attr(String aName, Object aValue) {
-        attrs?.put(aName, aValue)
-        this
     }
 
 
@@ -121,17 +109,27 @@ class ServerTpl {
     }
 
 
-    Long getLong(String name, Long defaultValue) { attrs.containsKey(name) ? Long.valueOf(attrs[(name)]) : defaultValue}
+    /**
+     * 属性集
+     * @return
+     */
+    Map attrs() { app.env[(name)] }
 
+    // 设置属性
+    ServerTpl attr(String aName, Object aValue) {
+        attrs().put(aName, aValue)
+        this
+    }
 
-    Integer getInteger(String name, Integer defaultValue) { attrs.containsKey(name) ? Integer.valueOf(attrs[(name)]) : defaultValue }
+    Long getLong(String key, Long defaultValue = null) { attrs().containsKey(key) ? Long.valueOf(attrs()[(key)]) : defaultValue}
 
+    Integer getInteger(String key, Integer defaultValue = null) { attrs().containsKey(key) ? Integer.valueOf(attrs()[(key)]) : defaultValue }
 
-    Double getDouble(String name, Double defaultValue) { attrs.containsKey(name)? Double.valueOf(attrs[(name)]) : defaultValue}
+    Double getDouble(String key, Double defaultValue = null) { attrs().containsKey(key)? Double.valueOf(attrs()[(key)]) : defaultValue}
 
+    Float getFloat(String key, Float defaultValue = null) { attrs().containsKey(key)? Float.valueOf(attrs()[(key)]) : defaultValue}
 
-    String getStr(String name, String defaultValue) { attrs.containsKey(name) ? attrs[(name)] : defaultValue}
+    String getStr(String key, String defaultValue = null) { attrs().containsKey(key) ? attrs()[(key)] : defaultValue}
 
-
-    Boolean getBoolean(String name, Boolean defaultValue) { attrs.containsKey(name) ? Boolean.valueOf(attrs[(name)]) : defaultValue}
+    Boolean getBoolean(String key, Boolean defaultValue = null) { attrs().containsKey(key) ? Boolean.valueOf(attrs()[(key)]) : defaultValue}
 }
