@@ -9,7 +9,6 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 import javax.annotation.Resource
-import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 
 class ServerTpl {
@@ -49,7 +48,7 @@ class ServerTpl {
         if (!beanCtx || ec?.result != null) return ec?.result
 
         Object bean = null
-        if (!beanName && !beanType) {
+        if (beanName && beanType) {
             bean = beanCtx[beanName]
             if (bean != null && !beanType.isAssignableFrom(bean.getClass())) bean = null
         } else if (beanName && !beanType) {
