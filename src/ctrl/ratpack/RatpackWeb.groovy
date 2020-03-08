@@ -10,7 +10,6 @@ import core.module.ServerTpl
 import ctrl.CtrlTpl
 import ctrl.common.ApiResp
 import io.netty.handler.ssl.SslContextBuilder
-import io.netty.handler.ssl.util.SelfSignedCertificate
 import org.ehcache.Cache
 import ratpack.error.internal.ErrorHandler
 import ratpack.handling.Chain
@@ -19,7 +18,6 @@ import ratpack.handling.RequestId
 import ratpack.render.RendererSupport
 import ratpack.server.BaseDir
 import ratpack.server.RatpackServer
-import ratpack.ssl.SSLContexts
 import sun.security.x509.AlgorithmId
 import sun.security.x509.CertificateAlgorithmId
 import sun.security.x509.CertificateIssuerName
@@ -43,19 +41,20 @@ import java.time.Clock
 import java.time.Duration
 import java.util.Map.Entry
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.LongAdder
 
 class RatpackWeb extends ServerTpl {
-    protected RatpackServer srv
-    protected final List<CtrlTpl> ctrls = new LinkedList<>()
+    protected RatpackServer       srv
+    protected final List<CtrlTpl> ctrls       = new LinkedList<>()
     // 是否可用
-    boolean enabled = false
+    boolean                       enabled     = false
     /**
      * 吞噬器.请求执行控制器
      */
-    protected Devourer devourer
+    @Lazy protected Devourer      reqDevourer = new Devourer(name, exec)
+    @Lazy def                     redis       = bean(RedisClient)
+    @Lazy def                     ehcache     = bean(EhcacheSrv)
 
 
     RatpackWeb() { super('web') }
@@ -93,7 +92,7 @@ class RatpackWeb extends ServerTpl {
 
 
     @EL(name = 'sys.stopping', async = false)
-    def stop() { srv?.stop() }
+    def stop() { srv?.stop(); reqDevourer.shutdown() }
 
 
     @EL(name = 'sys.started')
@@ -168,19 +167,19 @@ class RatpackWeb extends ServerTpl {
             // 限流? TODO
             // 打印请求
             if (!ignoreSuffix.find{ctx.request.path.endsWith(it)}) {
-                log.info("Start Request '{}': {}", ctx.get(RequestId.TYPE), ctx.request.uri)
+                log.info("Start Request '{}': {} from: " + ctx.request.remoteAddress.host, ctx.get(RequestId.TYPE), ctx.request.uri)
             }
             // 统计
             count()
             // session处理
-            if (attrs().session?.enabled) session(ctx)
+            if (attrs()['session']['enabled']) session(ctx)
             // 添加权限验证方法
-            ctx.metaClass.auth = {String lowestRole -> auth(ctx, lowestRole)}
+            ctx.metaClass['auth'] = {String lowestRole -> auth(ctx, lowestRole)}
             ctx.next()
         })
 
         // 添加所有Controller层
-        ctrls.each {ctrl ->
+        ctrls.each { ctrl ->
             ep.addListenerSource(ctrl)
             ep.fire('inject', ctrl)
             ctrl.init(chain)
@@ -189,9 +188,9 @@ class RatpackWeb extends ServerTpl {
 
 
     // 权限验证
-    def auth(Context ctx, String lowestRole) {
+    protected auth(Context ctx, String lowestRole) {
         if (!lowestRole) throw new IllegalArgumentException('lowestRole is empty')
-        Set<String> uRoles = ctx.sData?.uRoles // 当前用户的角色. 例: role1,role2,role3
+        Set<String> uRoles = ctx['sData']['uRoles'] // 当前用户的角色. 例: role1,role2,role3
         if (!uRoles) {ctx.metaClass['respCode'] = '100'; throw new AccessControlException('需要登录')}
         if (uRoles.contains(lowestRole)) return true
 
@@ -221,7 +220,7 @@ class RatpackWeb extends ServerTpl {
         }
 
         if (uRoles.find {uRole -> // 用户角色
-            ((Map) attrs['role'])?.find {e ->
+            ((Map) attrs()['role'])?.find {e ->
                 if (uRole == e.key) {
                     if (e.value instanceof Collection) {
                         if (recursiveList(e.value, lowestRole)) return true
@@ -254,8 +253,7 @@ class RatpackWeb extends ServerTpl {
     }
 
 
-    @Lazy RedisClient redis = bean(RedisClient)
-    @Lazy EhcacheSrv ehcache = bean(EhcacheSrv)
+
     // 处理session
     protected session(Context ctx) {
         def sId = ctx.request.oneCookie('sId')
@@ -337,34 +335,10 @@ class RatpackWeb extends ServerTpl {
     }
 
 
-    @EL(name = ['http.hp', 'web.hp'], async = false)
-    def getHp() {
-        String ip = srv.bindHost
-        if (ip == 'localhost') {
-            l: for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
-                NetworkInterface current = en.nextElement()
-                if (!current.isUp() || current.isLoopback() || current.isVirtual()) continue
-                Enumeration<InetAddress> addresses = current.getInetAddresses()
-                while (addresses.hasMoreElements()) {
-                    InetAddress addr = addresses.nextElement()
-                    if (addr.isLoopbackAddress()) continue
-                    ip = addr.getHostAddress()
-                    break l
-                }
-            }
-        }
-        ip + ':' + srv.bindPort
-    }
-
-
-    @EL(name = 'web.sessionExpire', async = false)
-    Duration getSessionExpire() {
-        if (attrs().session?.expire instanceof Duration) return attrs().session?.expire
-        else if (attrs().session?.expire instanceof Number || attrs().session?.expire instanceof String) return Duration.ofMinutes(Long.valueOf(attrs().session?.expire))
-        Duration.ofMinutes(30) // 默认session 30分钟
-    }
-
-
+    /**
+     * https
+     * @return
+     */
     protected Tuple2<PrivateKey, X509Certificate> security() {
         SecureRandom random = new SecureRandom()
         def gen = KeyPairGenerator.getInstance("RSA")
@@ -403,5 +377,35 @@ class RatpackWeb extends ServerTpl {
         cert.verify(pair.public)
 
         return Tuple.tuple(pair.private, cert)
+    }
+
+
+    @EL(name = ['http.hp', 'web.hp'], async = false)
+    def getHp() {
+        String ip = srv.bindHost
+        if (ip == 'localhost') {
+            l: for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
+                NetworkInterface current = en.nextElement()
+                if (!current.isUp() || current.isLoopback() || current.isVirtual()) continue
+                Enumeration<InetAddress> addresses = current.getInetAddresses()
+                while (addresses.hasMoreElements()) {
+                    InetAddress addr = addresses.nextElement()
+                    if (addr.isLoopbackAddress()) continue
+                    if (addr instanceof Inet4Address) {
+                        ip = addr.getHostAddress()
+                        break l
+                    }
+                }
+            }
+        }
+        ip + ':' + srv.bindPort
+    }
+
+
+    @EL(name = 'web.sessionExpire', async = false)
+    Duration getSessionExpire() {
+        if (attrs().session?.expire instanceof Duration) return attrs().session?.expire
+        else if (attrs().session?.expire instanceof Number || attrs().session?.expire instanceof String) return Duration.ofMinutes(Long.valueOf(attrs().session?.expire))
+        Duration.ofMinutes(30) // 默认session 30分钟
     }
 }
