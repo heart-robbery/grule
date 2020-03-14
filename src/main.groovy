@@ -18,36 +18,32 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import sevice.FileUploader
 import sevice.TestService
-import sevice.rule.RuleSrv
 
-import javax.annotation.Resource
 import java.text.SimpleDateFormat
 import java.time.Duration
-import java.util.concurrent.Executor
-
 
 @Field final Logger log = LoggerFactory.getLogger(getClass())
-@Field final AppContext ctx = new AppContext()
-@Lazy @Field EP ep = ctx.bean(EP)
+@Field final AppContext app = new AppContext()
+@Lazy @Field EP ep = app.bean(EP)
 
 // 系统功能添加区
-ctx.addSource(new EhcacheSrv())
-ctx.addSource(new SchedSrv())
-ctx.addSource(new RedisClient())
-ctx.addSource(new OkHttpSrv())
-ctx.addSource(new Remoter())
-ctx.addSource(new HibernateSrv().entities(Test, UploadFile, Component))
-ctx.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl))
+app.addSource(new EhcacheSrv())
+app.addSource(new SchedSrv())
+app.addSource(new RedisClient())
+app.addSource(new OkHttpSrv())
+app.addSource(new Remoter())
+app.addSource(new HibernateSrv().entities(Test, UploadFile, Component))
+app.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl))
 //ctx.addSource(new RuleSrv())
-ctx.addSource(new FileUploader())
-ctx.addSource(new TestService())
-ctx.addSource(this)
-ctx.start() // 启动系统
+app.addSource(new FileUploader())
+app.addSource(new TestService())
+app.addSource(this)
+app.start() // 启动系统
 
 
 @EL(name = 'sys.started')
 def sysStarted() {
-    TestService ts = ctx.bean(TestService)
+    TestService ts = app.bean(TestService)
     // ts.testObjBuilder()
     // ts.testVChain()
     return

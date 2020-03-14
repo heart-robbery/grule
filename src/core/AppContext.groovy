@@ -18,36 +18,36 @@ import static java.util.Collections.emptyList
 
 class AppContext {
     protected final Logger log = LoggerFactory.getLogger(AppContext.class)
-    @Lazy ConfigObject env = initEnv()
+    @Lazy ConfigObject                  env          = initEnv()
     /**
      * 系统名字. 用于多个系统启动区别
      */
-    @Lazy String name = env['sys']['name'] ?: null
+    @Lazy String                        name         = env['sys']['name'] ?: null
     /**
      * 实例Id
      * NOTE: 保证唯一
      */
-    @Lazy String id = env['sys']["id"] ?: ((name ? name + "_" : '') + UUID.randomUUID().toString().replace('-', ''))
+    @Lazy String                        id           = env['sys']["id"] ?: ((name ? name + "_" : '') + UUID.randomUUID().toString().replace('-', ''))
     /**
      * 系统运行线程池. {@link #initExecutor()}}
      */
-    protected ThreadPoolExecutor exec
+    protected ThreadPoolExecutor        exec
     /**
      * 事件中心 {@link #initEp()}}
      */
-    protected EP ep
+    protected EP                        ep
     /**
      * 服务对象源
      */
-    protected final Map<String, Object> sourceMap = new ConcurrentHashMap<>()
+    protected final Map<String, Object> sourceMap    = new ConcurrentHashMap<>()
     /**
      * 启动时间
      */
-    final Date startup = new Date()
+    final Date                          startup      = new Date()
     /**
      * jvm关闭钩子
      */
-    @Lazy protected Thread shutdownHook = new Thread({
+    @Lazy protected Thread              shutdownHook = new Thread({
         // 通知各个模块服务关闭
         ep.fire("sys.stopping", EC.of(this).async(false).completeFn({ ec ->
             exec.shutdown()
@@ -99,11 +99,11 @@ class AppContext {
         initExecutor()
         initEp()
         ep.addListenerSource(this)
-        sourceMap.each{k, v -> inject(v); ep.addListenerSource(v) }
+        sourceMap.each{ k, v -> inject(v); ep.addListenerSource(v) }
         // 2. 通知所有服务启动
         ep.fire('sys.starting', EC.of(this).completeFn({ ec ->
             if (shutdownHook) Runtime.getRuntime().addShutdownHook(shutdownHook)
-            sourceMap.each{s, o -> inject(o)} // 自动注入
+            sourceMap.each{ s, o -> inject(o)} // 自动注入
             log.info("Started Application "+ (name ? ('\'' + name + (id ? ':' + id : '') + '\'') : '') +" in {} seconds (JVM running for {})",
                 (System.currentTimeMillis() - startup.getTime()) / 1000.0,
                 ManagementFactory.getRuntimeMXBean().getUptime() / 1000.0

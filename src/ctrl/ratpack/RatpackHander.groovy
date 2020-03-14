@@ -1,7 +1,6 @@
 package ctrl.ratpack
 
 
-import core.Utils
 import groovy.transform.PackageScope
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.http.DefaultHttpResponse
@@ -26,14 +25,17 @@ class RatpackHander extends NettyHandlerAdapter {
     @Override
     void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         if (msg instanceof HttpRequest) {
-            int i = rw.devourer.getWaitingCount()
+            int i = rw.reqDevourer.waitingCount
             // 当请求对列中等待处理的请求过多就拒绝新的请求(默认值: 线程池的线程个数的3倍)
-            if (i >= (rw.attrs().maxWaitRequest?:(Utils.findMethod(rw.exec.getClass(), "getCorePoolSize").invoke(rw.exec) * 3))) {
+            if (i >= rw.getInteger("maxWaitRequest", ((Integer) rw.exec["getCorePoolSize"]) * 3) ||
+                ((Integer) rw.exec["waitingCount"]) > ((Integer) rw.exec["getCorePoolSize"]) * 2
+            ) {
                 if (i > 0 && i % 3 == 0) rw.log.warn("There are currently {} requests waiting to be processed.", i)
                 rw.log.warn("Drop request: {}", msg.uri())
                 ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, SERVICE_UNAVAILABLE))
             } else {
-                rw.devourer.offer{rw.exec.execute{rw.count(); super.channelRead(ctx, msg) }}
+                // 请求入对执行
+                rw.reqDevourer.offer{ super.channelRead(ctx, msg) }
             }
         } else {
             super.channelRead(ctx, msg)

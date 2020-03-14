@@ -3,7 +3,7 @@ package ctrl.common
 import groovy.transform.ToString
 import sevice.FileUploader
 
-@ToString(excludes = 'inputStream')
+@ToString(excludes = 'inputStream', includePackage = false)
 class FileData {
     /**
      * 原始文件名(包含扩展名)

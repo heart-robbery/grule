@@ -52,7 +52,7 @@ class TestService extends ServerTpl {
         if (!files) return Collections.emptyList()
         repo?.trans{
             files.collect{f ->
-                repo.saveOrUpdate(new UploadFile(originName: f.originName, finalName: f.generatedName))
+                repo.saveOrUpdate(new UploadFile(originName: f.originName, finalName: f.generatedName, size: f.size))
             }
         }
     }

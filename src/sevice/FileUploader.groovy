@@ -12,31 +12,23 @@ class FileUploader extends ServerTpl {
     /**
      * 文件上传的 本地保存目录
      */
-    private   String localDir
+    @Lazy String localDir        = new URL('file:' + (getStr("localDir", '../upload'))).getFile()
     /**
      * 文件上传 的访问url前缀
      */
-    private   URI    accessUrlPrefix
+    @Lazy URI    accessUrlPrefix = URI.create(getStr("accessUrlPrefix", ("//${ep.fire('http.hp')}/file/")) + "/").normalize()
     /**
      * 远程文件服务器url地址
      */
-    protected String remoteUrl
-    @Lazy OkHttpSrv  http = bean(OkHttpSrv)
+    @Lazy String remoteUrl       = getStr("remoteUrl", '')
+    @Lazy def    http            = bean(OkHttpSrv)
 
 
     @EL(name = 'web.started', async = false)
     protected init() {
-        localDir = new URL('file:' + (getStr("localDir", '../upload'))).getFile()
-        File dir = new File(localDir)
-        log.info('save upload file local dir: {}', dir.canonicalPath)
-
-        accessUrlPrefix = URI.create(getStr("accessUrlPrefix", ("http://${ep.fire('http.hp')}/file/")) + "/").normalize()
+        log.info('save upload file local dir: {}', new File(localDir).canonicalPath)
         log.info('access upload file url prefix: {}', accessUrlPrefix)
-
-        remoteUrl = getStr("remoteUrl", '')
-        if (remoteUrl) {
-            log.info('remote file server http url: {}', remoteUrl)
-        }
+        if (remoteUrl) {log.info('remote file server http url: {}', remoteUrl)}
     }
 
 
@@ -86,12 +78,12 @@ class FileUploader extends ServerTpl {
      * @param fds
      */
     // @Monitor(warnTimeOut = 7000)
-    def save(List<FileData> fds, boolean forwardRemote = false) {
+    List<FileData> save(List<FileData> fds, boolean forwardRemote = false) {
         if (!fds) return fds
 
         // 文件流copy
         def doSave = {FileData fd ->
-            if (fd == null) return
+            if (fd == null) return fd
             if (forwardRemote) { // http上传到远程文件服务
                 // 1. 阿里OSS文件服务器例子
                 // def oss = new OSSClient(endpoint, accessKeyId, accessKeySecret)
@@ -108,7 +100,8 @@ class FileUploader extends ServerTpl {
                     int n
                     while (-1 != (n = fd.inputStream.read(bs))) {os.write(bs, 0, n)}
                 }
-                log.info('Saved file: {}, origin name: {}', f.absolutePath, fd.originName)
+                fd.size = f.length() // 保存文件大小
+                log.info('Saved file: {}, origin name: {}, size: ' + fd.size, f.canonicalPath, fd.originName)
             }
             fd
         }
@@ -127,7 +120,4 @@ class FileUploader extends ServerTpl {
         } else if (fds.size() == 1){ doSave(fds[0]) }
         fds
     }
-
-
-    String getLocalDir() {localDir}
 }

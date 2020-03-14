@@ -24,6 +24,10 @@ class UploadFile extends LongIdEntity {
      */
     String originName
     /**
+     * 文件大小
+     */
+    Long size
+    /**
      * 备注
      */
     String comment
