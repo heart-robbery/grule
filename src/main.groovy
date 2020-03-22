@@ -1,6 +1,7 @@
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import core.AppContext
+import core.Utils
 import core.module.EhcacheSrv
 import core.module.OkHttpSrv
 import core.module.RedisClient
@@ -43,6 +44,8 @@ app.start() // 启动系统
 
 @EL(name = 'sys.started')
 def sysStarted() {
+    println Utils.rootFile("log")
+
     TestService ts = app.bean(TestService)
     // ts.testObjBuilder()
     // ts.testVChain()

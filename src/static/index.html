@@ -2,14 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+<!--    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">-->
     <title>GY</title>
     <!--<link rel="stylesheet" href="css/bootstrap.min.4.3.1.css" type="text/css">-->
-    <link rel="stylesheet" href="css/iview.4.0.0.css" type="text/css">
-    <script src="js/jquery-3.4.1.js"></script>
-    <script src="js/vue.js"></script>
-    <script src="js/httpVueLoader.js"></script>
-    <script src="js/iview.min.4.0.0.js"></script>
-    <script src='js/moment.min.js' async></script>
+    <link rel="stylesheet" href="static/css/lib/iview.4.0.0.css" type="text/css">
+    <script src="static/js/lib/jquery-3.4.1.js"></script>
+    <script src="static/js/lib/vue.js"></script>
+    <script src="static/js/lib/httpVueLoader.js"></script>
+    <script src="static/js/lib/iview.min.4.0.0.js"></script>
+    <script src='static/js/lib/moment.min.js' async></script>
     <script src="js/components.js"></script>
     <style>
         html,body,#app,.flex-row{
@@ -105,13 +106,14 @@
     <!--</div>-->
 </div>
 <script>
-    var app = new Vue({
+    let app = new Vue({
         el: '#app',
         data: {
             ws: null, msg: '', addResult: null,
             optId:'', loading: false, list: [], keyword: '',
             showAddForm: false, addForm: {},
-            files: []
+            files: [],
+            picUrl: 'http://125.67.237.26:9672/staticResource/freeTrade/recognizeRecord/20200320220709ocrc7ff8db843054ca0/3/2020031010006.jpg'
         },
         components: {
             // upload: httpVueLoader('coms/Upload.vue')()
@@ -128,7 +130,7 @@
         },
         methods: {
             addComponent: function() {
-                var _this = this
+                let _this = this
                 $.ajax({
                     url:'addComponent',
                     type: 'post',
@@ -143,7 +145,7 @@
                 })
             },
             search: function(keyword) {
-                var _this = this
+                let _this = this
                 // 选择某个选项时
                 if (keyword != '' && keyword == _this.optId) {
 
@@ -163,8 +165,8 @@
                 })
             },
             addFile: function () {
-                var _this = this;
-                var fd = new FormData($('#form1')[0])
+                let _this = this;
+                let fd = new FormData($('#form1')[0])
                 $.ajax({
                     url: 'upload',
                     type: 'post',
@@ -177,26 +179,16 @@
                     }
                 })
             },
-            initWs: function () {
-                var _this = this;
-                this.ws = new WebSocket("ws://localhost:8080/ws");
-                this.ws.onmessage= function (msg) {
-                    _this.msg = msg.data;
-                };
-                setInterval(function () {
-                    _this.ws.send('xxxxxxx' + new Date());
-                }, 7000);
-            },
             downXlsx: function() {
-                var xhr = new XMLHttpRequest();
+                let xhr = new XMLHttpRequest();
                 xhr.open('post', 'test/downXlsx', true);
                 xhr.responseType = 'blob';
                 xhr.setRequestHeader('Content-Type', 'application/json;charset=utf-8');
                 xhr.onload = function () {
                     if (this.status == 200) {
-                        var blob = this.response;
-                        var a = document.createElement('a');
-                        var url = window.URL.createObjectURL(blob);
+                        let blob = this.response;
+                        let a = document.createElement('a');
+                        let url = window.URL.createObjectURL(blob);
                         a.href = url;
                         //设置文件名称
                         a.download = '用户信息.xls';
@@ -210,8 +202,57 @@
                 }));
             }
         },
-
     });
+
+
+    // web socket
+    let ws = null;
+    function createWs() {
+        if (ws && (ws.readyState == 1 || ws.readyState == 2)) {
+            console.log('Websocket连接可用不用重创建. state: ' + ws.readyState);
+            return;
+        }
+        console.log('create websocket ...');
+        try {
+            let protocol = "ws://";
+            if (window.location.protocol.startsWith("https")) protocol = "wss://";
+            ws = new WebSocket(protocol + window.location.host + "/test/ws");
+        } catch (e) {
+            console.log('创建websocket错误');
+            setTimeout(function () {
+                createWs()
+            }, (1000 * 60 * 2)); // 每两分钟重试
+            return
+        }
+        ws.onclose = function () {
+            setTimeout(function () {
+                createWs()
+            }, (1000 * 60 * 1)); // 每两分钟重试
+        };
+        ws.onmessage = function (e) {
+            let jo = toJSON(e.data);
+            if (jo) {
+                // 消息类型
+            } else {
+                app.$Notice.info({title: '后台提示', desc: e.data, duration: 7})
+            }
+        };
+        ws.onopen = function() {
+            console.log('websocket onopen');
+            ws.send('成功连接...')
+        };
+    }
+    createWs();
+
+    function toJSON(str) {
+        if (typeof str == 'string') {
+            try {
+                let obj = JSON.parse(str);
+                return obj
+            } catch(e) {}
+        }
+        return null
+    }
 </script>
 </body>
 </html>

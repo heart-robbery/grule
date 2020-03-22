@@ -1,15 +1,15 @@
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.encoder.PatternLayoutEncoder
 import ch.qos.logback.core.util.FileSize
+import core.Utils
 
 import java.nio.charset.Charset
 
 // 日志文件名
 def logFileName = System.getProperty('log.file.name', 'sys')
 
-// 日志文件路径. 配了路径才会输出到文件
-def logPath = System.getProperty('log.path', '')
-// logPath = '../log'
+// 日志文件路径. 配了路径才会输出到文件. 默认输出到项目根目录下的log目录
+def logPath = System.getProperty('log.path', Utils.rootFile("log").canonicalPath)
 
 
 // 去掉最后的 /

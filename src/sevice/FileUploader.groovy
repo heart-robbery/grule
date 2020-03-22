@@ -1,6 +1,7 @@
 package sevice
 
 import cn.xnatural.enet.event.EL
+import core.Utils
 import core.module.OkHttpSrv
 import core.module.ServerTpl
 import ctrl.common.FileData
@@ -12,7 +13,7 @@ class FileUploader extends ServerTpl {
     /**
      * 文件上传的 本地保存目录
      */
-    @Lazy String localDir        = new URL('file:' + (getStr("localDir", '../upload'))).getFile()
+    @Lazy String localDir        = new URL('file:' + (getStr("localDir", Utils.rootFile('upload').canonicalPath))).getFile()
     /**
      * 文件上传 的访问url前缀
      */
@@ -60,9 +61,7 @@ class FileUploader extends ServerTpl {
      * @param fileName
      * @return
      */
-    File findFile(String fileName) {
-        new File(localDir + File.separator + fileName)
-    }
+    File findFile(String fileName) { new File(localDir + File.separator + fileName) }
 
 
     @EL(name = 'deleteFile')

@@ -42,6 +42,18 @@ class Utils {
 
 
     /**
+     * 项目根目录下边找目录或文件
+     * @param child 项目根目录下的子目录/文件
+     * @return
+     */
+    static File rootFile(String child = null) {
+        def p = new File(System.getProperty('user.dir')).parentFile
+        if (child) {return new File(p, child)}
+        return p
+    }
+
+
+    /**
      * 查找方法
      * @param clz
      * @param mName

@@ -26,7 +26,7 @@ class MainCtrl extends CtrlTpl {
     def file(Chain chain) {
         def fu = bean(FileUploader.class)
         chain.get('file/:fName') {ctx ->
-            ctx.response.cookie('Cache-Control', "max-age=60")
+            ctx.response.cookie('Cache-Control', "max-age=120")
             ctx.render fu.findFile(ctx.pathTokens.fName).toPath()
         }
     }
@@ -47,6 +47,10 @@ class MainCtrl extends CtrlTpl {
             // ctx.response.cookie('Cache-Control', "max-age=60")
             ctx.render ctx.file("static/js/$ctx.pathTokens.fName")
         }
+        chain.get("js/lib/:fName") { ctx ->
+            ctx.response.cookie('Cache-Control', "max-age=120")
+            ctx.render ctx.file("static/js/lib/$ctx.pathTokens.fName")
+        }
     }
 
 
@@ -62,12 +66,16 @@ class MainCtrl extends CtrlTpl {
     // css 文件
     def css(Chain chain) {
         chain.get("css/:fName") {ctx ->
-            ctx.response.cookie('Cache-Control', "max-age=60")
+            // ctx.response.cookie('Cache-Control', "max-age=60")
             ctx.render ctx.file("static/css/$ctx.pathTokens.fName")
         }
         chain.get("css/fonts/:fName") {ctx ->
             ctx.response.cookie('Cache-Control', "max-age=120")
             ctx.render ctx.file("static/css/fonts/$ctx.pathTokens.fName")
+        }
+        chain.get("css/lib/:fName") {ctx ->
+            ctx.response.cookie('Cache-Control', "max-age=120")
+            ctx.render ctx.file("static/css/lib/$ctx.pathTokens.fName")
         }
     }
 
@@ -75,7 +83,7 @@ class MainCtrl extends CtrlTpl {
     // 登录
     def login(Chain chain) {
         chain.post('login') {ctx ->
-            ctx?.sData?.uId = 'xxxxxxxx'
+            ctx?['sData']?['uId'] = 'uid_1'
         }
     }
 
@@ -87,7 +95,7 @@ class MainCtrl extends CtrlTpl {
             if (kw) {
                 def ret = ep.fire('cache.get', 'componentSearch', kw)
                 if (ret == null) {
-                    ret = repo.findPage(Component, 0, 10, {root, query, cb ->
+                    ret = repo.findPage(Component, 1, 10, {root, query, cb ->
                         cb.and(
                                 cb.notEqual(root.get('enabled'), false),
                                 cb.or(
@@ -109,7 +117,7 @@ class MainCtrl extends CtrlTpl {
             } else {
                 def ret = ep.fire('cache.get', 'componentSearch', '')
                 if (ret == null) {
-                    ret = repo.findPage(Component, 0, 10, {root, query, cb ->
+                    ret = repo.findPage(Component, 1, 10, {root, query, cb ->
                         cb.desc(root.get('id'))
                         cb.notEqual(root.get('enabled'), false)
                     }).list.stream().flatMap{e ->

@@ -2,8 +2,8 @@ package ctrl
 
 import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSONObject
-import core.module.jpa.BaseRepo
 import core.Page
+import core.module.jpa.BaseRepo
 import ctrl.common.FileData
 import dao.entity.UploadFile
 import io.netty.handler.codec.http.HttpResponseStatus
@@ -11,17 +11,12 @@ import ratpack.exec.Promise
 import ratpack.form.Form
 import ratpack.handling.Chain
 import ratpack.handling.RequestId
-import ratpack.websocket.WebSocket
-import ratpack.websocket.WebSocketClose
-import ratpack.websocket.WebSocketHandler
-import ratpack.websocket.WebSocketMessage
-import ratpack.websocket.WebSockets
+import ratpack.websocket.*
 import sevice.FileUploader
 import sevice.TestService
 
 import java.text.SimpleDateFormat
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executor
 import java.util.stream.Collectors
 
 import static ctrl.common.ApiResp.ok
@@ -107,7 +102,7 @@ class TestCtrl extends CtrlTpl {
             })
         }
         ep.fire('sched.cron', '0/30 * * * * ?', {
-            wsMsg(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date()))
+            wsMsg(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()))
         })
     }
 
