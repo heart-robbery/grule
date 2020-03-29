@@ -14,9 +14,16 @@ ratpackweb, sched(quartz), cache(ehcache),
 redis, jpa(hibernate), OkHttpClient, remoter(多应用tcp通信)
 
 
+####配置:
+    conf/app.conf
+    每个配置文件默认属性都有 baseDir(当前项目目录)
+####Remoter
+    TCPClient: tcp客户端 send(id, port, data)
+    TCPServer: tcp服务端 
+
 #### 安装教程
 
-只需要 jdk8+
+jdk8+, gradle5+
 
 #### 使用说明
 

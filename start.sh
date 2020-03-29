@@ -13,4 +13,4 @@ echo start...
 cd src
 sh ../bin/groovy $@ main.groovy
 
-# nohup sh start.sh -Dlog.path="`pwd`/log" > /dev/null 2>&1 &
+# nohup sh start.sh [-Dprofile=pro] > /dev/null 2>&1 &

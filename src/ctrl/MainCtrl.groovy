@@ -22,6 +22,11 @@ class MainCtrl extends CtrlTpl {
     }
 
 
+    def testHtml(Chain chain) {
+        chain.get('test.html') { ctx -> ctx.render ctx.file('static/test.html') }
+    }
+
+
     // 获取上传的文件
     def file(Chain chain) {
         def fu = bean(FileUploader.class)

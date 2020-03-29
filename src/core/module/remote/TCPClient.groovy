@@ -91,7 +91,7 @@ class TCPClient extends ServerTpl {
      */
     def send(String host, Integer port, String data, Consumer<Throwable> failFn = null) {
         log.debug("Send data to '{}:{}'. data: " + data, host, port)
-        hpNodes.computeIfAbsent("$host:$port", {s ->
+        hpNodes.computeIfAbsent("$host:$port", { ->
             def n = new Node(tcpHp: s)
             log.info("New Node added. tcpHp: {}", n.tcpHp)
             n

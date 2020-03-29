@@ -46,7 +46,7 @@ class Utils {
      * @param child 项目根目录下的子目录/文件
      * @return
      */
-    static File rootFile(String child = null) {
+    static File baseDir(String child = null) {
         def p = new File(System.getProperty('user.dir')).parentFile
         if (child) {return new File(p, child)}
         return p

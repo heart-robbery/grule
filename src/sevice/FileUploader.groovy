@@ -13,7 +13,7 @@ class FileUploader extends ServerTpl {
     /**
      * 文件上传的 本地保存目录
      */
-    @Lazy String localDir        = new URL('file:' + (getStr("localDir", Utils.rootFile('upload').canonicalPath))).getFile()
+    @Lazy String localDir        = new URL('file:' + (getStr("localDir", Utils.baseDir('upload').canonicalPath))).getFile()
     /**
      * 文件上传 的访问url前缀
      */

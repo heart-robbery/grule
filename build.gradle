@@ -28,12 +28,11 @@ targetCompatibility = 1.8
 
 dependencies {
     compile fileTree(dir: 'sysLib', include: ['*.jar'])
-    compile 'org.codehaus.groovy:groovy:3.0.1'
+    compile 'org.codehaus.groovy:groovy:3.0.2'
     // compile ('org.codehaus.groovy:groovy-sql:2.5.6')
 
     compile 'com.alibaba:fastjson:1.2.61'
     compile 'ch.qos.logback:logback-classic:1.2.3'
-    // compile 'com.google.guava:guava:28.2-jre'
     compile ('cn.xnatural.enet:enet-event:0.0.10')
     compile 'org.hibernate:hibernate-core:5.4.7.Final'
     // 连接池
@@ -43,9 +42,7 @@ dependencies {
     compile 'com.h2database:h2:1.4.199'
     compile 'io.netty:netty-all:4.1.41.Final'
     compile 'com.squareup.okhttp3:okhttp:3.14.2'
-    compile ('org.ehcache:ehcache:3.6.3') {
-        exclude group:'org.slf4j'
-    }
+    compile ('org.ehcache:ehcache:3.6.3') {exclude group:'org.slf4j'}
     compile ('org.quartz-scheduler:quartz:2.3.0') {
         exclude group:'org.slf4j'
         exclude group:'com.mchange'

@@ -9,7 +9,7 @@ import java.nio.charset.Charset
 def logFileName = System.getProperty('log.file.name', 'sys')
 
 // 日志文件路径. 配了路径才会输出到文件. 默认输出到项目根目录下的log目录
-def logPath = System.getProperty('log.path', Utils.rootFile("log").canonicalPath)
+def logPath = System.getProperty('log.path', Utils.baseDir("log").canonicalPath)
 
 
 // 去掉最后的 /

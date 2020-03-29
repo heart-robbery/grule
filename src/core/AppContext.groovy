@@ -12,6 +12,7 @@ import java.lang.management.ManagementFactory
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
 
+import static core.Utils.baseDir
 import static core.Utils.iterateField
 import static core.Utils.pid
 import static java.util.Collections.emptyList
@@ -57,7 +58,10 @@ class AppContext {
     }, 'stop')
 
 
-    // 初始化环境属性
+    /**
+     * 初始化环境属性
+     * @return
+     */
     protected ConfigObject initEnv() {
         // 加载配置文件
         def cs = new ConfigSlurper()
@@ -65,19 +69,22 @@ class AppContext {
         try {
             def ps = System.properties
 
+            // 共用初始化属性
+            def baseCgfStr = "baseDir='${baseDir().canonicalPath.replaceAll('\\\\', '/')}'" + System.lineSeparator()
+
             // 首先加载 app.conf
-            def f = new File("../conf/app.conf")
+            def f = baseDir('conf/app.conf')
             if (f.exists()) {
                 def s = f.getText('utf-8')
-                if (s) config.merge(cs.parse(s))
+                if (s) config.merge(cs.parse(baseCgfStr + s))
             }
 
             def profile = ps.containsKey('profile') ? ps.getProperty('profile') : config.getProperty('profile')
             if (profile) {
-                f = new File("../conf/app-${profile}.conf")
+                f = baseDir("conf/app-${profile}.conf")
                 if (f.exists()) {
                     def s = f.getText('utf-8')
-                    if (s) config.merge(cs.parse(s))
+                    if (s) config.merge(cs.parse(baseCgfStr + s))
                 }
             }
 
