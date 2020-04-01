@@ -19,9 +19,9 @@ class ApiResp<T> implements Serializable {
      */
     String desc
     /**
-     * 流水号(唯一请求id)
+     * 返回处理流水号
      */
-    String seqNo
+    String traceNo
     /**
      * 调用方的入参(原样返回)
      */

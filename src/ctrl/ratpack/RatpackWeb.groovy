@@ -119,16 +119,16 @@ class RatpackWeb extends ServerTpl {
                 @Override
                 void render(Context ctx, ApiResp resp) throws Exception {
                     ctx.response.contentType('application/json')
-                    resp.seqNo = ctx.get(RequestId.TYPE).toString()
+                    resp.traceNo = ctx.get(RequestId.TYPE).toString()
                     resp.cus = ctx.request.queryParams.cus // 原样返回的参数
                     def jsonStr = JSON.toJSONString(resp, SerializerFeature.WriteMapNullValue)
 
                     // 接口超时监控
                     def spend = ctx.get(Clock).instant().minusMillis(ctx.request.timestamp.toEpochMilli()).toEpochMilli()
                     if (spend > getLong("warnRequestTime", 5000)) {
-                        log.warn("End Request '" + resp.seqNo + "', path: " + ctx.request.uri + " , spend: " + spend + "ms, response: " + jsonStr)
+                        log.warn("End Request '" + resp.traceNo + "', path: " + ctx.request.uri + " , spend: " + spend + "ms, response: " + jsonStr)
                     } else {
-                        log.debug("End Request '" + resp.seqNo + "', path: " + ctx.request.uri + " , spend: " + spend + "ms, response: " + jsonStr)
+                        log.debug("End Request '" + resp.traceNo + "', path: " + ctx.request.uri + " , spend: " + spend + "ms, response: " + jsonStr)
                     }
 
                     ctx.response.send(jsonStr) // 返回给客户端
