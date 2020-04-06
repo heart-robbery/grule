@@ -6,14 +6,13 @@ import core.Utils
 import java.nio.charset.Charset
 
 // 日志文件名
-def logFileName = System.getProperty('log.file.name', 'sys')
+def logFileName = System.getProperty('log.file.name', 'app')
 
 // 日志文件路径. 配了路径才会输出到文件. 默认输出到项目根目录下的log目录
-def logPath = System.getProperty('log.path', Utils.baseDir("log").canonicalPath)
-
+def logPath = System.properties.containsKey('log.path') ? System.getProperty('log.path') : Utils.baseDir("log").canonicalPath
 
 // 去掉最后的 /
-if (logPath.endsWith('/')) logPath = logPath.substring(0, logPath.length() - 1)
+if ('/' != logPath && logPath.endsWith('/')) logPath = logPath.substring(0, logPath.length() - 1)
 
 // 默认只输出:标准输出,文件
 def appenders = System.getProperty('log.appenders', 'console,file')
@@ -40,9 +39,11 @@ if (logPath) { // 有日志输出目录配置
                 delegate.pattern = "%d{yyyy-MM-dd HH:mm:ss.SSS} [%-7thread] [%-5level] [%-40.40C :%-3L] => %m%n"
                 delegate.charset = Charset.forName("utf8")
             }
-            file = "$logPath/${logFileName}.log"
+            if ("/" == logPath) file = "/${logFileName}.log"
+            else file = "$logPath/${logFileName}.log"
             rollingPolicy(SizeAndTimeBasedRollingPolicy) {
-                delegate.fileNamePattern = "${logPath}/${logFileName}.%d{yyyy-MM-dd}.%i.log"
+                if ("/" == logPath) delegate.fileNamePattern = "/${logFileName}.%d{yyyy-MM-dd}.%i.log"
+                else delegate.fileNamePattern = "${logPath}/${logFileName}.%d{yyyy-MM-dd}.%i.log"
                 delegate.maxFileSize = FileSize.valueOf('50MB')
                 delegate.maxHistory = 500
                 delegate.totalSizeCap = FileSize.valueOf('50GB')
