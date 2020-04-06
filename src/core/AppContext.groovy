@@ -66,29 +66,31 @@ class AppContext {
         // 加载配置文件
         def cs = new ConfigSlurper()
         ConfigObject config = new ConfigObject()
+        // 共用初始化属性
+        config.put("baseDir", baseDir().canonicalPath.replaceAll('\\\\', '/'))
+        cs.setBinding(config) // 共享配置属性(按顺序:后加载的属性,可以使用之前加载的属性)
         try {
             def ps = System.properties
+            config.merge(cs.parse(ps)) // 方便 app.conf, app-[profile].conf 配置文件中使用系统属性
 
-            // 共用初始化属性
-            def baseCgfStr = "baseDir='${baseDir().canonicalPath.replaceAll('\\\\', '/')}'" + System.lineSeparator()
-
-            // 首先加载 app.conf
+            // 首先加载 app.conf 配置文件
             def f = baseDir('conf/app.conf')
-            if (f.exists()) {
+            if (f && f.exists()) {
                 def s = f.getText('utf-8')
-                if (s) config.merge(cs.parse(baseCgfStr + s))
+                if (s) config.merge(cs.parse(s))
             }
 
+            // 加载 app-profile.conf 配置文件
             def profile = ps.containsKey('profile') ? ps.getProperty('profile') : config.getProperty('profile')
             if (profile) {
                 f = baseDir("conf/app-${profile}.conf")
-                if (f.exists()) {
+                if (f && f.exists()) {
                     def s = f.getText('utf-8')
-                    if (s) config.merge(cs.parse(baseCgfStr + s))
+                    if (s) config.merge(cs.parse(s))
                 }
             }
 
-            config.merge(cs.parse(ps))
+            config.merge(cs.parse(ps)) // 系统属性优先级最高,所以最后覆盖一次
         } catch (ClassNotFoundException ex) {
             log.error("$ex.class.simpleName:$ex.message".toString())
         }
@@ -148,7 +150,7 @@ class AppContext {
      * @param o
      */
     @EL(name = "inject", async = false)
-    protected inject(Object o) {
+    def inject(Object o) {
         iterateField(o.getClass(), {f ->
             Resource aR = f.getAnnotation(Resource.class)
             if (aR) {
@@ -164,47 +166,46 @@ class AppContext {
                     if (v == null) return
                     f.set(o, v)
                     log.trace("Inject @Resource field '{}' for object '{}'", f.name, o)
-                } catch (Exception e) { log.error("Inject @Resource field '" + f.name + "' Error!", e) }
+                } catch (ex) { log.error("Inject @Resource field '" + f.name + "' Error!", ex) }
             }
         })
     }
 
 
     /**
-     * 全局查找Bean
-     * @param type
-     * @param name
-     * @param <T>
+     * 全局查找 bean 对象
+     * @param type 对象类型
+     * @param name 对象名字
      * @return
      */
     def <T> T bean(Class<T> type, String name = null) { (T) ep.fire("bean.get", type, name) }
 
 
     /**
-     * 查找对象
+     * {@link #sourceMap}中查找对象
      * @param ec
-     * @param beanType bean的类型
-     * @param beanName bean 名字
+     * @param bType bean 对象类型
+     * @param bName bean 对象名字
      * @return bean 对象
      */
     @EL(name = ['bean.get', 'sys.bean.get'], async = false, order = -1f)
-    protected findLocalBean(EC ec, Class beanType, String beanName) {
+    protected localBean(EC ec, Class bType, String bName) {
         if (ec.result != null) return ec.result // 已经找到结果了, 就直接返回
 
         Object bean
-        if (beanName && beanType) {
-            bean = sourceMap.get(beanName)
-            if (!bean && !beanType.isAssignableFrom(bean.getClass())) bean = null
-        } else if (beanName && !beanType) {
-            bean = sourceMap.get(beanName)
-        } else if (!beanName && beanType) {
-            if (Executor.isAssignableFrom(beanType) || ExecutorService.isAssignableFrom(beanType)) bean = wrapExecForSource(ec.source())
-            else if (AppContext.isAssignableFrom(beanType)) bean = this
-            else if (ConfigObject.isAssignableFrom(beanType)) bean = env
-            else if (EP.isAssignableFrom(beanType)) bean = wrapEpForSource(ec.source())
+        if (bName && bType) {
+            bean = sourceMap.get(bName)
+            if (!bean && !bType.isAssignableFrom(bean.getClass())) bean = null
+        } else if (bName && !bType) {
+            bean = sourceMap.get(bName)
+        } else if (!bName && bType) {
+            if (Executor.isAssignableFrom(bType) || ExecutorService.isAssignableFrom(bType)) bean = wrapExecForSource(ec.source())
+            else if (AppContext.isAssignableFrom(bType)) bean = this
+            else if (ConfigObject.isAssignableFrom(bType)) bean = env
+            else if (EP.isAssignableFrom(bType)) bean = wrapEpForSource(ec.source())
             else {
                 for (Map.Entry<String, Object> entry : sourceMap.entrySet()) {
-                    if (beanType.isAssignableFrom(entry.getValue().getClass())) {
+                    if (bType.isAssignableFrom(entry.getValue().getClass())) {
                         bean = entry.getValue(); break
                     }
                 }
