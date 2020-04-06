@@ -222,7 +222,7 @@ class Remoter extends ServerTpl {
                 String mName = master ? (tcpClient.apps.containsKey(master) ? master : null) : null
                 if (!masterHps && !mName) return
                 if (!app.name || !app.id) {
-                    log.warn("Current App name or id is empty")
+                    log.error("Current App name or id is empty")
                     return
                 }
                 def info = selfInfo

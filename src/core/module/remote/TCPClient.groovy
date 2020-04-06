@@ -63,7 +63,7 @@ class TCPClient extends ServerTpl {
     /**
      * 更新 app 信息
      * @param data app node信息
-     *  例: {"name":"rc", "id":"rc_b70d18d52269451291ea6380325e2a84", "tcp":"192.168.56.1:8001","http":"localhost:8000"}
+         *  例: {"name":"rc", "id":"rc_b70d18d52269451291ea6380325e2a84", "tcp":"192.168.56.1:8001","http":"localhost:8000"}
      *  属性不为空: name, id, tcp
      */
     @EL(name = "updateAppInfo")
@@ -197,7 +197,7 @@ class TCPClient extends ServerTpl {
      * @param ctx
      * @param dataStr
      */
-    protected receiveReply(ChannelHandlerContext ctx, String dataStr) {
+    protected receiveReply(ChannelHandlerContext ctx, final String dataStr) {
         log.trace("Receive reply from '{}': {}", ctx.channel().remoteAddress(), dataStr)
         def jo = JSON.parseObject(dataStr)
         if ("updateAppInfo" == jo['type']) {
@@ -241,9 +241,7 @@ class TCPClient extends ServerTpl {
      * @return
      */
     @EL(name = "resolveHttp", async = false)
-    String resolveHttp(String appName) {
-        return ((Node) apps.get(appName).nodes.find()?.value)?.httpHp
-    }
+    String resolveHttp(String appName) { ((Node) apps.get(appName).nodes.find()?.value)?.httpHp }
 
 
     /**
@@ -272,6 +270,31 @@ class TCPClient extends ServerTpl {
                 n = new Node(group: this, id: id, tcpHp: tcpHp, httpHp: httpHp)
                 nodes.put(id, n)
                 log.info("New Node added. Node: '{}'", n)
+                tryClear()
+            }
+        }
+
+        /**
+         * 清理出废掉的节点
+         */
+        protected tryClear() {
+            if (nodes.size() <= 1) return
+            Map<String, String> tcp2Id = new HashMap<>(nodes.size())
+            for (def it = nodes.iterator(); it.hasNext(); ) {
+                def e = it.next()
+                if (tcp2Id.containsKey(e.value.tcpHp)) { // 存在相同的tcpHp
+
+                }
+            }
+
+            try {
+                tcpPool.rwLock.writeLock().lock()
+                group.nodes.remove(id)
+                tcpPool.chs.each {
+                    try {it.close()} catch (ex) {}
+                }
+            } finally {
+                tcpPool.rwLock.writeLock().unlock()
             }
         }
 

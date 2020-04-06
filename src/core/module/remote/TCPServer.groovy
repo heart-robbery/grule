@@ -236,37 +236,49 @@ class TCPServer extends ServerTpl {
         apps << data
         if (isNew && data['id'] != app.id) log.info("New app '{}' online. {}", data["name"], data)
 
-        //2. 遍历所有的数据,删除不必要的数据
-        for (Iterator<Map.Entry<String, List<Map<String, Object>>>> it = appInfoMap.entrySet().iterator(); it.hasNext(); ) {
-            Map.Entry<String, List<Map<String, Object>>> e = it.next()
+        if (data['id'] != app.id) ep.fire("updateAppInfo", data) // 同步信息给本服务器的tcp-client
+
+        //2. 遍历所有的数据,删除不必要的数据, 同步注册信息
+        for (def it = appInfoMap.entrySet().iterator(); it.hasNext(); ) {
+            def e = it.next()
             if (!e.value) {it.remove(); continue} // 删除没有对应的服务信息的应用
             for (Iterator<Map<String, Object>> it2 = e.value.iterator(); it2.hasNext(); ) {
-                Map<String, Object> cur = it2.next()
+                def cur = it2.next()
                 if (!cur) {it2.remove(); continue} // 删除空的坏数据
                 // 删除一段时间未活动的注册信息, dropAppTimeout 单位: 分钟
                 if ((System.currentTimeMillis() - (Long) cur.getOrDefault("_time", System.currentTimeMillis()) > getInteger("dropAppTimeout", 10) * 60 * 1000) && (cur["id"] != app.id)) {
                     it2.remove()
                     log.warn("Drop timeout app register info: {}", cur)
+                    continue
                 }
-            }
-        }
-
-        //3. 同步注册信息
-        if (data['id'] != app.id) ep.fire("updateAppInfo", data) // 同步信息给本服务器的tcp-client
-        appInfoMap.each {e ->
-            e.value.each {d ->
                 // 返回所有的注册信息给当前来注册的客户端
-                if (d["id"] != data["id"]) {
+                if (cur["id"] != data["id"]) {
                     ctx?.writeAndFlush(Unpooled.copiedBuffer(
-                            (new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", d).toString() + (delimiter?:'')).getBytes('utf-8')
+                            (new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", cur).toString() + (delimiter?:'')).getBytes('utf-8')
                     ))
                 }
                 // 如果是新系统上线, 则主动通知其它系统
-                if (isNew && d['id'] != data['id'] && d['id'] != app.id) {
+                if (isNew && cur['id'] != data['id'] && cur['id'] != app.id) {
                     ep.fire("remote", EC.of(this).attr('toAll', true).args(e.key, "updateAppInfo", new Object[]{data}))
                 }
             }
         }
+
+//        //3. 同步注册信息
+//        appInfoMap.each {e ->
+//            e.value.each {cur ->
+//                // 返回所有的注册信息给当前来注册的客户端
+//                if (cur["id"] != data["id"]) {
+//                    ctx?.writeAndFlush(Unpooled.copiedBuffer(
+//                            (new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", cur).toString() + (delimiter?:'')).getBytes('utf-8')
+//                    ))
+//                }
+//                // 如果是新系统上线, 则主动通知其它系统
+//                if (isNew && cur['id'] != data['id'] && cur['id'] != app.id) {
+//                    ep.fire("remote", EC.of(this).attr('toAll', true).args(e.key, "updateAppInfo", new Object[]{data}))
+//                }
+//            }
+//        }
     }
 
 

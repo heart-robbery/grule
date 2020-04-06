@@ -9,6 +9,9 @@ import ctrl.common.FileData
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
+/**
+ * 文件上传
+ */
 class FileUploader extends ServerTpl {
     /**
      * 文件上传的 本地保存目录
