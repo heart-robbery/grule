@@ -54,6 +54,27 @@ class Utils {
 
 
     /**
+     * 本机ipv4地址
+     * @return
+     */
+    static String ipv4() {
+        for (def en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
+            NetworkInterface current = en.nextElement()
+            if (!current.isUp() || current.isLoopback() || current.isVirtual()) continue
+            Enumeration<InetAddress> addresses = current.getInetAddresses()
+            while (addresses.hasMoreElements()) {
+                InetAddress addr = addresses.nextElement()
+                if (addr.isLoopbackAddress()) continue
+                if (addr instanceof Inet4Address) {
+                    return addr.getHostAddress()
+                }
+            }
+        }
+        null
+    }
+
+
+    /**
      * 查找方法
      * @param clz
      * @param mName
