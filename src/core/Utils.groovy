@@ -20,9 +20,9 @@ import java.util.function.Consumer
 import java.util.function.Function
 
 class Utils {
-    static Logger log = LoggerFactory.getLogger(Utils)
+    static final Logger log = LoggerFactory.getLogger(Utils)
+    static final GroovyClassLoader gcl = new GroovyClassLoader()
 
-    static final GroovyClassLoader  gcl = new GroovyClassLoader()
 
     /**
      * 得到jvm进程号

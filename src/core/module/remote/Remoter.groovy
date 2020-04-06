@@ -15,15 +15,18 @@ import java.util.function.Consumer
 import java.util.stream.Collectors
 import java.util.stream.Stream
 
+import static core.Utils.getLog
+import static core.Utils.ipv4
+
 class Remoter extends ServerTpl {
     @Lazy def         sched = bean(SchedSrv)
     /**
      * ecId -> EC
      */
-    protected final Map<String, EC> ecMap     = new ConcurrentHashMap<>()
+    @Lazy Map<String, EC> ecMap     = new ConcurrentHashMap<>()
     protected       TCPClient       tcpClient
     protected       TCPServer       tcpServer
-    // 集群的服务中心地址 host:port,host1:port2
+    // 集群的服务中心地址 [host]:port,[host1]:port2
     @Lazy String          masterHps = getStr('masterHps', null)
     // 集群的服务中心应用名
     @Lazy String          master    = getStr('master', null)
@@ -63,7 +66,7 @@ class Remoter extends ServerTpl {
 
         tcpClient.handlers.add({jo ->
             if ("event"== jo['type']) {
-                async{receiveEventResp(jo.getJSONObject("data"))}
+                async {receiveEventResp(jo.getJSONObject("data"))}
             }
         } as Consumer)
         ep.fire("${name}.started")
@@ -72,14 +75,14 @@ class Remoter extends ServerTpl {
 
     @EL(name = "sys.stopping", async = false)
     def stop() {
-        findLocalBean(null, TCPClient, null)?.stop()
-        findLocalBean(null, TCPServer, null)?.stop()
+        localBean(TCPClient)?.stop()
+        localBean(TCPServer)?.stop()
     }
 
 
     @EL(name = 'sys.started')
     def started() {
-        tcpServer.upDevourer.offer{ tcpServer.appUp(selfInfo, null) }
+        tcpServer.upper.offer{ tcpServer.appUp(selfInfo, null) }
         registerFn.run()
     }
 
@@ -103,8 +106,7 @@ class Remoter extends ServerTpl {
         try {
             if (ec.id() == null) {ec.id(UUID.randomUUID().toString())}
             params.put("eId", ec.id())
-            // 是否需要远程响应执行结果(有完成回调函数就需要远程响应调用结果)
-            boolean reply = (ec.completeFn() != null)
+            boolean reply = (ec.completeFn() != null) // 是否需要远程响应执行结果(有完成回调函数就需要远程响应调用结果)
             params.put("reply", reply)
             params.put("eName", eName)
             if (remoteMethodArgs != null) {
@@ -136,7 +138,7 @@ class Remoter extends ServerTpl {
         } catch (Throwable ex) {
             log.error("Error fire remote event to '" +appName+ "'. params: " + params, ex)
             ecMap.remove(ec.id())
-            ec.ex(ex).resume()
+            ec.ex(ex).resume().tryFinish()
         }
     }
 
@@ -210,10 +212,8 @@ class Remoter extends ServerTpl {
     }
 
 
-    // 注册自己到 服务中心 即 配置的master
+    // 注册自己到 master 即 配置的master
     @Lazy def registerFn = new Runnable() {
-        // 是否需要循环注册
-        boolean needLoop
         @Override
         void run() {
             Throwable ex
@@ -221,6 +221,10 @@ class Remoter extends ServerTpl {
                 // 当tcpClient 中存在相应的 master 时, 则用master 作为服务中心
                 String mName = master ? (tcpClient.apps.containsKey(master) ? master : null) : null
                 if (!masterHps && !mName) return
+                if (!app.name || !app.id) {
+                    log.warn("Current App name or id is empty")
+                    return
+                }
                 def info = selfInfo
                 if (!info) return
 
@@ -230,19 +234,17 @@ class Remoter extends ServerTpl {
                 data.put("source", new JSONObject(2).fluentPut('name', app.name).fluentPut('id', app.id)) // 表明来源
                 data.put("data", info)
 
-                if (mName) { // 应用名
-                    needLoop = true
+                if (mName && tcpClient.apps.get(mName)) { // 应用名
                     tcpClient.send(mName, data.toString())
                 } else {
                     def ls = Stream.of(masterHps.split(",")).map{
-                        def arr = it.split(":")
-                        Tuple.tuple(arr[0].trim(), Integer.valueOf(arr[1].trim()))
+                        def arr = it.split(":") // :8001 or localhost:8001
+                        Tuple.tuple(arr[0].trim()?:'localhost', Integer.valueOf(arr[1].trim()))
                     }.collect(Collectors.toList())
                     if (ls.size() < 1) {
                         log.error("master not config right. {}", masterHps)
                         return
                     }
-                    needLoop = true
 
                     if (ls.size() == 1) {
                         tcpClient.send(ls.get(0).v1, ls.get(0).v2, data.toString())
@@ -255,14 +257,12 @@ class Remoter extends ServerTpl {
                 log.debug("register up success. {}", data)
             } catch(Throwable th) {
                 ex = th
-                log.error("register up error. " + ex.message)
+                log.error("register up error. " + (ex.message?:ex.class.simpleName))
             }
-            if (needLoop) {
-                if (ex) { // 发生错误,则缩短同步间隔时间
-                    sched?.after(Duration.ofSeconds(getInteger('upInterval', 30) + new Random().nextInt(60)), registerFn)
-                } else {
-                    sched?.after(Duration.ofSeconds(getInteger('upInterval', 180) + new Random().nextInt(60)), registerFn)
-                }
+            if (ex) { // 发生错误,则缩短同步间隔时间
+                sched?.after(Duration.ofSeconds(getInteger('upInterval', 30) + new Random().nextInt(60)), registerFn)
+            } else {
+                sched?.after(Duration.ofSeconds(getInteger('upInterval', 120) + new Random().nextInt(60)), registerFn)
             }
         }
     }
@@ -270,39 +270,23 @@ class Remoter extends ServerTpl {
 
     /**
      * 自己的信息
-     * 例: {"id":"rc_b70d18d5-2269-4512-91ea-6380325e2a84", "name":"rc", "tcp":"192.168.56.1:8001", "http":"localhost:8000"}
+     * 例: {"id":"rc_b70d18d52269451291ea6380325e2a84", "name":"rc", "tcp":"192.168.56.1:8001", "http":"localhost:8000"}
      */
     def getSelfInfo() {
         JSONObject data = new JSONObject(4)
-        data.put("id", app.id)
-        data.put("name", app.name)
-        Optional.ofNullable(ep.fire("http.hp")).ifPresent{ data.put("http", it) }
+        if (app.id) data.put("id", app.id)
+        if (app.name) data.put("name", app.name)
+
+        def exposeHttp = getStr('exposeHttp', null) // 配置暴露的http
+        if (exposeHttp) data.put("http", exposeHttp)
+        else Optional.ofNullable(ep.fire("http.hp")).ifPresent{ data.put("http", it) }
 
         def exposeTcp = getStr('exposeTcp', null) // 配置暴露的tcp
         if (exposeTcp) data.put("tcp", exposeTcp)
         else if (tcpServer.hp.split(":")[0]) data.put("tcp", tcpServer.hp)
-        else data.put("tcp", resolveLocalIp() + tcpServer.hp)
+        else data.put("tcp", ipv4() + tcpServer.hp)
 
         if (!data.containsKey('tcp')) return null
         return data
-    }
-
-
-    /**
-     * 解析出本地ip
-     * @return
-     */
-    protected String resolveLocalIp() {
-        for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
-            NetworkInterface current = en.nextElement()
-            if (!current.isUp() || current.isLoopback() || current.isVirtual()) continue
-            Enumeration<InetAddress> addresses = current.getInetAddresses()
-            while (addresses.hasMoreElements()) {
-                InetAddress addr = addresses.nextElement()
-                if (addr.isLoopbackAddress()) continue
-                return addr.getHostAddress()
-            }
-        }
-        ''
     }
 }

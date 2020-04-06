@@ -39,26 +39,26 @@ class ServerTpl {
 
 
     /**
-     * bean 容器. {@link #findLocalBean}
+     * bean 容器. {@link #localBean}
      */
     protected Map<Object, Object> beanCtx
     @EL(name = ["bean.get", '${name}.bean.get'], async = false)
-    protected <T> T findLocalBean(EC ec, Class<T> beanType, String beanName) {
+    protected <T> T localBean(EC ec, Class<T> bType, String bName) {
         //  已经找到结果了, 就直接返回
         if (!beanCtx || ec?.result != null) return ec?.result
 
         Object bean = null
-        if (beanName && beanType) {
-            bean = beanCtx[beanName]
-            if (bean != null && !beanType.isAssignableFrom(bean.getClass())) bean = null
-        } else if (beanName && !beanType) {
-            bean = beanCtx[beanName]
-        } else if (!beanName && beanType) {
-            if (beanType.isAssignableFrom(getClass())) bean = this
+        if (bName && bType) {
+            bean = beanCtx[bName]
+            if (bean != null && !bType.isAssignableFrom(bean.getClass())) bean = null
+        } else if (bName && !bType) {
+            bean = beanCtx[bName]
+        } else if (!bName && bType) {
+            if (bType.isAssignableFrom(getClass())) bean = this
             else {
                 for (def it = beanCtx.entrySet().iterator(); it.hasNext(); ) {
                     def e = it.next()
-                    if (beanType.isAssignableFrom(e.value.getClass())) {
+                    if (bType.isAssignableFrom(e.value.getClass())) {
                         bean = e.value; break
                     }
                 }
@@ -66,6 +66,24 @@ class ServerTpl {
         }
         bean
     }
+
+
+    /**
+     * 本地查找 对象
+     * @param bType 对象类型
+     * @param bName 对象名字
+     * @return
+     */
+    protected <T> T localBean(Class<T> bType, String bName = null) { localBean(null, bType, bName) }
+
+
+    /**
+     * 全局查找 对象
+     * @param type 对象类型
+     * @param name 对象名字
+     * @return
+     */
+    protected <T> T bean(Class<T> type, String name = null) { (T) ep.fire("bean.get", type, name) }
 
 
     /**
@@ -83,18 +101,7 @@ class ServerTpl {
 
 
     /**
-     * 全局查找Bean
-     * @param type
-     * @param name
-     * @param <T>
-     * @return
-     */
-    protected <T> T bean(Class<T> type, String name = null) { (T) ep.fire("bean.get", type, name) }
-
-
-
-    /**
-     * 暴露 bean 给其它模块用. {@link #findLocalBean}
+     * 暴露 bean 给其它模块用. {@link #localBean}
      * @param names bean 名字.
      * @param bean
      */

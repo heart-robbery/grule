@@ -29,6 +29,9 @@ import java.util.function.Consumer
 
 import static core.Utils.linux
 
+/**
+ * TCP client
+ */
 class TCPClient extends ServerTpl {
     @Lazy def remoter = bean(Remoter)
     final     Map<String, Node>          hpNodes   = new ConcurrentHashMap<>()
@@ -57,28 +60,32 @@ class TCPClient extends ServerTpl {
     }
 
 
-    @EL(name = 'sys.started', async = false)
-    def started() {
-        def node = getStr('node', null)
-        if (node) JSON.parseArray(node).each {JSONObject it -> updateAppInfo(it) }
-    }
-
-
     /**
      * 更新 app 信息
      * @param data app node信息
-     *  例: {"name":"rc", "id":"rc_b70d18d5-2269-4512-91ea-6380325e2a84", "tcp":"192.168.56.1:8001","http":"localhost:8000"}
+     *  例: {"name":"rc", "id":"rc_b70d18d52269451291ea6380325e2a84", "tcp":"192.168.56.1:8001","http":"localhost:8000"}
+     *  属性不为空: name, id, tcp
      */
     @EL(name = "updateAppInfo")
     def updateAppInfo(final JSONObject data) {
         log.trace("Update app info: {}", data)
         if (data == null || data.isEmpty()) return
+        if (!data["name"] && !data['id'] && !data['tcp']) throw new IllegalArgumentException("app info 参数错误: " + data)
         if (app.id == data["id"] || remoter.selfInfo?['tcp'] == data['tcp']) return // 不把系统本身的信息放进去
 
-        apps.computeIfAbsent(data["name"], {s -> {
-            log.info("New app group '{}'", s)
-            new AppGroup(name: s)
-        }}).updateNode(data)
+        String n = data['name']
+        def g = apps.get(n)
+        if (g == null) {
+            synchronized (this) {
+                g = apps.get(n)
+                if (g == null) {
+                    log.info("New app group '{}'", n)
+                    g = new AppGroup(name: n)
+                    apps.put(n, g)
+                }
+            }
+        }
+        g.updateNode(data)
     }
 
 
@@ -91,8 +98,8 @@ class TCPClient extends ServerTpl {
      */
     def send(String host, Integer port, String data, Consumer<Throwable> failFn = null) {
         log.debug("Send data to '{}:{}'. data: " + data, host, port)
-        hpNodes.computeIfAbsent("$host:$port", { ->
-            def n = new Node(tcpHp: s)
+        hpNodes.computeIfAbsent("$host:$port", {hp ->
+            def n = new Node(tcpHp: hp)
             log.info("New Node added. tcpHp: {}", n.tcpHp)
             n
         }).send(data, failFn)
@@ -194,7 +201,7 @@ class TCPClient extends ServerTpl {
         log.trace("Receive reply from '{}': {}", ctx.channel().remoteAddress(), dataStr)
         def jo = JSON.parseObject(dataStr)
         if ("updateAppInfo" == jo['type']) {
-            async{
+            async {
                 JSONObject d
                 try { d = jo.getJSONObject("data"); updateAppInfo(d) }
                 catch (Throwable ex) {
@@ -239,29 +246,39 @@ class TCPClient extends ServerTpl {
     }
 
 
-    // 应用组
+    /**
+     * 应用组: 一组name相同的应用实例
+     */
     class AppGroup {
+        // 组名
         String name
-        // 节点 tcpHp -> 节点
+        // 节点id -> 节点
         final Map<String, Node> nodes =  new ConcurrentHashMap<>()
 
-        // 更新/添加应用节点
+        /**
+         * 更新/添加应用节点
+         * @param data 应用节点信息
+         */
         def updateNode(final JSONObject data) {
-            def (tcpHp, httpHp) = [data['tcp'], data['http']]
+            def (String id, String tcpHp, String httpHp) = [data['id'], data['tcp'], data['http']]
             if (!tcpHp) { // tcpHp 不能为空
                 throw new IllegalArgumentException("Node illegal error. $tcpHp, $httpHp")
             }
-            def n = nodes.get(tcpHp)
+            def n = nodes.get(id)
             if (n) { // 更新
-                n.httpHp = httpHp
+                n.tcpHp = tcpHp.trim()
+                n.httpHp = httpHp.trim()
             } else {
-                n = new Node(group: this, httpHp: httpHp, tcpHp: tcpHp)
-                nodes.put(tcpHp, n)
+                n = new Node(group: this, id: id, tcpHp: tcpHp, httpHp: httpHp)
+                nodes.put(id, n)
                 log.info("New Node added. Node: '{}'", n)
             }
         }
 
-        // 随机选择一个节点发送数据
+        /**
+         * 随机选择一个节点发送数据
+         * @param data
+         */
         def sendToAny(final String data) {
             List<Node> ns = new LinkedList<>()
             nodes.each {ns.add(it.value)}
@@ -271,7 +288,11 @@ class TCPClient extends ServerTpl {
             randomStrategy(ns, data)
         }
 
-        // 随机节点策略
+        /**
+         * 随机节点策略
+         * @param ns 节点列表
+         * @param data 要发送的数据
+         */
         def randomStrategy(List<Node> ns, String data) {
             if (ns.size() == 1) ns[0].send(data)
             else {
@@ -290,21 +311,55 @@ class TCPClient extends ServerTpl {
     }
 
 
-    // 实例节点
+    /**
+     * 实例节点
+     */
     protected class Node {
+        // 应用实例所属组
         AppGroup          group
+        // 应用实例id
+        String            id
+        // 应用实例暴露的tcp连接信息: host:port
         String            tcpHp
+        // 应用实例暴露的http连接信息: host:port
         String            httpHp
+        // tcp 连接池
         final ChannelPool tcpPool = new ChannelPool()
 
         def setTcpHp(String hp) {
             if (!hp) throw new IllegalArgumentException("Node tcpHp must not be empty")
-            this.tcpHp = hp
-            def arr = hp.split(":")
-            tcpPool.host = arr[0].trim()
-            tcpPool.port = Integer.valueOf(arr[1].trim())
-            tcpPool.node = this
-            // async{try {tcpPool.create()} catch (Exception ex) {log.error('', ex)}} // 默认创建一个
+            if (tcpHp == null) {
+                try {
+                    this.tcpHp = hp
+                    def arr = hp.split(":")
+                    tcpPool.host = arr[0].trim()
+                    tcpPool.port = Integer.valueOf(arr[1].trim())
+                    tcpPool.node = this
+                } catch (ex) {
+                    throw new RuntimeException("tcp hp: '$hp' 格式信息错误. " + ex.message)
+                }
+                // async {tcpPool.create()} // 默认创建一个
+            }
+            else if (tcpHp != hp) { // 更新tcp连接信息(有可能ip变了)
+                try {
+                    tcpPool.rwLock.writeLock().lock()
+                    tcpPool.chs.each {
+                        try {it.close()} catch (ex) {}
+                    }
+                    tcpPool.chs.clear()
+                    log.info("Node tcp update: ('{}' -> '{}')", this.tcpHp, hp)
+                    this.tcpHp = hp
+                    def arr = hp.split(":")
+                    tcpPool.host = arr[0].trim()
+                    tcpPool.port = Integer.valueOf(arr[1].trim())
+                    tcpPool.node = this
+                } catch (ex) {
+                    throw new RuntimeException("tcp hp: '$hp' 格式信息错误. " + ex.message)
+                } finally {
+                    tcpPool.rwLock.writeLock().unlock()
+                }
+                // async {tcpPool.create()} // 默认创建一个
+            }
         }
 
         // 发送数据
@@ -335,7 +390,7 @@ class TCPClient extends ServerTpl {
 
         @Override
         String toString() {
-            '[' + (group ? "name:$group.name, " : '') + ("tcpHp:$tcpHp, ") + (httpHp ? "httpHp:$httpHp, " : '') + ("poolSize:${tcpPool.chs.size()}") + ']'
+            '[' + (group ? "name:$group.name, " : '') + (id ? "id:$id, " : '') + ("tcpHp:$tcpHp, ") + (httpHp ? "httpHp:$httpHp, " : '') + ("tcpPoolSize:${tcpPool.chs.size()}") + ']'
         }
     }
 
@@ -406,6 +461,12 @@ class TCPClient extends ServerTpl {
             } finally {
                 rwLock.writeLock().unlock()
             }
+        }
+
+        def setPort(Integer port) {
+            if (port == null) throw new IllegalArgumentException("端口号为空")
+            if (port < 0 && port > 65535) throw new IllegalArgumentException("端口号范围错误. port: " + port)
+            this.port = port
         }
     }
 }

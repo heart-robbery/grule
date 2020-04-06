@@ -5,7 +5,6 @@ import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONException
 import com.alibaba.fastjson.JSONObject
-import core.AppContext
 import core.Devourer
 import core.module.ServerTpl
 import groovy.transform.PackageScope
@@ -23,11 +22,9 @@ import io.netty.handler.timeout.IdleStateEvent
 import io.netty.handler.timeout.IdleStateHandler
 import io.netty.util.ReferenceCountUtil
 
-import javax.annotation.Resource
 import java.nio.charset.Charset
 import java.text.SimpleDateFormat
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.LongAdder
 import java.util.function.Consumer
@@ -35,6 +32,9 @@ import java.util.function.Consumer
 import static core.Utils.linux
 import static java.util.concurrent.TimeUnit.SECONDS
 
+/**
+ * TCP server
+ */
 class TCPServer extends ServerTpl {
     @Lazy def remoter = bean(Remoter)
     @Lazy String hp = getStr('hp', '')
@@ -44,7 +44,7 @@ class TCPServer extends ServerTpl {
     protected final AtomicInteger connCount = new AtomicInteger(0)
     // 保存 app info 的属性信息
     protected final Map<String, List<Map<String, Object>>> appInfoMap = new ConcurrentHashMap<>()
-    @Lazy Devourer upDevourer = new Devourer("registerUp", exec)
+    @Lazy Devourer upper = new Devourer("registerUp", exec)
     final List<Consumer<JSONObject>> handlers = new LinkedList<>()
 
 
@@ -64,7 +64,7 @@ class TCPServer extends ServerTpl {
     def stop() {
         log.info("Close '{}'", name)
         boos?.shutdownGracefully()
-        upDevourer?.shutdown()
+        upper?.shutdown()
     }
 
 
@@ -165,11 +165,11 @@ class TCPServer extends ServerTpl {
 
         String t = jo.getString("type")
         if ("event" == t) { // 远程事件请求
-            async{
-                remoter?.receiveEventReq(jo.getJSONObject("data"), {o -> ctx.writeAndFlush(Unpooled.copiedBuffer((o + (delimiter?:'')).getBytes('utf-8')))})
+            async {
+                remoter?.receiveEventReq(jo.getJSONObject("data"), {r -> ctx.writeAndFlush(Unpooled.copiedBuffer((r + (delimiter?:'')).getBytes('utf-8')))})
             }
         } else if ("appUp" == t) { // 应用注册在线通知
-            upDevourer.offer{
+            upper.offer{
                 JSONObject d
                 try { d = jo.getJSONObject("data"); appUp(d, ctx) }
                 catch (Exception ex) {
@@ -179,7 +179,7 @@ class TCPServer extends ServerTpl {
         } else if ("cmd-log" == t) { // telnet 命令行设置日志等级
             // telnet localhost 8001
             // 例: {"type":"cmd-log", "source": "xxx", "data": "core.module.remote: debug"}$_$
-            async{
+            async {
                 String[] arr = jo.getString("data").split(":")
                 // Log.setLevel(arr[0].trim(), arr[1].trim())
                 ctx.writeAndFlush(Unpooled.copiedBuffer("set log level success", Charset.forName("utf-8")))
@@ -268,7 +268,6 @@ class TCPServer extends ServerTpl {
             }
         }
     }
-
 
 
     /**

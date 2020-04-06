@@ -18,17 +18,7 @@ import ratpack.handling.RequestId
 import ratpack.render.RendererSupport
 import ratpack.server.BaseDir
 import ratpack.server.RatpackServer
-import sun.security.x509.AlgorithmId
-import sun.security.x509.CertificateAlgorithmId
-import sun.security.x509.CertificateIssuerName
-import sun.security.x509.CertificateSerialNumber
-import sun.security.x509.CertificateSubjectName
-import sun.security.x509.CertificateValidity
-import sun.security.x509.CertificateVersion
-import sun.security.x509.CertificateX509Key
-import sun.security.x509.X500Name
-import sun.security.x509.X509CertImpl
-import sun.security.x509.X509CertInfo
+import sun.security.x509.*
 
 import java.security.AccessControlException
 import java.security.KeyPairGenerator
@@ -43,6 +33,8 @@ import java.util.Map.Entry
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.LongAdder
+
+import static core.Utils.ipv4
 
 class RatpackWeb extends ServerTpl {
     protected RatpackServer       srv
@@ -253,7 +245,6 @@ class RatpackWeb extends ServerTpl {
     }
 
 
-
     // 处理session
     protected session(Context ctx) {
         def sId = ctx.request.oneCookie('sId')
@@ -383,29 +374,15 @@ class RatpackWeb extends ServerTpl {
     @EL(name = ['http.hp', 'web.hp'], async = false)
     def getHp() {
         String ip = srv.bindHost
-        if (ip == 'localhost') {
-            l: for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
-                NetworkInterface current = en.nextElement()
-                if (!current.isUp() || current.isLoopback() || current.isVirtual()) continue
-                Enumeration<InetAddress> addresses = current.getInetAddresses()
-                while (addresses.hasMoreElements()) {
-                    InetAddress addr = addresses.nextElement()
-                    if (addr.isLoopbackAddress()) continue
-                    if (addr instanceof Inet4Address) {
-                        ip = addr.getHostAddress()
-                        break l
-                    }
-                }
-            }
-        }
+        if (ip == 'localhost') {ip = ipv4()}
         ip + ':' + srv.bindPort
     }
 
 
     @EL(name = 'web.sessionExpire', async = false)
     Duration getSessionExpire() {
-        if (attrs().session?.expire instanceof Duration) return attrs().session?.expire
-        else if (attrs().session?.expire instanceof Number || attrs().session?.expire instanceof String) return Duration.ofMinutes(Long.valueOf(attrs().session?.expire))
+        if (attrs()['session']['expire'] instanceof Duration) return attrs()['session']['expire']
+        else if (attrs()['session']['expire'] instanceof Number || attrs()['session']['expire'] instanceof String) return Duration.ofMinutes(Long.valueOf(attrs()['session']['expire']))
         Duration.ofMinutes(30) // 默认session 30分钟
     }
 }

@@ -11,6 +11,4 @@
 
 @echo start ...
 cd src/
-
-@rem ../bin/groovy -Dprofile=dev main.groovy
-../bin/groovy main.groovy
+../bin/groovy %* main.groovy
