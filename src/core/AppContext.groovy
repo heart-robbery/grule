@@ -12,9 +12,7 @@ import java.lang.management.ManagementFactory
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
 
-import static core.Utils.baseDir
-import static core.Utils.iterateField
-import static core.Utils.pid
+import static core.Utils.*
 import static java.util.Collections.emptyList
 
 class AppContext {
@@ -28,27 +26,31 @@ class AppContext {
      * 实例Id
      * NOTE: 保证唯一
      */
-    @Lazy String                        id           = env['sys']["id"] ?: ((name ? name + "_" : '') + UUID.randomUUID().toString().replace('-', ''))
+    @Lazy String                          id             = env['sys']["id"] ?: ((name ? name + "_" : '') + UUID.randomUUID().toString().replace('-', ''))
     /**
      * 系统运行线程池. {@link #initExecutor()}}
      */
-    protected ThreadPoolExecutor        exec
+    protected ThreadPoolExecutor          exec
     /**
      * 事件中心 {@link #initEp()}}
      */
-    protected EP                        ep
+    protected EP                          ep
     /**
      * 服务对象源
      */
-    protected final Map<String, Object> sourceMap    = new ConcurrentHashMap<>()
+    protected final Map<String, Object>   sourceMap      = new ConcurrentHashMap<>()
+    /**
+     * 对列执行器映射
+     */
+    @Lazy protected Map<String, Devourer> queue2Devourer = new ConcurrentHashMap<>()
     /**
      * 启动时间
      */
-    final Date                          startup      = new Date()
+    final Date                            startup        = new Date()
     /**
      * jvm关闭钩子
      */
-    @Lazy protected Thread              shutdownHook = new Thread({
+    @Lazy protected Thread                shutdownHook   = new Thread({
         // 通知各个模块服务关闭
         ep.fire("sys.stopping", EC.of(this).async(false).completeFn({ ec ->
             exec.shutdown()
@@ -142,6 +144,28 @@ class AppContext {
         }
         sourceMap.put(name, source)
         if (ep) { inject(source); ep.addListenerSource(source) }
+    }
+
+
+    /**
+     * 加入到对列行器执行函数
+     * 每个对列里面的函数同一时间只执行一个, 各对列相互执行互不影响
+     * @param qName 对列名
+     * @param fn 要执行的函数
+     */
+    def queue(String qName = 'sys', Runnable fn) {
+        if (fn == null) throw new NullPointerException("fn is null")
+        def d = queue2Devourer.get(qName)
+        if (d == null) {
+            synchronized (this) {
+                d = queue2Devourer.get(qName)
+                if (d == null) {
+                    d = new Devourer(qName, exec)
+                    queue2Devourer.put(qName, d)
+                }
+            }
+        }
+        d.offer(fn)
     }
 
 

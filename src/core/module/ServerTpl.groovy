@@ -92,12 +92,20 @@ class ServerTpl {
      * @return
      */
     def async(Runnable fn) {
-        exec.execute{
+        exec.execute {
             try {fn.run()} catch(Throwable ex) {
                 log.error("Async Error", ex)
             }
         }
     }
+
+
+    /**
+     * 对列执行
+     * @param qName 要加入的对列名, 默认当前server名称
+     * @param fn 要执行的函数
+     */
+    def queue(String qName = name, Runnable fn) {app.queue(qName, fn)}
 
 
     /**
