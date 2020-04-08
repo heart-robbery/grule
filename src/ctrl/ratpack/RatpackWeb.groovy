@@ -3,7 +3,6 @@ package ctrl.ratpack
 import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.serializer.SerializerFeature
-import core.Devourer
 import core.module.EhcacheSrv
 import core.module.RedisClient
 import core.module.ServerTpl
@@ -41,10 +40,6 @@ class RatpackWeb extends ServerTpl {
     protected final List<CtrlTpl> ctrls       = new LinkedList<>()
     // 是否可用
     boolean                       enabled     = false
-    /**
-     * 吞噬器.请求执行控制器
-     */
-    @Lazy protected Devourer      reqDevourer = new Devourer(name, exec)
     @Lazy def                     redis       = bean(RedisClient)
     @Lazy def                     ehcache     = bean(EhcacheSrv)
 
@@ -84,7 +79,7 @@ class RatpackWeb extends ServerTpl {
 
 
     @EL(name = 'sys.stopping', async = false)
-    def stop() { srv?.stop(); reqDevourer.shutdown() }
+    def stop() { srv?.stop() }
 
 
     @EL(name = 'sys.started')
@@ -159,7 +154,7 @@ class RatpackWeb extends ServerTpl {
             // 限流? TODO
             // 打印请求
             if (!ignoreSuffix.find{ctx.request.path.endsWith(it)}) {
-                log.info("Start Request '{}': {} from: " + ctx.request.remoteAddress.host, ctx.get(RequestId.TYPE), ctx.request.uri)
+                log.info("Start Request '{}': {}. from: " + ctx.request.remoteAddress.host, ctx.get(RequestId.TYPE), ctx.request.uri)
             }
             // 统计
             count()

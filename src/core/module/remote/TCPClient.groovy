@@ -201,7 +201,7 @@ class TCPClient extends ServerTpl {
         log.trace("Receive reply from '{}': {}", ctx.channel().remoteAddress(), dataStr)
         def jo = JSON.parseObject(dataStr)
         if ("updateAppInfo" == jo['type']) {
-            async {
+            queue('updateAppInfo') {
                 JSONObject d
                 try { d = jo.getJSONObject("data"); updateAppInfo(d) }
                 catch (Throwable ex) {
@@ -260,41 +260,22 @@ class TCPClient extends ServerTpl {
         def updateNode(final JSONObject data) {
             def (String id, String tcpHp, String httpHp) = [data['id'], data['tcp'], data['http']]
             if (!tcpHp) { // tcpHp 不能为空
-                throw new IllegalArgumentException("Node illegal error. $tcpHp, $httpHp")
+                throw new IllegalArgumentException("Node illegal error. $data")
             }
             def n = nodes.get(id)
-            if (n) { // 更新
+            if (n) { // 更新,有可能节点ip变了
                 n.tcpHp = tcpHp.trim()
                 n.httpHp = httpHp.trim()
             } else {
-                n = new Node(group: this, id: id, tcpHp: tcpHp, httpHp: httpHp)
-                nodes.put(id, n)
-                log.info("New Node added. Node: '{}'", n)
-                tryClear()
-            }
-        }
-
-        /**
-         * 清理出废掉的节点
-         */
-        protected tryClear() {
-            if (nodes.size() <= 1) return
-            Map<String, String> tcp2Id = new HashMap<>(nodes.size())
-            for (def it = nodes.iterator(); it.hasNext(); ) {
-                def e = it.next()
-                if (tcp2Id.containsKey(e.value.tcpHp)) { // 存在相同的tcpHp
-
+                n = nodes.values().find {it.tcpHp == tcpHp}
+                if (n) { // tcp host:port 相同, 认为是节点被重启了
+                    n.id = id
+                    n.httpHp = httpHp
+                } else {
+                    n = new Node(group: this, id: id, tcpHp: tcpHp, httpHp: httpHp)
+                    nodes.put(id, n)
+                    log.info("New Node added. Node: '{}'", n)
                 }
-            }
-
-            try {
-                tcpPool.rwLock.writeLock().lock()
-                group.nodes.remove(id)
-                tcpPool.chs.each {
-                    try {it.close()} catch (ex) {}
-                }
-            } finally {
-                tcpPool.rwLock.writeLock().unlock()
             }
         }
 
@@ -317,6 +298,7 @@ class TCPClient extends ServerTpl {
          * @param data 要发送的数据
          */
         def randomStrategy(List<Node> ns, String data) {
+            if (!ns) throw new RuntimeException("Not found available node for '$name'")
             if (ns.size() == 1) ns[0].send(data)
             else {
                 def n = ns[new Random().nextInt(ns.size())]
@@ -348,6 +330,8 @@ class TCPClient extends ServerTpl {
         String            httpHp
         // tcp 连接池
         final ChannelPool tcpPool = new ChannelPool()
+        // 1分钟的调用记录时间
+        private final Queue<Long> times = new LinkedList<>()
 
         def setTcpHp(String hp) {
             if (!hp) throw new IllegalArgumentException("Node tcpHp must not be empty")
@@ -387,6 +371,16 @@ class TCPClient extends ServerTpl {
 
         // 发送数据
         def send(final String data, Consumer<Throwable> failFn = null, AtomicInteger limit = new AtomicInteger(0)) {
+            if (limit.get() == 0) {
+                times.offer(System.currentTimeMillis())
+                while (true) {
+                    def t = times.peek()
+                    if (t && t - System.currentTimeMillis() > 60 * 1000L) times.poll()
+                    else break
+                }
+                if (times.size() > 60) {tcpPool.create()}
+            }
+            // 发送数据
             try {
                 def ch = tcpPool.get()
                 ch.writeAndFlush(toByteBuf(data)).addListener{ChannelFuture cf ->
@@ -454,7 +448,7 @@ class TCPClient extends ServerTpl {
             } catch (Throwable th) {
                 // log.error("Create TCP Connection error. node: '{}'. errMsg: {}", node, (th.message ?: th.class.simpleName))
                 if (node.group && node.group.nodes.size() > 1) { // 删除连接不上的节点, 但保留一个
-                    node.group?.nodes.remove(node.tcpHp)
+                    node.group?.nodes.remove(node.id)
                 }
                 throw new RuntimeException("Create TCP Connection error. node: '${node}'. errMsg: ${(th.message ?: th.class.simpleName)}", th)
             }

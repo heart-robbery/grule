@@ -3,14 +3,17 @@ package core.module.remote
 import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
+import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONArray
 import com.alibaba.fastjson.JSONObject
+import com.alibaba.fastjson.serializer.SerializerFeature
 import core.module.SchedSrv
 import core.module.ServerTpl
 
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.function.Consumer
 import java.util.stream.Collectors
 import java.util.stream.Stream
@@ -19,17 +22,17 @@ import static core.Utils.getLog
 import static core.Utils.ipv4
 
 class Remoter extends ServerTpl {
-    @Lazy def         sched = bean(SchedSrv)
+    @Lazy def                 sched     = bean(SchedSrv)
     /**
      * ecId -> EC
      */
-    @Lazy Map<String, EC> ecMap     = new ConcurrentHashMap<>()
-    protected       TCPClient       tcpClient
-    protected       TCPServer       tcpServer
+    @Lazy Map<String, EC>     ecMap     = new ConcurrentHashMap<>()
+    protected       TCPClient tcpClient
+    protected       TCPServer tcpServer
     // 集群的服务中心地址 [host]:port,[host1]:port2
-    @Lazy String          masterHps = getStr('masterHps', null)
+    @Lazy String              masterHps = getStr('masterHps', null)
     // 集群的服务中心应用名
-    @Lazy String          master    = getStr('master', null)
+    @Lazy String              master    = getStr('master', null)
 
 
     Remoter() { super("remoter") }
@@ -82,7 +85,7 @@ class Remoter extends ServerTpl {
 
     @EL(name = 'sys.started')
     def started() {
-        tcpServer.upper.offer{ tcpServer.appUp(selfInfo, null) }
+        queue('registerUp') { tcpServer.appUp(selfInfo, null) }
         registerFn.run()
     }
 
@@ -132,7 +135,7 @@ class Remoter extends ServerTpl {
             }
             if (reply) { // 数据发送成功. 如果需要响应, 则添加等待响应超时处理
                 sched.after(Duration.ofSeconds(getInteger("eventTimeout.$eName", getInteger("eventTimeout", 20))), {
-                    ecMap.remove(ec.id())?.errMsg("'$eName' Timeout").resume().tryFinish()
+                    ecMap.remove(ec.id())?.errMsg("'$eName' Timeout")?.resume()?.tryFinish()
                 })
             }
         } catch (Throwable ex) {
@@ -190,34 +193,42 @@ class Remoter extends ServerTpl {
                     r.put("eId", ec.id())
                     if (!ec.isSuccess()) { r.put("exMsg", ec.failDesc()); }
                     r.put("result", ec.result)
-                    reply.accept(new JSONObject(3).fluentPut("type", "event").fluentPut("source", sysName).fluentPut("data", r))
+                    reply.accept(JSON.toJSONString(
+                        new JSONObject(3)
+                            .fluentPut("type", "event")
+                            .fluentPut("source", new JSONObject(2).fluentPut('name', app.name).fluentPut('id', app.id))
+                            .fluentPut("data", r),
+                        SerializerFeature.WriteMapNullValue
+                    ))
                 })
             }
             ep.fire(eName, ec)
         } catch (Throwable ex) {
+            log.error("invoke event error. data: " + data, ex)
             if (fReply) {
                 JSONObject r = new JSONObject(4)
                 r.put("eId", data.getString("eId"))
                 r.put("success", false)
                 r.put("result", null)
                 r.put("exMsg", ex.message ? ex.message: ex.getClass().name)
-                reply.accept(new JSONObject(3)
-                        .fluentPut("type", "event")
-                        .fluentPut("source", new JSONObject(2).fluentPut('name', app.name).fluentPut('id', app.id))
-                        .fluentPut("data", r)
-                )
+                def res = new JSONObject(3)
+                    .fluentPut("type", "event")
+                    .fluentPut("source", new JSONObject(2).fluentPut('name', app.name).fluentPut('id', app.id))
+                    .fluentPut("data", r)
+                reply.accept(JSON.toJSONString(res, SerializerFeature.WriteMapNullValue))
             }
-            log.error("invoke event error. data: " + data, ex)
         }
     }
 
 
     // 注册自己到 master 即 配置的master
     @Lazy def registerFn = new Runnable() {
+        final AtomicBoolean running = new AtomicBoolean(false)
         @Override
         void run() {
             Throwable ex
             try {
+                if (!running.compareAndSet(false, true)) return
                 // 当tcpClient 中存在相应的 master 时, 则用master 作为服务中心
                 String mName = master ? (tcpClient.apps.containsKey(master) ? master : null) : null
                 if (!masterHps && !mName) return
@@ -255,14 +266,13 @@ class Remoter extends ServerTpl {
                 }
 
                 log.debug("register up success. {}", data)
+                sched.after(Duration.ofSeconds(getInteger('upInterval', 120) + new Random().nextInt(60)), registerFn)
             } catch(Throwable th) {
                 ex = th
+                sched.after(Duration.ofSeconds(getInteger('upInterval', 30) + new Random().nextInt(60)), registerFn)
                 log.error("register up error. " + (ex.message?:ex.class.simpleName))
-            }
-            if (ex) { // 发生错误,则缩短同步间隔时间
-                sched?.after(Duration.ofSeconds(getInteger('upInterval', 30) + new Random().nextInt(60)), registerFn)
-            } else {
-                sched?.after(Duration.ofSeconds(getInteger('upInterval', 120) + new Random().nextInt(60)), registerFn)
+            } finally {
+                running.set(false)
             }
         }
     }

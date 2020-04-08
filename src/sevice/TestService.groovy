@@ -190,9 +190,9 @@ class TestService extends ServerTpl {
     }
 
 
-    void remote(String app, String eName, String ret, Consumer fn) {
+    def remote(String app, String eName, String ret = 'xx', Consumer fn) {
         // 远程调用
-        ep.fire("remote", EC.of(this).args(app, eName, [ret]).completeFn({ec ->
+        ep.fire("remote", EC.of(this).args(app, eName, [ret] as Object[]).completeFn({ec ->
             if (ec.isSuccess()) fn.accept(ec.result);
             else fn.accept(ec.ex() == null ? new Exception(ec.failDesc()) : ec.ex());
         }))
@@ -231,5 +231,10 @@ class TestService extends ServerTpl {
     @EL(name = "eName5", async = false)
     private void testEvent5(String p) {
         ep.fire("cache.set","java","java", p)
+    }
+
+    @EL(name = "eName6", async = false)
+    private Object testEvent6(String p) {
+        throw new RuntimeException("抛个错 $p")
     }
 }

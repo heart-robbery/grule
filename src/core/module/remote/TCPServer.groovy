@@ -5,7 +5,6 @@ import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONException
 import com.alibaba.fastjson.JSONObject
-import core.Devourer
 import core.module.ServerTpl
 import groovy.transform.PackageScope
 import io.netty.bootstrap.ServerBootstrap
@@ -36,16 +35,15 @@ import static java.util.concurrent.TimeUnit.SECONDS
  * TCP server
  */
 class TCPServer extends ServerTpl {
-    @Lazy def remoter = bean(Remoter)
-    @Lazy String hp = getStr('hp', '')
-    @Lazy String delimiter = getStr('delimiter', '')
-    protected EventLoopGroup boos
+    @Lazy def                                              remoter    = bean(Remoter)
+    @Lazy String                                           hp         = getStr('hp', '')
+    @Lazy String                                           delimiter  = getStr('delimiter', '')
+    protected EventLoopGroup                               boos
     // 当前连接数
-    protected final AtomicInteger connCount = new AtomicInteger(0)
+    protected final AtomicInteger                          connCount  = new AtomicInteger(0)
     // 保存 app info 的属性信息
     protected final Map<String, List<Map<String, Object>>> appInfoMap = new ConcurrentHashMap<>()
-    @Lazy Devourer upper = new Devourer("registerUp", exec)
-    final List<Consumer<JSONObject>> handlers = new LinkedList<>()
+    final List<Consumer<JSONObject>>                       handlers   = new LinkedList<>()
 
 
     TCPServer() { super("tcpServer") }
@@ -64,7 +62,6 @@ class TCPServer extends ServerTpl {
     def stop() {
         log.info("Close '{}'", name)
         boos?.shutdownGracefully()
-        upper?.shutdown()
     }
 
 
@@ -104,7 +101,7 @@ class TCPServer extends ServerTpl {
                             }
                         })
                         // 最好是将IdleStateHandler放在入站的开头，并且重写userEventTriggered这个方法的handler必须在其后面。否则无法触发这个事件。
-                        ch.pipeline().addLast(new IdleStateHandler(getLong("readerIdleTime", 10 * 60L), getLong("writerIdleTime", 0L), getLong("allIdleTime", 0L), SECONDS))
+                        ch.pipeline().addLast(new IdleStateHandler(getLong("readerIdleTime", 30 * 60L), getLong("writerIdleTime", 0L), getLong("allIdleTime", 0L), SECONDS))
                         if (delimiter) {
                             ch.pipeline().addLast(
                                     new DelimiterBasedFrameDecoder(
@@ -169,7 +166,7 @@ class TCPServer extends ServerTpl {
                 remoter?.receiveEventReq(jo.getJSONObject("data"), {r -> ctx.writeAndFlush(Unpooled.copiedBuffer((r + (delimiter?:'')).getBytes('utf-8')))})
             }
         } else if ("appUp" == t) { // 应用注册在线通知
-            upper.offer{
+            queue('registerUp') {
                 JSONObject d
                 try { d = jo.getJSONObject("data"); appUp(d, ctx) }
                 catch (Exception ex) {

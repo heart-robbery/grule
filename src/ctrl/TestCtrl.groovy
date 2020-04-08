@@ -3,6 +3,7 @@ package ctrl
 import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSONObject
 import core.Page
+import core.module.SchedSrv
 import core.module.jpa.BaseRepo
 import ctrl.common.FileData
 import dao.entity.UploadFile
@@ -17,8 +18,10 @@ import sevice.TestService
 
 import java.text.SimpleDateFormat
 import java.util.concurrent.ConcurrentHashMap
+import java.util.function.Consumer
 import java.util.stream.Collectors
 
+import static ctrl.common.ApiResp.fail
 import static ctrl.common.ApiResp.ok
 
 class TestCtrl extends CtrlTpl {
@@ -26,9 +29,6 @@ class TestCtrl extends CtrlTpl {
     final Set<WebSocket> wss = ConcurrentHashMap.newKeySet()
 
     TestCtrl() { prefix = 'test' }
-
-    @Lazy repo = bean(BaseRepo)
-
 
     @EL(name = 'testWsMsg')
     def wsMsg(String msg) {
@@ -55,6 +55,7 @@ class TestCtrl extends CtrlTpl {
     // dao 测试
     def dao(Chain chain) {
         def srv = bean(TestService)
+        def repo = bean(BaseRepo)
         chain.get('dao') {ctx ->
             if ('file' == ctx.request.queryParams.type) {
                 ctx.render ok(Page.of(
@@ -101,9 +102,9 @@ class TestCtrl extends CtrlTpl {
                 }
             })
         }
-        ep.fire('sched.cron', '0/30 * * * * ?', {
+        bean(SchedSrv).cron('0/30 * * * * ?') {
             wsMsg(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()))
-        })
+        }
     }
 
 
@@ -184,7 +185,7 @@ class TestCtrl extends CtrlTpl {
     def async(Chain chain) {
         chain.get('async') {ctx ->
             ctx.render Promise.async{down ->
-                async{
+                async {
                     Thread.sleep(3000)
                     down.success(ok('date', new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())))
                 }
@@ -196,9 +197,9 @@ class TestCtrl extends CtrlTpl {
     // 测试登录
     def testLogin(Chain chain) {
         chain.get('testLogin') {ctx ->
-            ctx.sData?.uRoles = Arrays.stream(ctx.request.queryParams.role.split(',')).map{it.trim()}.filter{it?true:false}.collect(Collectors.toSet())
-            log.warn('用户权限角色被改变. {}', ctx.sData?.uRoles)
-            ctx.render ok(ctx.sData)
+            ctx['sData']['uRoles'] = Arrays.stream(ctx.request.queryParams.role.split(',')).map{it.trim()}.filter{it?true:false}.collect(Collectors.toSet())
+            log.warn('用户权限角色被改变. {}', ctx['sData']['uRoles'])
+            ctx.render ok(ctx['sData'])
         }
     }
 
@@ -208,6 +209,20 @@ class TestCtrl extends CtrlTpl {
         chain.get('auth') {ctx ->
             ctx.auth(ctx.request.queryParams['role'])
             ctx.render ok(ctx.sData)
+        }
+    }
+
+
+    // 远程事件调用
+    def remote(Chain chain) {
+        def ts = bean(TestService)
+        chain.path('remote') {ctx ->
+            ctx.render Promise.async { down ->
+                ts.remote(ctx.request.queryParams['app']?:"gy", ctx.request.queryParams['event']?:'eName1', {
+                    if (it instanceof Exception) down.success(fail(it.message))
+                    else down.success ok(it)
+                })
+            }
         }
     }
 

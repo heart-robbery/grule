@@ -152,9 +152,9 @@ class AppContext {
      * 每个对列里面的函数同一时间只执行一个, 各对列相互执行互不影响
      * @param qName 对列名
      * @param fn 要执行的函数
+     * @return {@link Devourer}
      */
-    def queue(String qName = 'sys', Runnable fn) {
-        if (fn == null) throw new NullPointerException("fn is null")
+    Devourer queue(String qName = 'sys', Runnable fn) {
         def d = queue2Devourer.get(qName)
         if (d == null) {
             synchronized (this) {
@@ -165,7 +165,8 @@ class AppContext {
                 }
             }
         }
-        d.offer(fn)
+        if (fn) d.offer(fn)
+        return d
     }
 
 

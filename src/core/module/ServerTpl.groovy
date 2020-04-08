@@ -12,21 +12,21 @@ import javax.annotation.Resource
 import java.util.concurrent.ExecutorService
 
 class ServerTpl {
-    protected final Logger       log = LoggerFactory.getLogger(getClass())
+    protected final Logger log  = LoggerFactory.getLogger(getClass())
     /**
      * 服务名字标识.(保证唯一)
      * 可用于命名空间:
      * 1. 可用于属性配置前缀
      * 2. 可用于事件名字前缀
      */
-    final           String       name
+    final           String name
     /**
      * 1. 当此服务被加入核心时, 此值会自动设置为核心的EP.
      * 2. 如果要服务独立运行时, 请手动设置
      */
-    @Resource EP ep
-    @Lazy def app = bean(AppContext)
-    @Lazy def exec = bean(ExecutorService)
+    @Resource EP           ep
+    @Lazy def              app  = bean(AppContext)
+    @Lazy protected def    exec = bean(ExecutorService)
 
 
     ServerTpl(String name) {
@@ -104,8 +104,9 @@ class ServerTpl {
      * 对列执行
      * @param qName 要加入的对列名, 默认当前server名称
      * @param fn 要执行的函数
+     * @return {@link core.Devourer}当前对列
      */
-    def queue(String qName = name, Runnable fn) {app.queue(qName, fn)}
+    def queue(String qName = name, Runnable fn = null) {app.queue(qName, fn)}
 
 
     /**

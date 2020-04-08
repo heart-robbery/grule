@@ -25,7 +25,7 @@ class RatpackHander extends NettyHandlerAdapter {
     @Override
     void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         if (msg instanceof HttpRequest) {
-            int i = rw.reqDevourer.waitingCount
+            int i = rw.queue().waitingCount
             // 当请求对列中等待处理的请求过多就拒绝新的请求(默认值: 线程池的线程个数的3倍)
             if (i >= rw.getInteger("maxWaitRequest", ((Integer) rw.exec["getCorePoolSize"]) * 3) ||
                 ((Integer) rw.exec["waitingCount"]) > ((Integer) rw.exec["getCorePoolSize"]) * 2
@@ -35,7 +35,7 @@ class RatpackHander extends NettyHandlerAdapter {
                 ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, SERVICE_UNAVAILABLE))
             } else {
                 // 请求入对执行
-                rw.reqDevourer.offer{ super.channelRead(ctx, msg) }
+                rw.queue().offer{ super.channelRead(ctx, msg) }
             }
         } else {
             super.channelRead(ctx, msg)
