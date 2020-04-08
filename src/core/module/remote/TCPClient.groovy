@@ -118,13 +118,7 @@ class TCPClient extends ServerTpl {
         if ('any' == target) {
             group.sendToAny(data)
         } else if ('all' == target) {
-            group.nodes.values().each {
-                try {
-                    it.send(data)
-                } catch (Throwable th) {
-                    log.error("Send data: '{}' fail. Node: '{}'. errMsg: {}" + (th.message?:th.class.simpleName), data, it)
-                }
-            }
+            group.sendToAll(data)
         } else {
             throw new IllegalArgumentException("Not support target '$target'")
         }
@@ -269,6 +263,7 @@ class TCPClient extends ServerTpl {
             } else {
                 n = nodes.values().find {it.tcpHp == tcpHp}
                 if (n) { // tcp host:port 相同, 认为是节点被重启了
+                    nodes.put(id, n); nodes.remove(n.id)
                     n.id = id
                     n.httpHp = httpHp
                 } else {
@@ -293,6 +288,20 @@ class TCPClient extends ServerTpl {
         }
 
         /**
+         * 发送给所有节点
+         * @param data
+         */
+        def sendToAll(final String data) {
+            nodes.values().each {
+                try {
+                    it.send(data)
+                } catch (Throwable th) {
+                    log.error("Send data: '{}' fail. Node: '{}'. errMsg: " + (th.message?:th.class.simpleName), data, it)
+                }
+            }
+        }
+
+        /**
          * 随机节点策略
          * @param ns 节点列表
          * @param data 要发送的数据
@@ -302,7 +311,8 @@ class TCPClient extends ServerTpl {
             if (ns.size() == 1) ns[0].send(data)
             else {
                 def n = ns[new Random().nextInt(ns.size())]
-                n.send(data, {th -> // 尽可能找到可用的节点把数据发送出去
+                n.send(data, {ex -> // 尽可能找到可用的节点把数据发送出去
+                    log.error(ex.message?:ex.class.simpleName)
                     ns.remove(n)
                     randomStrategy(ns, data)
                 })
