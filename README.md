@@ -20,6 +20,7 @@ redis, jpa(hibernate), OkHttpClient, Remoter(多应用tcp通信)
     app-[profile].conf: 可使用共用属性和app.conf中的属性
     优先级: 系统属性 > app-profile.conf > app.conf
     
+   
 #### Remoter 集群分布式
     集群中有一台或多台被选为master
     master收集集群中的注册到自己应用信息, 并把同步这些信息给每个注册到自己的服务
@@ -28,7 +29,11 @@ redis, jpa(hibernate), OkHttpClient, Remoter(多应用tcp通信)
     通过配置 remoter.master:'应用名字', remoter.masterHps: 'host:port,host1:port1'指定master
     master的注册功能和发布通知功能由TCPServer实现
     加入集群和集群保存活动的功能由TCPClient实现
-    
+
+#### OkHttpSrv http客户端
+    支持集群中的应用名调用(此功能依赖Remoter)
+    http://gy/test/cus, 当gy 是属于集群中的某个应用名时, 会调到此应用去
+
 
 #### 安装教程
 

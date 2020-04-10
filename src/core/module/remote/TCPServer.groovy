@@ -166,7 +166,7 @@ class TCPServer extends ServerTpl {
                 remoter?.receiveEventReq(jo.getJSONObject("data"), {r -> ctx.writeAndFlush(Unpooled.copiedBuffer((r + (delimiter?:'')).getBytes('utf-8')))})
             }
         } else if ("appUp" == t) { // 应用注册在线通知
-            queue('registerUp') {
+            queue('appUp') {
                 JSONObject d
                 try { d = jo.getJSONObject("data"); appUp(d, ctx) }
                 catch (Exception ex) {
@@ -260,22 +260,6 @@ class TCPServer extends ServerTpl {
                 }
             }
         }
-
-//        //3. 同步注册信息
-//        appInfoMap.each {e ->
-//            e.value.each {cur ->
-//                // 返回所有的注册信息给当前来注册的客户端
-//                if (cur["id"] != data["id"]) {
-//                    ctx?.writeAndFlush(Unpooled.copiedBuffer(
-//                            (new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", cur).toString() + (delimiter?:'')).getBytes('utf-8')
-//                    ))
-//                }
-//                // 如果是新系统上线, 则主动通知其它系统
-//                if (isNew && cur['id'] != data['id'] && cur['id'] != app.id) {
-//                    ep.fire("remote", EC.of(this).attr('toAll', true).args(e.key, "updateAppInfo", new Object[]{data}))
-//                }
-//            }
-//        }
     }
 
 

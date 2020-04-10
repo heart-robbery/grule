@@ -99,19 +99,27 @@ class HibernateSrv extends ServerTpl {
             }
         } catch (ClassNotFoundException ex) {}
 
-        if (!dsAttr.containsKey('validationQuery')) dsAttr.put('validationQuery', 'select 1')
         // druid 数据源
         if (!ds) {
             try {
-                ds = (DataSource) Utils.findMethod(Class.forName('com.alibaba.druid.pool.DruidDataSourceFactory'), 'createDataSource', Map.class).invoke(null, dsAttr)
+                Map props = new HashMap()
+                dsAttr.each {props.put(it.key, Objects.toString(it.value, ''))}
+                if (!props.containsKey('validationQuery')) props.put('validationQuery', 'select 1')
+                if (!props.containsKey('filters')) { // 默认监控慢sql
+                    props.put('filters', 'stat')
+                    props.put('connectionProperties', 'druid.stat.slowSqlMillis=5000')
+                }
+                ds = (DataSource) Utils.findMethod(Class.forName('com.alibaba.druid.pool.DruidDataSourceFactory'), 'createDataSource', Map.class).invoke(null, props)
             } catch(ClassNotFoundException ex) {}
         }
 
         // dbcp2 数据源
         if (!ds) {
             try {
-                Properties p = new Properties(); p.putAll(dsAttr)
-                ds = (DataSource) Utils.findMethod(Class.forName('org.apache.commons.dbcp2.BasicDataSourceFactory'), 'createDataSource', Properties.class).invoke(null, dsAttr)
+                Map props = new HashMap()
+                dsAttr.each {props.put(it.key, Objects.toString(it.value, ''))}
+                if (!props.containsKey('validationQuery')) props.put('validationQuery', 'select 1')
+                ds = (DataSource) Utils.findMethod(Class.forName('org.apache.commons.dbcp2.BasicDataSourceFactory'), 'createDataSource', Properties.class).invoke(null, props)
             } catch (ClassNotFoundException ex) {}
         }
         if (!ds) throw new RuntimeException('Not found DataSource implement class')

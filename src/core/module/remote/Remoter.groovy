@@ -67,11 +67,6 @@ class Remoter extends ServerTpl {
             tcpServer.start()
         }
 
-        tcpClient.handlers.add({jo ->
-            if ("event"== jo['type']) {
-                async {receiveEventResp(jo.getJSONObject("data"))}
-            }
-        } as Consumer)
         ep.fire("${name}.started")
     }
 
@@ -85,7 +80,7 @@ class Remoter extends ServerTpl {
 
     @EL(name = 'sys.started')
     def started() {
-        queue('registerUp') { tcpServer.appUp(selfInfo, null) }
+        queue('appUp') { tcpServer.appUp(selfInfo, null) }
         registerFn.run()
     }
 
@@ -223,10 +218,9 @@ class Remoter extends ServerTpl {
 
     // 注册自己到 master 即 配置的master
     @Lazy def registerFn = new Runnable() {
-        final AtomicBoolean running = new AtomicBoolean(false)
+        private final AtomicBoolean running = new AtomicBoolean(false)
         @Override
         void run() {
-            Throwable ex
             try {
                 if (!running.compareAndSet(false, true)) return
                 // 当tcpClient 中存在相应的 master 时, 则用master 作为服务中心
@@ -245,9 +239,8 @@ class Remoter extends ServerTpl {
                 data.put("source", new JSONObject(2).fluentPut('name', app.name).fluentPut('id', app.id)) // 表明来源
                 data.put("data", info)
 
-                if (mName && tcpClient.apps.get(mName)) { // 应用名
-                    tcpClient.send(mName, data.toString())
-                } else {
+                // 用 hps 函数
+                def fn = {
                     def ls = Stream.of(masterHps.split(",")).map{
                         def arr = it.split(":") // :8001 or localhost:8001
                         Tuple.tuple(arr[0].trim()?:'localhost', Integer.valueOf(arr[1].trim()))
@@ -265,10 +258,19 @@ class Remoter extends ServerTpl {
                     }
                 }
 
+                if (mName && tcpClient.apps.get(mName)) { // 应用名
+                    try {
+                        tcpClient.send(mName, data.toString())
+                    } catch (e) {
+                        fn.call()
+                    }
+                } else {
+                    fn.call()
+                }
+
                 log.debug("register up success. {}", data)
-                sched.after(Duration.ofSeconds(getInteger('upInterval', 120) + new Random().nextInt(60)), registerFn)
-            } catch(Throwable th) {
-                ex = th
+                sched.after(Duration.ofSeconds(getInteger('upInterval', 90) + new Random().nextInt(60)), registerFn)
+            } catch (Throwable ex) {
                 sched.after(Duration.ofSeconds(getInteger('upInterval', 30) + new Random().nextInt(60)), registerFn)
                 log.error("register up error. " + (ex.message?:ex.class.simpleName))
             } finally {

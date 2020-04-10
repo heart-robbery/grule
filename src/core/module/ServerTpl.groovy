@@ -97,6 +97,7 @@ class ServerTpl {
                 log.error("Async Error", ex)
             }
         }
+        fn
     }
 
 

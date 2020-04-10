@@ -22,6 +22,7 @@ import sun.net.util.IPAddressUtil
 import java.nio.channels.ClosedChannelException
 import java.nio.charset.Charset
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReadWriteLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
@@ -71,7 +72,7 @@ class TCPClient extends ServerTpl {
         log.trace("Update app info: {}", data)
         if (data == null || data.isEmpty()) return
         if (!data["name"] && !data['id'] && !data['tcp']) throw new IllegalArgumentException("app info 参数错误: " + data)
-        if (app.id == data["id"] || remoter.selfInfo?['tcp'] == data['tcp']) return // 不把系统本身的信息放进去
+        if (app.id == data["id"] || remoter?.selfInfo?['tcp'] == data['tcp']) return // 不把系统本身的信息放进去
 
         String n = data['name']
         def g = apps.get(n)
@@ -203,6 +204,9 @@ class TCPClient extends ServerTpl {
                 }
             }
         }
+        else if ("event"== jo['type']) {
+            async { remoter?.receiveEventResp(jo.getJSONObject("data")) }
+        }
         handlers.each {it.accept(jo)}
     }
 
@@ -219,10 +223,13 @@ class TCPClient extends ServerTpl {
      */
     @EL(name = "dns", async = false)
     InetAddress dns(String hostname) {
-        def ip = ((Node) apps.get(hostname).nodes.find()?.value)?.tcpHp?.split(":")?[0]
-        if(ip) {
-            if ("localhost" == ip) ip = "127.0.0.1"
-            return InetAddress.getByAddress(hostname, IPAddressUtil.textToNumericFormatV4(ip))
+        def vs = apps.get(hostname)?.nodes
+        if (vs) {
+            def ip = (vs.size() == 1 ? (vs[0].tcpHp?.split(":")?[0]) : (vs[new Random().nextInt(vs.size())].tcpHp?.split(":")?[0]))
+            if (ip) {
+                if ("localhost" == ip) ip = "127.0.0.1"
+                return InetAddress.getByAddress(hostname, IPAddressUtil.textToNumericFormatV4(ip))
+            }
         }
         null
     }
@@ -235,7 +242,16 @@ class TCPClient extends ServerTpl {
      * @return
      */
     @EL(name = "resolveHttp", async = false)
-    String resolveHttp(String appName) { ((Node) apps.get(appName).nodes.find()?.value)?.httpHp }
+    String resolveHttp(String appName) {
+        def vs = apps.get(appName)?.nodes.values()
+        if (vs) {
+            if (vs.size() == 1) return vs[0].httpHp
+            else {
+                return vs[new Random().nextInt(vs.size())].httpHp
+            }
+        }
+        null
+    }
 
 
     /**
@@ -340,8 +356,6 @@ class TCPClient extends ServerTpl {
         String            httpHp
         // tcp 连接池
         final ChannelPool tcpPool = new ChannelPool()
-        // 1分钟的调用记录时间
-        private final Queue<Long> times = new LinkedList<>()
 
         def setTcpHp(String hp) {
             if (!hp) throw new IllegalArgumentException("Node tcpHp must not be empty")
@@ -381,18 +395,10 @@ class TCPClient extends ServerTpl {
 
         // 发送数据
         def send(final String data, Consumer<Throwable> failFn = null, AtomicInteger limit = new AtomicInteger(0)) {
-            if (limit.get() == 0) {
-                times.offer(System.currentTimeMillis())
-                while (true) {
-                    def t = times.peek()
-                    if (t && t - System.currentTimeMillis() > 60 * 1000L) times.poll()
-                    else break
-                }
-                if (times.size() > 60) {tcpPool.create()}
-            }
             // 发送数据
             try {
                 def ch = tcpPool.get()
+                if (limit.get() == 0) ((Runnable) ch.attr(AttributeKey.valueOf("upFn")).get())?.run()
                 ch.writeAndFlush(toByteBuf(data)).addListener{ChannelFuture cf ->
                     if (cf.cause() != null) {
                         if (cf.cause() instanceof ClosedChannelException) {
@@ -454,11 +460,11 @@ class TCPClient extends ServerTpl {
             Channel ch
             try { // 连接
                 ch = boot.connect(host, port).sync().channel()
-                ch.attr(AttributeKey.valueOf("removeFn")).set({ remove(ch) } as Runnable)
+                initChannel(ch)
             } catch (Throwable th) {
                 // log.error("Create TCP Connection error. node: '{}'. errMsg: {}", node, (th.message ?: th.class.simpleName))
                 if (node.group && node.group.nodes.size() > 1) { // 删除连接不上的节点, 但保留一个
-                    node.group?.nodes.remove(node.id)
+                    node.group.nodes.remove(node.id)
                 }
                 throw new RuntimeException("Create TCP Connection error. node: '${node}'. errMsg: ${(th.message ?: th.class.simpleName)}", th)
             }
@@ -472,6 +478,25 @@ class TCPClient extends ServerTpl {
                 }
             }
             ch
+        }
+
+        // 初始化连接Channel
+        protected initChannel(final Channel ch) {
+            ch.attr(AttributeKey.valueOf("removeFn")).set({ remove(ch) } as Runnable)
+
+            // 1分钟的调用记录时间
+            final Queue<Long> records = new ConcurrentLinkedQueue<>()
+            ch.attr(AttributeKey.valueOf("upFn")).set({
+                records.offer(System.currentTimeMillis())
+                while (true) {
+                    def t = records.peek()
+                    if (t && t - System.currentTimeMillis() > 60 * 1000L) records.poll()
+                    else break
+                }
+                if (records.size() > getInteger("oneMinuteLimitPerChannel", 70) && chs.size() < getInteger('maxConnectPerNode', 3)) {
+                    async {create()}
+                }
+            } as Runnable)
         }
 
         // 删除连接Channel

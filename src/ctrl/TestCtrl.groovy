@@ -3,6 +3,7 @@ package ctrl
 import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSONObject
 import core.Page
+import core.module.OkHttpSrv
 import core.module.SchedSrv
 import core.module.jpa.BaseRepo
 import ctrl.common.FileData
@@ -208,7 +209,7 @@ class TestCtrl extends CtrlTpl {
     def auth(Chain chain) {
         chain.get('auth') {ctx ->
             ctx.auth(ctx.request.queryParams['role'])
-            ctx.render ok(ctx.sData)
+            ctx.render ok(ctx['sData'])
         }
     }
 
@@ -222,6 +223,16 @@ class TestCtrl extends CtrlTpl {
                     if (it instanceof Exception) down.success(fail(it.message))
                     else down.success ok(it)
                 })
+            }
+        }
+    }
+
+
+    def http(Chain chain) {
+        def http = bean(OkHttpSrv)
+        chain.path("http") {ctx ->
+            ctx.render Promise.async {down ->
+                ctx.render http.get(ctx.request.queryParams['url']?:'http://gy/test/cus').debug().execute()
             }
         }
     }
