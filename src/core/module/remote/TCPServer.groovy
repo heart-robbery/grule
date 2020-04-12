@@ -97,7 +97,7 @@ class TCPServer extends ServerTpl {
                             @Override
                             void channelUnregistered(ChannelHandlerContext ctx) throws Exception {
                                 super.channelUnregistered(ctx); connCount.decrementAndGet()
-                                log.debug("TCP Connection unregistered: {}, addr: '{}'-'{}'", connCount, ch.remoteAddress(), ch.localAddress())
+                                log.debug("TCP Connection unregistered: "+ connCount +", addr: '{}'-'{}'", ch.remoteAddress(), ch.localAddress())
                             }
                         })
                         // 最好是将IdleStateHandler放在入站的开头，并且重写userEventTriggered这个方法的handler必须在其后面。否则无法触发这个事件。
@@ -166,6 +166,15 @@ class TCPServer extends ServerTpl {
                 remoter?.receiveEventReq(jo.getJSONObject("data"), {r -> ctx.writeAndFlush(Unpooled.copiedBuffer((r + (delimiter?:'')).getBytes('utf-8')))})
             }
         } else if ("appUp" == t) { // 应用注册在线通知
+            def sJo = jo.getJSONObject('source')
+            if (!sJo) {
+                log.warn("Unknown source. origin data: " + dataStr); return
+            }
+            if (sJo['id'] == app.id) {
+                log.warn("Not allow register up to self")
+                ctx.close()
+                return
+            }
             queue('appUp') {
                 JSONObject d
                 try { d = jo.getJSONObject("data"); appUp(d, ctx) }
@@ -186,6 +195,13 @@ class TCPServer extends ServerTpl {
             // 例: {"type":"cmd-restart-server", "source": "xxx", "data": "ehcache"}$_$
             String sName = jo.getString("data")
             ep.fire(sName+ ".stop", EC.of(this).completeFn{ec -> ep.fire(sName + ".start")})
+        } else if (t.startsWith("ls ")) {
+            def arr = t.split(" ")
+            if (arr?[1] = "apps") {
+                ctx.writeAndFlush(Unpooled.copiedBuffer(JSON.toJSONString(appInfoMap), Charset.forName("utf-8")))
+            } else if (arr?[1] == 'app' && arr?[2]) {
+                ctx.writeAndFlush(Unpooled.copiedBuffer(JSON.toJSONString(appInfoMap[arr?[2]]), Charset.forName("utf-8")))
+            }
         } else {
             ctx.close()
             log.error("Not support exchange data type '{}'", t)

@@ -29,6 +29,8 @@ redis, jpa(hibernate), OkHttpClient, Remoter(多应用tcp通信)
     通过配置 remoter.master:'应用名字', remoter.masterHps: 'host:port,host1:port1'指定master
     master的注册功能和发布通知功能由TCPServer实现
     加入集群和集群保存活动的功能由TCPClient实现
+    remoter.registerToAll=true, remoter.masterHps=master.com:8001 应用此配置会向master.com所对应的所有ip(除自己)同时注册自己
+    隔离性/非传递性: app1(master:app2), app2(master:app3), app3没有master,则: app1 拿不到app3
 
 #### OkHttpSrv http客户端
     支持集群中的应用名调用(此功能依赖Remoter)

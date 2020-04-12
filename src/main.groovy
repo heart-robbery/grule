@@ -22,6 +22,7 @@ import sevice.TestService
 import java.text.SimpleDateFormat
 import java.time.Duration
 
+
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Field final AppContext app = new AppContext()
 @Lazy @Field EP ep = app.bean(EP)

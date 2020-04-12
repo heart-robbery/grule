@@ -431,7 +431,7 @@ class TCPClient extends ServerTpl {
     // netty Channel 连接池
     protected class ChannelPool {
               Node          node
-              String        host
+              String        host // TODO 域名 对应多个ip
               Integer       port
         final ReadWriteLock rwLock = new ReentrantReadWriteLock()
         final List<Channel> chs    = new ArrayList<>(7)
@@ -490,7 +490,7 @@ class TCPClient extends ServerTpl {
                 records.offer(System.currentTimeMillis())
                 while (true) {
                     def t = records.peek()
-                    if (t && t - System.currentTimeMillis() > 60 * 1000L) records.poll()
+                    if (t && System.currentTimeMillis() - t > 60 * 1000L) records.poll()
                     else break
                 }
                 if (records.size() > getInteger("oneMinuteLimitPerChannel", 70) && chs.size() < getInteger('maxConnectPerNode', 3)) {
