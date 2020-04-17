@@ -73,7 +73,6 @@ dependencies {
 
     // 异步sql
     // compile 'com.github.jasync-sql:jasync-mysql:1.0.12'
-    //compile 'org.xbill:dnsjava:2003'
 }
 
 

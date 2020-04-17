@@ -21,7 +21,7 @@ class AppContext {
     /**
      * 系统名字. 用于多个系统启动区别
      */
-    @Lazy String                        name         = env['sys']['name'] ?: null
+    @Lazy String                        name         = env['sys']['name'] ?: "gy"
     /**
      * 实例Id
      * NOTE: 保证唯一

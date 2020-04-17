@@ -103,7 +103,7 @@ class TestCtrl extends CtrlTpl {
                 }
             })
         }
-        bean(SchedSrv).cron('0/30 * * * * ?') {
+        bean(SchedSrv).cron('0 0/1 * * * ?') {
             wsMsg(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()))
         }
     }

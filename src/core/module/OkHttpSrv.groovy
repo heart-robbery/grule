@@ -1,6 +1,5 @@
 package core.module
 
-
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import com.alibaba.fastjson.JSON
@@ -9,6 +8,7 @@ import okhttp3.*
 
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
+import java.util.function.BiConsumer
 import java.util.function.Consumer
 
 import static java.util.Collections.emptyList
@@ -103,6 +103,41 @@ class OkHttpSrv extends ServerTpl {
     }
 
 
+    /**
+     * 创建 WebSocket
+     * @param urlStr 连接地址
+     * @param tryInterval 重连接时间间隔. 秒
+     * @param msgFn 消息处理函数
+     * @return
+     */
+    WebSocket ws(String urlStr, Integer tryInterval, BiConsumer<String, WebSocket> msgFn = null) {
+        def req = new Request.Builder().url(urlStr).build()
+        def listener = new WebSocketListener() {
+            @Override
+            void onOpen(WebSocket webSocket, Response resp) {
+                log.info("WebSocket onOpen. url: " + urlStr)
+            }
+            @Override
+            void onMessage(WebSocket webSocket, String msg) {
+                msgFn?.accept(msg, webSocket)
+            }
+            @Override
+            void onFailure(WebSocket ws, Throwable t, Response resp) {
+                log.error("WS Error. url: " + urlStr + ", res: " + resp?.body()?.toString(), t)
+                if (tryInterval) {
+                    def sched = bean(SchedSrv)
+                    if (sched) {
+                        sched.after(Duration.ofSeconds(tryInterval), { client.newWebSocket(req, this) })
+                    } else {
+                        log.warn("重连接WebSocket, 依赖于 sched 服务")
+                    }
+                }
+            }
+        }
+        client.newWebSocket(req, listener)
+    }
+
+
     OkHttpClient client() {client}
 
     class OkHttp {
@@ -165,6 +200,12 @@ class OkHttpSrv extends ServerTpl {
             if ('GET' == builder.method) { // get 请求拼装参数
                 urlStr = Utils.buildUrl(urlStr, params)
                 builder.get()
+                // okHttp get 不能body
+//                if (jsonBodyStr) { // get body
+//                    builder.method("GET", RequestBody.create(MediaType.get(contentType), jsonBodyStr))
+//                } else {
+//                    builder.get()
+//                }
             } else if ('POST' == builder.method) {
                 if (contentType && contentType.containsIgnoreCase('application/json')) {
                     if (jsonBodyStr) builder.post(RequestBody.create(MediaType.get(contentType), (jsonBodyStr == null ? '' : jsonBodyStr)))

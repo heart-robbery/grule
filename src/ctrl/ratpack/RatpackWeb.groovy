@@ -62,6 +62,9 @@ class RatpackWeb extends ServerTpl {
                     baseDir(BaseDir.find('static/'))
                     development(getBoolean('development', false))
 
+                    def addr = getStr('address', null)
+                    if (addr) { address(InetAddress.getByName(addr)) }
+
                     if (getBoolean("secure", false) || getBoolean("ssl", false)) {
                         def se = security()
                         log.info("publicKey: " + Base64.encoder.encodeToString(se.v2.publicKey.encoded))
@@ -83,7 +86,7 @@ class RatpackWeb extends ServerTpl {
 
 
     @EL(name = 'sys.started')
-    def started() { ctrls.each {ep.fire('inject', it)}; enabled = true }
+    protected started() { ctrls.each {ep.fire('inject', it)}; enabled = true }
 
 
     /**
@@ -266,11 +269,11 @@ class RatpackWeb extends ServerTpl {
                     super.setProperty(pName, newValue)
                 }
             }
-            ctx.metaClass.sData = sData
+            ctx.metaClass['sData'] = sData
             if (sId && redis.exists("session:$sId")) {
-                sData.id = sId
+                sData['id'] = sId
             } else {
-                sData.id = sId = UUID.randomUUID().toString().replace('-', '')
+                sData['id'] = sId = UUID.randomUUID().toString().replace('-', '')
                 log.info("New session '{}'", sId)
             }
         } else {// session的数据, 默认用ehcache 保存 session 数据
@@ -286,7 +289,7 @@ class RatpackWeb extends ServerTpl {
             ctx.metaClass.sData = sData
         }
 
-        ctx.metaClass.sId = sId
+        ctx.metaClass['sId'] = sId
         def c = ctx.response.cookie('sId', sId)
         c.maxAge = sessionExpire.plusSeconds(30).seconds
     }
@@ -296,7 +299,7 @@ class RatpackWeb extends ServerTpl {
     protected final Map<String, LongAdder> hourCount = new ConcurrentHashMap<>(3)
     // 请求统计
     protected count() {
-        SimpleDateFormat sdf = new SimpleDateFormat('MM-dd HH')
+        def sdf = new SimpleDateFormat('MM-dd HH')
         boolean isNew = false
         String hStr = sdf.format(new Date())
         LongAdder count = hourCount.get(hStr)

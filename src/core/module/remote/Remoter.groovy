@@ -31,6 +31,8 @@ class Remoter extends ServerTpl {
     @Lazy String              masterHps = getStr('masterHps', null)
     // 集群的服务中心应用名
     @Lazy String              master    = getStr('master', null)
+    // 设置默认tcp折包粘包的分割
+    @Lazy String              delimiter = getStr('delimiter', '$_$')
 
 
     Remoter() { super("remoter") }
@@ -43,8 +45,6 @@ class Remoter extends ServerTpl {
         if (exec == null) exec = Executors.newFixedThreadPool(2)
         if (ep == null) {ep = new EP(exec); ep.addListenerSource(this)}
 
-        // 设置默认tcp折包粘包的分割
-        String delimiter = getStr('delimiter', '$_$')
         // 如果系统中没有TCPClient, 则创建
         tcpClient = bean(TCPClient)
         if (tcpClient == null) {
@@ -77,7 +77,7 @@ class Remoter extends ServerTpl {
 
 
     @EL(name = 'sys.started')
-    def started() {
+    protected started() {
         queue('appUp') { tcpServer.appUp(selfInfo, null) }
         syncFn.run()
     }
@@ -89,8 +89,8 @@ class Remoter extends ServerTpl {
      *          2. 服务端接收到事件: {@link #receiveEventReq(com.alibaba.fastjson.JSONObject, java.util.function.Consumer)}
      *          3. 客户端接收到返回: {@link #receiveEventResp(com.alibaba.fastjson.JSONObject)}
      * @param ec
-     * @param appName 应用名字
-     * @param eName 要触发的事件名
+     * @param appName 应用名
+     * @param eName 远程应用中的事件名
      * @param remoteMethodArgs 远程事件监听方法的参数
      */
     @EL(name = "remote")
@@ -100,7 +100,7 @@ class Remoter extends ServerTpl {
         ec.suspend()
         JSONObject params = new JSONObject(4)
         try {
-            if (ec.id() == null) {ec.id(UUID.randomUUID().toString())}
+            if (ec.id() == null) {ec.id(UUID.randomUUID().toString().replaceAll("-", ''))}
             params.put("eId", ec.id())
             boolean reply = (ec.completeFn() != null) // 是否需要远程响应执行结果(有完成回调函数就需要远程响应调用结果)
             params.put("reply", reply)
@@ -136,6 +136,21 @@ class Remoter extends ServerTpl {
             ecMap.remove(ec.id())
             ec.ex(ex).resume().tryFinish()
         }
+    }
+
+
+    /**
+     * 同步远程事件调用
+     * @param appName 应用名
+     * @param eName 远程应用中的事件名
+     * @param remoteMethodArgs 远程事件监听方法的参数
+     */
+    def event(String appName, String eName, Object... remoteMethodArgs) {
+//        def ec = EC.of(this).completeFn({ec ->
+//            ec.notify()
+//        })
+//        sendEvent(ec, appName, eName, remoteMethodArgs)
+//        ec.wait()
     }
 
 
@@ -218,11 +233,11 @@ class Remoter extends ServerTpl {
     @Lazy def syncFn = new Runnable() {
         private final def running = new AtomicBoolean(false)
         private final def toAll = getBoolean('syncToAll', false)
-        private final def hps = masterHps.split(",").collect {
+        private final def hps = masterHps?.split(",").collect {
             def arr = it.split(":")
             Tuple.tuple(arr[0].trim()?:'127.0.0.1', Integer.valueOf(arr[1].trim()))
-        }.findAll {it}
-        private final Set<String> localHps = {
+        }.findAll {it.v1 && it.v2}
+        private final Set<String> localHps = { //忽略的hp
             Set<String> r = new HashSet<>()
             def port = tcpServer.hp?.split(":")[1]
             if (port) {
@@ -233,22 +248,14 @@ class Remoter extends ServerTpl {
             def exposeTcp = getStr('exposeTcp', null)
             if (exposeTcp) r.add(exposeTcp)
             return r
-        }.call()
+        }()
 
         @Override
         void run() {
             try {
-                if (!running.compareAndSet(false, true)) return
-                // 当tcpClient 中存在相应的 master 时, 则用master 作为服务中心
-                String mName = master ? (tcpClient.apps.containsKey(master) ? master : null) : null
-                if (!masterHps && !mName) return
-                if (!app.name || !app.id) {
-                    log.error("Current App name or id is empty")
-                    return
-                }
-                if (hps.size() < 1) {
-                    log.error("Master not config right. {}", masterHps)
-                    return
+                if (!running.compareAndSet(false, true)) return //同时只允许一个线程执行
+                if (!hps && !master) {
+                    log.error("'masterHps' or 'master' must config one"); return
                 }
                 def info = selfInfo
                 if (!info) return
@@ -275,14 +282,10 @@ class Remoter extends ServerTpl {
                     }
                 }
 
-                if (mName && tcpClient.apps.get(mName)) { // 应用名
-                    try {
-                        tcpClient.send(mName, data.toString(), toAll ? 'all' : 'any')
-                    } catch (e) {
-                        fn.call()
-                    }
-                } else {
-                    fn.call()
+                try {
+                    tcpClient.send(master, data.toString(), (toAll ? 'all' : 'any'))
+                } catch (e) {
+                    fn()
                 }
 
                 log.debug("Register up success. {}", data)
@@ -303,8 +306,12 @@ class Remoter extends ServerTpl {
      */
     def getSelfInfo() {
         JSONObject data = new JSONObject(4)
-        if (app.id) data.put("id", app.id)
-        if (app.name) data.put("name", app.name)
+        if (app.id && app.name) {
+            data.put("id", app.id)
+            data.put("name", app.name)
+        } else {
+            log.error("Current App name or id is empty"); return null
+        }
 
         def exposeHttp = getStr('exposeHttp', null) // 配置暴露的http
         if (exposeHttp) data.put("http", exposeHttp)
@@ -314,15 +321,15 @@ class Remoter extends ServerTpl {
         if (exposeTcp) data.put("tcp", exposeTcp)
         else if (tcpServer.hp.split(":")[0]) data.put("tcp", tcpServer.hp)
         else {
-            if (ipv4()) {
-                data.put("tcp", ipv4() + tcpServer.hp)
+            def ip = ipv4()
+            if (ip) {
+                data.put("tcp", ip + tcpServer.hp)
             } else {
                 log.warn("Can't get local ipv4")
-                return new JSONObject()
+                return null
             }
         }
 
-        if (!data.containsKey('tcp')) return null
         return data
     }
 }

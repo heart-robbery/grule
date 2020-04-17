@@ -22,20 +22,19 @@ import sevice.TestService
 import java.text.SimpleDateFormat
 import java.time.Duration
 
-
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Field final AppContext app = new AppContext()
 @Lazy @Field EP ep = app.bean(EP)
 
 // 系统功能添加区
+app.addSource(new OkHttpSrv())
 app.addSource(new EhcacheSrv())
 app.addSource(new SchedSrv())
 app.addSource(new RedisClient())
-app.addSource(new OkHttpSrv())
 app.addSource(new Remoter())
 app.addSource(new HibernateSrv().entities(Test, UploadFile, Component))
 app.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl))
-//ctx.addSource(new RuleSrv())
+////ctx.addSource(new RuleSrv())
 app.addSource(new FileUploader())
 app.addSource(new TestService())
 app.addSource(this)
@@ -45,6 +44,7 @@ app.start() // 启动系统
 @EL(name = 'sys.started')
 def sysStarted() {
     TestService ts = app.bean(TestService)
+    //ts.wsClientTest()
     return
     try {
         ts.authTest()

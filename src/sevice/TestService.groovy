@@ -15,10 +15,6 @@ import core.module.jpa.BaseRepo
 import ctrl.common.FileData
 import dao.entity.Test
 import dao.entity.UploadFile
-import okhttp3.Request
-import okhttp3.Response
-import okhttp3.WebSocket
-import okhttp3.WebSocketListener
 
 import java.text.SimpleDateFormat
 import java.util.concurrent.Executor
@@ -76,20 +72,9 @@ class TestService extends ServerTpl {
 
 
     def wsClientTest() {
-        http.client().newWebSocket(new Request.Builder().url("ws://rl.cnxnu.com:9659/ppf/ar/6.0").build(), new WebSocketListener() {
-            @Override
-            void onOpen(WebSocket webSocket, Response resp) {
-                println "webSocket onOpen: ${resp.body().string()}"
-            }
-            final AtomicInteger i = new AtomicInteger()
-            @Override
-            void onMessage(WebSocket webSocket, String text) {
-                println("消息" + i.getAndIncrement() + ": " + text)
-            }
-            @Override
-            void onFailure(WebSocket webSocket, Throwable t, Response resp) {
-                t.printStackTrace()
-            }
+        def i = 1
+        http.ws('ws://localhost:7100/test/ws', 90,{msg, ws ->
+            log.info("消息" + (i++) + ": " + msg)
         })
     }
 
