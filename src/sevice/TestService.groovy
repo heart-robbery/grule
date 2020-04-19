@@ -1,6 +1,6 @@
 package sevice
 
-import cn.xnatural.enet.event.EC
+
 import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
 import core.Page
@@ -12,13 +12,13 @@ import core.mode.v.VProcessor
 import core.module.OkHttpSrv
 import core.module.ServerTpl
 import core.module.jpa.BaseRepo
+import core.module.remote.Remoter
 import ctrl.common.FileData
 import dao.entity.Test
 import dao.entity.UploadFile
 
 import java.text.SimpleDateFormat
 import java.util.concurrent.Executor
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Consumer
 
 class TestService extends ServerTpl {
@@ -177,10 +177,8 @@ class TestService extends ServerTpl {
 
     def remote(String app, String eName, String ret = 'xx', Consumer fn) {
         // 远程调用
-        ep.fire("remote", EC.of(this).args(app, eName, [ret] as Object[]).completeFn({ec ->
-            if (ec.isSuccess()) fn.accept(ec.result);
-            else fn.accept(ec.ex() == null ? new Exception(ec.failDesc()) : ec.ex());
-        }))
+        // fn.accept(bean(Remoter).fire(app?:'gy', eName?:'eName1', ['p1']))
+        bean(Remoter).fireAsync(app?:'gy', eName?:'eName1', fn, ['p1'])
     }
 
 
@@ -196,30 +194,36 @@ class TestService extends ServerTpl {
 
 
     @EL(name = "eName2", async = false)
-    private Object testEvent2(String p) {
-        return repo.findPage(0, 20, { root, query, cb -> query.orderBy(cb.desc(root.get("id")))})
+    def testEvent2(String p) {
+        repo.findPage(Test, 1, 10, { root, query, cb -> query.orderBy(cb.desc(root.get("id")))})
     }
 
 
     @EL(name = "eName3", async = false)
-    private long testEvent3(String p) {
-        return repo.count({root, query, cb -> query.orderBy(cb.desc(root.get("id")))})
+    testEvent3(String p) {
+        repo.count(Test, {root, query, cb -> query.orderBy(cb.desc(root.get("id")))})
     }
 
 
     @EL(name = "eName4", async = false)
-    private Object testEvent4(String p) {
-        return ep.fire("cache.get","java","java")
+    def testEvent4(String p) {
+        ep.fire("cache.get","java","java")
     }
 
 
     @EL(name = "eName5", async = false)
-    private void testEvent5(String p) {
+    void testEvent5(String p) {
         ep.fire("cache.set","java","java", p)
     }
 
     @EL(name = "eName6", async = false)
-    private Object testEvent6(String p) {
+    def testEvent6(String p) {
         throw new RuntimeException("抛个错 $p")
+    }
+
+    @EL(name = "eName7", async = false)
+    def testEvent7(String p) {
+        Thread.sleep(5000L)
+        "eName7_"+System.currentTimeMillis()
     }
 }

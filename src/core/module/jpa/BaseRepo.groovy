@@ -154,8 +154,8 @@ class BaseRepo extends ServerTpl {
      */
     def <E extends IEntity> Page<E> findPage(Class<E> eType, Integer page, Integer pageSize, CriteriaSpec spec = null) {
         if (eType == null) throw new IllegalArgumentException('eType must not be null')
-        if (page == null || page < 1) throw new IllegalArgumentException("page: $page")
-        if (pageSize == null || pageSize < 0) throw new IllegalArgumentException("pageSize: $pageSize")
+        if (page == null || page < 1) throw new IllegalArgumentException("page: $page, must >=1")
+        if (pageSize == null || pageSize < 1) throw new IllegalArgumentException("pageSize: $pageSize, must >=1")
         trans{s ->
             CriteriaBuilder cb = s.getCriteriaBuilder()
             CriteriaQuery<E> query = cb.createQuery(eType)

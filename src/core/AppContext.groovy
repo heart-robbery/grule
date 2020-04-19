@@ -129,9 +129,8 @@ class AppContext {
      * {@link #ep} 会找出source对象中所有其暴露的功能. 即: 用 @EL 标注的方法
      * 注: 为每个对象源都配一个 name 属性标识
      * @param source 不能是一个 Class
-     * @return
      */
-    def addSource(
+    void addSource(
         Object source,
         String name = source instanceof ServerTpl ? source['name'] : (source?.class.simpleName.uncapitalize())
     ) {
@@ -175,7 +174,7 @@ class AppContext {
      * @param o
      */
     @EL(name = "inject", async = false)
-    def inject(Object o) {
+    void inject(Object o) {
         iterateField(o.getClass(), {f ->
             Resource aR = f.getAnnotation(Resource.class)
             if (aR) {

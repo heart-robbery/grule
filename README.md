@@ -19,11 +19,10 @@ groovy 快速开发代码
     共用属性: baseDir(当前项目目录), System.properties
     app.conf: 可像 $baseDir 这样使用共用属性
     app-[profile].conf: 可使用共用属性和app.conf中的属性
-    优先级: 系统属性 > app-profile.conf > app.conf
+    优先级: 系统属性 > app-[profile].conf > app.conf
     
 
 #### Remoter 集群分布式
-极简应用
 ```
 remoter {
     // 集群的服务中心地址. 格式为: host1:port1,host2:port2. 域名可配置多个Ip
@@ -32,10 +31,9 @@ remoter {
     // syncToAll=true
 }
 ```
-    ep.fire("remote", EC.of(this).args("应用名", eName, [ret] as Object[]).completeFn({ec ->
-        if (ec.isSuccess()) fn.accept(ec.result);
-        else fn.accept(ec.ex() == null ? new Exception(ec.failDesc()) : ec.ex());
-    }))
+    同步调用: fire(应用名, 事件名, 参数...)
+    异步调用: fireAsync(应用名, 事件名, 回调函数, 参数...)
+    例: bean(Remoter).fire('gy', 'eName1', ['p1'])
 
 #### OkHttpSrv http客户端api封装
     get请求:  get("localhost:8080/test/cus?p1=111").param("p2", "222").execute()
@@ -43,8 +41,7 @@ remoter {
     json请求: post("localhost:8080/test/cus").jsonBody("json string").execute()
     文件上传: post("localhost:8080/test/cus?p1=111").param("file", new File("/tmp/a.txt")).execute()
     WebSocket: ws("ws://localhost:7100/test/ws", 60, {msg, ws -> println msg}); 60秒重试一次(如果连接失败) 
-    支持集群中的应用名调用(此功能依赖Remoter)
-    get("http://gy/test/cus").execute(), 当gy 是属于集群中的某个应用名时, 会调到此应用去
+    集群应用接口: get("http://应用名/test/cus").execute(). 此功能依赖Remoter
 
 
 #### 安装教程

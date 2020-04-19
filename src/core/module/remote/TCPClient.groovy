@@ -261,7 +261,7 @@ class TCPClient extends ServerTpl {
         // 组名
         String name
         // 节点id -> 节点
-        final Map<String, Node> nodes =  new ConcurrentHashMap<>()
+        final Map<String, Node> nodes = new ConcurrentHashMap<>()
 
         /**
          * 更新/添加应用节点

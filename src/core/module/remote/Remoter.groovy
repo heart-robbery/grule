@@ -12,8 +12,9 @@ import core.module.ServerTpl
 
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.TimeUnit
 import java.util.function.Consumer
 
 import static core.Utils.getLog
@@ -85,7 +86,7 @@ class Remoter extends ServerTpl {
 
     /**
      * 调用远程事件
-     * 执行流程: 1. 客户端发送事件:  {@link #sendEvent(EC, String, String, Object[])}
+     * 执行流程: 1. 客户端发送事件:  {@link #sendEvent(EC, String, String, List)}
      *          2. 服务端接收到事件: {@link #receiveEventReq(com.alibaba.fastjson.JSONObject, java.util.function.Consumer)}
      *          3. 客户端接收到返回: {@link #receiveEventResp(com.alibaba.fastjson.JSONObject)}
      * @param ec
@@ -93,27 +94,44 @@ class Remoter extends ServerTpl {
      * @param eName 远程应用中的事件名
      * @param remoteMethodArgs 远程事件监听方法的参数
      */
-    @EL(name = "remote")
-    protected sendEvent(EC ec, String appName, String eName, Object[] remoteMethodArgs) {
+    @EL(name = "remote", async = false)
+    protected sendEvent(EC ec, String appName, String eName, List remoteMethodArgs) {
         if (tcpClient == null) throw new RuntimeException("$tcpClient.name not is running")
         if (app.name == null) throw new IllegalArgumentException("app.name is empty")
         ec.suspend()
-        JSONObject params = new JSONObject(4)
+        JSONObject params = new JSONObject(5, true)
         try {
+            boolean trace = (ec.track || getBoolean("trace_*_*") || getBoolean("trace_*_${eName}") || getBoolean("trace_${appName}_*") || getBoolean("trace_${appName}_${eName}"))
             if (ec.id() == null) {ec.id(UUID.randomUUID().toString().replaceAll("-", ''))}
-            params.put("eId", ec.id())
+            params.put("id", ec.id())
             boolean reply = (ec.completeFn() != null) // 是否需要远程响应执行结果(有完成回调函数就需要远程响应调用结果)
             params.put("reply", reply)
-            params.put("eName", eName)
-            if (remoteMethodArgs != null) {
-                JSONArray args = new JSONArray(remoteMethodArgs.length)
+            params.put("name", eName)
+            // params.put("trace", trace)
+            if (remoteMethodArgs) {
+                JSONArray args = new JSONArray(remoteMethodArgs.size())
                 params.put("args", args)
                 for (Object arg : remoteMethodArgs) {
                     if (arg == null) args.add(new JSONObject(0))
                     else args.add(new JSONObject(2).fluentPut("type", arg.getClass().getName()).fluentPut("value", arg))
                 }
             }
-            if (reply) ecMap.put(ec.id(), ec)
+            if (reply) {
+                ecMap.put(ec.id(), ec)
+                // 数据发送成功. 如果需要响应, 则添加等待响应超时处理
+                sched.after(Duration.ofSeconds(getInteger("timeout_$eName", getInteger("eventTimeout", 20))), {
+                    ecMap.remove(ec.id())?.errMsg("'${appName}_$eName' Timeout")?.resume()?.tryFinish()
+                })
+                if (trace) {
+                    def fn = ec.completeFn()
+                    ec.completeFn({
+                        if (ec.isSuccess()) {
+                            log.info("End remote event. id: "+ ec.id() + ", result: $ec.result")
+                        }
+                        fn.accept(ec)
+                    })
+                }
+            }
 
             // 发送请求给远程应用appName执行. 消息类型为: 'event'
             JSONObject data = new JSONObject(3)
@@ -121,15 +139,11 @@ class Remoter extends ServerTpl {
                     .fluentPut("source", new JSONObject(2).fluentPut('name', app.name).fluentPut('id', app.id))
                     .fluentPut("data", params)
             if (ec.getAttr('toAll', Boolean.class, false)) {
+                if (trace) {log.info("Start Remote Event(toAll). app:"+ appName +", params: " + params)}
                 tcpClient.send(appName, data.toString(), 'all')
             } else {
-                // 默认 toAny
-                tcpClient.send(appName, data.toString())
-            }
-            if (reply) { // 数据发送成功. 如果需要响应, 则添加等待响应超时处理
-                sched.after(Duration.ofSeconds(getInteger("eventTimeout.$eName", getInteger("eventTimeout", 20))), {
-                    ecMap.remove(ec.id())?.errMsg("'$eName' Timeout")?.resume()?.tryFinish()
-                })
+                if (trace) {log.info("Start Remote Event(toAny). app:"+ appName +", params: " + params)}
+                tcpClient.send(appName, data.toString(), 'any')
             }
         } catch (Throwable ex) {
             log.error("Error fire remote event to '" +appName+ "'. params: " + params, ex)
@@ -144,23 +158,40 @@ class Remoter extends ServerTpl {
      * @param appName 应用名
      * @param eName 远程应用中的事件名
      * @param remoteMethodArgs 远程事件监听方法的参数
+     * @return
      */
-    def event(String appName, String eName, Object... remoteMethodArgs) {
-//        def ec = EC.of(this).completeFn({ec ->
-//            ec.notify()
-//        })
-//        sendEvent(ec, appName, eName, remoteMethodArgs)
-//        ec.wait()
+    def fire(String appName, String eName, List remoteMethodArgs) {
+        final def latch = new CountDownLatch(1)
+        def ec = EC.of(this).args(appName, eName, remoteMethodArgs).completeFn({latch.countDown()})
+        ep.fire("remote", ec)
+        latch.await(15, TimeUnit.SECONDS)
+        if (ec.isSuccess()) return ec.result
+        else throw new Exception(ec.failDesc()?:"TimeOut")
     }
 
 
     /**
-     * 接收远程事件返回的数据. 和 {@link #sendEvent(EC, String, String, Object[])} 对应
+     * 异步远程事件调用
+     * @param appName 应用名
+     * @param eName 远程应用中的事件名
+     * @param callback 回调函数. 1. 正常结果, 2. Exception
+     * @param remoteMethodArgs 远程事件监听方法的参数
+     */
+    def fireAsync(String appName, String eName, Consumer callback, List remoteMethodArgs) {
+        ep.fire("remote", EC.of(this).args(appName, eName, remoteMethodArgs).completeFn({ec ->
+            if (ec.isSuccess()) callback.accept(ec.result)
+            else callback.accept(new Exception(ec.failDesc()))
+        }))
+    }
+
+
+    /**
+     * 接收远程事件返回的数据. 和 {@link #sendEvent(EC, String, String, List)} 对应
      * @param data
      */
     def receiveEventResp(JSONObject data) {
         log.debug("Receive event response: {}", data)
-        EC ec = ecMap.remove(data.getString("eId"))
+        EC ec = ecMap.remove(data.getString("id"))
         if (ec != null) ec.errMsg(data.getString("exMsg")).result(data["result"]).resume().tryFinish()
     }
 
@@ -174,8 +205,8 @@ class Remoter extends ServerTpl {
         log.debug("Receive event request: {}", data);
         boolean fReply = (Boolean.TRUE == data.getBoolean("reply")) // 是否需要响应
         try {
-            String eId = data.getString("eId")
-            String eName = data.getString("eName")
+            String eId = data.getString("id")
+            String eName = data.getString("name")
 
             EC ec = new EC()
             ec.id(eId)
@@ -198,7 +229,7 @@ class Remoter extends ServerTpl {
             if (fReply) {
                 ec.completeFn(ec1 -> {
                     JSONObject r = new JSONObject(3)
-                    r.put("eId", ec.id())
+                    r.put("id", ec.id())
                     if (!ec.isSuccess()) { r.put("exMsg", ec.failDesc()); }
                     r.put("result", ec.result)
                     reply.accept(JSON.toJSONString(
@@ -215,7 +246,7 @@ class Remoter extends ServerTpl {
             log.error("invoke event error. data: " + data, ex)
             if (fReply) {
                 JSONObject r = new JSONObject(4)
-                r.put("eId", data.getString("eId"))
+                r.put("id", data.getString("id"))
                 r.put("success", false)
                 r.put("result", null)
                 r.put("exMsg", ex.message ? ex.message: ex.getClass().name)
@@ -229,9 +260,11 @@ class Remoter extends ServerTpl {
     }
 
 
-    // 向master同步函数
-    @Lazy def syncFn = new Runnable() {
-        private final def running = new AtomicBoolean(false)
+    /**
+     * 向master同步函数
+     * 不允许手机调用
+     */
+    @Lazy protected def syncFn = new Runnable() {
         private final def toAll = getBoolean('syncToAll', false)
         private final def hps = masterHps?.split(",").collect {
             def arr = it.split(":")
@@ -253,7 +286,6 @@ class Remoter extends ServerTpl {
         @Override
         void run() {
             try {
-                if (!running.compareAndSet(false, true)) return //同时只允许一个线程执行
                 if (!hps && !master) {
                     log.error("'masterHps' or 'master' must config one"); return
                 }
@@ -268,16 +300,20 @@ class Remoter extends ServerTpl {
 
                 // 用 hps 函数
                 def fn = {
-                    if (toAll) {
-                        hps.each {hp ->
-                            InetAddress.getAllByName(hp.v1).each {addr-> // 如果是域名,得到所有Ip
-                                if (!localHps.contains(addr.hostAddress+ ":" +hp.v2)) { // 除本机
-                                    tcpClient.send(addr.hostAddress, hp.v2, data.toString())
-                                }
+                    // 如果是域名,得到所有Ip, 除本机
+                    List<Tuple2<String, Integer>> ls = hps.collectMany {hp ->
+                        InetAddress.getAllByName(hp.v1)
+                            .collect {addr ->
+                                if (localHps.contains(addr.hostAddress+ ":" +hp.v2)) return null
+                                else return Tuple.tuple(addr.hostAddress, hp.v2)
                             }
-                        }
+                            .findAll {it}
+                    }
+
+                    if (toAll) {
+                        ls.each {hp -> tcpClient.send(hp.v1, hp.v2, data.toString())}
                     } else {
-                        def hp = hps.get(new Random().nextInt(hps.size()))
+                        def hp = ls.get(new Random().nextInt(ls.size()))
                         tcpClient.send(hp.v1, hp.v2, data.toString())
                     }
                 }
@@ -289,12 +325,17 @@ class Remoter extends ServerTpl {
                 }
 
                 log.debug("Register up success. {}", data)
-                sched.after(Duration.ofSeconds(getInteger('upInterval', 90) + new Random().nextInt(60)), syncFn)
+
+                // 下次触发策略
+                if (System.currentTimeMillis() - app.startup.time > 3 * 60 * 1000L) {
+                    sched.after(Duration.ofSeconds(getInteger('upInterval', 90) + new Random().nextInt(60)), syncFn)
+                } else {
+                    sched.after(Duration.ofSeconds(10), syncFn)
+                }
             } catch (Throwable ex) {
                 sched.after(Duration.ofSeconds(getInteger('upInterval', 30) + new Random().nextInt(60)), syncFn)
                 log.error("Register up error. " + (ex.message?:ex.class.simpleName))
             } finally {
-                running.set(false)
             }
         }
     }
