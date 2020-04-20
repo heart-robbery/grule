@@ -67,7 +67,7 @@ class TCPClient extends ServerTpl {
          *  例: {"name":"rc", "id":"rc_b70d18d52269451291ea6380325e2a84", "tcp":"192.168.56.1:8001","http":"localhost:8000"}
      *  属性不为空: name, id, tcp
      */
-    @EL(name = "updateAppInfo")
+    @EL(name = "updateAppInfo", async = false)
     def updateAppInfo(final JSONObject data) {
         log.trace("Update app info: {}", data)
         if (data == null || data.isEmpty()) return
@@ -197,11 +197,7 @@ class TCPClient extends ServerTpl {
         def jo = JSON.parseObject(dataStr)
         if ("updateAppInfo" == jo['type']) {
             queue('updateAppInfo') {
-                JSONObject d
-                try { d = jo.getJSONObject("data"); updateAppInfo(d) }
-                catch (Throwable ex) {
-                    log.error("updateAppInfo error. data: " + d, ex)
-                }
+                ep.fire("updateAppInfo", jo.getJSONObject("data"))
             }
         }
         else if ("event"== jo['type']) {

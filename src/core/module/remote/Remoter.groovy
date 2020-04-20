@@ -31,7 +31,9 @@ class Remoter extends ServerTpl {
     // 集群的服务中心地址 [host]:port,[host1]:port2. 例 :8001 or localhost:8001
     @Lazy String              masterHps = getStr('masterHps', null)
     // 集群的服务中心应用名
-    @Lazy String              master    = getStr('master', null)
+    @Lazy String masterName = getStr('masterName', null)
+    // 是否为master
+    @Lazy boolean master = getBoolean('master', false)
     // 设置默认tcp折包粘包的分割
     @Lazy String              delimiter = getStr('delimiter', '$_$')
 
@@ -262,10 +264,9 @@ class Remoter extends ServerTpl {
 
     /**
      * 向master同步函数
-     * 不允许手机调用
+     * 不允许手动调用
      */
     @Lazy protected def syncFn = new Runnable() {
-        private final def toAll = getBoolean('syncToAll', false)
         private final def hps = masterHps?.split(",").collect {
             def arr = it.split(":")
             Tuple.tuple(arr[0].trim()?:'127.0.0.1', Integer.valueOf(arr[1].trim()))
@@ -286,7 +287,7 @@ class Remoter extends ServerTpl {
         @Override
         void run() {
             try {
-                if (!hps && !master) {
+                if (!hps && !masterName) {
                     log.error("'masterHps' or 'master' must config one"); return
                 }
                 def info = selfInfo
@@ -310,7 +311,7 @@ class Remoter extends ServerTpl {
                             .findAll {it}
                     }
 
-                    if (toAll) {
+                    if (master) { // 如果是master, 则同步所有
                         ls.each {hp -> tcpClient.send(hp.v1, hp.v2, data.toString())}
                     } else {
                         def hp = ls.get(new Random().nextInt(ls.size()))
@@ -319,7 +320,7 @@ class Remoter extends ServerTpl {
                 }
 
                 try {
-                    tcpClient.send(master, data.toString(), (toAll ? 'all' : 'any'))
+                    tcpClient.send(masterName, data.toString(), (master ? 'all' : 'any'))
                 } catch (e) {
                     fn()
                 }
@@ -327,7 +328,7 @@ class Remoter extends ServerTpl {
                 log.debug("Register up success. {}", data)
 
                 // 下次触发策略
-                if (System.currentTimeMillis() - app.startup.time > 3 * 60 * 1000L) {
+                if (System.currentTimeMillis() - app.startup.time > 60 * 1000L) {
                     sched.after(Duration.ofSeconds(getInteger('upInterval', 90) + new Random().nextInt(60)), syncFn)
                 } else {
                     sched.after(Duration.ofSeconds(10), syncFn)

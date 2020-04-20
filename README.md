@@ -27,8 +27,8 @@ groovy 快速开发代码
 remoter {
     // 集群的服务中心地址. 格式为: host1:port1,host2:port2. 域名可配置多个Ip
     masterHps='xnatural.cn:8001'
-    // 是否向所有master同步. 一般被选为master的应用设置为true, 以保证master之间信息同步
-    // syncToAll=true
+    // 一般被选为master的应用设置为true, 以保证master之间信息同步
+    // master=true
 }
 ```
     同步调用: fire(应用名, 事件名, 参数...)

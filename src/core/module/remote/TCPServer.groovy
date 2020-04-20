@@ -238,7 +238,7 @@ class TCPServer extends ServerTpl {
         if (!data['name'] || !data['tcp']) { // 数据验证
             throw new IllegalArgumentException("app register up info bad data: " + data)
         }
-        data["_time"] = System.currentTimeMillis()
+        data["_uptime"] = System.currentTimeMillis()
 
         //1. 先删除之前的数据,再添加新的
         boolean isNew = true
@@ -259,10 +259,14 @@ class TCPServer extends ServerTpl {
                 def cur = it2.next()
                 if (!cur) {it2.remove(); continue} // 删除空的坏数据
                 // 删除一段时间未活动的注册信息, dropAppTimeout 单位: 分钟
-                if ((System.currentTimeMillis() - (Long) cur.getOrDefault("_time", System.currentTimeMillis()) > getInteger("dropAppTimeout", 30) * 60 * 1000) && (cur["id"] != app.id)) {
-                    it2.remove()
-                    log.warn("Drop timeout app up info: {}", cur)
-                    continue
+                if ((System.currentTimeMillis() - (Long) cur.getOrDefault("_uptime", System.currentTimeMillis()) > getInteger("dropAppTimeout", 20) * 60 * 1000)) {
+                    if (cur["id"] == app.id) { // 更新当前App up的时间
+                        cur['_uptime'] = System.currentTimeMillis()
+                    } else {
+                        it2.remove()
+                        log.warn("Drop timeout app up info: {}", cur)
+                        continue
+                    }
                 }
                 // 返回所有的注册信息给当前来注册的客户端
                 if (cur["id"] != data["id"]) {
@@ -272,9 +276,38 @@ class TCPServer extends ServerTpl {
                 }
                 // 如果是新系统上线, 则主动通知其它系统
                 if (isNew && cur['id'] != data['id'] && cur['id'] != app.id) {
-                    ep.fire("remote", EC.of(this).attr('toAll', true).args(e.key, "updateAppInfo", new Object[]{data}))
+                    ep.fire("remote", EC.of(this).attr('toAll', true).args(e.key, "updateAppInfo", [data]))
                 }
             }
+        }
+    }
+
+
+    /**
+     * 当为master时, 同步从其他master更新的信息
+     * @param data
+     * @return
+     */
+    @EL(name = "updateAppInfo", async = false)
+    def updateAppInfo(final JSONObject data) {
+        if (!remoter.master) return
+        if (!data) return
+        if (app.id == data["id"] || remoter?.selfInfo?['tcp'] == data['tcp']) return // 不把系统本身的信息放进去
+        queue('appUp') {
+            boolean add = true
+            List<Map<String, Object>> apps = appInfoMap.computeIfAbsent(data["name"], {new LinkedList<>()})
+            for (def itt = apps.iterator(); itt.hasNext(); ) {
+                def e = itt.next()
+                if (e["id"] == data["id"]) {
+                    if (data['_uptime'] > e['_uptime']) {
+                        itt.remove()
+                    } else {
+                        add = false
+                    }
+                    break
+                }
+            }
+            if (add) {apps << data}
         }
     }
 
