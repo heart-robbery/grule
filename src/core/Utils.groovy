@@ -20,7 +20,7 @@ import java.util.function.Consumer
 import java.util.function.Function
 
 class Utils {
-    static final Logger log = LoggerFactory.getLogger(Utils)
+    protected static final Logger log = LoggerFactory.getLogger(Utils)
     static final GroovyClassLoader gcl = new GroovyClassLoader()
 
 

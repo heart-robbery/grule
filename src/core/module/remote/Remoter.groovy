@@ -15,9 +15,9 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.function.Consumer
 
-import static core.Utils.getLog
 import static core.Utils.ipv4
 
 class Remoter extends ServerTpl {
@@ -204,7 +204,7 @@ class Remoter extends ServerTpl {
      * @param reply 响应回调(传参为响应的数据)
      */
     def receiveEventReq(JSONObject data, Consumer<String> reply) {
-        log.debug("Receive event request: {}", data);
+        log.debug("Receive event request: {}", data)
         boolean fReply = (Boolean.TRUE == data.getBoolean("reply")) // 是否需要响应
         try {
             String eId = data.getString("id")
@@ -267,11 +267,17 @@ class Remoter extends ServerTpl {
      * 不允许手动调用
      */
     @Lazy protected def syncFn = new Runnable() {
-        private final def hps = masterHps?.split(",").collect {
-            def arr = it.split(":")
-            Tuple.tuple(arr[0].trim()?:'127.0.0.1', Integer.valueOf(arr[1].trim()))
-        }.findAll {it.v1 && it.v2}
-        private final Set<String> localHps = { //忽略的hp
+        def               hps      = masterHps?.split(",").collect {
+            if (!it) return null
+            try {
+                def arr = it.split(":")
+                return Tuple.tuple(arr[0].trim()?:'127.0.0.1', Integer.valueOf(arr[1].trim()))
+            } catch (ex) {
+                log.error("'masterHps' config error. " + it, ex)
+            }
+            null
+        }.findAll {it && it.v1 && it.v2}
+        @Lazy Set<String> localHps = { //忽略的hp
             Set<String> r = new HashSet<>()
             def port = tcpServer.hp?.split(":")[1]
             if (port) {
@@ -283,60 +289,64 @@ class Remoter extends ServerTpl {
             if (exposeTcp) r.add(exposeTcp)
             return r
         }()
+        // 上传的数据格式
+        @Lazy def dataFn = {JSONObject info ->
+            new JSONObject(3).fluentPut("type", 'appUp')
+                .fluentPut("source", new JSONObject(2).fluentPut('name', app.name).fluentPut('id', app.id))
+                .fluentPut("data", info)
+                .toString()
+        }
+        // 用 hps 函数
+        @Lazy def toHps     = { String data->
+            // 如果是域名,得到所有Ip, 除本机
+            List<Tuple2<String, Integer>> ls = hps.collectMany {hp ->
+                InetAddress.getAllByName(hp.v1)
+                    .collect {addr ->
+                        if (localHps.contains(addr.hostAddress+ ":" +hp.v2)) return null
+                        else return Tuple.tuple(addr.hostAddress, hp.v2)
+                    }
+                    .findAll {it}
+            }
+
+            if (master) { // 如果是master, 则同步所有
+                ls.each {hp -> tcpClient.send(hp.v1, hp.v2, data)}
+            } else {
+                def hp = ls.get(new Random().nextInt(ls.size()))
+                tcpClient.send(hp.v1, hp.v2, data)
+            }
+        }
+        def running = new AtomicBoolean(false)
 
         @Override
         void run() {
             try {
                 if (!hps && !masterName) {
-                    log.error("'masterHps' or 'master' must config one"); return
+                    log.error("'masterHps' or 'masterName' must config one"); return
                 }
+                if (!running.compareAndSet(false, true)) return
                 def info = selfInfo
                 if (!info) return
-
-                // 上传的数据格式
-                JSONObject data = new JSONObject(3)
-                data.put("type", 'appUp') // 数据类型 appUp
-                data.put("source", new JSONObject(2).fluentPut('name', app.name).fluentPut('id', app.id)) // 表明来源
-                data.put("data", info)
-
-                // 用 hps 函数
-                def fn = {
-                    // 如果是域名,得到所有Ip, 除本机
-                    List<Tuple2<String, Integer>> ls = hps.collectMany {hp ->
-                        InetAddress.getAllByName(hp.v1)
-                            .collect {addr ->
-                                if (localHps.contains(addr.hostAddress+ ":" +hp.v2)) return null
-                                else return Tuple.tuple(addr.hostAddress, hp.v2)
-                            }
-                            .findAll {it}
-                    }
-
-                    if (master) { // 如果是master, 则同步所有
-                        ls.each {hp -> tcpClient.send(hp.v1, hp.v2, data.toString())}
-                    } else {
-                        def hp = ls.get(new Random().nextInt(ls.size()))
-                        tcpClient.send(hp.v1, hp.v2, data.toString())
-                    }
-                }
+                String data = dataFn(info)
 
                 try {
-                    tcpClient.send(masterName, data.toString(), (master ? 'all' : 'any'))
+                    tcpClient.send(masterName, data, (master ? 'all' : 'any'))
                 } catch (e) {
-                    fn()
+                    toHps(data)
                 }
+                log.debug("Up success. {}", data)
 
-                log.debug("Register up success. {}", data)
-
-                // 下次触发策略
+                // 下次触发策略, upInterval master越多可设置时间越长
                 if (System.currentTimeMillis() - app.startup.time > 60 * 1000L) {
-                    sched.after(Duration.ofSeconds(getInteger('upInterval', 90) + new Random().nextInt(60)), syncFn)
+                    int upInterval = getInteger('upInterval', master ? Math.min(300, tcpClient.apps.get(app.name).nodes.size() * 40) : 90)
+                    sched.after(Duration.ofSeconds(upInterval + new Random().nextInt(60)), syncFn)
                 } else {
                     sched.after(Duration.ofSeconds(10), syncFn)
                 }
             } catch (Throwable ex) {
                 sched.after(Duration.ofSeconds(getInteger('upInterval', 30) + new Random().nextInt(60)), syncFn)
-                log.error("Register up error. " + (ex.message?:ex.class.simpleName))
+                log.error("Up error. " + (ex.message?:ex.class.simpleName))
             } finally {
+                running.set(false)
             }
         }
     }
@@ -346,7 +356,7 @@ class Remoter extends ServerTpl {
      * 自己的信息
      * 例: {"id":"rc_b70d18d52269451291ea6380325e2a84", "name":"rc", "tcp":"192.168.56.1:8001", "http":"localhost:8000"}
      */
-    def getSelfInfo() {
+    JSONObject getSelfInfo() {
         JSONObject data = new JSONObject(4)
         if (app.id && app.name) {
             data.put("id", app.id)
@@ -371,6 +381,7 @@ class Remoter extends ServerTpl {
                 return null
             }
         }
+        data.put('master', master)
 
         return data
     }

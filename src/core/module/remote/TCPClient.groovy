@@ -4,6 +4,7 @@ import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONException
 import com.alibaba.fastjson.JSONObject
+import com.alibaba.fastjson.parser.Feature
 import core.module.ServerTpl
 import io.netty.bootstrap.Bootstrap
 import io.netty.buffer.ByteBuf
@@ -98,7 +99,7 @@ class TCPClient extends ServerTpl {
      * @param failFn 失败回调函数(可不传)
      */
     def send(String host, Integer port, String data, Consumer<Throwable> failFn = null) {
-        log.debug("Send data to '{}:{}'. data: " + data, host, port)
+        log.trace("Send data to '{}:{}'. data: " + data, host, port)
         hpNodes.computeIfAbsent("$host:$port", {hp ->
             def n = new Node(tcpHp: hp)
             log.info("New Node added. tcpHp: {}", n.tcpHp)
@@ -114,6 +115,7 @@ class TCPClient extends ServerTpl {
      * @param target 可用值: 'any', 'all'
      */
     def send(String appName, String data, String target = 'any') {
+        log.trace("Send data to '{}'. data: " + data, appName)
         def group = apps.get(appName)
         if (group == null) throw new RuntimeException("Not found app '$appName' system online")
         if ('any' == target) {
@@ -194,7 +196,7 @@ class TCPClient extends ServerTpl {
      */
     protected receiveReply(ChannelHandlerContext ctx, final String dataStr) {
         log.trace("Receive reply from '{}': {}", ctx.channel().remoteAddress(), dataStr)
-        def jo = JSON.parseObject(dataStr)
+        def jo = JSON.parseObject(dataStr, Feature.OrderedField)
         if ("updateAppInfo" == jo['type']) {
             queue('updateAppInfo') {
                 ep.fire("updateAppInfo", jo.getJSONObject("data"))
@@ -264,7 +266,7 @@ class TCPClient extends ServerTpl {
          * @param data 应用节点信息
          */
         def updateNode(final JSONObject data) {
-            def (String id, String tcpHp, String httpHp) = [data['id'], data['tcp'], data['http']]
+            def (String id, String tcpHp, String httpHp, Long uptime) = [data['id'], data['tcp'], data['http'], data['_uptime']]
             if (!tcpHp) { // tcpHp 不能为空
                 throw new IllegalArgumentException("Node illegal error. $data")
             }
@@ -272,14 +274,16 @@ class TCPClient extends ServerTpl {
             if (n) { // 更新,有可能节点ip变了
                 n.tcpHp = tcpHp.trim()
                 n.httpHp = httpHp.trim()
+                n.uptime = uptime
             } else {
                 n = nodes.values().find {it.tcpHp == tcpHp}
-                if (n) { // tcp host:port 相同, 认为是节点被重启了
+                if (n && n.uptime < uptime) { // tcp host:port 相同, 认为是节点被重启了
                     nodes.put(id, n); nodes.remove(n.id)
                     n.id = id
                     n.httpHp = httpHp
+                    n.uptime = uptime
                 } else {
-                    n = new Node(group: this, id: id, tcpHp: tcpHp, httpHp: httpHp)
+                    n = new Node(group: this, id: id, tcpHp: tcpHp, httpHp: httpHp, uptime: uptime)
                     nodes.put(id, n)
                     log.info("New Node added. Node: '{}'", n)
                 }
@@ -350,6 +354,8 @@ class TCPClient extends ServerTpl {
         String            tcpHp
         // 应用实例暴露的http连接信息: host:port
         String            httpHp
+        // 上次更新时间
+        Long              uptime
         // tcp 连接池
         final ChannelPool tcpPool = new ChannelPool()
 

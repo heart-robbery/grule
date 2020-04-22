@@ -5,6 +5,7 @@ import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONException
 import com.alibaba.fastjson.JSONObject
+import com.alibaba.fastjson.parser.Feature
 import core.module.ServerTpl
 import groovy.transform.PackageScope
 import io.netty.bootstrap.ServerBootstrap
@@ -157,11 +158,20 @@ class TCPServer extends ServerTpl {
         log.trace("Receive client '{}' data: {}", ctx.channel().remoteAddress(), dataStr)
         count() // 统计
 
-        JSONObject jo = JSON.parseObject(dataStr)
+        JSONObject jo = JSON.parseObject(dataStr, Feature.OrderedField)
         handlers.each {it.accept(jo)}
 
         String t = jo.getString("type")
         if ("event" == t) { // 远程事件请求
+            def sJo = jo.getJSONObject('source')
+            if (!sJo) {
+                log.warn("Unknown source. origin data: " + dataStr); return
+            }
+            if (sJo['id'] == app.id) {
+                log.warn("Not allow fire remote event to self")
+                ctx.close()
+                return
+            }
             async {
                 remoter?.receiveEventReq(jo.getJSONObject("data"), {r -> ctx.writeAndFlush(Unpooled.copiedBuffer((r + (delimiter?:'')).getBytes('utf-8')))})
             }
@@ -184,7 +194,7 @@ class TCPServer extends ServerTpl {
             }
         } else if ("cmd-log" == t) { // telnet 命令行设置日志等级
             // telnet localhost 8001
-            // 例: {"type":"cmd-log", "source": "xxx", "data": "core.module.remote: debug"}$_$
+            // 例: {"type":"cmd-log", "data": "core.module.remote: debug"}$_$
             async {
                 String[] arr = jo.getString("data").split(":")
                 // Log.setLevel(arr[0].trim(), arr[1].trim())
@@ -192,10 +202,11 @@ class TCPServer extends ServerTpl {
             }
         } else if ("cmd-restart-server" == t) { // telnet 命令行重启某个服务
             // telnet localhost 8001
-            // 例: {"type":"cmd-restart-server", "source": "xxx", "data": "ehcache"}$_$
+            // 例: {"type":"cmd-restart-server", "data": "ehcache"}$_$
             String sName = jo.getString("data")
             ep.fire(sName+ ".stop", EC.of(this).completeFn{ec -> ep.fire(sName + ".start")})
         } else if (t.startsWith("ls ")) {
+            // {"type":"ls apps"}$_$
             def arr = t.split(" ")
             if (arr?[1] = "apps") {
                 ctx.writeAndFlush(Unpooled.copiedBuffer(JSON.toJSONString(appInfoMap), Charset.forName("utf-8")))
@@ -233,10 +244,10 @@ class TCPServer extends ServerTpl {
      */
     @PackageScope
     def appUp(final JSONObject data, final ChannelHandlerContext ctx) {
-        if (!data) { log.warn("Register data is empty"); return}
-        log.debug("Receive register up: {}", data)
+        if (!data) { log.warn("App up data is empty"); return}
+        log.debug("Receive app up: {}", data)
         if (!data['name'] || !data['tcp']) { // 数据验证
-            throw new IllegalArgumentException("app register up info bad data: " + data)
+            throw new IllegalArgumentException("app up info bad data: " + data)
         }
         data["_uptime"] = System.currentTimeMillis()
 
@@ -259,14 +270,16 @@ class TCPServer extends ServerTpl {
                 def cur = it2.next()
                 if (!cur) {it2.remove(); continue} // 删除空的坏数据
                 // 删除一段时间未活动的注册信息, dropAppTimeout 单位: 分钟
-                if ((System.currentTimeMillis() - (Long) cur.getOrDefault("_uptime", System.currentTimeMillis()) > getInteger("dropAppTimeout", 20) * 60 * 1000)) {
-                    if (cur["id"] == app.id) { // 更新当前App up的时间
-                        cur['_uptime'] = System.currentTimeMillis()
-                    } else {
-                        it2.remove()
-                        log.warn("Drop timeout app up info: {}", cur)
-                        continue
-                    }
+                if ((System.currentTimeMillis() - (Long) cur.getOrDefault("_uptime", System.currentTimeMillis()) > getInteger("dropAppTimeout", 15) * 60 * 1000)  && cur["id"] != app.id) {
+                    it2.remove()
+                    log.warn("Drop timeout app up info: {}", cur)
+                    continue
+                }
+                // 更新当前App up的时间
+                if (cur["id"] == app.id) {
+                    cur['_uptime'] = System.currentTimeMillis()
+                    def self = remoter.selfInfo // 判断当前机器ip是否变化
+                    if (self && self['tcp'] != cur['tcp']) cur.putAll(self)
                 }
                 // 返回所有的注册信息给当前来注册的客户端
                 if (cur["id"] != data["id"]) {
@@ -286,11 +299,11 @@ class TCPServer extends ServerTpl {
     /**
      * 当为master时, 同步从其他master更新的信息
      * @param data
-     * @return
      */
     @EL(name = "updateAppInfo", async = false)
-    def updateAppInfo(final JSONObject data) {
+    protected updateAppInfo(EC ec, final JSONObject data) {
         if (!remoter.master) return
+        if (this == ec?.source()) return
         if (!data) return
         if (app.id == data["id"] || remoter?.selfInfo?['tcp'] == data['tcp']) return // 不把系统本身的信息放进去
         queue('appUp') {
@@ -307,7 +320,10 @@ class TCPServer extends ServerTpl {
                     break
                 }
             }
-            if (add) {apps << data}
+            if (add) {
+                apps << data
+                log.debug("Update app info: " + data)
+            }
         }
     }
 
