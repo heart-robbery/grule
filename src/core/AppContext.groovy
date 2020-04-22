@@ -285,9 +285,6 @@ class AppContext {
                 if ("sys.starting" == eName || "sys.stopping" == eName || "sys.started" == eName) {
                     if (ec.source() != AppContext.this) throw new UnsupportedOperationException("not allow fire event '$eName'")
                 }
-                if ("env.updateAttr" == eName) {
-                    if (ec.source() != env) throw new UnsupportedOperationException("not allow fire event '$eName'")
-                }
                 return super.doPublish(eName, ec)
             }
             @Override

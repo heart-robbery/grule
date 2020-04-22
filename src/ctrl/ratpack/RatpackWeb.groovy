@@ -9,7 +9,6 @@ import core.module.ServerTpl
 import ctrl.CtrlTpl
 import ctrl.common.ApiResp
 import io.netty.handler.ssl.SslContextBuilder
-import org.ehcache.Cache
 import ratpack.error.internal.ErrorHandler
 import ratpack.handling.Chain
 import ratpack.handling.Context
@@ -282,11 +281,11 @@ class RatpackWeb extends ServerTpl {
             if (sData == null) {
                 sData = new ConcurrentHashMap()
                 sData.id = sId = UUID.randomUUID().toString().replace('-', '')
-                Cache cache = ehcache.getOrCreateCache('session', sessionExpire, Integer.valueOf(attrs()['session']['maxLimit']?:100000), null)
+                def cache = ehcache.getOrCreateCache('session', sessionExpire, Integer.valueOf(attrs()['session']['maxLimit']?:100000), null)
                 cache.put(sId, sData)
                 log.info("New session '{}'", sId)
             }
-            ctx.metaClass.sData = sData
+            ctx.metaClass['sData'] = sData
         }
 
         ctx.metaClass['sId'] = sId

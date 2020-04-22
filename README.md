@@ -10,7 +10,7 @@ groovy 快速开发代码
 
 前端文件 src/static
 
-######集常用功能: 
+###### 集常用功能: 
     ratpackweb, sched(quartz), cache(ehcache), 
     redis, jpa(hibernate), OkHttpClient, Remoter(多应用tcp通信)
 
