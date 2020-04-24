@@ -197,6 +197,7 @@ class TCPClient extends ServerTpl {
     protected receiveReply(ChannelHandlerContext ctx, final String dataStr) {
         log.trace("Receive reply from '{}': {}", ctx.channel().remoteAddress(), dataStr)
         def jo = JSON.parseObject(dataStr, Feature.OrderedField)
+        handlers.each {it.accept(jo)}
         if ("updateAppInfo" == jo['type']) {
             queue('updateAppInfo') {
                 ep.fire("updateAppInfo", jo.getJSONObject("data"))
@@ -205,7 +206,6 @@ class TCPClient extends ServerTpl {
         else if ("event"== jo['type']) {
             async { remoter?.receiveEventResp(jo.getJSONObject("data")) }
         }
-        handlers.each {it.accept(jo)}
     }
 
 

@@ -121,13 +121,13 @@ class Remoter extends ServerTpl {
             if (reply) {
                 ecMap.put(ec.id(), ec)
                 // 数据发送成功. 如果需要响应, 则添加等待响应超时处理
-                sched.after(Duration.ofSeconds(getInteger("timeout_$eName", getInteger("eventTimeout", 20))), {
+                sched.after(Duration.ofSeconds(ec.getAttr("timeout", Integer, getInteger("timeout_$eName", getInteger("eventTimeout", 20)))), {
                     ecMap.remove(ec.id())?.errMsg("'${appName}_$eName' Timeout")?.resume()?.tryFinish()
                 })
                 if (trace) {
                     def fn = ec.completeFn()
                     ec.completeFn({
-                        if (ec.isSuccess()) {
+                        if (ec.success) {
                             log.info("End remote event. id: "+ ec.id() + ", result: $ec.result")
                         }
                         fn.accept(ec)
@@ -166,8 +166,8 @@ class Remoter extends ServerTpl {
         final def latch = new CountDownLatch(1)
         def ec = EC.of(this).args(appName, eName, remoteMethodArgs).completeFn({latch.countDown()})
         ep.fire("remote", ec)
-        latch.await(15, TimeUnit.SECONDS)
-        if (ec.isSuccess()) return ec.result
+        latch.await(4, TimeUnit.SECONDS)
+        if (ec.success) return ec.result
         else throw new Exception(ec.failDesc()?:"TimeOut")
     }
 
@@ -243,7 +243,7 @@ class Remoter extends ServerTpl {
                     ))
                 })
             }
-            ep.fire(eName, ec)
+            ep.fire(eName, ec.sync()) // 同步执行, 没必要异步去切换线程
         } catch (Throwable ex) {
             log.error("invoke event error. data: " + data, ex)
             if (fReply) {
@@ -357,7 +357,7 @@ class Remoter extends ServerTpl {
      * 例: {"id":"rc_b70d18d52269451291ea6380325e2a84", "name":"rc", "tcp":"192.168.56.1:8001", "http":"localhost:8000"}
      */
     JSONObject getSelfInfo() {
-        JSONObject data = new JSONObject(4)
+        JSONObject data = new JSONObject(5)
         if (app.id && app.name) {
             data.put("id", app.id)
             data.put("name", app.name)
@@ -365,10 +365,12 @@ class Remoter extends ServerTpl {
             log.error("Current App name or id is empty"); return null
         }
 
+        // http
         def exposeHttp = getStr('exposeHttp', null) // 配置暴露的http
         if (exposeHttp) data.put("http", exposeHttp)
         else Optional.ofNullable(ep.fire("http.hp")).ifPresent{ data.put("http", it) }
 
+        // tcp
         def exposeTcp = getStr('exposeTcp', null) // 配置暴露的tcp
         if (exposeTcp) data.put("tcp", exposeTcp)
         else if (tcpServer.hp.split(":")[0]) data.put("tcp", tcpServer.hp)

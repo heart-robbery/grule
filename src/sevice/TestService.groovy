@@ -222,8 +222,8 @@ class TestService extends ServerTpl {
     }
 
     @EL(name = "eName7", async = false)
-    def testEvent7(String p) {
-        Thread.sleep(5000L)
+    def testEvent7(Integer i) {
+        Thread.sleep(i?:5000L)
         "eName7_"+System.currentTimeMillis()
     }
 }
