@@ -316,7 +316,6 @@ class Utils {
      */
     static String buildUrl(String urlStr, Map<String, Object> params) {
         if (!params) return urlStr
-        StringBuilder sb = new StringBuilder(urlStr)
         params.each {
             if (it.value != null) {
                 if (urlStr.endsWith('?')) urlStr += (it.key + '=' + it.value + '&')
@@ -325,7 +324,7 @@ class Utils {
                 else urlStr += ('?' + it.key + '=' + it.value + '&')
             }
         }
-        return sb.toString()
+        return urlStr
     }
 
 
