@@ -239,6 +239,7 @@ class TCPServer extends ServerTpl {
      * 应用上线通知
      * NOTE: 此方法线程已安全
      * 例: {"name": "应用名", "id": "应用实例id", "tcp":"localhost:8001", "http":"localhost:8080", "udp": "localhost:11111"}
+     *  id 和 tcp 必须唯一
      * @param data
      * @param ctx
      */
@@ -269,6 +270,8 @@ class TCPServer extends ServerTpl {
             for (Iterator<Map<String, Object>> it2 = e.value.iterator(); it2.hasNext(); ) {
                 def cur = it2.next()
                 if (!cur) {it2.remove(); continue} // 删除空的坏数据
+                // 删除当前up的app 相同的tcp的节点
+                if (data['id'] != cur['id'] && data['tcp'] && data['tcp'] == cur['tcp']) {it2.remove(); continue}
                 // 删除一段时间未活动的注册信息, dropAppTimeout 单位: 分钟
                 if ((System.currentTimeMillis() - (Long) cur.getOrDefault("_uptime", System.currentTimeMillis()) > getInteger("dropAppTimeout", 15) * 60 * 1000)  && cur["id"] != app.id) {
                     it2.remove()

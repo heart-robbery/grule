@@ -219,7 +219,7 @@ class TestCtrl extends CtrlTpl {
         def ts = bean(TestService)
         chain.path('remote') {ctx ->
             ctx.render Promise.async { down ->
-                ts.remote(ctx.request.queryParams['app']?:"gy", ctx.request.queryParams['event']?:'eName1', {
+                ts.remote(ctx.request.queryParams['app']?:"gy", ctx.request.queryParams['event']?:'eName1', ctx.request.queryParams['param']?:'p1',{
                     if (it instanceof Exception) down.success(fail(it.message))
                     else down.success ok(it)
                 })

@@ -14,7 +14,6 @@ import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.function.Consumer
 
@@ -166,9 +165,9 @@ class Remoter extends ServerTpl {
         final def latch = new CountDownLatch(1)
         def ec = EC.of(this).args(appName, eName, remoteMethodArgs).completeFn({latch.countDown()})
         ep.fire("remote", ec)
-        latch.await(4, TimeUnit.SECONDS)
+        latch.await()
         if (ec.success) return ec.result
-        else throw new Exception(ec.failDesc()?:"TimeOut")
+        else throw new Exception(ec.failDesc())
     }
 
 
@@ -267,7 +266,7 @@ class Remoter extends ServerTpl {
      * 不允许手动调用
      */
     @Lazy protected def syncFn = new Runnable() {
-        def               hps      = masterHps?.split(",").collect {
+        def hps = masterHps?.split(",").collect {
             if (!it) return null
             try {
                 def arr = it.split(":")
@@ -290,14 +289,14 @@ class Remoter extends ServerTpl {
             return r
         }()
         // 上传的数据格式
-        @Lazy def dataFn = {JSONObject info ->
+        @Lazy def dataFn = {
             new JSONObject(3).fluentPut("type", 'appUp')
                 .fluentPut("source", new JSONObject(2).fluentPut('name', app.name).fluentPut('id', app.id))
-                .fluentPut("data", info)
+                .fluentPut("data", selfInfo)
                 .toString()
         }
         // 用 hps 函数
-        @Lazy def toHps     = { String data->
+        @Lazy def toHps = { String data->
             // 如果是域名,得到所有Ip, 除本机
             List<Tuple2<String, Integer>> ls = hps.collectMany {hp ->
                 InetAddress.getAllByName(hp.v1)
@@ -324,9 +323,7 @@ class Remoter extends ServerTpl {
                     log.error("'masterHps' or 'masterName' must config one"); return
                 }
                 if (!running.compareAndSet(false, true)) return
-                def info = selfInfo
-                if (!info) return
-                String data = dataFn(info)
+                String data = dataFn()
 
                 try {
                     tcpClient.send(masterName, data, (master ? 'all' : 'any'))
@@ -362,7 +359,7 @@ class Remoter extends ServerTpl {
             data.put("id", app.id)
             data.put("name", app.name)
         } else {
-            log.error("Current App name or id is empty"); return null
+            throw new IllegalArgumentException("Current App name or id is empty")
         }
 
         // http
@@ -373,14 +370,13 @@ class Remoter extends ServerTpl {
         // tcp
         def exposeTcp = getStr('exposeTcp', null) // 配置暴露的tcp
         if (exposeTcp) data.put("tcp", exposeTcp)
-        else if (tcpServer.hp.split(":")[0]) data.put("tcp", tcpServer.hp)
+        else if (tcpServer?.hp?.split(":")?[0]) data.put("tcp", tcpServer.hp)
         else {
             def ip = ipv4()
             if (ip) {
-                data.put("tcp", ip + tcpServer.hp)
+                data.put("tcp", ip + tcpServer?.hp)
             } else {
-                log.warn("Can't get local ipv4")
-                return null
+                throw new IllegalArgumentException("Can't get local ipv4")
             }
         }
         data.put('master', master)

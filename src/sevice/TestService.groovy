@@ -175,10 +175,10 @@ class TestService extends ServerTpl {
     }
 
 
-    def remote(String app, String eName, String ret = 'xx', Consumer fn) {
+    def remote(String app, String eName, String param = 'xx', Consumer fn) {
         // 远程调用
         // fn.accept(bean(Remoter).fire(app?:'gy', eName?:'eName1', ['p1']))
-        bean(Remoter).fireAsync(app?:'gy', eName?:'eName1', fn, ['p1'])
+        bean(Remoter).fireAsync(app?:'gy', eName?:'eName1', fn, [param?:'1'])
     }
 
 
@@ -222,8 +222,8 @@ class TestService extends ServerTpl {
     }
 
     @EL(name = "eName7", async = false)
-    def testEvent7(Integer i) {
-        Thread.sleep(i?:5000L)
+    def testEvent7(String i) {
+        Thread.sleep(5000L)
         "eName7_"+System.currentTimeMillis()
     }
 }

@@ -241,7 +241,7 @@ class TCPClient extends ServerTpl {
      */
     @EL(name = "resolveHttp", async = false)
     String resolveHttp(String appName) {
-        def vs = apps.get(appName)?.nodes.values()
+        def vs = apps.get(appName)?.nodes?.values()
         if (vs) {
             if (vs.size() == 1) return vs[0].httpHp
             else {
