@@ -47,7 +47,7 @@ class Devourer {
                 Runnable t = waiting.poll()
                 if (t != null) t.run()
             } catch (Throwable t) {
-                log.error(getClass().simpleName + ":" + key, t)
+                log.error("$Devourer.class.simpleName: " + key, t)
             } finally {
                 running.set(false)
                 if (!waiting.isEmpty()) trigger()
