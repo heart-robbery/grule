@@ -22,7 +22,7 @@ class HibernateSrv extends ServerTpl {
     HibernateSrv(String name) { super(name) }
 
 
-    @EL(name = 'sys.starting')
+    @EL(name = 'sys.starting', async = true)
     def start() {
         if (sf) throw new RuntimeException("$name is already running")
         if (ep == null) {ep = new EP(); ep.addListenerSource(this)}

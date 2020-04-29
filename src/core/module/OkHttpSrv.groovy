@@ -29,7 +29,7 @@ class OkHttpSrv extends ServerTpl {
     OkHttpSrv() {super('okHttp')}
 
 
-    @EL(name = 'sys.starting')
+    @EL(name = 'sys.starting', async = true)
     def init() {
         if (client) throw new RuntimeException("$name is already running")
         if (ep == null) {ep = new EP(); ep.addListenerSource(this)}

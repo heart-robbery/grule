@@ -22,7 +22,7 @@ class EhcacheSrv extends ServerTpl {
 
     EhcacheSrv() { super(F_NAME) }
 
-    @EL(name = 'sys.starting')
+    @EL(name = 'sys.starting', async = true)
     def start() {
         if (cm) throw new RuntimeException("$name is already running")
         if (ep == null) {ep = new EP(); ep.addListenerSource(this)}

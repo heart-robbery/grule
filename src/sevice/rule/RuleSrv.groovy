@@ -9,7 +9,7 @@ import java.util.function.Function
 class RuleSrv extends ServerTpl {
 
 
-    @EL(name = 'sys.starting')
+    @EL(name = 'sys.starting', async = true)
     def start() {
 //        new RuleChain(
 //            id: 'r1',

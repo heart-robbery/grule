@@ -48,7 +48,7 @@ class TCPClient extends ServerTpl {
     TCPClient(String name) { super(name) }
 
 
-    @EL(name = 'sys.starting')
+    @EL(name = 'sys.starting', async = true)
     def start() {
         create()
         ep.fire("${name}.started")
@@ -430,7 +430,9 @@ class TCPClient extends ServerTpl {
     }
 
 
-    // netty Channel 连接池
+    /**
+     * netty Channel 连接池
+     */
     protected class ChannelPool {
               Node          node
               String        host // TODO 域名 对应多个ip

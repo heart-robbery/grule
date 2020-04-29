@@ -8,6 +8,7 @@ gradle/
 *.iml
 .project
 .classpath
+nohup.out
 gradlew
 gradlew.bat
 /upload

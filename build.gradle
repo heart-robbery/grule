@@ -33,7 +33,7 @@ dependencies {
 
     compile 'com.alibaba:fastjson:1.2.61'
     compile 'ch.qos.logback:logback-classic:1.2.3'
-    compile ('cn.xnatural.enet:enet-event:0.0.11')
+    compile 'cn.xnatural.enet:enet-event:0.0.12'
     compile 'org.hibernate:hibernate-core:5.4.7.Final'
 
     // 连接池

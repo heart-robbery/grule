@@ -10,7 +10,7 @@ class EmailSrv extends ServerTpl {
     @Lazy String password = getStr('password', null)
 
 
-    @EL(name = 'sys.starting')
+    @EL(name = 'sys.starting', async = true)
     def start() {
 
     }

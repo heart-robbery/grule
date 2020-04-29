@@ -193,35 +193,35 @@ class TestService extends ServerTpl {
     }
 
 
-    @EL(name = "eName2", async = false)
+    @EL(name = "eName2")
     def testEvent2(String p) {
         repo.findPage(Test, 1, 10, { root, query, cb -> query.orderBy(cb.desc(root.get("id")))})
     }
 
 
-    @EL(name = "eName3", async = false)
+    @EL(name = "eName3")
     testEvent3(String p) {
         repo.count(Test, {root, query, cb -> query.orderBy(cb.desc(root.get("id")))})
     }
 
 
-    @EL(name = "eName4", async = false)
+    @EL(name = "eName4")
     def testEvent4(String p) {
         ep.fire("cache.get","java","java")
     }
 
 
-    @EL(name = "eName5", async = false)
+    @EL(name = "eName5")
     void testEvent5(String p) {
         ep.fire("cache.set","java","java", p)
     }
 
-    @EL(name = "eName6", async = false)
+    @EL(name = "eName6")
     def testEvent6(String p) {
         throw new RuntimeException("抛个错 $p")
     }
 
-    @EL(name = "eName7", async = false)
+    @EL(name = "eName7")
     def testEvent7(String i) {
         Thread.sleep(5000L)
         "eName7_"+System.currentTimeMillis()

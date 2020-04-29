@@ -50,7 +50,7 @@ class TCPServer extends ServerTpl {
     TCPServer() { super("tcpServer") }
 
 
-    @EL(name = 'sys.starting')
+    @EL(name = 'sys.starting', async = true)
     def start() {
         if (boos) throw new RuntimeException("$name is already running")
         if (!hp) throw new RuntimeException("'${name}.hp' not config. format is '[host]:port'")

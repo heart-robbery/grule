@@ -19,7 +19,7 @@ class SchedSrv extends ServerTpl {
     SchedSrv() { super(F_NAME) }
 
 
-    @EL(name = "sys.starting")
+    @EL(name = "sys.starting", async = true)
     def start() {
         if (scheduler) throw new RuntimeException("$name is already running")
         if (ep == null) {ep = new EP(exec); ep.addListenerSource(this)}
@@ -37,7 +37,7 @@ class SchedSrv extends ServerTpl {
     }
 
 
-    @EL(name = "sys.stopping")
+    @EL(name = "sys.stopping", async = true)
     def stop() {
         log.debug("Shutdown '{}'(Quartz) Server", name)
         scheduler?.shutdown(); scheduler = null

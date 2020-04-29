@@ -20,27 +20,27 @@ import java.util.function.Consumer
 import static core.Utils.ipv4
 
 class Remoter extends ServerTpl {
-    @Lazy def                 sched     = bean(SchedSrv)
+    @Lazy def                 sched      = bean(SchedSrv)
     /**
      * ecId -> EC
      */
-    @Lazy Map<String, EC>     ecMap     = new ConcurrentHashMap<>()
+    @Lazy Map<String, EC>     ecMap      = new ConcurrentHashMap<>()
+    // 集群的服务中心地址 [host]:port,[host1]:port2. 例 :8001 or localhost:8001
+    @Lazy String              masterHps  = getStr('masterHps', null)
+    // 集群的服务中心应用名
+    @Lazy String              masterName = getStr('masterName', null)
+    // 是否为master
+    @Lazy boolean             master     = getBoolean('master', false)
+    // 设置默认tcp折包粘包的分割
+    @Lazy String              delimiter  = getStr('delimiter', '$_$')
     protected       TCPClient tcpClient
     protected       TCPServer tcpServer
-    // 集群的服务中心地址 [host]:port,[host1]:port2. 例 :8001 or localhost:8001
-    @Lazy String              masterHps = getStr('masterHps', null)
-    // 集群的服务中心应用名
-    @Lazy String masterName = getStr('masterName', null)
-    // 是否为master
-    @Lazy boolean master = getBoolean('master', false)
-    // 设置默认tcp折包粘包的分割
-    @Lazy String              delimiter = getStr('delimiter', '$_$')
 
 
     Remoter() { super("remoter") }
 
 
-    @EL(name = "sys.starting")
+    @EL(name = "sys.starting", async = true)
     def start() {
         if (tcpClient || tcpServer) throw new RuntimeException("$name is already running")
         if (sched == null) throw new RuntimeException("Need sched Server!")
@@ -78,10 +78,10 @@ class Remoter extends ServerTpl {
     }
 
 
-    @EL(name = 'sys.started')
+    @EL(name = 'sys.started', async = true)
     protected started() {
         queue('appUp') { tcpServer.appUp(selfInfo, null) }
-        syncFn.run()
+        sync(true)
     }
 
 
@@ -180,7 +180,7 @@ class Remoter extends ServerTpl {
      */
     def fireAsync(String appName, String eName, Consumer callback, List remoteMethodArgs) {
         ep.fire("remote", EC.of(this).args(appName, eName, remoteMethodArgs).completeFn({ec ->
-            if (ec.isSuccess()) callback.accept(ec.result)
+            if (ec.success) callback.accept(ec.result)
             else callback.accept(new Exception(ec.failDesc()))
         }))
     }
@@ -217,9 +217,9 @@ class Remoter extends ServerTpl {
                 else if (String.class.name == t) return jo.getString("value")
                 else if (Boolean.class.name == t) return jo.getBoolean("value")
                 else if (Integer.class.name == t) return jo.getInteger("value")
-                else if (Short.class.name == t) return jo.getShort("value")
                 else if (Long.class.name == t) return jo.getLong("value")
                 else if (Double.class.name == t) return jo.getDouble("value")
+                else if (Short.class.name == t) return jo.getShort("value")
                 else if (Float.class.name == t) return jo.getFloat("value")
                 else if (BigDecimal.class.name == t) return jo.getBigDecimal("value")
                 else if (JSONObject.class.name == t || Map.class.name == t) return jo.getJSONObject("value")
@@ -231,7 +231,7 @@ class Remoter extends ServerTpl {
                 ec.completeFn(ec1 -> {
                     JSONObject r = new JSONObject(3)
                     r.put("id", ec.id())
-                    if (!ec.isSuccess()) { r.put("exMsg", ec.failDesc()); }
+                    if (!ec.success) { r.put("exMsg", ec.failDesc()) }
                     r.put("result", ec.result)
                     reply.accept(JSON.toJSONString(
                         new JSONObject(3)
@@ -246,9 +246,8 @@ class Remoter extends ServerTpl {
         } catch (Throwable ex) {
             log.error("invoke event error. data: " + data, ex)
             if (fReply) {
-                JSONObject r = new JSONObject(4)
+                JSONObject r = new JSONObject(3)
                 r.put("id", data.getString("id"))
-                r.put("success", false)
                 r.put("result", null)
                 r.put("exMsg", ex.message ? ex.message: ex.getClass().name)
                 def res = new JSONObject(3)
@@ -262,8 +261,30 @@ class Remoter extends ServerTpl {
 
 
     /**
+     * 同步函数
+     * @param next 是否触发下一次
+     */
+    def sync(boolean next = false) {
+        try {
+            syncFn.run()
+            if (next) {
+                // 下次触发策略, upInterval master越多可设置时间越长
+                if (System.currentTimeMillis() - app.startup.time > 60 * 1000L) {
+                    int upInterval = getInteger('upInterval', master ? Math.min(300, tcpClient.apps.get(app.name).nodes.size() * 40) : 90)
+                    sched.after(Duration.ofSeconds(upInterval + new Random().nextInt(60)), syncFn)
+                } else {
+                    sched.after(Duration.ofSeconds(10), syncFn)
+                }
+            }
+        } catch (Throwable ex) {
+            if (next) sched.after(Duration.ofSeconds(getInteger('upInterval', 30) + new Random().nextInt(60)), syncFn)
+            log.error("Up error. " + (ex.message?:ex.class.simpleName))
+        }
+    }
+
+
+    /**
      * 向master同步函数
-     * 不允许手动调用
      */
     @Lazy protected def syncFn = new Runnable() {
         def hps = masterHps?.split(",").collect {
@@ -314,7 +335,7 @@ class Remoter extends ServerTpl {
                 tcpClient.send(hp.v1, hp.v2, data)
             }
         }
-        def running = new AtomicBoolean(false)
+        final def running = new AtomicBoolean(false)
 
         @Override
         void run() {
@@ -331,17 +352,6 @@ class Remoter extends ServerTpl {
                     toHps(data)
                 }
                 log.debug("Up success. {}", data)
-
-                // 下次触发策略, upInterval master越多可设置时间越长
-                if (System.currentTimeMillis() - app.startup.time > 60 * 1000L) {
-                    int upInterval = getInteger('upInterval', master ? Math.min(300, tcpClient.apps.get(app.name).nodes.size() * 40) : 90)
-                    sched.after(Duration.ofSeconds(upInterval + new Random().nextInt(60)), syncFn)
-                } else {
-                    sched.after(Duration.ofSeconds(10), syncFn)
-                }
-            } catch (Throwable ex) {
-                sched.after(Duration.ofSeconds(getInteger('upInterval', 30) + new Random().nextInt(60)), syncFn)
-                log.error("Up error. " + (ex.message?:ex.class.simpleName))
             } finally {
                 running.set(false)
             }

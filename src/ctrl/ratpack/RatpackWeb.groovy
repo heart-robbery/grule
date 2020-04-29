@@ -46,7 +46,7 @@ class RatpackWeb extends ServerTpl {
     RatpackWeb() { super('web') }
 
 
-    @EL(name = 'sys.starting')
+    @EL(name = 'sys.starting', async = true)
     def start() {
         if (srv) throw new RuntimeException("$name is already running")
         srv = RatpackServer.start({ srv ->
@@ -84,7 +84,7 @@ class RatpackWeb extends ServerTpl {
     def stop() { srv?.stop() }
 
 
-    @EL(name = 'sys.started')
+    @EL(name = 'sys.started', async = true)
     protected started() { ctrls.each {ep.fire('inject', it)}; enabled = true }
 
 
