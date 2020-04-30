@@ -10,5 +10,6 @@
 )
 
 @echo start ...
+set JAVA_OPTS=%JAVA_OPTS% %*
 cd src/
-../bin/groovy %* main.groovy
+../bin/groovy main.groovy

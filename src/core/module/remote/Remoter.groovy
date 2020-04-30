@@ -31,7 +31,7 @@ class Remoter extends ServerTpl {
     @Lazy String              masterName = getStr('masterName', null)
     // 是否为master
     @Lazy boolean             master     = getBoolean('master', false)
-    // 设置默认tcp折包粘包的分割
+    // 设置默认tcp折包粘包的分割符
     @Lazy String              delimiter  = getStr('delimiter', '$_$')
     protected       TCPClient tcpClient
     protected       TCPServer tcpServer
@@ -178,7 +178,7 @@ class Remoter extends ServerTpl {
      * @param callback 回调函数. 1. 正常结果, 2. Exception
      * @param remoteMethodArgs 远程事件监听方法的参数
      */
-    def fireAsync(String appName, String eName, Consumer callback, List remoteMethodArgs) {
+    void fireAsync(String appName, String eName, Consumer callback, List remoteMethodArgs) {
         ep.fire("remote", EC.of(this).args(appName, eName, remoteMethodArgs).completeFn({ec ->
             if (ec.success) callback.accept(ec.result)
             else callback.accept(new Exception(ec.failDesc()))
@@ -190,7 +190,7 @@ class Remoter extends ServerTpl {
      * 接收远程事件返回的数据. 和 {@link #sendEvent(EC, String, String, List)} 对应
      * @param data
      */
-    def receiveEventResp(JSONObject data) {
+    void receiveEventResp(JSONObject data) {
         log.debug("Receive event response: {}", data)
         EC ec = ecMap.remove(data.getString("id"))
         if (ec != null) ec.errMsg(data.getString("exMsg")).result(data["result"]).resume().tryFinish()
@@ -202,7 +202,7 @@ class Remoter extends ServerTpl {
      * @param data 数据
      * @param reply 响应回调(传参为响应的数据)
      */
-    def receiveEventReq(JSONObject data, Consumer<String> reply) {
+    void receiveEventReq(JSONObject data, Consumer<String> reply) {
         log.debug("Receive event request: {}", data)
         boolean fReply = (Boolean.TRUE == data.getBoolean("reply")) // 是否需要响应
         try {
@@ -264,8 +264,11 @@ class Remoter extends ServerTpl {
      * 同步函数
      * @param next 是否触发下一次
      */
-    def sync(boolean next = false) {
+    void sync(boolean next = false) {
         try {
+            if (!masterHps && !masterName) {
+                log.warn("'masterHps' or 'masterName' must config one"); return
+            }
             syncFn.run()
             if (next) {
                 // 下次触发策略, upInterval master越多可设置时间越长
@@ -311,9 +314,11 @@ class Remoter extends ServerTpl {
         }()
         // 上传的数据格式
         @Lazy def dataFn = {
+            def info = selfInfo
+            if (!info) throw new RuntimeException("Can not get app self data")
             new JSONObject(3).fluentPut("type", 'appUp')
                 .fluentPut("source", new JSONObject(2).fluentPut('name', app.name).fluentPut('id', app.id))
-                .fluentPut("data", selfInfo)
+                .fluentPut("data", info)
                 .toString()
         }
         // 用 hps 函数
@@ -369,7 +374,8 @@ class Remoter extends ServerTpl {
             data.put("id", app.id)
             data.put("name", app.name)
         } else {
-            throw new IllegalArgumentException("Current App name or id is empty")
+            log.warn("Current App name or id is empty")
+            return null
         }
 
         // http
@@ -386,7 +392,8 @@ class Remoter extends ServerTpl {
             if (ip) {
                 data.put("tcp", ip + tcpServer?.hp)
             } else {
-                throw new IllegalArgumentException("Can't get local ipv4")
+                log.error("Can't get local ipv4")
+                return null
             }
         }
         data.put('master', master)

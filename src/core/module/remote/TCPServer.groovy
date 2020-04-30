@@ -172,9 +172,7 @@ class TCPServer extends ServerTpl {
                 ctx.close()
                 return
             }
-            async {
-                remoter?.receiveEventReq(jo.getJSONObject("data"), {r -> ctx.writeAndFlush(Unpooled.copiedBuffer((r + (delimiter?:'')).getBytes('utf-8')))})
-            }
+            async { remoter?.receiveEventReq(jo.getJSONObject("data"), {r -> ctx.writeAndFlush(Unpooled.copiedBuffer((r + (delimiter?:'')).getBytes('utf-8')))}) }
         } else if ("appUp" == t) { // 应用注册在线通知
             def sJo = jo.getJSONObject('source')
             if (!sJo) {
@@ -245,43 +243,46 @@ class TCPServer extends ServerTpl {
      */
     @PackageScope
     def appUp(final JSONObject data, final ChannelHandlerContext ctx) {
-        if (!data) { log.warn("App up data is empty"); return}
-        log.debug("Receive app up: {}", data)
-        if (!data['name'] || !data['tcp']) { // 数据验证
-            throw new IllegalArgumentException("app up info bad data: " + data)
+        if (!data || !data['name'] || !data['tcp'] || !data['id']) { // 数据验证
+            log.warn("App up data incomplete: " + data)
+            return
         }
+        log.debug("Receive app up: {}", data)
         data["_uptime"] = System.currentTimeMillis()
 
         //1. 先删除之前的数据,再添加新的
         boolean isNew = true
-        List<Map<String, Object>> apps = appInfoMap.computeIfAbsent(data["name"], {new LinkedList<>()})
-        for (Iterator<Map<String, Object>> it = apps.iterator(); it.hasNext(); ) {
+        final List<Map<String, Object>> apps = appInfoMap.computeIfAbsent(data["name"], {new LinkedList<>()})
+        for (final def it = apps.iterator(); it.hasNext(); ) {
             if (it.next()["id"] == data["id"]) {it.remove(); isNew = false; break}
         }
         apps << data
         if (isNew && data['id'] != app.id) log.info("New app '{}' online. {}", data["name"], data)
-
-        if (data['id'] != app.id) ep.fire("updateAppInfo", data) // 同步信息给本服务器的tcp-client
+        if (data['id'] != app.id) async {ep.fire("updateAppInfo", data)} // 同步信息给本服务器的tcp-client
 
         //2. 遍历所有的数据,删除不必要的数据, 同步注册信息
-        for (def it = appInfoMap.entrySet().iterator(); it.hasNext(); ) {
+        for (final def it = appInfoMap.entrySet().iterator(); it.hasNext(); ) {
             def e = it.next()
-            if (!e.value) {it.remove(); continue} // 删除没有对应的服务信息的应用
-            for (Iterator<Map<String, Object>> it2 = e.value.iterator(); it2.hasNext(); ) {
-                def cur = it2.next()
-                if (!cur) {it2.remove(); continue} // 删除空的坏数据
-                // 删除当前up的app 相同的tcp的节点
-                if (data['id'] != cur['id'] && data['tcp'] && data['tcp'] == cur['tcp']) {it2.remove(); continue}
+            for (final def it2 = e.value.iterator(); it2.hasNext(); ) {
+                final def cur = it2.next()
+                // 删除空的坏数据
+                if (!cur) {it2.remove(); continue}
+                // 删除和当前up的app 相同的tcp的节点(节点重启,但节点上次的信息还没被移除)
+                if (data['id'] != cur['id'] && data['tcp'] && data['tcp'] == cur['tcp']) {
+                    it2.remove()
+                    log.debug("Drop same tcp node: {}", cur)
+                    continue
+                }
                 // 删除一段时间未活动的注册信息, dropAppTimeout 单位: 分钟
                 if ((System.currentTimeMillis() - (Long) cur.getOrDefault("_uptime", System.currentTimeMillis()) > getInteger("dropAppTimeout", 15) * 60 * 1000)  && cur["id"] != app.id) {
                     it2.remove()
-                    log.warn("Drop timeout app up info: {}", cur)
+                    log.warn("Drop timeout node: {}", cur)
                     continue
                 }
                 // 更新当前App up的时间
-                if (cur["id"] == app.id) {
+                if (cur["id"] == app.id && (System.currentTimeMillis() - cur['_uptime'] > 1000 * 60)) { // 超过1分钟更新一次,不必每次更新
                     cur['_uptime'] = System.currentTimeMillis()
-                    def self = remoter.selfInfo // 判断当前机器ip是否变化
+                    def self = remoter?.selfInfo // 判断当前机器ip是否变化
                     if (self && self['tcp'] != cur['tcp']) cur.putAll(self)
                 }
                 // 返回所有的注册信息给当前来注册的客户端
@@ -290,10 +291,12 @@ class TCPServer extends ServerTpl {
                             (new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", cur).toString() + (delimiter?:'')).getBytes('utf-8')
                     ))
                 }
-                // 如果是新系统上线, 则主动通知其它系统
-                if (isNew && cur['id'] != data['id'] && cur['id'] != app.id) {
-                    ep.fire("remote", EC.of(this).attr('toAll', true).args(e.key, "updateAppInfo", [data]))
-                }
+            }
+            // 删除没有对应的服务信息的应用
+            if (!e.value) {it.remove(); continue}
+            // 如果是新系统上线, 则主动通知其它系统
+            if (isNew) {
+                async {ep.fire("remote", EC.of(this).attr('toAll', true).args(e.key, "updateAppInfo", [data]))}
             }
         }
     }
@@ -305,15 +308,18 @@ class TCPServer extends ServerTpl {
      */
     @EL(name = "updateAppInfo", async = false)
     protected updateAppInfo(EC ec, final JSONObject data) {
-        if (!remoter.master) return
+        if (!remoter?.master) return
         if (this == ec?.source()) return
-        if (!data) return
+        if (!data || !data['tcp'] || !data['id'] || !data['name']) {
+            log.warn("App up data incomplete: " + data)
+            return
+        }
         if (app.id == data["id"] || remoter?.selfInfo?['tcp'] == data['tcp']) return // 不把系统本身的信息放进去
         queue('appUp') {
             boolean add = true
-            List<Map<String, Object>> apps = appInfoMap.computeIfAbsent(data["name"], {new LinkedList<>()})
-            for (def itt = apps.iterator(); itt.hasNext(); ) {
-                def e = itt.next()
+            final def apps = appInfoMap.computeIfAbsent(data["name"], {new LinkedList<>()})
+            for (final def itt = apps.iterator(); itt.hasNext(); ) {
+                final def e = itt.next()
                 if (e["id"] == data["id"]) {
                     if (data['_uptime'] > e['_uptime']) {
                         itt.remove()

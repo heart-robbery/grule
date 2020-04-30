@@ -70,9 +70,11 @@ class TCPClient extends ServerTpl {
      */
     @EL(name = "updateAppInfo", async = false)
     def updateAppInfo(final JSONObject data) {
+        if (!data || !data["name"] || !data['id'] || !data['tcp']) {
+            log.warn("App up data incomplete: " + data)
+            return
+        }
         log.trace("Update app info: {}", data)
-        if (data == null || data.isEmpty()) return
-        if (!data["name"] && !data['id'] && !data['tcp']) throw new IllegalArgumentException("app info 参数错误: " + data)
         if (app.id == data["id"] || remoter?.selfInfo?['tcp'] == data['tcp']) return // 不把系统本身的信息放进去
 
         String n = data['name']
@@ -82,7 +84,7 @@ class TCPClient extends ServerTpl {
                 g = apps.get(n)
                 if (g == null) {
                     log.info("New app group '{}'", n)
-                    g = new AppGroup(name: n)
+                    g = new AppGroup(n)
                     apps.put(n, g)
                 }
             }
@@ -98,7 +100,7 @@ class TCPClient extends ServerTpl {
      * @param data 要发送的数据
      * @param failFn 失败回调函数(可不传)
      */
-    def send(String host, Integer port, String data, Consumer<Throwable> failFn = null) {
+    void send(String host, Integer port, String data, Consumer<Throwable> failFn = null) {
         log.trace("Send data to '{}:{}'. data: " + data, host, port)
         hpNodes.computeIfAbsent("$host:$port", {hp ->
             def n = new Node(tcpHp: hp)
@@ -114,7 +116,7 @@ class TCPClient extends ServerTpl {
      * @param data 要发送的数据
      * @param target 可用值: 'any', 'all'
      */
-    def send(String appName, String data, String target = 'any') {
+    void send(String appName, String data, String target = 'any') {
         log.trace("Send data to '{}'. data: " + data, appName)
         def group = apps.get(appName)
         if (group == null) throw new RuntimeException("Not found app '$appName' system online")
@@ -199,7 +201,7 @@ class TCPClient extends ServerTpl {
         def jo = JSON.parseObject(dataStr, Feature.OrderedField)
         handlers.each {it.accept(jo)}
         if ("updateAppInfo" == jo['type']) {
-            queue('updateAppInfo') {
+            queue() {
                 ep.fire("updateAppInfo", jo.getJSONObject("data"))
             }
         }
@@ -257,9 +259,14 @@ class TCPClient extends ServerTpl {
      */
     class AppGroup {
         // 组名
-        String name
+        final String name
         // 节点id -> 节点
         final Map<String, Node> nodes = new ConcurrentHashMap<>()
+
+        AppGroup(String name) {
+            if (!name) throw new IllegalArgumentException("name must not be empty")
+            this.name = name
+        }
 
         /**
          * 更新/添加应用节点
@@ -291,19 +298,6 @@ class TCPClient extends ServerTpl {
         }
 
         /**
-         * 随机选择一个节点发送数据
-         * @param data
-         */
-        def sendToAny(final String data) {
-            List<Node> ns = new LinkedList<>()
-            nodes.each {ns.add(it.value)}
-            if (ns.size() == 0) {
-                throw new RuntimeException("Not found available node for '$name'")
-            }
-            randomStrategy(ns, data)
-        }
-
-        /**
          * 发送给所有节点
          * @param data
          */
@@ -311,10 +305,20 @@ class TCPClient extends ServerTpl {
             nodes.values().each {
                 try {
                     it.send(data)
-                } catch (Throwable th) {
-                    log.error("Send data: '{}' fail. Node: '{}'. errMsg: " + (th.message?:th.class.simpleName), data, it)
+                } catch (ex) {
+                    log.error("Send data: '{}' fail. Node: '{}'. errMsg: " + (ex.message?:ex.class.simpleName), data, it)
                 }
             }
+        }
+
+        /**
+         * 随机选择一个节点发送数据
+         * @param data
+         */
+        def sendToAny(final String data) {
+            final List<Node> ns = new LinkedList<>()
+            nodes.each {ns.add(it.value)}
+            randomStrategy(ns, data)
         }
 
         /**
@@ -322,22 +326,17 @@ class TCPClient extends ServerTpl {
          * @param ns 节点列表
          * @param data 要发送的数据
          */
-        def randomStrategy(List<Node> ns, String data) {
+        void randomStrategy(List<Node> ns, String data) {
             if (!ns) throw new RuntimeException("Not found available node for '$name'")
             if (ns.size() == 1) ns[0].send(data)
             else {
                 def n = ns[new Random().nextInt(ns.size())]
                 n.send(data, {ex -> // 尽可能找到可用的节点把数据发送出去
-                    log.error(ex.message?:ex.class.simpleName)
+                    log.error(ex.class.simpleName+": " +ex.message)
                     ns.remove(n)
                     randomStrategy(ns, data)
                 })
             }
-        }
-
-        def setName(String name) {
-            if (this.name != null) throw new RuntimeException("'name' not allow change")
-            this.name = name
         }
     }
 
@@ -395,31 +394,29 @@ class TCPClient extends ServerTpl {
             }
         }
 
-        // 发送数据
-        def send(final String data, Consumer<Throwable> failFn = null, AtomicInteger limit = new AtomicInteger(0)) {
-            // 发送数据
+        /**
+         * 发送数据
+         * @param data 数据
+         * @param failFn 失败函数
+         * @param limit 重试次数
+         */
+        void send(final String data, Consumer<Throwable> failFn = null, AtomicInteger limit = new AtomicInteger(0)) {
+            def ch = null
             try {
-                def ch = tcpPool.get()
+                ch = tcpPool.get()
                 if (limit.get() == 0) ((Runnable) ch.attr(AttributeKey.valueOf("upFn")).get())?.run()
-                ch.writeAndFlush(toByteBuf(data)).addListener{ChannelFuture cf ->
-                    if (cf.cause() != null) {
-                        if (cf.cause() instanceof ClosedChannelException) {
-                            tcpPool.remove(ch)
-                            if (limit.get() < 3) {
-                                limit.incrementAndGet()
-                                send(data, failFn, limit) // 重试
-                                return
-                            }
-                        }
-                        if (failFn != null) failFn.accept(cf.cause())
-                        else {
-                            log.error("Send data: '{}' fail. Node: '{}'. errMsg: {}" + (cf.cause().message?:cf.cause().class.simpleName), data, this)
-                        }
+                ch.writeAndFlush(toByteBuf(data)).sync()
+            } catch (Throwable ex) {
+                if (ex instanceof ClosedChannelException) { // 通道关闭的情况,可重试
+                    tcpPool.remove(ch)
+                    if (limit.get() < 2) {
+                        limit.incrementAndGet()
+                        send(data, failFn, limit) // 重试
+                        return
                     }
                 }
-            } catch (Throwable th) {
-                if (failFn) failFn.accept(th)
-                else throw th
+                if (failFn) failFn.accept(ex)
+                else throw ex
             }
         }
 
@@ -441,8 +438,8 @@ class TCPClient extends ServerTpl {
         final List<Channel> chs    = new ArrayList<>(7)
 
         // 获取连接Channel
-        def get() {
-            if (chs.size() == 0) create()
+        Channel get() {
+            if (chs.size() == 0) add()
             if (chs.size() == 0) {
                 throw new RuntimeException("Not found available Channel for '${node.toString()}'")
             }
@@ -459,18 +456,19 @@ class TCPClient extends ServerTpl {
             null
         }
 
-        // 创建新连接Channel
-        def create() {
+        /**
+         * 添加新连接Channel
+         */
+        void add() {
             Channel ch
             try { // 连接
                 ch = boot.connect(host, port).sync().channel()
                 initChannel(ch)
             } catch (Throwable th) {
-                // log.error("Create TCP Connection error. node: '{}'. errMsg: {}", node, (th.message ?: th.class.simpleName))
                 if (node.group && node.group.nodes.size() > 1) { // 删除连接不上的节点, 但保留一个
                     node.group.nodes.remove(node.id)
                 }
-                throw new RuntimeException("Create TCP Connection error. node: '${node}'. errMsg: ${(th.message ?: th.class.simpleName)}", th)
+                throw new RuntimeException("Create TCP Connection error. node: '${node}'. errMsg: $th.class.simpleName: $th.message", th)
             }
             if (ch != null) {
                 try { // 添加连接
@@ -481,7 +479,6 @@ class TCPClient extends ServerTpl {
                     rwLock.writeLock().unlock()
                 }
             }
-            ch
         }
 
         // 初始化连接Channel
@@ -498,13 +495,14 @@ class TCPClient extends ServerTpl {
                     else break
                 }
                 if (records.size() > getInteger("oneMinuteLimitPerChannel", 70) && chs.size() < getInteger('maxConnectPerNode', 3)) {
-                    async {create()}
+                    async {add()}
                 }
             } as Runnable)
         }
 
         // 删除连接Channel
-        def remove(final Channel ch) {
+        void remove(final Channel ch) {
+            if (ch == null) return
             try {
                 rwLock.writeLock().lock()
                 for (def it = chs.iterator(); it.hasNext();) {
