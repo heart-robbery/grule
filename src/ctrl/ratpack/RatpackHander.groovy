@@ -35,7 +35,7 @@ class RatpackHander extends NettyHandlerAdapter {
                 ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, SERVICE_UNAVAILABLE))
             } else {
                 // 请求入对执行
-                rw.queue().offer{ super.channelRead(ctx, msg) }
+                rw.queue() { super.channelRead(ctx, msg) }
             }
         } else {
             super.channelRead(ctx, msg)

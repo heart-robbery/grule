@@ -102,7 +102,7 @@ class TCPServer extends ServerTpl {
                             }
                         })
                         // 最好是将IdleStateHandler放在入站的开头，并且重写userEventTriggered这个方法的handler必须在其后面。否则无法触发这个事件。
-                        ch.pipeline().addLast(new IdleStateHandler(getLong("readerIdleTime", 30 * 60L), getLong("writerIdleTime", 0L), getLong("allIdleTime", 0L), SECONDS))
+                        ch.pipeline().addLast(new IdleStateHandler(getLong("readerIdleTime", 60 * 60L), getLong("writerIdleTime", 0L), getLong("allIdleTime", 0L), SECONDS))
                         if (delimiter) {
                             ch.pipeline().addLast(
                                     new DelimiterBasedFrameDecoder(
@@ -114,7 +114,7 @@ class TCPServer extends ServerTpl {
                         ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
                             @Override
                             void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-                                log.error("server side error. ", cause)
+                                log.error("server side error", cause)
                             }
                             @Override
                             void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
@@ -202,7 +202,7 @@ class TCPServer extends ServerTpl {
             // telnet localhost 8001
             // 例: {"type":"cmd-restart-server", "data": "ehcache"}$_$
             String sName = jo.getString("data")
-            ep.fire(sName+ ".stop", EC.of(this).completeFn{ec -> ep.fire(sName + ".start")})
+            ep.fire(sName+ ".stop", EC.of(app).completeFn{ec -> ep.fire(sName + ".start")})
         } else if (t.startsWith("ls ")) {
             // {"type":"ls apps"}$_$
             def arr = t.split(" ")
@@ -270,7 +270,7 @@ class TCPServer extends ServerTpl {
                 // 删除和当前up的app 相同的tcp的节点(节点重启,但节点上次的信息还没被移除)
                 if (data['id'] != cur['id'] && data['tcp'] && data['tcp'] == cur['tcp']) {
                     it2.remove()
-                    log.debug("Drop same tcp node: {}", cur)
+                    log.info("Drop same tcp node: {}", cur)
                     continue
                 }
                 // 删除一段时间未活动的注册信息, dropAppTimeout 单位: 分钟
@@ -295,7 +295,7 @@ class TCPServer extends ServerTpl {
             // 删除没有对应的服务信息的应用
             if (!e.value) {it.remove(); continue}
             // 如果是新系统上线, 则主动通知其它系统
-            if (isNew) {
+            if (isNew && data['id'] != app.id) {
                 async {ep.fire("remote", EC.of(this).attr('toAll', true).args(e.key, "updateAppInfo", [data]))}
             }
         }

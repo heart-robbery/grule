@@ -108,6 +108,7 @@ class ServerTpl {
      * @return {@link core.Devourer}当前对列
      */
     def queue(String qName = name, Runnable fn = null) {app.queue(qName, fn)}
+    def queue(Runnable fn) {app.queue(name, fn)}
 
 
     /**

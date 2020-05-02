@@ -273,8 +273,7 @@ class Remoter extends ServerTpl {
             if (next) {
                 // 下次触发策略, upInterval master越多可设置时间越长
                 if (System.currentTimeMillis() - app.startup.time > 60 * 1000L) {
-                    int upInterval = getInteger('upInterval', (master ? Math.min(180, tcpClient.apps.get(app.name)?.nodes?.size()?:1 * 40) : 90))
-                    sched.after(Duration.ofSeconds(upInterval + new Random().nextInt(90)), {sync(true)})
+                    sched.after(Duration.ofSeconds(getInteger('upInterval', 120) + new Random().nextInt(90)), {sync(true)})
                 } else {
                     sched.after(Duration.ofSeconds(10), {sync(true)})
                 }

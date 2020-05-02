@@ -13,7 +13,7 @@ class Devourer {
     protected final        Executor            exec
     protected final        AtomicBoolean       running = new AtomicBoolean(false)
     protected final        Queue<Runnable>     waiting = new ConcurrentLinkedQueue<>()
-    protected final        Object              key
+    final Object key
 
 
     Devourer(Object key, Executor exec) {
@@ -64,7 +64,7 @@ class Devourer {
 
 
 
-    def shutdown() {
+    void shutdown() {
         if (exec instanceof ExecutorService) ((ExecutorService) exec).shutdown()
     }
 

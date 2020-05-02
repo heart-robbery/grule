@@ -153,7 +153,8 @@ class AppContext {
      * @param fn 要执行的函数
      * @return {@link Devourer}
      */
-    Devourer queue(String qName = 'sys', Runnable fn) {
+    Devourer queue(String qName, Runnable fn = null) {
+        if (!qName) throw new IllegalArgumentException('queue name must be not empty')
         def d = queue2Devourer.get(qName)
         if (d == null) {
             synchronized (this) {

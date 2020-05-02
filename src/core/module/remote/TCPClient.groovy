@@ -168,9 +168,22 @@ class TCPClient extends ServerTpl {
                             }
 
                             @Override
-                            void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-                                log.error(name + " error", cause)
+                            void channelInactive(ChannelHandlerContext ctx) throws Exception {
+                                ((Runnable) ctx.channel().attr(AttributeKey.valueOf("removeFn")).get())?.run()
+                                super.channelInactive(ctx)
                             }
+
+                            @Override
+                            void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+                                log.error("client side error", cause)
+                            }
+
+                            @Override
+                            void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
+                                ctx.flush()
+                                super.channelReadComplete(ctx)
+                            }
+
                             @Override
                             void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
                                 ByteBuf buf = (ByteBuf) msg
@@ -178,8 +191,9 @@ class TCPClient extends ServerTpl {
                                 try {
                                     str = buf.toString(Charset.forName("utf-8"))
                                     receiveReply(ctx, str)
+                                    ctx.flush()
                                 } catch (JSONException ex) {
-                                    log.error("Received Error Data from '{}'. data: {}, errMsg: {}", ctx.channel().remoteAddress(), str, ex.getMessage())
+                                    log.error("Received Error Data from '{}'. data: {}, errMsg: " + ex.message, ctx.channel().remoteAddress(), str)
                                     ctx.close()
                                 } finally {
                                     ReferenceCountUtil.release(msg)
@@ -279,16 +293,13 @@ class TCPClient extends ServerTpl {
             }
             def n = nodes.get(id)
             if (n) { // 更新,有可能节点ip变了
-                n.tcpHp = tcpHp.trim()
-                n.httpHp = httpHp.trim()
-                n.uptime = uptime
+                n.uptime = uptime; n.tcpHp = tcpHp.trim(); n.httpHp = httpHp.trim()
             } else {
                 n = nodes.values().find {it.tcpHp == tcpHp}
                 if (n && n.uptime < uptime) { // tcp host:port 相同, 认为是节点被重启了
+                    log.info("Node id update: ('{}' -> '{}')", n.id, id)
                     nodes.put(id, n); nodes.remove(n.id)
-                    n.id = id
-                    n.httpHp = httpHp
-                    n.uptime = uptime
+                    n.id = id; n.httpHp = httpHp; n.uptime = uptime
                 } else {
                     n = new Node(group: this, id: id, tcpHp: tcpHp, httpHp: httpHp, uptime: uptime)
                     nodes.put(id, n)
@@ -437,23 +448,31 @@ class TCPClient extends ServerTpl {
         final ReadWriteLock rwLock = new ReentrantReadWriteLock()
         final List<Channel> chs    = new ArrayList<>(7)
 
-        // 获取连接Channel
+        /**
+         * 获取连接Channel
+         * @return {@link Channel}
+         */
         Channel get() {
             if (chs.size() == 0) add()
             if (chs.size() == 0) {
                 throw new RuntimeException("Not found available Channel for '${node.toString()}'")
             }
+            Channel ch
             try {
                 rwLock.readLock().lock()
                 if (chs.size() == 1) {
-                    return chs.get(0)
+                    ch = chs.get(0)
                 } else {
-                    return chs.get(new Random().nextInt(chs.size())) // 随机选择连接
+                    ch = chs.get(new Random().nextInt(chs.size())) // 随机选择连接
                 }
             } finally {
                 rwLock.readLock().unlock()
             }
-            null
+
+            // 验证是否可用
+            if (ch && ch.isActive()) return ch
+            remove(ch)
+            return get()
         }
 
         /**
@@ -508,6 +527,7 @@ class TCPClient extends ServerTpl {
                 for (def it = chs.iterator(); it.hasNext();) {
                     if (it.next() == ch) {
                         it.remove()
+                        try {ch.close()} catch (ex) {}
                         log.info("Remove TCP connection for Node '{}'", node)
                         break
                     }
