@@ -16,6 +16,8 @@ import dao.entity.UploadFile
 import groovy.transform.Field
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import org.tio.core.Tio
+import org.tio.server.TioServer
 import sevice.FileUploader
 import sevice.TestService
 
@@ -43,6 +45,7 @@ app.start() // 启动系统
 
 @EL(name = 'sys.started')
 def sysStarted() {
+    Tio.bindBsId()
     TestService ts = app.bean(TestService)
     //ts.wsClientTest()
     return

@@ -69,7 +69,7 @@ class TCPClient extends ServerTpl {
      *  属性不为空: name, id, tcp
      */
     @EL(name = "updateAppInfo", async = false)
-    def updateAppInfo(final JSONObject data) {
+    void updateAppInfo(final JSONObject data) {
         if (!data || !data["name"] || !data['id'] || !data['tcp']) {
             log.warn("App up data incomplete: " + data)
             return
@@ -77,19 +77,10 @@ class TCPClient extends ServerTpl {
         log.trace("Update app info: {}", data)
         if (app.id == data["id"] || remoter?.selfInfo?['tcp'] == data['tcp']) return // 不把系统本身的信息放进去
 
-        String n = data['name']
-        def g = apps.get(n)
-        if (g == null) {
-            synchronized (this) {
-                g = apps.get(n)
-                if (g == null) {
-                    log.info("New app group '{}'", n)
-                    g = new AppGroup(n)
-                    apps.put(n, g)
-                }
-            }
-        }
-        g.updateNode(data)
+        apps.computeIfAbsent(data['name'], {n ->
+            log.info("New app group '{}'", n)
+            new AppGroup(n)
+        }).updateNode(data)
     }
 
 
