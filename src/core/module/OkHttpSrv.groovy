@@ -22,7 +22,6 @@ import static java.util.Collections.emptyList
  */
 class OkHttpSrv extends ServerTpl {
 
-    protected OkHttpClient client
     final Map<String, List<Cookie>> cookieStore = new ConcurrentHashMap<>()
     final Map<String, Set<String>> shareCookie = new ConcurrentHashMap<>()
 
@@ -31,11 +30,18 @@ class OkHttpSrv extends ServerTpl {
 
     @EL(name = 'sys.starting', async = true)
     def init() {
-        if (client) throw new RuntimeException("$name is already running")
         if (ep == null) {ep = new EP(); ep.addListenerSource(this)}
-        client = new OkHttpClient.Builder()
+        exposeBean(client)
+    }
+
+
+    /**
+     * OkHttpClient
+     */
+    @Lazy OkHttpClient client = {
+        new OkHttpClient.Builder()
             .connectTimeout(Duration.ofSeconds(getLong('connectTimeout', 8)))
-            .readTimeout(Duration.ofSeconds(getLong('readTimeout', 16)))
+            .readTimeout(Duration.ofSeconds(getLong('readTimeout', 20)))
             .writeTimeout(Duration.ofSeconds(getLong('writeTimeout', 32)))
             .dispatcher(new Dispatcher(exec))
             .cookieJar(new CookieJar() {// 共享cookie
@@ -45,11 +51,11 @@ class OkHttpSrv extends ServerTpl {
                     if (cs == null) {
                         cookieStore.put(url.host, new LinkedList<Cookie>(cookies)) // 可更改
                     } else {// 更新cookie
-                        for (def it = cs.iterator(); it.hasNext(); ) {
-                            Cookie coo = it.next()
+                        for (def itt = cs.iterator(); itt.hasNext(); ) {
+                            Cookie coo = itt.next()
                             for (Cookie c: cookies) {
                                 if (c.name() == coo.name()) {
-                                    it.remove()
+                                    itt.remove()
                                     break
                                 }
                             }
@@ -71,8 +77,7 @@ class OkHttpSrv extends ServerTpl {
                     }
                 }
             }).build()
-        exposeBean(client)
-    }
+    }()
 
 
     /**
@@ -138,15 +143,13 @@ class OkHttpSrv extends ServerTpl {
     }
 
 
-    OkHttpClient client() {client}
-
     class OkHttp {
         // 宿主
         protected final Request.Builder                           builder
         protected       String                                    urlStr
         protected       Map<String, Object>                       params
-        // 文件流:(属性名, 文件名, 文件流)
-        protected       List<Tuple3<String, String, InputStream>> fileStreams
+        // 文件流:(属性名, 文件名, 文件内容)
+        protected       List<Tuple3<String, String, Object>>      fileStreams
         protected       Map<String, Object>                       cookies
         protected       String                                    contentType
         protected       String                                    jsonBodyStr
@@ -166,12 +169,14 @@ class OkHttpSrv extends ServerTpl {
             }
             this
         }
-        OkHttp fileStream(String pName, String fileName, InputStream is) {
+        OkHttp fileStream(String pName, String fileName, Object body) {
             if (pName == null) throw new NullPointerException('pName == null')
-            if (is == null) throw new NullPointerException('InputStream == null')
-            if (fileStreams == null) fileStreams = new LinkedList<>()
-            fileStreams.add(Tuple.tuple(pName, fileName, is))
-            if (contentType == null) contentType = 'multipart/form-data;charset=utf-8'
+            if (body == null) throw new NullPointerException('body == null')
+            if (body instanceof byte[] || body instanceof String || body instanceof InputStream || body instanceof File) {
+                if (fileStreams == null) fileStreams = new LinkedList<>()
+                fileStreams.add(Tuple.tuple(pName, fileName, body))
+                if (contentType == null) contentType = 'multipart/form-data;charset=utf-8'
+            } else throw new IllegalArgumentException("Not support file body type: " + body.class.name)
             this
         }
         OkHttp jsonBody(String jsonBodyStr) {
@@ -197,15 +202,11 @@ class OkHttpSrv extends ServerTpl {
         OkHttp debug() {this.debug = true; this}
         // 请求执行
         def execute(Consumer<String> okFn = null, Consumer<Exception> failFn = {throw it}) {
+            List<File> tmpFile
             if ('GET' == builder.method) { // get 请求拼装参数
                 urlStr = Utils.buildUrl(urlStr, params)
                 builder.get()
                 // okHttp get 不能body
-//                if (jsonBodyStr) { // get body
-//                    builder.method("GET", RequestBody.create(MediaType.get(contentType), jsonBodyStr))
-//                } else {
-//                    builder.get()
-//                }
             } else if ('POST' == builder.method) {
                 if (contentType && contentType.containsIgnoreCase('application/json')) {
                     if (jsonBodyStr) builder.post(RequestBody.create(MediaType.get(contentType), (jsonBodyStr == null ? '' : jsonBodyStr)))
@@ -213,7 +214,16 @@ class OkHttpSrv extends ServerTpl {
                 } else if (contentType && contentType.containsIgnoreCase('multipart/form-data')) {
                     def b = new MultipartBody.Builder().setType(MediaType.get(contentType))
                     fileStreams?.each {
-                        b.addFormDataPart(it.v1, it.v2, RequestBody.create(MediaType.get('application/octet-stream'), it.v3))
+                        def v = it.v3
+                        if (it.v3 instanceof InputStream) {
+                            v = new File(getStr('tmpDir', Utils.baseDir('tmp').canonicalPath))
+                            v.mkdirs()
+                            v = new File(v,  "/" + UUID.randomUUID().toString().replace("-", ''))
+                            v.append((InputStream) it.v3)
+                            if (tmpFile == null) tmpFile = new LinkedList<>()
+                            tmpFile.add(v)
+                        }
+                        b.addFormDataPart(it.v1, it.v2, RequestBody.create(MediaType.get('application/octet-stream'), v))
                     }
                     params?.each {
                         if (it.value instanceof File) {
@@ -264,6 +274,7 @@ class OkHttpSrv extends ServerTpl {
                         @Override
                         void onFailure(Call c, IOException e) {
                             if (debug) log.error('Send http: {}, params: {}', urlStr, params?:jsonBodyStr)
+                            tmpFile?.each {it.delete()}
                             failFn?.accept(e)
                         }
 
@@ -271,12 +282,14 @@ class OkHttpSrv extends ServerTpl {
                         void onResponse(Call c, Response resp) throws IOException {
                             result = resp.body()?.string()
                             if (200 != resp.code()) {
-                                log.error('Send http: {}, params: {}, result: ' + Objects.toString(result, ''), urlStr, params?:jsonBodyStr)
+                                log.error('Send http: {}, params: {}, ' + (fileStreams ? "fileStreams: " + fileStreams.join(",") : '') + ' result: ' + Objects.toString(result, ''), urlStr, params?:jsonBodyStr)
+                                tmpFile?.each {it.delete()}
                                 if (failFn) {
                                     failFn.accept(new RuntimeException("Http error. code: ${resp.code()}, url: $urlStr, resp: ${Objects.toString(result, '')}"))
                                 }
                             } else {
-                                log.info('Send http: {}, params: {}, result: ' + Objects.toString(result, ''), urlStr, params?:jsonBodyStr)
+                                log.info('Send http: {}, params: {}, ' + (fileStreams ? "fileStreams: " + fileStreams.join(",") : '') + 'result: ' + Objects.toString(result, ''), urlStr, params?:jsonBodyStr)
+                                tmpFile?.each {it.delete()}
                                 okFn?.accept(result)
                             }
                         }
@@ -285,6 +298,7 @@ class OkHttpSrv extends ServerTpl {
                 } else { // 同步请求
                     def resp = call.execute()
                     result = resp.body()?.string()
+                    tmpFile?.each {it.delete()}
                     if (200 != resp.code()) {
                         throw new RuntimeException("Http error. code: ${resp.code()}, url: $urlStr, resp: ${Objects.toString(result, '')}")
                     }
@@ -294,9 +308,9 @@ class OkHttpSrv extends ServerTpl {
             }
             if (debug) {
                 if (ex) {
-                    log.error('Send http: {}, params: {}', urlStr, params?:jsonBodyStr)
+                    log.error('Send http: {}, params: {}' + (fileStreams ? ", fileStreams: " + fileStreams.join(",") : ''), urlStr, params?:jsonBodyStr)
                 } else {
-                    log.info('Send http: {}, params: {}, result: ' + Objects.toString(result, ''), urlStr, params?:jsonBodyStr)
+                    log.info('Send http: {}, params: {}, ' + (fileStreams ? "fileStreams: " + fileStreams.join(";") : '') + ' result: ' + Objects.toString(result, ''), urlStr, params?:jsonBodyStr)
                 }
             }
             if (ex) throw ex

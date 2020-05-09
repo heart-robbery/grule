@@ -258,7 +258,7 @@ class TCPServer extends ServerTpl {
         }
         apps << data
         if (isNew && data['id'] != app.id) log.info("New app '{}' online. {}", data["name"], data)
-        if (data['id'] != app.id) async {ep.fire("updateAppInfo", data)} // 同步信息给本服务器的tcp-client
+        if (data['id'] != app.id) ep.fire("updateAppInfo", data) // 同步信息给本服务器的tcp-client
 
         //2. 遍历所有的数据,删除不必要的数据, 同步注册信息
         for (final def it = appInfoMap.entrySet().iterator(); it.hasNext(); ) {

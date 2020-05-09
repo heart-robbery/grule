@@ -16,8 +16,6 @@ import dao.entity.UploadFile
 import groovy.transform.Field
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import org.tio.core.Tio
-import org.tio.server.TioServer
 import sevice.FileUploader
 import sevice.TestService
 
@@ -34,6 +32,7 @@ app.addSource(new EhcacheSrv())
 app.addSource(new SchedSrv())
 app.addSource(new RedisClient())
 app.addSource(new Remoter())
+//app.addSource(new AioServer())
 app.addSource(new HibernateSrv().entities(Test, UploadFile, Component))
 app.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl))
 //app.addSource(new RuleSrv())
@@ -45,7 +44,16 @@ app.start() // 启动系统
 
 @EL(name = 'sys.started')
 def sysStarted() {
-    Tio.bindBsId()
+//    app.bean(AioServer).msgFn {s ->
+//        log.info("收到的消息: " + s)
+//        "i received " + System.currentTimeMillis()
+//    }
+//    def sc = AsynchronousSocketChannel.open(AsynchronousChannelGroup.withThreadPool(app.bean(ExecutorService)))
+//    sc.connect(new InetSocketAddress("localhost",8000)).get()
+//    for (int i = 0; i < 5; i++) {
+//        sc.write(ByteBuffer.wrap("send a msg $i".getBytes("utf-8")))
+//    }
+
     TestService ts = app.bean(TestService)
     //ts.wsClientTest()
     return
