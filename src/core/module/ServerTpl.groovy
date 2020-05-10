@@ -130,7 +130,37 @@ class ServerTpl {
      * 属性集
      * @return
      */
-    Map attrs() { app.env[(name)] }
+    Map attrs(String key = null) {
+        def r = app.env[(name)]
+        if (key && key.contains("."))  {
+            key.split(".").each {s ->
+                r = r[(s)]
+            }
+        }
+        r
+    }
+
+
+    /**
+     * 不要属性值
+     * @param key 属性key, 含逗号.
+     * @return
+     */
+    def attr(String key) {
+        def r = app.env[(name)]
+        String k = key
+        if (key && key.contains("."))  {
+            def arr = key.split(".")
+            for (int i = 0, size = arr.length - 1; i < size; i++) {
+                r = r[(arr[i])]
+            }
+            k = arr[arr.length-1]
+        }
+
+        if (r instanceof Map) {return r.containsKey(k) ? r[(k)] : null}
+        r
+    }
+
 
     // 设置属性
     ServerTpl attr(String aName, Object aValue) {

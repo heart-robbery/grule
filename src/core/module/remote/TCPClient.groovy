@@ -284,7 +284,7 @@ class TCPClient extends ServerTpl {
             }
             def n = nodes.get(id)
             if (n) { // 更新,有可能节点ip变了
-                n.uptime = uptime; n.tcpHp = tcpHp.trim(); n.httpHp = httpHp.trim()
+                n.uptime = uptime; n.tcpHp = tcpHp.trim(); n.httpHp = httpHp?.trim()
             } else {
                 n = nodes.values().find {it.tcpHp == tcpHp}
                 if (n && n.uptime < uptime) { // tcp host:port 相同, 认为是节点被重启了
