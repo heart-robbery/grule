@@ -159,7 +159,6 @@ class RatpackWeb extends ServerTpl {
                     log.error("Request Error '" + ctx.get(RequestId.TYPE) + "', path: " + ctx.request.uri, ex)
                 }
                 ctx.render ApiResp.of(ctx['respCode']?:'01', (ex.class.name + (ex.message ? ": $ex.message" : '')))
-                // ctx.response.status(500).send()
             }
         })
     }
@@ -268,7 +267,7 @@ class RatpackWeb extends ServerTpl {
     protected session(Context ctx) {
         def sId = ctx.request.oneCookie('sId')
 
-        if ('redis' == attrs()['session']['type']) { // session的数据, 用redis 保存 session 数据
+        if ('redis' == getStr('session.type')) { // session的数据, 用redis 保存 session 数据
             if (redis == null) throw new RuntimeException('RedisClient is not exist')
             def sData = new Expando(new ConcurrentHashMap()) {
                 @Override

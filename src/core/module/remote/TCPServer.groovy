@@ -202,7 +202,7 @@ class TCPServer extends ServerTpl {
             // telnet localhost 8001
             // 例: {"type":"cmd-restart-server", "data": "ehcache"}$_$
             String sName = jo.getString("data")
-            ep.fire(sName+ ".stop", EC.of(app).completeFn{ec -> ep.fire(sName + ".start")})
+            ep.fire(sName+ ".stop", EC.of(app).completeFn{ ec -> ep.fire(sName + ".start")})
         } else if (t.startsWith("ls ")) {
             // {"type":"ls apps"}$_$
             def arr = t.split(" ")

@@ -24,8 +24,8 @@ class ServerTpl {
      * 1. 当此服务被加入核心时, 此值会自动设置为核心的EP.
      * 2. 如果要服务独立运行时, 请手动设置
      */
-    @Resource EP           ep
-    @Lazy def              app  = bean(AppContext)
+    @Resource protected EP ep
+    @Lazy protected def    app  = bean(AppContext)
     @Lazy protected def    exec = bean(ExecutorService)
 
 
@@ -132,17 +132,17 @@ class ServerTpl {
      */
     Map attrs(String key = null) {
         def r = app.env[(name)]
-        if (key && key.contains("."))  {
-            key.split(".").each {s ->
-                r = r[(s)]
-            }
+        if (key)  {
+            if (key.contains(".")) {
+                key.split("\\.").each {s -> r = r[(s)] }
+            } else r = r[(key)]
         }
         r
     }
 
 
     /**
-     * 不要属性值
+     * 属性值
      * @param key 属性key, 含逗号.
      * @return
      */
@@ -150,7 +150,7 @@ class ServerTpl {
         def r = app.env[(name)]
         String k = key
         if (key && key.contains("."))  {
-            def arr = key.split(".")
+            def arr = key.split("\\.")
             for (int i = 0, size = arr.length - 1; i < size; i++) {
                 r = r[(arr[i])]
             }
@@ -168,15 +168,15 @@ class ServerTpl {
         this
     }
 
-    Long getLong(String key, Long defaultValue = null) { attrs().containsKey(key) ? Long.valueOf(attrs()[(key)]) : defaultValue}
+    Long getLong(String key, Long defaultValue = null) { def r = attr(key); r != null ? Long.valueOf(r) : defaultValue}
 
-    Integer getInteger(String key, Integer defaultValue = null) { attrs().containsKey(key) ? Integer.valueOf(attrs()[(key)]) : defaultValue }
+    Integer getInteger(String key, Integer defaultValue = null) { def r = attr(key); r != null ? Integer.valueOf(r) : defaultValue }
 
-    Double getDouble(String key, Double defaultValue = null) { attrs().containsKey(key)? Double.valueOf(attrs()[(key)]) : defaultValue}
+    Double getDouble(String key, Double defaultValue = null) { def r = attr(key); r != null ? Double.valueOf(r) : defaultValue}
 
-    Float getFloat(String key, Float defaultValue = null) { attrs().containsKey(key)? Float.valueOf(attrs()[(key)]) : defaultValue}
+    Float getFloat(String key, Float defaultValue = null) { def r = attr(key); r != null ? Float.valueOf(r) : defaultValue}
 
-    String getStr(String key, String defaultValue = null) { attrs().containsKey(key) ? attrs()[(key)] : defaultValue}
+    String getStr(String key, String defaultValue = null) { def r = attr(key); r != null ? r : defaultValue}
 
-    Boolean getBoolean(String key, Boolean defaultValue = null) { attrs().containsKey(key) ? Boolean.valueOf(attrs()[(key)]) : defaultValue}
+    Boolean getBoolean(String key, Boolean defaultValue = null) { def r = attr(key); r != null ? Boolean.valueOf(r) : defaultValue}
 }
