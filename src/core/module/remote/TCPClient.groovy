@@ -7,7 +7,6 @@ import com.alibaba.fastjson.JSONObject
 import com.alibaba.fastjson.parser.Feature
 import core.module.ServerTpl
 import io.netty.bootstrap.Bootstrap
-import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import io.netty.channel.*
 import io.netty.channel.epoll.EpollEventLoopGroup
@@ -16,15 +15,19 @@ import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.codec.DelimiterBasedFrameDecoder
+import io.netty.handler.codec.string.StringDecoder
+import io.netty.handler.codec.string.StringEncoder
+import io.netty.handler.timeout.IdleStateEvent
+import io.netty.handler.timeout.IdleStateHandler
+import io.netty.handler.timeout.WriteTimeoutHandler
 import io.netty.util.AttributeKey
-import io.netty.util.ReferenceCountUtil
 import sun.net.util.IPAddressUtil
 
 import java.nio.channels.ClosedChannelException
 import java.nio.charset.Charset
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReadWriteLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import java.util.function.Consumer
@@ -142,7 +145,8 @@ class TCPClient extends ServerTpl {
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel ch) throws Exception {
-                        // ch.pipeline().addLast(new IdleStateHandler(getLong("readerIdleTime", 12 * 60 * 60L), getLong("writerIdleTime", 10L), getLong("allIdleTime", 0L), SECONDS))
+                        ch.pipeline().addLast(new WriteTimeoutHandler(getInteger('writeTimeout', 10)))
+                        ch.pipeline().addLast(new IdleStateHandler(getLong("readerIdleTime", 0L), getLong("writerIdleTime", 60 * 10L), getLong("allIdleTime", 0L), TimeUnit.SECONDS))
                         if (delimiter) {
                             ch.pipeline().addLast(
                                     new DelimiterBasedFrameDecoder(
@@ -151,43 +155,38 @@ class TCPClient extends ServerTpl {
                                     )
                             )
                         }
+                        ch.pipeline().addLast(new StringEncoder(Charset.forName('utf-8')))
+                        ch.pipeline().addLast(new StringDecoder(Charset.forName('utf-8')))
                         ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
                             @Override
                             void channelUnregistered(ChannelHandlerContext ctx) throws Exception {
                                 ((Runnable) ctx.channel().attr(AttributeKey.valueOf("removeFn")).get())?.run()
                                 super.channelUnregistered(ctx)
                             }
-
                             @Override
                             void channelInactive(ChannelHandlerContext ctx) throws Exception {
                                 ((Runnable) ctx.channel().attr(AttributeKey.valueOf("removeFn")).get())?.run()
                                 super.channelInactive(ctx)
                             }
-
+                            @Override
+                            void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+                                if (evt instanceof IdleStateEvent) { ctx.close() }
+                                else super.userEventTriggered(ctx, evt)
+                            }
                             @Override
                             void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
                                 log.error("client side error", cause)
+                                ((Runnable) ctx.channel().attr(AttributeKey.valueOf("removeFn")).get())?.run()
                             }
-
-                            @Override
-                            void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
-                                ctx.flush()
-                                super.channelReadComplete(ctx)
-                            }
-
                             @Override
                             void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                                ByteBuf buf = (ByteBuf) msg
-                                String str = null
                                 try {
-                                    str = buf.toString(Charset.forName("utf-8"))
-                                    receiveReply(ctx, str)
-                                    ctx.flush()
+                                    receiveReply(ctx, msg)
                                 } catch (JSONException ex) {
-                                    log.error("Received Error Data from '{}'. data: {}, errMsg: " + ex.message, ctx.channel().remoteAddress(), str)
+                                    log.error("Received Error Data from '{}'. data: {}, errMsg: " + ex.message, ctx.channel().remoteAddress(), msg)
                                     ctx.close()
-                                } finally {
-                                    ReferenceCountUtil.release(msg)
+                                } catch (Throwable ex) {
+                                    ctx.close(); log.error('handleReceive error', ex)
                                 }
                             }
                         })
@@ -215,9 +214,6 @@ class TCPClient extends ServerTpl {
         }
     }
 
-
-    // 字符串 转换成 ByteBuf
-    ByteBuf toByteBuf(String data) { Unpooled.copiedBuffer((data + (delimiter?:'')).getBytes('utf-8')) }
 
 
     /**
@@ -402,21 +398,28 @@ class TCPClient extends ServerTpl {
          * @param failFn 失败函数
          * @param limit 重试次数
          */
-        void send(final String data, Consumer<Throwable> failFn = null, AtomicInteger limit = new AtomicInteger(0)) {
+        void send(final String data, Consumer<Throwable> failFn = null, Integer limit = 0) {
             def ch = null
             try {
                 ch = tcpPool.get()
-                if (limit.get() == 0) ((Runnable) ch.attr(AttributeKey.valueOf("upFn")).get())?.run()
-                ch.writeAndFlush(toByteBuf(data)).sync()
-            } catch (Throwable ex) {
-                if (ex instanceof ClosedChannelException) { // 通道关闭的情况,可重试
-                    tcpPool.remove(ch)
-                    if (limit.get() < 2) {
-                        limit.incrementAndGet()
-                        send(data, failFn, limit) // 重试
-                        return
+                if (limit == 0) ((Runnable) ch.attr(AttributeKey.valueOf("upFn")).get())?.run()
+                ch.writeAndFlush(data + (delimiter?:'')).addListener{ChannelFuture cf ->
+                    if (cf.cause() != null) {
+                        if (cf.cause() instanceof ClosedChannelException) {
+                            // Errors$NativeIoException
+                            tcpPool.remove(ch)
+                            if (limit < 3) {
+                                send(data + (delimiter?:''), failFn, limit++) // 重试
+                                return
+                            }
+                        }
+                        if (failFn != null) failFn.accept(cf.cause())
+                        else {
+                            log.error("Send data: '{}' fail. Node: '{}'. errMsg: {}" + (cf.cause().message?:cf.cause().class.simpleName), data, this)
+                        }
                     }
                 }
+            } catch (Throwable ex) {
                 if (failFn) failFn.accept(ex)
                 else throw ex
             }
@@ -459,11 +462,8 @@ class TCPClient extends ServerTpl {
             } finally {
                 rwLock.readLock().unlock()
             }
-
-            // 验证是否可用
-            if (ch && ch.isActive()) return ch
-            remove(ch)
-            return get()
+            // TODO ch.isWritable()
+            return ch
         }
 
         /**

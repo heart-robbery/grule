@@ -9,7 +9,6 @@ import com.alibaba.fastjson.parser.Feature
 import core.module.ServerTpl
 import groovy.transform.PackageScope
 import io.netty.bootstrap.ServerBootstrap
-import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import io.netty.channel.*
 import io.netty.channel.epoll.EpollEventLoopGroup
@@ -18,9 +17,10 @@ import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.NioServerSocketChannel
 import io.netty.handler.codec.DelimiterBasedFrameDecoder
+import io.netty.handler.codec.string.StringDecoder
+import io.netty.handler.codec.string.StringEncoder
 import io.netty.handler.timeout.IdleStateEvent
 import io.netty.handler.timeout.IdleStateHandler
-import io.netty.util.ReferenceCountUtil
 
 import java.nio.charset.Charset
 import java.text.SimpleDateFormat
@@ -111,6 +111,8 @@ class TCPServer extends ServerTpl {
                                     )
                             )
                         }
+                        ch.pipeline().addLast(new StringEncoder(Charset.forName('utf-8')))
+                        ch.pipeline().addLast(new StringDecoder(Charset.forName('utf-8')))
                         ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
                             @Override
                             void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
@@ -123,18 +125,13 @@ class TCPServer extends ServerTpl {
                             }
                             @Override
                             void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                                ByteBuf buf = (ByteBuf) msg
-                                String str
                                 try {
-                                    str = buf.toString(Charset.forName("utf-8"))
-                                    handleReceive(ctx, str)
+                                    handleReceive(ctx, msg)
                                 } catch (JSONException ex) {
-                                    log.error("Received Error Data from '{}'. data: {}, errMsg: " + ex.message, ctx.channel().remoteAddress(), str)
+                                    log.error("Received Error Data from '{}'. data: {}, errMsg: " + ex.message, ctx.channel().remoteAddress(), msg)
                                     ctx.close()
                                 } catch (Throwable ex) {
                                     ctx.close(); log.error('handleReceive error', ex)
-                                } finally {
-                                    ReferenceCountUtil.release(msg)
                                 }
                             }
                         })
@@ -172,7 +169,7 @@ class TCPServer extends ServerTpl {
                 ctx.close()
                 return
             }
-            async { remoter?.receiveEventReq(jo.getJSONObject("data"), {r -> ctx.writeAndFlush(Unpooled.copiedBuffer((r + (delimiter?:'')).getBytes('utf-8')))}) }
+            async { remoter?.receiveEventReq(jo.getJSONObject("data"), {send(ctx, it)}) }
         } else if ("appUp" == t) { // 应用注册在线通知
             def sJo = jo.getJSONObject('source')
             if (!sJo) {
@@ -196,7 +193,7 @@ class TCPServer extends ServerTpl {
             async {
                 String[] arr = jo.getString("data").split(":")
                 // Log.setLevel(arr[0].trim(), arr[1].trim())
-                ctx.writeAndFlush(Unpooled.copiedBuffer("set log level success", Charset.forName("utf-8")))
+                send(ctx, "set log level success")
             }
         } else if ("cmd-restart-server" == t) { // telnet 命令行重启某个服务
             // telnet localhost 8001
@@ -207,14 +204,24 @@ class TCPServer extends ServerTpl {
             // {"type":"ls apps"}$_$
             def arr = t.split(" ")
             if (arr?[1] = "apps") {
-                ctx.writeAndFlush(Unpooled.copiedBuffer(JSON.toJSONString(appInfoMap), Charset.forName("utf-8")))
+                send(ctx, JSON.toJSONString(appInfoMap))
             } else if (arr?[1] == 'app' && arr?[2]) {
-                ctx.writeAndFlush(Unpooled.copiedBuffer(JSON.toJSONString(appInfoMap[arr?[2]]), Charset.forName("utf-8")))
+                send(ctx, JSON.toJSONString(appInfoMap[arr?[2]]))
             }
         } else {
             ctx.close()
             log.error("Not support exchange data type '{}'", t)
         }
+    }
+
+
+    /**
+     * 发送数据
+     * @param ctx
+     * @param data
+     */
+    protected send(final ChannelHandlerContext ctx, final String data) {
+        ctx?.writeAndFlush(data + (delimiter?:''))
     }
 
 
@@ -225,7 +232,7 @@ class TCPServer extends ServerTpl {
      */
     protected boolean fusing(ChannelHandlerContext ctx) {
         if (connCount.get() >= getInteger("maxConnection", 100)) { // 最大连接
-            ctx.writeAndFlush(Unpooled.copiedBuffer("server is busy", Charset.forName("utf-8")))
+            send(ctx, "server is busy")
             ctx.close()
             return true
         }
@@ -287,9 +294,7 @@ class TCPServer extends ServerTpl {
                 }
                 // 返回所有的注册信息给当前来注册的客户端
                 if (cur["id"] != data["id"]) {
-                    ctx?.writeAndFlush(Unpooled.copiedBuffer(
-                            (new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", cur).toString() + (delimiter?:'')).getBytes('utf-8')
-                    ))
+                    send(ctx, new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", cur).toString())
                 }
             }
             // 删除没有对应的服务信息的应用

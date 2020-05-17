@@ -74,6 +74,23 @@ class Utils {
     }
 
 
+    static final char[] CS = ['0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z']
+    /**
+     * 随机字符串(区分大小写)
+     * @param l 长度
+     */
+    static String random(int l) {
+        if (l < 1) throw new IllegalArgumentException("length must le 1")
+        final cs = new char[l]
+        def r = new Random()
+        for (int i = 0; i < cs.length; i++) {
+            cs[i] = CS[r.nextInt(CS.length)]
+        }
+        return String.valueOf(cs)
+    }
+
+
+
     /**
      * 查找方法
      * @param clz

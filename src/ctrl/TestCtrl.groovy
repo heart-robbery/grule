@@ -19,7 +19,6 @@ import sevice.TestService
 
 import java.text.SimpleDateFormat
 import java.util.concurrent.ConcurrentHashMap
-import java.util.function.Consumer
 import java.util.stream.Collectors
 
 import static ctrl.common.ApiResp.fail
@@ -219,10 +218,10 @@ class TestCtrl extends CtrlTpl {
         def ts = bean(TestService)
         chain.path('remote') {ctx ->
             ctx.render Promise.async { down ->
-                ts.remote(ctx.request.queryParams['app']?:"gy", ctx.request.queryParams['event']?:'eName1', ctx.request.queryParams['param']?:'p1',{
+                async {ts.remote(ctx.request.queryParams['app']?:"gy", ctx.request.queryParams['event']?:'eName1', ctx.request.queryParams['param']?:'p1',{
                     if (it instanceof Exception) down.success(fail(it.message))
                     else down.success ok(it)
-                })
+                })}
             }
         }
     }
