@@ -81,6 +81,10 @@ dependencies {
 
     // compile 'cn.hutool:hutool-socket:5.3.3'
 
+    compile('io.vertx:vertx-core:3.9.0')
+    compile('com.alibaba:dubbo:2.6.8')
+    compile('commons-codec:commons-codec:1.14')
+
 //    compile('org.activiti:activiti-engine:7.0.0.GA') {
 //        exclude group: 'org.mybatis'
 //        exclude group: 'org.springframework'
