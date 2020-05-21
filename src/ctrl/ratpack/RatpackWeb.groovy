@@ -114,11 +114,14 @@ class RatpackWeb extends ServerTpl {
             @Override
             RequestId generate(Request req) {
                 String value
-                def reqIdHeaderName = getStr("reqIdHeaderName", null)
+                def reqIdHeaderName = getStr("reqIdHeaderName", 'X-Request-ID')
                 if (reqIdHeaderName) {
-                    value = req.getHeaders().get(reqIdHeaderName)
+                    value = req.headers.get(reqIdHeaderName)
                 }
-                if (value == null) value = UUID.randomUUID().toString().replaceAll("-", '')
+                if (!value) {
+                    //value = new SimpleDateFormat('yyyyMMddHHmmssSSS').format(new Date()) + '-' + Utils.random(6)
+                    value = UUID.randomUUID().toString().replaceAll('-', '')
+                }
                 return RequestId.of(value)
             }
         })

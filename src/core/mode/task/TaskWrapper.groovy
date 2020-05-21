@@ -8,14 +8,17 @@ import java.util.concurrent.atomic.AtomicReference
 
 /**
  * {@link Step} 任务包装类
- * Task被折分成{@link #headStep()}, {@link #processStep()}, {@link #stopStep()} 3个执行步骤依次执行
- * 启动: {@link #start()}, 核心方法 {@link #trigger()}
+ * Task被折分成{@link #headStep}, {@link #processStep}, {@link #stopStep} 3个执行步骤依次执行
+ * 重写 {@link #processStep} 可增添 执行步骤
+ *
+ * 启动: {@link #start}, 核心方法 {@link #trigger}
+ * 任务方法执行顺序: {@link #pre}, {@link #process}, {@link #post}
  * Created by xxb on 18/1/10.
  */
 class TaskWrapper {
-    protected final Logger                   log         = LoggerFactory.getLogger(getClass())
+    protected static final Logger                   log         = LoggerFactory.getLogger(TaskWrapper.class)
     // 所属TaskContext 执行容器/执行上下文
-    private         TaskContext           ctx
+    protected          TaskContext           ctx
     /**
      * 是否已关闭
      */
@@ -39,7 +42,7 @@ class TaskWrapper {
     /**
      * 任务唯一标识
      */
-    protected       Object                key
+    @Lazy       Object                key = "Task(" + Integer.toHexString(hashCode()) + ")"
     /**
      * 日志前缀
      */
@@ -104,7 +107,7 @@ class TaskWrapper {
      * 推荐: 执行步骤有可能会间断执行的用{@link Step}实现, 连续执行的步骤用方法实现
      * 此方法会遍历执行所有Step, 是整个Task的核心调度方法
      * 可手动调用此方法来触发Task继续执行下一个Step
-     * NOTE: 要保证, 所有的Step 最终都必须要以 {@link StopStep} 结束
+     * NOTE: 要保证, 所有的Step 最终都必须要以 {@link core.mode.task.Step.StopStep} 结束
      * NOTE: 确保同一时间只有一个线程在执行此方法,即不能随便手动去调用此方法
      */
     final void trigger() {
@@ -135,7 +138,7 @@ class TaskWrapper {
      * 第一个被执行的{@link Step}
      * @return
      */
-    protected Step headStep() {
+    protected final Step headStep() {
         return new Step.ClosureStep(
             this,
             {
@@ -155,7 +158,7 @@ class TaskWrapper {
      * NOTE: 不必非得用到此步骤, 只要Task的{@link Step}链, 以 {@link #headStep()} 开始, 以 {@link #stopStep()} 结束都是可以的
      * @return
      */
-    protected final Step processStep() {
+    protected Step processStep() {
         return new Step.ClosureStep(
             this,
             {
@@ -171,16 +174,18 @@ class TaskWrapper {
 
 
     /**
-     * 关闭Task的 {@link StopStep}
-     * @return {@link StopStep}
+     * 关闭Task的 {@link core.mode.task.Step.StopStep}
+     * @return {@link core.mode.task.Step.StopStep}
      */
     protected final Step.StopStep stopStep() {
         return new Step.StopStep(
             this,
             {
                 try {
-                    doStop()
-                } catch (Throwable t) {
+                    post()
+                    if (isSuccessEnd()) log.info(logPrefix + "正常结束. 共执行: {} 毫秒" + (isTimeout() ? ", 超时" : ""), spendTime())
+                    else log.warn(logPrefix + "非正常结束. 共执行: {} 毫秒" + (isTimeout() ? ", 超时" : ""), spendTime())
+                } catch (Exception t) {
                     log.error(logPrefix + "关闭错误", t)
                 } finally {
                     ctx().removeTask(this)
@@ -193,10 +198,7 @@ class TaskWrapper {
     /**
      * 任务结束方法
      */
-    protected doStop() {
-        if (isSuccessEnd()) log.info(logPrefix + "正常结束. 共执行: {} 毫秒" + (isTimeout() ? ", 超时" : ""), spendTime())
-        else log.warn(logPrefix + "非正常结束. 共执行: {} 毫秒" + (isTimeout() ? ", 超时" : ""), spendTime())
-    }
+    protected void post() {}
 
 
     /**
@@ -286,17 +288,6 @@ class TaskWrapper {
         return (getEndTime().getTime() - getStartupTime().getTime())
     }
 
-
-    /**
-     * 任务的唯一标识sssta
-     * @return
-     */
-    Object getKey() {
-        if (key == null) {
-            key = "Task(" + Integer.toHexString(hashCode()) + ")"
-        }
-        return key
-    }
 
 
     TaskContext ctx() { return ctx }

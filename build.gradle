@@ -80,6 +80,14 @@ dependencies {
     // compile 'org.smartboot.socket:aio-core:1.4.10'
 
     // compile 'cn.hutool:hutool-socket:5.3.3'
+
+//    compile('org.activiti:activiti-engine:7.0.0.GA') {
+//        exclude group: 'org.mybatis'
+//        exclude group: 'org.springframework'
+//    }
+//    compile('org.drools:drools-core:7.37.0.Final')
+//    compile('com.alibaba:QLExpress:3.2.4')
+//    compile('com.googlecode.aviator:aviator:5.0.0')
 }
 
 

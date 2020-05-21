@@ -1,9 +1,9 @@
 package sevice
 
-
 import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
 import core.Page
+import core.mode.builder.ObjBuilder
 import core.mode.pipeline.Pipeline
 import core.mode.task.TaskContext
 import core.mode.task.TaskWrapper
@@ -18,7 +18,6 @@ import dao.entity.Test
 import dao.entity.UploadFile
 
 import java.text.SimpleDateFormat
-import java.util.concurrent.Executor
 import java.util.function.Consumer
 
 class TestService extends ServerTpl {
@@ -127,13 +126,17 @@ class TestService extends ServerTpl {
 
 
     def taskTest() {
-        new TaskContext<>(executor: bean(Executor), key: "testTaskCTX")
-            .inWaitingQueue(TaskWrapper.of{log.info("执行任务....")}.suspendNext())
-            .inWaitingQueue(new TaskWrapper() {
+        new TaskContext<>('test ctx')
+            .setExecutor(exec)
+            .addTask(TaskWrapper.of{log.info("执行任务....")})
+            .addTask(new TaskWrapper() {
                 @Override
                 protected process() {
                     log.info(logPrefix + "执行任务")
-                    ctx().inWaitingQueue(TaskWrapper.of({log.info(logPrefix + "执行衍生任务....")}))
+                }
+                @Override
+                protected void post() {
+                    ctx().addTask(TaskWrapper.of({log.info(logPrefix + "执行衍生任务....")}))
                 }
             })
             .start()

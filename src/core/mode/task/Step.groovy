@@ -7,8 +7,8 @@ import java.util.function.Supplier
 
 /**
  * 执行步骤/执行节点
- * 每个 Step 通过 {@link #next()} 顺序关联
- * 核心方法: {@link #run()}
+ * 每个 Step 通过 {@link #next} 顺序关联
+ * 核心方法: {@link #run}
  * @param <I>  输入参数类型
  * @param <R>  步骤返回值类型
  */
@@ -259,7 +259,7 @@ class Step<I, R> {
         if (fn == null) throw new NullPointerException(getKey() + ": fn is null")
         // 如果已执行过了 则直接返回
         if (count.incrementAndGet() > 1) {
-            task.log.error("Step被重复执行, Task被强制Stop!!!")
+            TaskWrapper.log.error("Step被重复执行, Task被强制Stop!!!")
             task.shouldStop()
             return
         }
@@ -269,21 +269,19 @@ class Step<I, R> {
         }
     }
 
+
     /**
      * 挂起/暂停
      * 等待
      */
-    final void suspendNext() {
-        suspendNext = true
-    }
+    final void suspendNext() { suspendNext = true }
+
 
     /**
      * 是否被 暂停 中
      * @return
      */
-    final boolean isWaitingNext() {
-        return suspendNext
-    }
+    final boolean isWaitingNext() { return suspendNext }
 
     /**
      * 恢复执行
