@@ -366,7 +366,7 @@ class TCPClient extends ServerTpl {
                     tcpPool.port = Integer.valueOf(arr[1].trim())
                     tcpPool.node = this
                 } catch (ex) {
-                    throw new RuntimeException("tcp hp: '$hp' 格式信息错误. " + ex.message)
+                    throw new Exception("tcp hp: '$hp' 格式信息错误. " + ex.message)
                 }
                 // async {tcpPool.create()} // 默认创建一个
             }
@@ -384,7 +384,7 @@ class TCPClient extends ServerTpl {
                     tcpPool.port = Integer.valueOf(arr[1].trim())
                     tcpPool.node = this
                 } catch (ex) {
-                    throw new RuntimeException("tcp hp: '$hp' 格式信息错误. " + ex.message)
+                    throw new Exception("tcp hp: '$hp' 格式信息错误. " + ex.message)
                 } finally {
                     tcpPool.rwLock.writeLock().unlock()
                 }
@@ -524,6 +524,17 @@ class TCPClient extends ServerTpl {
                     }
                 }
             } finally {
+                rwLock.writeLock().unlock()
+            }
+        }
+
+        // stop
+        void stop() {
+            try {
+                rwLock.writeLock().lock()
+                chs.each {it.close()}
+            } catch(ex) {}
+            finally {
                 rwLock.writeLock().unlock()
             }
         }

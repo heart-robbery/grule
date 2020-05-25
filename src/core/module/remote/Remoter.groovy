@@ -264,6 +264,7 @@ class Remoter extends ServerTpl {
      * 同步函数
      * @param next 是否触发下一次
      */
+    @EL(name = '${name}.sync')
     void sync(boolean next = false) {
         try {
             if (!masterHps && !masterName) {
@@ -314,7 +315,7 @@ class Remoter extends ServerTpl {
         // 上传的数据格式
         @Lazy def dataFn = {
             def info = selfInfo
-            if (!info) throw new RuntimeException("Can not get app self data")
+            if (!info) return null
             new JSONObject(3).fluentPut("type", 'appUp')
                 .fluentPut("source", new JSONObject(2).fluentPut('name', app.name).fluentPut('id', app.id))
                 .fluentPut("data", info)
@@ -349,6 +350,7 @@ class Remoter extends ServerTpl {
                 }
                 if (!running.compareAndSet(false, true)) return
                 String data = dataFn()
+                if (!data) return
 
                 try {
                     tcpClient.send(masterName, data, (master ? 'all' : 'any'))

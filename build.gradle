@@ -81,17 +81,29 @@ dependencies {
 
     // compile 'cn.hutool:hutool-socket:5.3.3'
 
-    compile('io.vertx:vertx-core:3.9.0')
-    compile('com.alibaba:dubbo:2.6.8')
-    compile('commons-codec:commons-codec:1.14')
+    // compile('com.alibaba:dubbo:2.6.8')
+//    compile('commons-codec:commons-codec:1.14')
 
+    // 工作流
 //    compile('org.activiti:activiti-engine:7.0.0.GA') {
 //        exclude group: 'org.mybatis'
 //        exclude group: 'org.springframework'
 //    }
+
+    // 规则引擎
 //    compile('org.drools:drools-core:7.37.0.Final')
 //    compile('com.alibaba:QLExpress:3.2.4')
+
+    // java 脚本语言
 //    compile('com.googlecode.aviator:aviator:5.0.0')
+
+    // 响应式
+    //compile('io.reactivex.rxjava2:rxjava:2.2.19')
+    //compile('io.projectreactor:reactor-core:3.3.5.RELEASE')
+    //compile('io.rsocket:rsocket-core:1.0.0')
+
+
+//    compile('io.vertx:vertx-core:3.9.0')
 }
 
 

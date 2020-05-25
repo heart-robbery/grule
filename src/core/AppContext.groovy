@@ -26,7 +26,7 @@ class AppContext {
      * 实例Id
      * NOTE: 保证唯一
      */
-    @Lazy String                          id             = env['sys']["id"] ?: ((name ? name + "_" : '') + Utils.random(8))
+    @Lazy String                          id             = env['sys']["id"] ?: ((name ? name + "_" : '') + Utils.random(10))
     /**
      * 系统运行线程池. {@link #initExecutor()}}
      */

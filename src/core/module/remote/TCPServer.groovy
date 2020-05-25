@@ -300,8 +300,8 @@ class TCPServer extends ServerTpl {
             // 删除没有对应的服务信息的应用
             if (!e.value) {it.remove(); continue}
             // 如果是新系统上线, 则主动通知其它系统
-            if (isNew && data['id'] != app.id) {
-                async {ep.fire("remote", EC.of(this).attr('toAll', true).args(e.key, "updateAppInfo", [data]))}
+            if (isNew && data['id'] != app.id && e.value?.size() > 0) {
+                ep.fire("remote", EC.of(this).async(true).attr('toAll', true).args(e.key, "updateAppInfo", [data]))
             }
         }
     }
@@ -313,7 +313,7 @@ class TCPServer extends ServerTpl {
      */
     @EL(name = "updateAppInfo", async = false)
     protected updateAppInfo(EC ec, final JSONObject data) {
-        if (!remoter?.master) return
+        if (!(remoter?.master)) return
         if (this == ec?.source()) return
         if (!data || !data['tcp'] || !data['id'] || !data['name']) {
             log.warn("App up data incomplete: " + data)
