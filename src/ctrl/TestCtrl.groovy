@@ -243,4 +243,18 @@ class TestCtrl extends CtrlTpl {
             ctx.render new JSONObject().fluentPut("code", "0000").toString()
         }
     }
+
+
+    def test(Chain chain) {
+        chain.path('test') {ctx ->
+            async {
+                for (int i = 0; i < 1000000; i++) {
+                    // AviatorEvaluator.getInstance().execute("com.alibaba.fastjson.JSON.parseObject()")
+                    // AviatorEvaluator.getInstance().execute("1+1")
+                }
+                log.info("over")
+            }
+            ctx.render ok()
+        }
+    }
 }
