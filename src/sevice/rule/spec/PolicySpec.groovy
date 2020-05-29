@@ -1,9 +1,7 @@
 package sevice.rule.spec
 
-import groovy.transform.TailRecursive
-import sevice.rule.Decision
-import sevice.rule.ExecutionContext
-
+import org.codehaus.groovy.control.CompilerConfiguration
+import org.codehaus.groovy.control.customizers.ImportCustomizer
 
 class PolicySpec {
     String               策略名
@@ -11,35 +9,31 @@ class PolicySpec {
     @Lazy List<RuleSpec> rs = new LinkedList<>()
 
 
+    static PolicySpec of(@DelegatesTo(PolicySpec) Closure cl) {
+        def p = new PolicySpec()
+        def code = cl.rehydrate(p, cl, this)
+        code.resolveStrategy = Closure.DELEGATE_FIRST
+        code()
+        return p
+    }
 
-    def 规则定义(@DelegatesTo(value = RuleSpec, strategy = Closure.DELEGATE_ONLY) Closure cl) {
-        RuleSpec rule = new RuleSpec(); rs.add(rule)
-        def code = cl.rehydrate(rule, rule, rule)
-        // cl.resolveStrategy = Closure.DELEGATE_ONLY
-        // code()
+    static PolicySpec of(String dsl) {
+        Binding binding = new Binding()
+        def config = new CompilerConfiguration()
+        def icz = new ImportCustomizer()
+        config.addCompilationCustomizers(icz)
+        icz.addImports(PolicySpec.class.name)
+        icz.addStarImports(RuleSpec.class.name)
+        def shell = new GroovyShell(binding, config)
+        shell.evaluate("PolicySpec.of{$dsl}")
     }
 
 
-    /**
-     * 规则决策
-     * @param ctx 执行上下文
-     * @return Decision
-     */
-    Decision decide(ExecutionContext ctx) { return decide0(ctx, rs) }
-
-    @TailRecursive
-    protected Decision decide0(ExecutionContext ctx, List<RuleSpec> rs, int limit) {
-        if (limit > 5) throw new RuntimeException("策略'$策略名'循环过多")
-        Decision decision
-        for (RuleSpec r : rs) {
-            decision = r.decide(ctx)
-            if (Decision.Reject == decision) break
-            if (ctx.nextCustomId) {
-                limit++
-                def cId = ctx.nextCustomId; ctx.nextCustomId = null
-                decide0(this.rs.dropWhile {rr -> rr.规则id == cId })
-            }
-        }
-        return decision
+    PolicySpec 规则定义(@DelegatesTo(value = RuleSpec, strategy = Closure.DELEGATE_FIRST) Closure cl) {
+        RuleSpec rule = new RuleSpec(); rs.add(rule)
+        def code = cl.rehydrate(cl, rule, this)
+        cl.resolveStrategy = Closure.DELEGATE_FIRST
+        code()
+        this
     }
 }

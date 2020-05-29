@@ -3,25 +3,24 @@ import cn.xnatural.enet.event.EP
 import core.AppContext
 import core.module.EhcacheSrv
 import core.module.OkHttpSrv
-import core.module.RedisClient
 import core.module.SchedSrv
 import core.module.jpa.HibernateSrv
-import core.module.remote.Remoter
 import ctrl.MainCtrl
+import ctrl.RuleCtrl
 import ctrl.TestCtrl
 import ctrl.ratpack.RatpackWeb
-import dao.entity.Component
-import dao.entity.Test
-import dao.entity.UploadFile
 import groovy.transform.Field
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import sevice.FileUploader
 import sevice.TestService
+import sevice.rule.AttrManager
+import sevice.rule.PolicyManger
+import sevice.rule.PolicySetManager
+import sevice.rule.RuleEngine
 
 import java.text.SimpleDateFormat
 import java.time.Duration
-
 
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Field final AppContext app = new AppContext()
@@ -31,31 +30,27 @@ import java.time.Duration
 app.addSource(new OkHttpSrv())
 app.addSource(new EhcacheSrv())
 app.addSource(new SchedSrv())
-app.addSource(new RedisClient())
-app.addSource(new Remoter())
-//app.addSource(new AioServer())
-app.addSource(new HibernateSrv().entities(Test, UploadFile, Component))
-app.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl))
+//app.addSource(new RedisClient())
+//app.addSource(new Remoter())
+app.addSource(new HibernateSrv('jpa105'))
+app.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl, RuleCtrl))
 //app.addSource(new RuleSrv())
 app.addSource(new FileUploader())
 app.addSource(new TestService())
+app.addSource(new AttrManager())
+app.addSource(new RuleEngine())
+app.addSource(new PolicySetManager())
+app.addSource(new PolicyManger())
 app.addSource(this)
 app.start() // 启动系统
 
 
-@EL(name = 'sys.started')
+@EL(name = 'sys.started', async = true)
 def sysStarted() {
-//    app.bean(AioServer).msgFn {s ->
-//        log.info("收到的消息: " + s)
-//        "i received " + System.currentTimeMillis()
-//    }
-//    def sc = AsynchronousSocketChannel.open(AsynchronousChannelGroup.withThreadPool(app.bean(ExecutorService)))
-//    sc.connect(new InetSocketAddress("localhost",8000)).get()
-//    for (int i = 0; i < 5; i++) {
-//        sc.write(ByteBuffer.wrap("send a msg $i".getBytes("utf-8")))
-//    }
+    println(app.bean(OkHttpSrv).post("http://${ep.fire('http.hp')}/risk?policySet=test").contentType("application/json").execute())
 
     TestService ts = app.bean(TestService)
+    // ts.taskTest()
     //ts.wsClientTest()
     return
     try {

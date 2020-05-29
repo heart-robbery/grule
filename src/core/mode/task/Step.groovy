@@ -36,7 +36,7 @@ class Step<I, R> {
     /**
      * 执行次数
      */
-    protected AtomicInteger count = new AtomicInteger(0)
+    protected final AtomicInteger count = new AtomicInteger(0)
     /**
      * 执行体(当前Step的主要执行逻辑)
      */

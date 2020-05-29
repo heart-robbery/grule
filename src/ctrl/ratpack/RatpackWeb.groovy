@@ -91,7 +91,7 @@ class RatpackWeb extends ServerTpl {
     def stop() { srv?.stop() }
 
 
-    @EL(name = 'sys.started', async = true)
+    @EL(name = 'sys.started', async = false)
     protected started() { ctrls.each {ep.fire('inject', it)}; enabled = true }
 
 

@@ -3,11 +3,12 @@ import sevice.rule.Decision
 import sevice.rule.ExecutionContext
 
 class RuleSpec {
-    boolean enabled = true
+    private boolean enabled = true
             String                        规则名
             String                        规则id
             String                        规则描述
     private @Lazy List<Closure<Decision>> decisionFn = new LinkedList<>()
+    private @Lazy Set<String> ignoreAttr = new LinkedHashSet<>()
     private @Lazy Map<String, Set<String>> customList = new LinkedHashMap<>(5)
 
 
@@ -15,128 +16,115 @@ class RuleSpec {
 
     def 关闭() {enabled = false}
 
-    def 拒绝(@DelegatesTo(strategy = Closure.DELEGATE_FIRST) Closure<Boolean> 条件) {
+    def 拒绝(Closure<Boolean> 条件) {
         decisionFn.add{ExecutionContext ctx ->
+            条件.resolveStrategy = Closure.DELEGATE_FIRST
+            条件.delegate = ctx
             if (条件.call()) return Decision.Reject
             null
         }
     }
 
-    def 通过(@DelegatesTo(strategy = Closure.DELEGATE_FIRST) Closure<Boolean> 条件) {
+    def 通过(Closure<Boolean> 条件) {
         decisionFn.add{ExecutionContext ctx ->
+            条件.resolveStrategy = Closure.DELEGATE_FIRST
+            条件.delegate = ctx
             if (条件.call()) return Decision.Accept
             null
         }
     }
 
-    def 人工审核(@DelegatesTo(strategy = Closure.DELEGATE_FIRST) Closure<Boolean> 条件) {
+    def 人工审核(Closure<Boolean> 条件) {
         decisionFn.add{ExecutionContext ctx ->
+            条件.resolveStrategy = Closure.DELEGATE_FIRST
+            条件.delegate = ctx
             if (条件.call()) return Decision.Review
             null
         }
     }
 
-    def 执行操作(@DelegatesTo(strategy = Closure.DELEGATE_FIRST) Closure 操作) {
+    def 执行操作(Closure 操作) {
         decisionFn.add{ExecutionContext ctx ->
-            操作.call()
-            return null
+            def cl = 操作.rehydrate(ctx, 操作, this)
+            cl.resolveStrategy = Closure.DELEGATE_FIRST
+            cl.call()
+            null
         }
     }
 
-    def 跳到规则(String 目标规则id, @DelegatesTo(strategy = Closure.DELEGATE_FIRST) 条件) {
+    def 跳到规则(String 目标规则id, 条件) {
         decisionFn.add{ExecutionContext ctx ->
+            条件.resolveStrategy = Closure.DELEGATE_FIRST
+            条件.delegate = ctx
             if (条件.call()) ctx.nextCustomId = 目标规则id
-            return null
+            null
         }
     }
 
 
-    /**
-     * 规则决策
-     * @param ctx 执行上下文
-     * @return Decision
-     */
-    Decision decide(ExecutionContext ctx) {
-        if (!enabled) return null
-        ctx.begin(this)
-        Decision decision
-        decisionFn?.each {fn ->
-            fn.resolveStrategy = DELEGATE_FIRST
-            fn.delegate = ctx
-            decision = fn.call()
-        }
-        ctx.end(this, decision)
-        return decision
-    }
-
-
-    /**
-     * 不重复列表 set集合
-     * @param ss
-     */
-    def 列表定义(String...ss) {
-        if (!ss || ss.length < 2) throw new IllegalArgumentException("列表定义: 列表名, 值1, 值2...")
-        Set<String> ls
-        ss.eachWithIndex {s,i ->
-            if (i == 0) {
-                ls = customList.get(s)
-                if (ls) throw new IllegalArgumentException("列表被覆盖. " + s)
-                ls = customList.computeIfAbsent(s, {new LinkedHashSet<>()})
-            } else {
-                ls.add(s)
-            }
-        }
-    }
-
-    boolean 在列表中(String 列表名, String 值) {customList.get(列表名)?.contains(值)}
-
-    boolean 不在列表中(String 列表名, String 值) {
-        def ls = customList.get(列表名)
-        if (ls?.contains(值)) return true
-        false
-    }
-
-    static boolean 性别是否为男(String 身份证号) {
-        if (身份证号.length() >= 18) {
-            return Integer.parseInt(身份证号.substring(16, 17)) % 2 != 0
-        }
-        false
-    }
-
-    static boolean 性别是否为女(String 身份证号) {
-        if (身份证号.length() >= 18) {
-            return Integer.parseInt(身份证号.substring(16, 17)) % 2 == 0
-        }
-        false
-    }
-
-    static int 计算年龄(String 身份证号) {
-        int iAge = 0
-        Calendar cal = Calendar.getInstance()
-        String year = 身份证号.substring(6, 10)
-        int iCurrYear = cal.get(Calendar.YEAR)
-        iAge = iCurrYear - Integer.valueOf(year)
-        return iAge
-    }
-
-    static boolean 或者(boolean... 条件列表) { 条件列表?.find {it} }
-
-    static boolean 并且(boolean... 条件列表) { 条件列表?.every {it}}
-
-    static boolean 包含(String 值1, String 值2) {值1?.contains(值2)}
-
-    static boolean 不包含(String 值1, String 值2) {值1?.contains(值2)}
-
-    static boolean 等于(Object 值1, Object 值2) {值1 == 值2}
-
-    static boolean 不等于(Object 值1, Object 值2) {值1 != 值2}
-
-    static boolean 大于(Comparable 值1, Comparable 值2) {值1 > 值2}
-
-    static boolean 小于(Comparable 值1, Comparable 值2) {值1 < 值2}
-
-    static boolean 大于等于(Comparable 值1, Comparable 值2) {值1 >= 值2}
-
-    static boolean 小于等于(Comparable 值1, Comparable 值2) {值1 <= 值2}
+//    def 列表定义(String...ss) {
+//        if (!ss || ss.length < 2) throw new IllegalArgumentException("列表定义: 列表名, 值1, 值2...")
+//        Set<String> ls
+//        ss.eachWithIndex {s,i ->
+//            if (i == 0) {
+//                ls = customList.get(s)
+//                if (ls) throw new IllegalArgumentException("列表被覆盖. " + s)
+//                ls = customList.computeIfAbsent(s, {new LinkedHashSet<>()})
+//            } else {
+//                ls.add(s)
+//            }
+//        }
+//    }
+//
+//    boolean 在列表中(String 列表名, String 值) {customList.get(列表名)?.contains(值)}
+//
+//    boolean 不在列表中(String 列表名, String 值) {
+//        def ls = customList.get(列表名)
+//        if (ls?.contains(值)) return true
+//        false
+//    }
+//
+//    static boolean 性别是否为男(String 身份证号) {
+//        if (身份证号.length() >= 18) {
+//            return Integer.parseInt(身份证号.substring(16, 17)) % 2 != 0
+//        }
+//        false
+//    }
+//
+//    static boolean 性别是否为女(String 身份证号) {
+//        if (身份证号.length() >= 18) {
+//            return Integer.parseInt(身份证号.substring(16, 17)) % 2 == 0
+//        }
+//        false
+//    }
+//
+//    static int 计算年龄(String 身份证号) {
+//        int iAge = 0
+//        Calendar cal = Calendar.getInstance()
+//        String year = 身份证号.substring(6, 10)
+//        int iCurrYear = cal.get(Calendar.YEAR)
+//        iAge = iCurrYear - Integer.valueOf(year)
+//        return iAge
+//    }
+//
+//    static boolean 或者(boolean... 条件列表) { 条件列表?.find {it} }
+//
+//    static boolean 并且(boolean... 条件列表) { 条件列表?.every {it}}
+//
+//    static boolean 包含(String 值1, String 值2) {值1?.contains(值2)}
+//
+//    static boolean 不包含(String 值1, String 值2) {值1?.contains(值2)}
+//
+//    static boolean 等于(Object 值1, Object 值2) {值1 == 值2}
+//
+//    static boolean 不等于(Object 值1, Object 值2) {值1 != 值2}
+//
+//    static boolean 大于(Comparable 值1, Comparable 值2) {值1 > 值2}
+//
+//    static boolean 小于(Comparable 值1, Comparable 值2) {值1 < 值2}
+//
+//    static boolean 大于等于(Comparable 值1, Comparable 值2) {值1 >= 值2}
+//
+//    static boolean 小于等于(Comparable 值1, Comparable 值2) {值1 <= 值2}
 
 }
