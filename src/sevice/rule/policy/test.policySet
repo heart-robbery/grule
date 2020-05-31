@@ -1,4 +1,5 @@
 策略集名 = 'test'
+策略集id = 'test_ps1'
 策略集描述 = 'test'
 
 执行策略 'test'

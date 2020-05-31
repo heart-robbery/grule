@@ -1,5 +1,7 @@
 package sevice.rule
 
+import cn.xnatural.enet.event.EL
+import core.Utils
 import core.module.ServerTpl
 import sevice.rule.spec.PolicySpec
 
@@ -7,11 +9,25 @@ import java.util.concurrent.ConcurrentHashMap
 
 class PolicyManger extends ServerTpl {
 
-    Map<String, PolicySpec> policyMap = new ConcurrentHashMap<>()
+    protected final Map<String, PolicySpec> policyMap = new ConcurrentHashMap<>()
 
-    PolicySpec findPolicy(String name) {
-        policyMap.computeIfAbsent(name, {
-            PolicySpec.of(new File("D:\\code_repo\\gy\\src\\sevice\\rule\\policy\\${name}.policy").getText('utf-8'))
-        })
+
+    @EL(name = 'sys.started')
+    void started() {
+        load()
+    }
+
+
+    PolicySpec findPolicy(String name) { policyMap.get(name) }
+
+
+    protected void load() {
+        log.info("加载策略")
+        Utils.baseDir("/src/sevice/rule/policy/").eachFileRecurse {f ->
+            if (f.name.endsWith(".policy")) {
+                def p = PolicySpec.of(f.getText('utf-8'))
+                policyMap.put(p.策略名, p)
+            }
+        }
     }
 }

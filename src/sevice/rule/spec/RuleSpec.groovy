@@ -1,15 +1,13 @@
 package sevice.rule.spec
 import sevice.rule.Decision
-import sevice.rule.ExecutionContext
+import sevice.rule.RuleContext
 
 class RuleSpec {
     private boolean enabled = true
             String                        规则名
             String                        规则id
             String                        规则描述
-    private @Lazy List<Closure<Decision>> decisionFn = new LinkedList<>()
-    private @Lazy Set<String> ignoreAttr = new LinkedHashSet<>()
-    private @Lazy Map<String, Set<String>> customList = new LinkedHashMap<>(5)
+    private @Lazy Map<String, Closure> decisionFn = new LinkedHashMap<>()
 
 
     def 启用() {enabled = true}
@@ -17,49 +15,49 @@ class RuleSpec {
     def 关闭() {enabled = false}
 
     def 拒绝(Closure<Boolean> 条件) {
-        decisionFn.add{ExecutionContext ctx ->
+        decisionFn.put('Reject', { RuleContext ctx ->
             条件.resolveStrategy = Closure.DELEGATE_FIRST
             条件.delegate = ctx
             if (条件.call()) return Decision.Reject
             null
-        }
+        })
     }
 
     def 通过(Closure<Boolean> 条件) {
-        decisionFn.add{ExecutionContext ctx ->
+        decisionFn.put('Accept', { RuleContext ctx ->
             条件.resolveStrategy = Closure.DELEGATE_FIRST
             条件.delegate = ctx
             if (条件.call()) return Decision.Accept
             null
-        }
+        })
     }
 
     def 人工审核(Closure<Boolean> 条件) {
-        decisionFn.add{ExecutionContext ctx ->
+        decisionFn.put('Review', { RuleContext ctx ->
             条件.resolveStrategy = Closure.DELEGATE_FIRST
             条件.delegate = ctx
             if (条件.call()) return Decision.Review
             null
-        }
+        })
     }
 
-    def 执行操作(Closure 操作) {
-        decisionFn.add{ExecutionContext ctx ->
+    def 赋值操作(Closure 操作) {
+        decisionFn.put('Operate-set', { RuleContext ctx ->
             def cl = 操作.rehydrate(ctx, 操作, this)
             cl.resolveStrategy = Closure.DELEGATE_FIRST
             cl.call()
             null
-        }
+        })
     }
 
-    def 跳到规则(String 目标规则id, 条件) {
-        decisionFn.add{ExecutionContext ctx ->
-            条件.resolveStrategy = Closure.DELEGATE_FIRST
-            条件.delegate = ctx
-            if (条件.call()) ctx.nextCustomId = 目标规则id
-            null
-        }
-    }
+//    def 跳到规则(String 目标规则id, 条件) {
+//        decisionFn.add{ExecutionContext ctx ->
+//            条件.resolveStrategy = Closure.DELEGATE_FIRST
+//            条件.delegate = ctx
+//            if (条件.call()) ctx.nextCustomId = 目标规则id
+//            null
+//        }
+//    }
 
 
 //    def 列表定义(String...ss) {

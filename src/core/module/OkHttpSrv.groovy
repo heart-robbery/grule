@@ -238,7 +238,7 @@ class OkHttpSrv extends ServerTpl {
                     if (bodyStr.endsWith('&') && bodyStr.length() > 2) bodyStr = bodyStr.substring(0, bodyStr.length() - 1)
                     builder.post(RequestBody.create(MediaType.get('application/x-www-form-urlencoded;charset=utf-8'), bodyStr))
                 }
-            } else throw new RuntimeException("not support http method '$builder.method'")
+            } else throw new Exception("not support http method '$builder.method'")
 
             // 删除url最后的&符号
             if (urlStr.endsWith('&') && urlStr.length() > 2) urlStr = urlStr.substring(0, urlStr.length() - 1)
@@ -300,7 +300,7 @@ class OkHttpSrv extends ServerTpl {
                     result = resp.body()?.string()
                     tmpFile?.each {it.delete()}
                     if (200 != resp.code()) {
-                        throw new RuntimeException("Http error. code: ${resp.code()}, url: $urlStr, resp: ${Objects.toString(result, '')}")
+                        throw new Exception("Http error. code: ${resp.code()}, url: $urlStr, resp: ${Objects.toString(result, '')}")
                     }
                 }
             } catch(Throwable t) {

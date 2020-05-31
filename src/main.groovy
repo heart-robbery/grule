@@ -32,10 +32,10 @@ app.addSource(new EhcacheSrv())
 app.addSource(new SchedSrv())
 //app.addSource(new RedisClient())
 //app.addSource(new Remoter())
-app.addSource(new HibernateSrv('jpa105'))
+//app.addSource(new HibernateSrv('jpa105'))
 app.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl, RuleCtrl))
 //app.addSource(new RuleSrv())
-app.addSource(new FileUploader())
+//app.addSource(new FileUploader())
 app.addSource(new TestService())
 app.addSource(new AttrManager())
 app.addSource(new RuleEngine())
@@ -47,7 +47,7 @@ app.start() // 启动系统
 
 @EL(name = 'sys.started', async = true)
 def sysStarted() {
-    println(app.bean(OkHttpSrv).post("http://${ep.fire('http.hp')}/risk?policySet=test").contentType("application/json").execute())
+    println(app.bean(OkHttpSrv).get("http://${ep.fire('http.hp')}/risk?policySet=test_ps1").execute())
 
     TestService ts = app.bean(TestService)
     // ts.taskTest()

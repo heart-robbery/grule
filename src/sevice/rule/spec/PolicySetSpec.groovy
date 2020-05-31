@@ -5,6 +5,7 @@ import org.codehaus.groovy.control.customizers.ImportCustomizer
 
 class PolicySetSpec {
     String               策略集名
+    String               策略集id
     String               策略集描述
 
     @Lazy List<String> ps = new LinkedList<>()
