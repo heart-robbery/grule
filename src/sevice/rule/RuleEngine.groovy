@@ -1,5 +1,6 @@
 package sevice.rule
 
+import cn.xnatural.enet.event.EL
 import core.module.ServerTpl
 
 import java.util.function.Consumer
@@ -9,6 +10,12 @@ import java.util.function.Consumer
  */
 class RuleEngine extends ServerTpl {
     @Lazy def psm = bean(PolicySetManager)
+
+
+    @EL(name = 'end-rule-ctx', async = true)
+    void endCtx(RuleContext ctx) {
+
+    }
 
 
     /**
@@ -25,19 +32,18 @@ class RuleEngine extends ServerTpl {
         RuleContext ctx = new RuleContext(){
             @Override
             protected void end() {
-                super.end()
                 if (!async) fn.accept(this.result())
             }
         }
         ctx.setId(id?:UUID.randomUUID().toString().replaceAll('-', ''))
+        ctx.setPss(psm.findPolicySet(policySetId))
         ctx.setPm(bean(PolicyManger))
         ctx.setAm(bean(AttrManager))
         ctx.setEp(ep)
+        ctx.setExec(exec)
 
-        log.info("run policy. policySet: " + policySetId + ", async: " + async + ", id: " + ctx.getId() + ", params: " + params)
-        params.each {e ->
-            ctx.setProperty(e.key, e.value)
-        }
+        log.info("Run policy. policySet: " + policySetId + ", async: " + async + ", id: " + ctx.getId() + ", params: " + params)
+        params.forEach{k, v -> ctx.setProperty(k, v) }
         if (async) fn.accept(ctx.result())
         ctx.start()
     }

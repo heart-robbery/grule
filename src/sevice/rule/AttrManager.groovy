@@ -8,12 +8,11 @@ import org.hibernate.transform.Transformers
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.function.Consumer
-import java.util.function.Function
 
 class AttrManager extends ServerTpl {
 
     @Lazy def repo = bean(BaseRepo, 'jpa105_repo')
-    final Map<String, String>   attrAlias     = new ConcurrentHashMap<>()
+    protected final Map<String, String>   attrAlias     = new ConcurrentHashMap<>()
     /**
      * 数据获取函数. 函数名 -> 函数
      */
@@ -22,30 +21,46 @@ class AttrManager extends ServerTpl {
     protected final Map<String, String> attrGet = new ConcurrentHashMap<>()
 
 
-    @EL(name = 'sys.started', async = true)
-    void started() {
+    @EL(name = 'jpa105.started', async = true)
+    protected void init() {
         // loadAttrAlias()
     }
 
 
-    def populateAttr(String key, RuleContext ctx) {
+    /**
+     * 属性值计算获取
+     * @param key 属性名
+     * @param ctx 执行上下文
+     */
+    void populateAttr(String key, RuleContext ctx) {
+        log.trace(ctx.logPrefixFn() + "Populate attr: {}", key)
         def fnName = attrGet.get(key)
         if (fnName == null) {
-            if (alias(key)) log.warn("属性'" + key + "'没有对应的取值函数")
-            return Optional.empty()
+            if (alias(key)) log.warn(ctx.logPrefixFn() + "属性'" + key + "'没有对应的取值函数")
+            ctx.setProperty(key, null)
+            return
         }
-        dataGetterFnMap.get(fnName).accept(ctx)
+        def fn = dataGetterFnMap.get(fnName)
+        if (fn) {
+            log.trace(ctx.logPrefixFn() + "Get attr '{}' value apply function: '{}'", key, fnName)
+            fn.accept(ctx)
+        }
+        else {
+            log.debug(ctx.logPrefixFn() + "Not fund attr '{}' mapped getter function", key)
+            ctx.setProperty(key, null)
+        }
     }
 
 
     // 数据获取设置
     def dataFn(String fnName, Consumer<RuleContext> fn) {dataGetterFnMap.put(fnName, fn)}
 
+
     // 属性获取配置
     def attrGetConfig(String aName, String fnName, Consumer<RuleContext> fn = null) {
         if (fn) {
             def existFn = dataGetterFnMap.get(fnName)
-            if (existFn != fn) {
+            if (existFn && existFn != fn) {
                 throw new Exception("覆盖 函数名 '$fnName' 对应的函数. $aName")
             }
             dataFn(fnName, fn)
@@ -62,21 +77,6 @@ class AttrManager extends ServerTpl {
      * @return
      */
     String alias(String attr) {attrAlias.get(attr)}
-
-
-    /**
-     * 注册一个属性同步getter
-     * @param key 属性名
-     * @param getter 属性值获取函数
-     */
-    AttrManager attrSyncGetter(String key, Function<RuleContext, Object> getter) {attrSyncGetterMap.put(key, getter); this}
-
-    /**
-     * 注册一个属性异步getter
-     * @param key 属性名
-     * @param getter 属性值获取函数
-     */
-    AttrManager attrAsyncGetter(String key, Consumer<RuleContext> getter) {attrAsyncGetterMap.put(key, getter); this}
 
 
     protected void loadAttrAlias() {

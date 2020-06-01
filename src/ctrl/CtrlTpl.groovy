@@ -57,14 +57,14 @@ class CtrlTpl extends ServerTpl {
                 ctx.render Promise.async{ down ->
                     async {
                         try {
-                            def fn = {o -> down.success(ok(o))} as Consumer
+                            def fn = {o -> down.success(ok(o)) } as Consumer
                             def o = m.invoke(this, ts.collect {t ->
                                 if (Map.isAssignableFrom(t)) return ctx.request.queryParams
                                 else if (RequestId.isAssignableFrom(t)) return ctx.get(RequestId.TYPE)
                                 else if (Consumer.isAssignableFrom(t)) return fn
                                 else throw new RuntimeException("$m.name 不支持的参数类型: " + t.simpleName)
                             }.toArray())
-                            if (void.class.isAssignableFrom(m.getReturnType())) fn.accept(o)
+                            if (!void.class.isAssignableFrom(m.getReturnType())) fn.accept(o)
                         } catch(Exception ex) {
                             down.success(fail(ex.message?:ex.class.simpleName))
                             log.error("", ex)
@@ -90,7 +90,7 @@ class CtrlTpl extends ServerTpl {
                                     else if (t instanceof Consumer) return fn
                                     else throw new RuntimeException("$m.name 不支持的参数类型: " + t.simpleName)
                                 }.toArray())
-                                if (void.class.isAssignableFrom(m.getReturnType())) fn.accept(o)
+                                if (!void.class.isAssignableFrom(m.getReturnType())) fn.accept(o)
                             } catch(Exception ex) {
                                 down.success(fail(ex.message?:ex.class.simpleName))
                                 if (ex !instanceof IllegalArgumentException) log.error("", ex)
@@ -117,7 +117,7 @@ class CtrlTpl extends ServerTpl {
                                     else if (t instanceof Consumer) return fn
                                     else throw new RuntimeException("$m.name 不支持的参数类型: " + t.simpleName)
                                 }.toArray())
-                                if (void.class.isAssignableFrom(m.getReturnType())) fn.accept(o)
+                                if (!void.class.isAssignableFrom(m.getReturnType())) fn.accept(o)
                             } catch(Exception ex) {
                                 down.success(fail(ex.message?:ex.class.simpleName))
                                 if (ex !instanceof IllegalArgumentException) log.error("", ex)

@@ -4,9 +4,9 @@ import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.ImportCustomizer
 
 class PolicySpec {
-    String               策略名
-    String               策略描述
-    @Lazy List<RuleSpec> rs = new LinkedList<>()
+    String 策略名
+    String 策略描述
+    protected final List<RuleSpec> rs = new LinkedList<>()
 
 
     static PolicySpec of(@DelegatesTo(PolicySpec) Closure cl) {
@@ -22,10 +22,10 @@ class PolicySpec {
         def config = new CompilerConfiguration()
         def icz = new ImportCustomizer()
         config.addCompilationCustomizers(icz)
-        icz.addImports(PolicySpec.class.name)
-        icz.addStarImports(RuleSpec.class.name)
+//        icz.addImports(PolicySpec.class.name)
+//        icz.addStarImports(RuleSpec.class.name)
         def shell = new GroovyShell(binding, config)
-        shell.evaluate("PolicySpec.of{$dsl}")
+        shell.evaluate("sevice.rule.spec.PolicySpec.of{$dsl}")
     }
 
 

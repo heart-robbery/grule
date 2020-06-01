@@ -16,8 +16,9 @@ class RuleSpec {
 
     def 拒绝(Closure<Boolean> 条件) {
         decisionFn.put('Reject', { RuleContext ctx ->
-            条件.resolveStrategy = Closure.DELEGATE_FIRST
-            条件.delegate = ctx
+//            条件.resolveStrategy = Closure.DELEGATE_FIRST
+//            条件.delegate = ctx
+            条件 = 条件.rehydrate(ctx, ctx, ctx)
             if (条件.call()) return Decision.Reject
             null
         })
@@ -25,8 +26,9 @@ class RuleSpec {
 
     def 通过(Closure<Boolean> 条件) {
         decisionFn.put('Accept', { RuleContext ctx ->
-            条件.resolveStrategy = Closure.DELEGATE_FIRST
-            条件.delegate = ctx
+//            条件.resolveStrategy = Closure.DELEGATE_FIRST
+//            条件.delegate = ctx
+            条件 = 条件.rehydrate(ctx, 条件, ctx)
             if (条件.call()) return Decision.Accept
             null
         })
@@ -34,8 +36,9 @@ class RuleSpec {
 
     def 人工审核(Closure<Boolean> 条件) {
         decisionFn.put('Review', { RuleContext ctx ->
-            条件.resolveStrategy = Closure.DELEGATE_FIRST
-            条件.delegate = ctx
+//            条件.resolveStrategy = Closure.DELEGATE_FIRST
+//            条件.delegate = ctx
+            条件 = 条件.rehydrate(ctx, 条件, ctx)
             if (条件.call()) return Decision.Review
             null
         })
@@ -43,9 +46,13 @@ class RuleSpec {
 
     def 赋值操作(Closure 操作) {
         decisionFn.put('Operate-set', { RuleContext ctx ->
-            def cl = 操作.rehydrate(ctx, 操作, this)
-            cl.resolveStrategy = Closure.DELEGATE_FIRST
-            cl.call()
+//            def cl = 操作.rehydrate(ctx, 操作, this)
+//            cl.resolveStrategy = Closure.DELEGATE_FIRST
+//            cl.call()
+//            操作.resolveStrategy = Closure.DELEGATE_FIRST
+//            操作.delegate = ctx
+            操作 = 操作.rehydrate(ctx, 操作, ctx)
+            操作.call()
             null
         })
     }

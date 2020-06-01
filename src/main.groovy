@@ -1,10 +1,13 @@
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
+import com.alibaba.fastjson.JSON
 import core.AppContext
 import core.module.EhcacheSrv
 import core.module.OkHttpSrv
 import core.module.SchedSrv
 import core.module.jpa.HibernateSrv
+import core.module.remote.Remoter
+import core.module.remote.TCPClient
 import ctrl.MainCtrl
 import ctrl.RuleCtrl
 import ctrl.TestCtrl
@@ -17,6 +20,7 @@ import sevice.TestService
 import sevice.rule.AttrManager
 import sevice.rule.PolicyManger
 import sevice.rule.PolicySetManager
+import sevice.rule.RuleContext
 import sevice.rule.RuleEngine
 
 import java.text.SimpleDateFormat
@@ -32,7 +36,7 @@ app.addSource(new EhcacheSrv())
 app.addSource(new SchedSrv())
 //app.addSource(new RedisClient())
 //app.addSource(new Remoter())
-//app.addSource(new HibernateSrv('jpa105'))
+app.addSource(new HibernateSrv('jpa105'))
 app.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl, RuleCtrl))
 //app.addSource(new RuleSrv())
 //app.addSource(new FileUploader())
@@ -47,7 +51,22 @@ app.start() // 启动系统
 
 @EL(name = 'sys.started', async = true)
 def sysStarted() {
-    println(app.bean(OkHttpSrv).get("http://${ep.fire('http.hp')}/risk?policySet=test_ps1").execute())
+//    println new TCPClient.Node(id: 'xxx')
+//    println new RuleContext.PassedRule(customId: '1', name: '22')
+    app.bean(AttrManager).attrGetConfig('同盾_消费金融分v2', 'bodyguard_xjfzq2') { RuleContext ctx ->
+        app.bean(OkHttpSrv).get(
+            'https://thrall-dev.corp.jccfc.com/3d/tongd/bodyguard_xjfzq2/v1?channel=test&applyId=test&operCode=test&idNum=620421198411230958&phone=18280065906'
+        ).execute {r ->
+            JSON.parseObject(r).getJSONObject('result').each {e ->
+                ctx.setProperty('tongdConsumerFinanceScoreV2', e.value)
+            }
+        }
+    }
+    app.bean(SchedSrv).after(Duration.ofSeconds(3)) {
+        try {
+            println(app.bean(OkHttpSrv).get("http://${ep.fire('http.hp')}/risk?policySet=test_ps1").execute())
+        } catch (ex) {}
+    }
 
     TestService ts = app.bean(TestService)
     // ts.taskTest()

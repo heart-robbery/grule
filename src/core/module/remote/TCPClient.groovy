@@ -342,7 +342,7 @@ class TCPClient extends ServerTpl {
     /**
      * 实例节点
      */
-    protected class Node {
+    class Node {
         // 应用实例所属组
         AppGroup          group
         // 应用实例id
