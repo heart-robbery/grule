@@ -9,10 +9,10 @@ class PolicySetSpec {
     String 策略集描述
 
     @Lazy List<String> ps = new LinkedList<>()
-    @Lazy List<String> returnAttrs = new LinkedList<>()
+    @Lazy Set<String> returnAttrs = new LinkedHashSet<>()
 
 
-    PolicySetSpec 执行策略(String 策略名) { ps.add(策略名); this }
+    PolicySetSpec 添加策略(String 策略名) { ps.add(策略名); this }
 
     PolicySetSpec 返回属性(String 属性名) { returnAttrs.add(属性名); this }
 
@@ -31,9 +31,9 @@ class PolicySetSpec {
         def config = new CompilerConfiguration()
         def icz = new ImportCustomizer()
         config.addCompilationCustomizers(icz)
-        icz.addImports(PolicySetSpec.class.name)
+//        icz.addImports(PolicySetSpec.class.name)
         // icz.addStarImports(RuleSpec.class.name)
         def shell = new GroovyShell(binding, config)
-        shell.evaluate("PolicySetSpec.of{$dsl}")
+        shell.evaluate("sevice.rule.spec.PolicySetSpec.of{$dsl}")
     }
 }

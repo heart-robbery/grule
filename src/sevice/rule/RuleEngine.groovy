@@ -1,6 +1,8 @@
 package sevice.rule
 
 import cn.xnatural.enet.event.EL
+import com.alibaba.fastjson.JSON
+import com.alibaba.fastjson.serializer.SerializerFeature
 import core.module.ServerTpl
 
 import java.util.function.Consumer
@@ -14,7 +16,7 @@ class RuleEngine extends ServerTpl {
 
     @EL(name = 'end-rule-ctx', async = true)
     void endCtx(RuleContext ctx) {
-
+        log.info("end rule ctx: " + JSON.toJSONString(ctx.summary(), SerializerFeature.WriteMapNullValue))
     }
 
 
@@ -24,17 +26,11 @@ class RuleEngine extends ServerTpl {
      * @param async 是否异步
      * @param id id
      * @param params 参数
-     * @param fn
      * @return
      */
-    void run(String policySetId, boolean async = true, String id = null, Map params = [], Consumer fn) {
+    Map run(String policySetId, boolean async = true, String id = null, Map params = []) {
         // TODO
-        RuleContext ctx = new RuleContext(){
-            @Override
-            protected void end() {
-                if (!async) fn.accept(this.result())
-            }
-        }
+        RuleContext ctx = new RuleContext()
         ctx.setId(id?:UUID.randomUUID().toString().replaceAll('-', ''))
         ctx.setPss(psm.findPolicySet(policySetId))
         ctx.setPm(bean(PolicyManger))
@@ -43,9 +39,10 @@ class RuleEngine extends ServerTpl {
         ctx.setExec(exec)
 
         log.info("Run policy. policySet: " + policySetId + ", async: " + async + ", id: " + ctx.getId() + ", params: " + params)
-        params.forEach{k, v -> ctx.setProperty(k, v) }
-        if (async) fn.accept(ctx.result())
-        ctx.start()
+        params.forEach{k, v -> ctx.setAttr(k, v) }
+        if (async) super.async { ctx.start() }
+        else ctx.start()
+        return ctx.result()
     }
 
 

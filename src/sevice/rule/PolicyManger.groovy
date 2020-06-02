@@ -12,21 +12,31 @@ class PolicyManger extends ServerTpl {
     protected final Map<String, PolicySpec> policyMap = new ConcurrentHashMap<>()
 
 
-    @EL(name = 'sys.started')
-    void started() {
+    @EL(name = 'sys.starting')
+    void start() {
         load()
     }
 
 
     PolicySpec findPolicy(String name) { policyMap.get(name) }
 
+    /**
+     * 创建策略
+     * @param s
+     * @return
+     */
+    PolicySpec create(String s) {
+        def p = PolicySpec.of(s)
+        policyMap.put(p.策略名, p)
+        p
+    }
+
 
     protected void load() {
         log.info("加载策略")
         Utils.baseDir("/src/sevice/rule/policy/").eachFileRecurse {f ->
             if (f.name.endsWith(".policy")) {
-                def p = PolicySpec.of(f.getText('utf-8'))
-                policyMap.put(p.策略名, p)
+                create(f.getText('utf-8'))
             }
         }
     }

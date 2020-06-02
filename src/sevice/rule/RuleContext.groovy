@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * 一条决策执行上下文
  */
-class RuleContext extends GroovyObjectSupport {
+class RuleContext {
     protected static final Logger log = LoggerFactory.getLogger(RuleContext)
 
     protected final Map<String, Boolean> attrGettingMap = new ConcurrentHashMap<>()
@@ -22,7 +22,6 @@ class RuleContext extends GroovyObjectSupport {
                     String               id
     // 开始
     final           Date                 startup = new Date()
-    protected final Map                  data           = new ConcurrentHashMap()
                     PolicySetSpec        pss
     protected       RuleSpec             curRuleSpec
     protected       PassedRule           curPassedRule
@@ -36,31 +35,13 @@ class RuleContext extends GroovyObjectSupport {
                     Executor             exec
     // 运行状态
     protected final def                  running        = new AtomicBoolean(false)
-    protected       boolean              pause
     // 是否已启动
-    final def                            started = new AtomicBoolean(false)
+    protected final def                            started = new AtomicBoolean(false)
+    protected final def                            end = new AtomicBoolean(false)
+    // 数据属性
+    @Lazy protected Map                  data           = new Data(this)
     // 执行迭代器
-    @Lazy def                            itt = new Iterator<RuleSpec>() {
-        RuleContext ctx = RuleContext.this
-        // 策略迭代器
-        Iterator<PolicySpec> psIt = ctx.getPss().ps.collect {s -> ctx.getPm().findPolicy(s)}.findAll {it}.iterator()
-        Iterator<RuleSpec> rIt
-        @Override
-        boolean hasNext() { psIt.hasNext() || (rIt && rIt.hasNext()) }
-
-        @Override
-        RuleSpec next() {
-            if (ctx.@pause) return ctx.@curPassedRule // 暂停的时候返回当前正在执行的规则
-            if ((ctx.@curPolicySpec == null || (rIt == null || !rIt.hasNext())) && psIt.hasNext()) {
-                ctx.@curPolicySpec = psIt.next()
-                log.debug(logPrefixFn() + "开始执行策略")
-            }
-
-            if (rIt == null || !rIt.hasNext()) rIt = ctx.@curPolicySpec.rs.iterator()
-            if (rIt.hasNext())  return rIt.next()
-            return null
-        }
-    }
+    @Lazy protected def                            itt = new Itt(this)
 
 
     /**
@@ -77,26 +58,29 @@ class RuleContext extends GroovyObjectSupport {
      * 触发执行流程
      */
     protected final void trigger() {
-        if (!this.@running.compareAndSet(false, true)) return
+        if (!running.compareAndSet(false, true)) return
         try {
-            while (this.@running.get() && !this.@pause && getItt().hasNext()) {
-                def r = getItt().next()
+            while (running.get() && itt.hasNext()) {
+                def r = itt.next()
                 if (!r) break
                 if (!r.enabled) continue
-                decide(r)
+                finalDecision = decide(r)
+                if (Decision.Reject == finalDecision) break
             }
-            if (!getItt().hasNext() && !this.@pause) {
-                this.@finalDecision = this.@finalDecision?:Decision.Accept
-                this.@running.set(false); this.@curPolicySpec = null; this.@curPassedRule = null; this.@curRuleSpec = null
+            if ((Decision.Reject == finalDecision) || (!itt.hasNext())) {
+                finalDecision = finalDecision?:Decision.Accept
+                running.set(false); curPolicySpec = null; curPassedRule = null; curRuleSpec = null
                 log.info(logPrefixFn() + "结束成功. " + summary())
-                this.@ep?.fire("end-rule-ctx", this)
+                end.set(true)
+                ep?.fire("end-rule-ctx", this)
                 end()
             }
         } catch (Exception ex) {
-            this.@finalDecision = Decision.Reject
-            this.@running.set(false); this.@curPolicySpec = null; this.@curPassedRule = null; this.@curRuleSpec = null
+            finalDecision = Decision.Reject
+            running.set(false); curPolicySpec = null; curPassedRule = null; curRuleSpec = null
             log.error(logPrefixFn() + "结束错误. " + summary(), ex)
-            this.@ep?.fire("end-rule-ctx", this)
+            end.set(true)
+            ep?.fire("end-rule-ctx", this)
             end()
         }
     }
@@ -114,16 +98,14 @@ class RuleContext extends GroovyObjectSupport {
     protected Decision decide(RuleSpec r) {
         if (!r.enabled) return null
 
-        this.@curRuleSpec = r
-        this.@curPassedRule = new PassedRule()
-        this.@curPassedRule.setCustomId(r.规则id); this.@curPassedRule.setName(r.规则名)
-        this.@passedRules.add(curPassedRule)
+        curRuleSpec = r
+        curPassedRule = new PassedRule(name: r.规则名, customId: r.规则id); passedRules.add(curPassedRule)
         log.debug(logPrefixFn() + "开始执行规则")
 
         Decision decision
         try {
             r.decisionFn?.forEach((k, fn) -> {
-                def d = fn.call(this)
+                def d = fn.call(this.data)
                 if ("Reject" == k) {
                     decision = d
                     log.trace(logPrefixFn() + "拒绝函数执行结果: " + d)
@@ -133,99 +115,176 @@ class RuleContext extends GroovyObjectSupport {
                 } else if ("Review" == k) {
                     decision = d
                     log.trace(logPrefixFn() + "人工审核函数执行结果: " + d)
-                } else if ("Operate-set" == k) {
-                    log.trace(logPrefixFn() + "赋值操作函数执行完成")
+                } else if ("Operate" == k) {
+                    log.trace(logPrefixFn() + "操作函数执行完成")
                 } else {
                     log.trace(logPrefixFn() + k + "函数执行完成. " + d)
                 }
             })
-            log.debug(logPrefixFn() + "结束执行规则. decision: " + decision)
+            log.debug(logPrefixFn() + "结束执行规则. " + decision)
         } catch (Exception ex) {
             decision = Decision.Reject
             log.error(logPrefixFn() + "规则执行错误. 拒绝")
             throw ex
         } finally {
-            this.@curPassedRule.setDecision(decision); this.@curRuleSpec = null; this.@curPassedRule = null
+            curPassedRule.setDecision(decision); curRuleSpec = null; curPassedRule = null
         }
         return decision
     }
 
 
-    @Override
-    Object getProperty(String key) {
-        if (!this.@data.containsKey(key)) { // 所有不存在的属性获取都异步
-            this.@data.put(key, Optional.empty())
-            suspend()
-            this.@attrGettingMap.put(key, false)
-            this.@am.populateAttr(key, this)
-        }
-        def r = this.@data.get(key)
-        if (r instanceof Optional) {
-            if (r.present) r = r.get()
-            else r = null
-        }
-        this.@curPassedRule?.attrs?.put(key, r)
-        return r
+    Object getAttr(String key) {
+        boolean f = curPassedRule?.attrs?.containsKey(key)
+        data.get(key)
+        if (!f) curPassedRule?.attrs?.remove(key)
     }
 
 
-    @Override
-    void setProperty(String name, Object value) {
-        boolean f = false
-        if (this.@attrGettingMap.containsKey(name)) {
-            this.@attrGettingMap.put(name, true)
-            f = true
-        }
-        if (value == null) value = Optional.empty()
-        this.@data.put(name, value)
-        def n = this.@am.alias(name)
-        if (n && n != name) this.@data.put(n, value)
-        if (f) tryResume()
-        // super.setProperty(name, value)
+    void setAttr(String name, Object value) { data.put(name, value) }
+
+
+    /**
+     * 设置为规则用到的属性
+     * @param key
+     * @param value
+     */
+    protected void ruleAttr(String key, Object value) {
+        if (curPassedRule) curPassedRule.attrs.put(key, value)
     }
 
 
-    class PassedRule {
+    /**
+     * 执行迭代器
+     */
+    protected class Itt implements Iterator<RuleSpec> {
+        final RuleContext ctx
+
+        Itt(RuleContext ctx) {if (ctx == null) throw new NullPointerException("Ctx is null"); this.ctx = ctx}
+
+        // 策略迭代器
+        Iterator<PolicySpec> psIt = ctx.getPss().ps.stream()
+            .map((s) -> {ctx.getPm().findPolicy(s)}).filter(p -> p != null).iterator()
+        Iterator<RuleSpec> rIt
+
+        @Override
+        boolean hasNext() { psIt.hasNext() || (rIt && rIt.hasNext()) }
+
+        @Override
+        RuleSpec next() {
+            if ((ctx.curPolicySpec == null || (rIt == null || !rIt.hasNext())) && psIt.hasNext()) {
+                ctx.curPolicySpec = psIt.next()
+                log.debug(logPrefixFn() + "开始执行策略")
+            }
+
+            if (rIt == null || !rIt.hasNext()) rIt = ctx.curPolicySpec.rs.iterator()
+            if (rIt.hasNext()) return rIt.next()
+            return null
+        }
+    }
+
+
+    /**
+     * 数据存放
+     */
+    protected class Data extends ConcurrentHashMap {
+        final RuleContext ctx
+
+        Data(RuleContext ctx) {this.ctx = ctx}
+
+        @Override
+        Object get(Object key) {
+            def r = super.get(key)
+            if (r == null) {
+                put(key, null)
+                if (!ctx.end.get()) { // 外部数据获取
+                    def v = ctx.getAm().getAttr(key, ctx)
+                    if (v instanceof Map) v.forEach((k, vv) -> put(k, vv))
+                    else put(key, v)
+                }
+            }
+            r = super.get(key)
+            if (r instanceof Optional) {
+                if (r.present) r = r.get()
+                else r = null
+            }
+            ctx.ruleAttr(key, r)
+            return r
+        }
+
+        @Override
+        Object put(Object key, Object value) {
+            if (value == null) value = Optional.empty()
+            else {
+                if (value instanceof Optional) {
+                    value = Optional.ofNullable(ctx.getAm().convert(value.orElseGet({null})))
+                } else {
+                    value = ctx.getAm().convert(key, value)
+                }
+            }
+            super.put(key, value)
+            def n = ctx.getAm().alias(key)
+            if (n && n != key) super.put(n, value)
+
+            ctx.ruleAttr(key, value)
+            value
+        }
+    }
+
+
+    /**
+     * 执行过的规则
+     */
+    protected class PassedRule {
         String    name
         String    customId
-        // String    desc
         Decision  decision
-        @Lazy Map attrs = new LinkedHashMap(7)
-    }
+        @Lazy Map<String, Object> attrs = new LinkedHashMap(7)
 
-
-    /**
-     * 暂停
-     */
-    void suspend() {this.@pause = true; this.@running.set(false)}
-
-
-    /**
-     * 尝试恢复执行
-     */
-    void tryResume() {
-        // 当前正在执行的规则中如果还有未取成功的属性, 则暂时不恢复执行
-        if (this.@curPassedRule?.attrs?.find {e ->
-            (this.@attrGettingMap.containsKey(e.key) && !this.@attrGettingMap.get(e.key))
-        }) return
-        this.@pause = false
-        trigger()
+        @Override
+        String toString() {
+            return [name: name, customId: customId, decision: decision, attrs: attrs].toMapString()
+        }
     }
 
 
     // 日志前缀
     protected String logPrefixFn() {
-        "[${getId()? "${getId()}, " :''}${getPss().策略集名?:''}${this.@curPolicySpec? ", 策略: ${this.@curPolicySpec.策略名}" :''}${this.@curRuleSpec ? ", 规则: ${this.@curRuleSpec.规则名}" :''}] -> "
+        "[${id? "$id, " :''}${pss.策略集名?:''}${curPolicySpec? ", 策略: ${curPolicySpec.策略名}" :''}${curRuleSpec ? ", 规则: ${curRuleSpec.规则名}" :''}] -> "
     }
 
 
+    /**
+     * 整条决策 所有信息
+     * @return
+     */
     Map summary() {
-        [id: id, finalDecision: finalDecision, policySetName: pss.策略集名, passedRules: passedRules]
+        [id: id, finalDecision: finalDecision, policySetName: pss.策略集名,
+         attrs: data.findAll {e ->
+             if (e.key.matches("[a-zA-Z]+")) return e
+             null
+         },
+         passedRules: passedRules.collect {r ->
+            [name: r.name, customId: r.customId, decision: r.decision, attrs: r.attrs.collectEntries {e ->
+                if (e.key.matches("[a-zA-Z]+")) return e
+                else [am.alias(e.key), e.value]
+            }]
+        }]
     }
 
 
+    /**
+     * 用于接口返回
+     * @return
+     */
     Map result() {
-        [id: id, finalDecision: finalDecision, policySetName: pss.策略集名, passedRules: passedRules]
+        [id: id, finalDecision: finalDecision, policySetName: pss.策略集名, attrs: pss.returnAttrs.collectEntries {n ->
+            if (n.matches("[a-zA-Z]+")) return [n, data.get(n)]
+            else {
+                def en = am.alias(n)
+                if (en) return [en, data.get(en)]
+                else [n, data.get(n)]
+            }
+        }]
     }
 
 

@@ -51,20 +51,19 @@ app.start() // 启动系统
 
 @EL(name = 'sys.started', async = true)
 def sysStarted() {
-//    println new TCPClient.Node(id: 'xxx')
-//    println new RuleContext.PassedRule(customId: '1', name: '22')
-    app.bean(AttrManager).attrGetConfig('同盾_消费金融分v2', 'bodyguard_xjfzq2') { RuleContext ctx ->
-        app.bean(OkHttpSrv).get(
-            'https://thrall-dev.corp.jccfc.com/3d/tongd/bodyguard_xjfzq2/v1?channel=test&applyId=test&operCode=test&idNum=620421198411230958&phone=18280065906'
-        ).execute {r ->
-            JSON.parseObject(r).getJSONObject('result').each {e ->
-                ctx.setProperty('tongdConsumerFinanceScoreV2', e.value)
-            }
-        }
-    }
     app.bean(SchedSrv).after(Duration.ofSeconds(3)) {
         try {
-            println(app.bean(OkHttpSrv).get("http://${ep.fire('http.hp')}/risk?policySet=test_ps1").execute())
+            println app.bean(OkHttpSrv).get("http://${ep.fire('http.hp')}/risk?policySet=test_ps1")
+                .param('age', 50)
+                .param('thirdChannelCode', 'test')
+                .param('thirdOperId', 'test')
+                .param('thirdAuthNo', '11111111111')
+                //.param('appCode', 'FQL')
+                .param('queryType', '99')
+                .param('mobileNo', '18280065906')
+                .param('idNumber', '620421198411230958')
+                //.debug()
+                .execute()
         } catch (ex) {}
     }
 

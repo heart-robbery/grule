@@ -92,10 +92,10 @@ dependencies {
 
     // 规则引擎
 //    compile('org.drools:drools-core:7.37.0.Final')
-    compile('com.alibaba:QLExpress:3.2.4')
+//    compile('com.alibaba:QLExpress:3.2.4')
 
     // java 脚本语言
-    compile('com.googlecode.aviator:aviator:5.0.0')
+//    compile('com.googlecode.aviator:aviator:5.0.0')
 
     // 响应式
     //compile('io.reactivex.rxjava2:rxjava:2.2.19')
