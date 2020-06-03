@@ -16,8 +16,8 @@ import dao.entity.UploadFile
 import groovy.transform.Field
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import sevice.FileUploader
-import sevice.TestService
+import service.FileUploader
+import service.TestService
 
 import java.text.SimpleDateFormat
 import java.time.Duration
@@ -36,7 +36,6 @@ app.addSource(new Remoter())
 //app.addSource(new AioServer())
 app.addSource(new HibernateSrv().entities(Test, UploadFile, Component))
 app.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl))
-//app.addSource(new RuleSrv())
 app.addSource(new FileUploader())
 app.addSource(new TestService())
 app.addSource(this)

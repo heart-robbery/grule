@@ -4,7 +4,7 @@ import core.module.jpa.BaseRepo
 import dao.entity.Component
 import ratpack.form.Form
 import ratpack.handling.Chain
-import sevice.FileUploader
+import service.FileUploader
 
 import java.util.stream.Collectors
 
