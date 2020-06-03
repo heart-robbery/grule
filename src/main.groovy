@@ -46,13 +46,13 @@ app.start() // 启动系统
 
 @EL(name = 'sys.started', async = true)
 def sysStarted() {
-    app.bean(SchedSrv).after(Duration.ofSeconds(3)) {
+    app.bean(SchedSrv).after(Duration.ofSeconds(5)) {
         try {
             println app.bean(OkHttpSrv).get("http://${ep.fire('http.hp')}/decision?decisionId=test_ps1")
-                .param('age', 50)
                 .param('thirdChannelCode', 'test')
                 .param('thirdOperId', 'test')
                 .param('thirdAuthNo', '11111111111')
+                .param('age', 50)
                 //.param('appCode', 'FQL')
                 .param('queryType', '99')
                 .param('mobileNo', '18280065906')

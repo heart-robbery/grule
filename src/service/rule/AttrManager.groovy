@@ -28,7 +28,7 @@ class AttrManager extends ServerTpl {
     protected final Map<String, Function<DecisionContext, Object>> dataGetterFnMap = new ConcurrentHashMap()
     //同步属性 值获取 函数名 映射
     protected final Map<String, String>                            attrFnMap       = new ConcurrentHashMap<>()
-    @Lazy def Set<String> ignoreGetAttr = new HashSet<>((getStr('ignoreGetAttr', '')).split(",").toList())
+    @Lazy Set<String> ignoreGetAttr = new HashSet<>((getStr('ignoreGetAttr', '')).split(",").toList())
 
 
     @EL(name = 'jpa_kratos.started', async = true)
@@ -36,6 +36,7 @@ class AttrManager extends ServerTpl {
         // 有顺序
         loadAttrAlias()
         loadDataCollector()
+        ep.fire("${name}.started")
     }
 
 
@@ -205,7 +206,7 @@ class AttrManager extends ServerTpl {
                     ep.fire("decision.dataCollect", ctx, e, jsonBody, r, ret)
                     return ret
                 } catch (Exception ex) {
-                    log.error("数据获取函数 " +e['name']+ "执行错误")
+                    log.error(ctx.logPrefixFn() + "数据获取函数 " +e['name']+ " 执行错误", ex)
                 }
                 null
             }
