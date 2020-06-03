@@ -22,9 +22,9 @@ class PolicySpec {
         def config = new CompilerConfiguration()
         def icz = new ImportCustomizer()
         config.addCompilationCustomizers(icz)
-//        icz.addImports(PolicySpec.class.name)
-//        icz.addStarImports(RuleSpec.class.name)
-        def shell = new GroovyShell(binding, config)
+        icz.addImports(PolicySpec.class.name)
+        icz.addStarImports(RuleSpec.class.name)
+        def shell = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config)
         shell.evaluate("service.rule.spec.PolicySpec.of{$dsl}")
     }
 

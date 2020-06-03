@@ -30,9 +30,8 @@ class DecisionSpec {
         def config = new CompilerConfiguration()
         def icz = new ImportCustomizer()
         config.addCompilationCustomizers(icz)
-//        icz.addImports(PolicySetSpec.class.name)
-        // icz.addStarImports(RuleSpec.class.name)
-        def shell = new GroovyShell(binding, config)
+        icz.addImports(DecisionSpec.class.name)
+        def shell = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config)
         shell.evaluate("service.rule.spec.DecisionSpec.of{$dsl}")
     }
 }
