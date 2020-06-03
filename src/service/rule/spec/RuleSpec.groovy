@@ -1,6 +1,6 @@
-package sevice.rule.spec
+package service.rule.spec
 
-import sevice.rule.Decision
+import service.rule.Decision
 
 class RuleSpec {
     private boolean enabled = true

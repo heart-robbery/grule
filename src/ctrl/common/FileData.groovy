@@ -1,7 +1,7 @@
 package ctrl.common
 
 import groovy.transform.ToString
-import sevice.FileUploader
+import service.FileUploader
 
 @ToString(excludes = 'inputStream', includePackage = false)
 class FileData {

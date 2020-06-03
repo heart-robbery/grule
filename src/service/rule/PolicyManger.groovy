@@ -1,9 +1,9 @@
-package sevice.rule
+package service.rule
 
 import cn.xnatural.enet.event.EL
 import core.Utils
 import core.module.ServerTpl
-import sevice.rule.spec.PolicySpec
+import service.rule.spec.PolicySpec
 
 import java.util.concurrent.ConcurrentHashMap
 
@@ -34,7 +34,7 @@ class PolicyManger extends ServerTpl {
 
     protected void load() {
         log.info("加载策略")
-        Utils.baseDir("/src/sevice/rule/policy/").eachFileRecurse {f ->
+        Utils.baseDir("/src/service/rule/policy/").eachFileRecurse {f ->
             if (f.name.endsWith(".policy")) {
                 create(f.getText('utf-8'))
             }

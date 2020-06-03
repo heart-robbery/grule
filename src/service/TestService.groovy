@@ -1,4 +1,4 @@
-package sevice
+package service
 
 import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON

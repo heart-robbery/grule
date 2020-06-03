@@ -1,4 +1,4 @@
-package sevice.rule
+package service.rule
 
 import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
@@ -12,21 +12,27 @@ import org.hibernate.transform.Transformers
 import java.util.concurrent.ConcurrentHashMap
 import java.util.function.Function
 
+/**
+ * 属性管理
+ * 属性别名
+ * 属性值函数
+ */
 class AttrManager extends ServerTpl {
 
-    @Lazy def                                                  repo            = bean(BaseRepo, 'jpa105_repo')
-    protected final Map<String, String>                        attrAlias       = new ConcurrentHashMap<>()
-    protected final Map<String, Class>                        attrType       = new ConcurrentHashMap<>()
+    @Lazy def                                                      repo            = bean(BaseRepo, 'jpa_kratos_repo')
+    protected final Map<String, String>                            attrAlias       = new ConcurrentHashMap<>()
+    protected final Map<String, Class>                             attrType        = new ConcurrentHashMap<>()
     /**
      * 数据获取函数. 函数名 -> 函数
      */
-    protected final Map<String, Function<RuleContext, Object>> dataGetterFnMap = new ConcurrentHashMap()
+    protected final Map<String, Function<DecisionContext, Object>> dataGetterFnMap = new ConcurrentHashMap()
     //同步属性 值获取 函数名 映射
-    protected final Map<String, String>                        attrFnMap       = new ConcurrentHashMap<>()
+    protected final Map<String, String>                            attrFnMap       = new ConcurrentHashMap<>()
+    @Lazy def Set<String> ignoreGetAttr = new HashSet<>((getStr('ignoreGetAttr', '')).split(",").toList())
 
 
-    @EL(name = 'jpa105.started', async = true)
-    protected void init() {
+    @EL(name = 'jpa_kratos.started', async = true)
+    void init() {
         // 有顺序
         loadAttrAlias()
         loadDataCollector()
@@ -39,7 +45,8 @@ class AttrManager extends ServerTpl {
      * @param ctx
      * @return
      */
-    def getAttr(String key, RuleContext ctx) {
+    def getAttr(String key, DecisionContext ctx) {
+        if (ignoreGetAttr.contains(key)) return null
         def fnName = attrFnMap.get(key)
         if (fnName == null) {
             if (alias(key)) log.warn(ctx.logPrefixFn() + "属性'" + key + "'没有对应的取值函数")
@@ -47,7 +54,7 @@ class AttrManager extends ServerTpl {
         }
         def fn = dataGetterFnMap.get(fnName)
         if (fn) {
-            log.trace(ctx.logPrefixFn() + "Get attr '{}' value apply function: '{}'", key, fnName)
+            log.debug(ctx.logPrefixFn() + "Get attr '{}' value apply function: '{}'", key, fnName)
             return fn.apply(ctx)
         }
         else {
@@ -57,12 +64,25 @@ class AttrManager extends ServerTpl {
     }
 
 
+    /**
+     * 决策产生的数据接口调用
+     * @param ctx 当前决策 DecisionContext
+     * @param dataCfg 数据配置
+     * @param jsonBody 入参json
+     * @param resultStr 接口返回结果
+     */
+    @EL(name = 'decision.dataCollect')
+    void dataCollected(DecisionContext ctx, Map dataCfg, String jsonBody, String resultStr, Map resolveResult) {
+        log.info(ctx.logPrefixFn() + "接口调用: " + dataCfg['display_name'] + ", " + jsonBody + ", " + resultStr + ", " + resolveResult)
+    }
+
+
     // 数据获取设置
-    def dataFn(String fnName, Function<RuleContext, Object> fn) {dataGetterFnMap.put(fnName, fn)}
+    def dataFn(String fnName, Function<DecisionContext, Object> fn) {dataGetterFnMap.put(fnName, fn)}
 
 
     // 属性获取配置
-    def attrGetConfig(String aName, String fnName, Function<RuleContext, Object> fn = null) {
+    def attrGetConfig(String aName, String fnName, Function<DecisionContext, Object> fn = null) {
         if (fn) {
             def existFn = dataGetterFnMap.get(fnName)
             if (existFn && existFn != fn) {
@@ -81,7 +101,7 @@ class AttrManager extends ServerTpl {
      * @param attr
      * @return
      */
-    String alias(String attr) {attrAlias.get(attr)}
+    String alias(String attr) {def r = attrAlias.get(attr); (r == null ? attr : r)}
 
     /**
      * 获取属性值类型
@@ -92,10 +112,10 @@ class AttrManager extends ServerTpl {
 
 
     /**
-     * 类型转换
-     * @param key
-     * @param value
-     * @return
+     * 属性值类型转换
+     * @param key 属性名
+     * @param value 值
+     * @return 转换后的值
      */
     Object convert(String key, Object value) {
         if (value == null) return value
@@ -108,8 +128,11 @@ class AttrManager extends ServerTpl {
     }
 
 
+    /**
+     * 加载属性
+     */
     protected void loadAttrAlias() {
-        log.info("加载属性别名配置")
+        log.info("加载属性配置")
         repo.trans{se ->
             se.createNativeQuery("select * from rule_field")
                     .unwrap(NativeQueryImpl).setResultTransformer(Transformers.ALIAS_TO_ENTITY_MAP)
@@ -125,16 +148,32 @@ class AttrManager extends ServerTpl {
             // TODO 其它类型
             attrType.put(e['name'], t)
             attrType.put(e['display_name'], t)
+
+            // 特殊属性值配置
+            if ('isOrNotWeekend' == e['name']) { // DYN_申请日期是否周末
+                attrGetConfig(e['name'], 'attr_getter_isOrNotWeekend') {ctx ->
+                    (java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK) - 1) >= 6 ? true : false
+                }
+                attrGetConfig(e['display_name'], 'attr_getter_isOrNotWeekend')
+            }
         }
     }
 
+
+    /**
+     * 加载数据集成
+     */
     protected void loadDataCollector() {
         log.info("加载数据集成配置")
+        def http = bean(OkHttpSrv)
         repo.trans{se ->
             se.createNativeQuery("select * from data_collector")
                 .unwrap(NativeQueryImpl).setResultTransformer(Transformers.ALIAS_TO_ENTITY_MAP)
                 .list()
         }.each {e ->
+            // 忽略接口
+            if ('_modelPlatform' == e['name']) return
+
             Map<String, String> outAttrMap = JSON.parseArray(e['output_config']).collectEntries {JSONObject jo ->
                 [jo['responseField'], jo['systemField']]
             }
@@ -144,26 +183,27 @@ class AttrManager extends ServerTpl {
 
             dataFn(e['name']) {ctx ->
                 try {
-                    def r = bean(OkHttpSrv).post(e['url'])
-                        .jsonBody({
-                            def inValueMap = inAttrMap.collectEntries {['${' + it.key + '}', ctx.getAttr(it.value)]}
-                            def inTplJo = JSON.parseObject(e['input_template'])
-                            for (def itt = inTplJo.iterator(); itt.hasNext(); ) {
-                                def ee = itt.next()
-                                ee.value = inValueMap.get(ee.value)
-                                if (ee.value == null) itt.remove()
-                            }
-                            inTplJo.toString()
-                        }())
-                        .debug().execute()
+                    def inValueMap = inAttrMap.collectEntries {['${' + it.key + '}', ctx.getAttr(it.value)]}
+                    def inTplJo = JSON.parseObject(e['input_template'])
+                    for (def itt = inTplJo.iterator(); itt.hasNext(); ) {
+                        def ee = itt.next()
+                        ee.value = inValueMap.get(ee.value)
+                        if (ee.value == null) itt.remove()
+                    }
+                    String jsonBody = inTplJo.toString()
+                    def r = http.post(e['url']).jsonBody(jsonBody).execute()
                     def jo = JSON.parseObject(r)
+                    def ret
                     if ('0000' == jo['code']) {
                         JSONObject dataJo = jo.containsKey('data') ? jo['data'] : jo['result']
-                        return dataJo.collectEntries {ee ->
+                        ret = dataJo.collectEntries {ee ->
                             [outAttrMap[(ee.key)], ee.value]
                         }
+                    } else {
+                        ret = [errorCode: jo['code'], data_collector_cn: e['display_name']]
                     }
-                    return [errorCode: jo['code'], data_collector_cn: e['display_name']]
+                    ep.fire("decision.dataCollect", ctx, e, jsonBody, r, ret)
+                    return ret
                 } catch (Exception ex) {
                     log.error("数据获取函数 " +e['name']+ "执行错误")
                 }

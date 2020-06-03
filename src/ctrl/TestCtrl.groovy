@@ -14,8 +14,8 @@ import ratpack.form.Form
 import ratpack.handling.Chain
 import ratpack.handling.RequestId
 import ratpack.websocket.*
-import sevice.FileUploader
-import sevice.TestService
+import service.FileUploader
+import service.TestService
 
 import java.text.SimpleDateFormat
 import java.util.concurrent.ConcurrentHashMap

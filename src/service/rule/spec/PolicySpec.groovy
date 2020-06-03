@@ -1,4 +1,4 @@
-package sevice.rule.spec
+package service.rule.spec
 
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.ImportCustomizer
@@ -25,7 +25,7 @@ class PolicySpec {
 //        icz.addImports(PolicySpec.class.name)
 //        icz.addStarImports(RuleSpec.class.name)
         def shell = new GroovyShell(binding, config)
-        shell.evaluate("sevice.rule.spec.PolicySpec.of{$dsl}")
+        shell.evaluate("service.rule.spec.PolicySpec.of{$dsl}")
     }
 
 

@@ -1,4 +1,4 @@
-package sevice
+package service
 
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
