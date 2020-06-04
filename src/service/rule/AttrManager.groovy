@@ -2,6 +2,7 @@ package service.rule
 
 import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
+import com.alibaba.fastjson.JSONException
 import com.alibaba.fastjson.JSONObject
 import core.module.OkHttpSrv
 import core.module.ServerTpl
@@ -55,6 +56,8 @@ class AttrManager extends ServerTpl {
         }
         def fn = dataGetterFnMap.get(fnName)
         if (fn) {
+            if (ctx.appliedGetterFn.contains(fnName)) return null
+            ctx.appliedGetterFn.add(fnName)
             log.debug(ctx.logPrefixFn() + "Get attr '{}' value apply function: '{}'", key, fnName)
             return fn.apply(ctx)
         }
@@ -157,6 +160,13 @@ class AttrManager extends ServerTpl {
                 }
                 attrGetConfig(e['display_name'], 'attr_getter_isOrNotWeekend')
             }
+
+//            if ("idExpiryDateToAppDayNum" == e['name']) { // 身份证到期日距查询当日天数
+//                attrGetConfig(e['name'], 'attr_getter_idExpiryDateToAppDayNum') {ctx ->
+//                    String id = ctx.getAttr("idNumber")
+//                }
+//                attrGetConfig(e['display_name'], 'attr_getter_idExpiryDateToAppDayNum')
+//            }
         }
     }
 
@@ -183,7 +193,14 @@ class AttrManager extends ServerTpl {
             }
 
             dataFn(e['name']) {ctx ->
+                // 请求发送的json body
+                String jsonBody
+                // 接口返回的字符串
+                String retStr
+                // 最终要返回的值
+                def ret
                 try {
+                    // 解析数据集成里面的输入配置
                     def inValueMap = inAttrMap.collectEntries {['${' + it.key + '}', ctx.getAttr(it.value)]}
                     def inTplJo = JSON.parseObject(e['input_template'])
                     for (def itt = inTplJo.iterator(); itt.hasNext(); ) {
@@ -191,24 +208,48 @@ class AttrManager extends ServerTpl {
                         ee.value = inValueMap.get(ee.value)
                         if (ee.value == null) itt.remove()
                     }
-                    String jsonBody = inTplJo.toString()
-                    def r = http.post(e['url']).jsonBody(jsonBody).execute()
-                    def jo = JSON.parseObject(r)
-                    def ret
-                    if ('0000' == jo['code']) {
-                        JSONObject dataJo = jo.containsKey('data') ? jo['data'] : jo['result']
-                        ret = dataJo.collectEntries {ee ->
-                            [outAttrMap[(ee.key)], ee.value]
+                    jsonBody = inTplJo.toString() // 要请求body json字符串
+
+                    // 接口请求
+                    for (int i = 0; i < 3; i++) { // 重试3次
+                        try {
+                            retStr = http.post(e['url']).jsonBody(jsonBody).execute()
+                            if (retStr == null || retStr.empty) {
+                                ret = [errorCode: 'TD501']
+                                throw new Exception("接口${e['name']}无返回结果")
+                            }
+                            ret = []
+                            break
+                        } catch (Exception ex) {
+                            if (ex instanceof SocketTimeoutException) {
+                                ret = [errorCode: 'TD500']
+                                continue
+                            } //超时则重试
+                            ret = [errorCode: 'TD504']
+                            throw ex
                         }
-                    } else {
-                        ret = [errorCode: jo['code'], data_collector_cn: e['display_name']]
                     }
-                    ep.fire("decision.dataCollect", ctx, e, jsonBody, r, ret)
-                    return ret
+
+                    // 处理接口返回的结果
+                    try {
+                        def rJo = JSON.parseObject(retStr)
+                        if ('0000' == rJo['code']) { // 取清洗结果
+                            JSONObject dataJo = rJo.containsKey('data') ? rJo['data'] : rJo['result']
+                            ret = dataJo.collectEntries {ee -> [outAttrMap[(ee.key)], ee.value] }
+                        } else {
+                            ret = [errorCode: rJo['code']]
+                        }
+                    } catch (Exception ex) {
+                        ret = [errorCode: 'TD503']
+                        if (ex instanceof JSONException) throw new Exception("接口${e['name']}返回的不是Json. " + retStr, ex)
+                        else throw ex
+                    }
                 } catch (Exception ex) {
-                    log.error(ctx.logPrefixFn() + "数据获取函数 " +e['name']+ " 执行错误", ex)
+                    log.error(ctx.logPrefixFn() + "数据获取函数 " + e['name']+ " 发生错误: " + ex.message, ex)
+                } finally {
+                    ep.fire("decision.dataCollect", ctx, e, jsonBody, retStr, ret)
                 }
-                null
+                return ret
             }
 
             // 属性取值函数配置

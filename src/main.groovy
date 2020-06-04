@@ -46,21 +46,28 @@ app.start() // 启动系统
 
 @EL(name = 'sys.started', async = true)
 def sysStarted() {
-    app.bean(SchedSrv).after(Duration.ofSeconds(5)) {
-        try {
-            println app.bean(OkHttpSrv).get("http://${ep.fire('http.hp')}/decision?decisionId=test_ps1")
-                .param('thirdChannelCode', 'test')
-                .param('thirdOperId', 'test')
-                .param('thirdAuthNo', '11111111111')
-                .param('age', 50)
-                //.param('appCode', 'FQL')
-                .param('queryType', '99')
-                .param('mobileNo', '18280065906')
-                .param('idNumber', '620421198411230958')
-                //.debug()
-                .execute()
-        } catch (ex) {}
-    }
+//    List<String> ids = "410421199008264512,441721200102232056,320924200005274117,511526199204185610,340403197806161817,433123197704054563,511923200008266673,370126199710101820,532101199901120025,342425198410170113,511324199505254284,420902200104180816,511725200009081111,441302200107145129,362202199811196237,430524200001252459,452528198304027743,321322199409220414,510105199712131278,50010120010321595X,232303199804187044,421083198303054222,331023200002022923,500101196906146223,341021198408277570,320724200107136013,510525199804053438,450703200107072731,370727197310103077,53292319751101051X,220381199511283812,500236199808130235".split(",").toList()
+//    app.bean(SchedSrv).after(Duration.ofSeconds(5)) {
+//        for (int i = 0; i < 10; i++) {
+//            try {
+//                // ${ep.fire('http.hp')}
+//                // cdh-02.jccfc.local:7070
+//                println app.bean(OkHttpSrv).get("http://${ep.fire('http.hp')}/decision?decisionId=desicion"+ (new Random().nextInt(3) + 1))
+//                //println app.bean(OkHttpSrv).get("http://cdh-02.jccfc.local:7070/decision?decisionId=desicion" + (new Random().nextInt(3) + 1))
+//                    .param('thirdChannelCode', 'test')
+//                    .param('thirdOperId', 'test')
+//                    .param('thirdAuthNo', '11111111111')
+//                    .param('age', 50)
+//                //.param('appCode', 'FQL')
+//                    .param('queryType', '99')
+//                    .param('mobileNo', '18280065906')
+//                    .param('idNumber', ids.get(new Random().nextInt(ids.size())))
+//                //.debug()
+//                    .execute()
+//            } catch (ex) {}
+//        }
+//        log.info("end====================")
+//    }
 
     TestService ts = app.bean(TestService)
     // ts.taskTest()

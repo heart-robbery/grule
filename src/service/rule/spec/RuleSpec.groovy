@@ -46,4 +46,13 @@ class RuleSpec {
             null
         })
     }
+
+    def 拒绝后操作(Closure 操作) {
+        decisionFn.put('Operate-after-Reject', { Map ctx ->
+            def cl = 操作.rehydrate(ctx, 操作, ctx)
+            cl.resolveStrategy = Closure.DELEGATE_FIRST
+            cl()
+            null
+        })
+    }
 }
