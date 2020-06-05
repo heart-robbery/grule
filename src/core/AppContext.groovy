@@ -47,6 +47,8 @@ class AppContext {
      * 启动时间
      */
     final Date                            startup        = new Date()
+    // 系统负载值 0 - 10
+    Integer sysLoad = 0
     /**
      * jvm关闭钩子
      */
@@ -247,10 +249,11 @@ class AppContext {
      */
     protected initExecutor() {
         log.debug("init sys executor ... ")
+        Integer maxSize = Integer.valueOf(env.sys.exec.maximumPoolSize?:32)
         exec = new ThreadPoolExecutor(
-            Integer.valueOf(env.sys.exec.corePoolSize?:8), Integer.valueOf(env.sys.exec.maximumPoolSize?:8),
-            Long.valueOf(env.sys.exec.keepAliveTime?:120), TimeUnit.MINUTES,
-            new LinkedBlockingQueue<>(),
+            Integer.valueOf(env.sys.exec.corePoolSize?:8), maxSize,
+            Long.valueOf(env.sys.exec.keepAliveTime?:2), TimeUnit.HOURS,
+            new LinkedBlockingQueue<>(maxSize * 2),
             new ThreadFactory() {
                 final AtomicInteger i = new AtomicInteger(1)
                 @Override
@@ -259,6 +262,12 @@ class AppContext {
                 }
             }
         ) {
+            @Override
+            protected void beforeExecute(Thread t, Runnable r) {
+                super.beforeExecute(t, r)
+                populateLoad()
+            }
+
             @Override
             void execute(Runnable fn) {
                 try {
@@ -269,7 +278,30 @@ class AppContext {
                     log.error("Task Error", t)
                 }
             }
-        };
+
+            @Override
+            protected void afterExecute(Runnable r, Throwable t) {
+                super.afterExecute(r, t)
+                populateLoad()
+            }
+
+            int gap1 = corePoolSize / 3
+            int gap2 = (maximumPoolSize - corePoolSize) / 3
+            // 计算线程池负载
+            void populateLoad() {
+                int ac = activeCount
+                if (corePoolSize - ac > gap1 * 2) sysLoad = 2
+                else if (corePoolSize - ac > gap1) sysLoad = 3
+                else if (corePoolSize - ac > 0) sysLoad = 4
+                else if (corePoolSize == ac) sysLoad = 5
+                else if (queue.size() > 0) sysLoad = 6
+                // 超过核心线程的线程数在工作
+                else if (maximumPoolSize - ac > gap2 * 2) sysLoad = 7
+                else if (maximumPoolSize - ac > gap2) sysLoad = 8
+                else if (maximumPoolSize - ac > 0) sysLoad = 9
+                else if (maximumPoolSize == ac) sysLoad = 10
+            }
+        }
         exec.allowCoreThreadTimeOut(true)
     }
 
@@ -383,5 +415,20 @@ class AppContext {
                 return "wrappedCoreEp: $source.class.simpleName"
             }
         }
+    }
+
+
+    /**
+     * 监控负载值的变化
+     * @param i 新的负载值
+     */
+    protected void setSysLoad(Integer i) {
+        if (sysLoad == i) return
+        if (sysLoad > 5 && i > sysLoad) {
+            log.info("System load average " + sysLoad + " up to " + i)
+        }
+        this.sysLoad = i
+//        if (sysLoad == 10) log.info(exec)
+//        else log.info("===================" + i)
     }
 }

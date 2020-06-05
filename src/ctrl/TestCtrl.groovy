@@ -244,6 +244,18 @@ class TestCtrl extends CtrlTpl {
         }
     }
 
+    // 超时接口
+    def timeout(Chain chain) {
+        chain.path('timeout') {ctx ->
+            ctx.render Promise.async{down ->
+                async {
+                    Thread.sleep(Integer.valueOf(ctx.request.queryParams['timeout']?:10) * 1000L)
+                    down.success(ok())
+                }
+            }
+        }
+    }
+
 
     def test(Chain chain) {
         chain.path('test') {ctx ->

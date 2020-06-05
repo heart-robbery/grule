@@ -76,16 +76,16 @@ class DecisionContext {
             if ((Decision.Reject == finalDecision) || (!itt.hasNext())) {
                 finalDecision = finalDecision?:Decision.Accept
                 running.set(false); curPolicySpec = null; curPassedRule = null; curRuleSpec = null
-                log.info(logPrefixFn() + "结束成功. 共执行: " + (System.currentTimeMillis() - startup.getTime()) + ". "  + result())
                 end.set(true)
+                log.info(logPrefixFn() + "结束成功. 共执行: " + (System.currentTimeMillis() - startup.getTime()) + ".ms "  + result())
                 ep?.fire("decision.end", this)
                 end()
             }
         } catch (Exception ex) {
             finalDecision = Decision.Reject
             running.set(false); curPolicySpec = null; curPassedRule = null; curRuleSpec = null
-            log.error(logPrefixFn() + "结束错误. 共执行: " + (System.currentTimeMillis() - startup.getTime()) + ". " + summary(), ex)
-            end.set(true)
+            end.set(true); setAttr("errorCode", "EEEE")
+            log.error(logPrefixFn() + "结束错误. 共执行: " + (System.currentTimeMillis() - startup.getTime()) + ".ms " + summary(), ex)
             ep?.fire("decision.end", this)
             end()
         }
@@ -282,24 +282,25 @@ class DecisionContext {
     private Map summary
     Map summary() {
         if (this.summary && end.get()) return this.summary
-        this.summary = [id: id, finalDecision: finalDecision, decisionId: ds.决策id,
-         input: input,
-         attrs: data.collect {e ->
-             if (!e.key.matches("[a-zA-Z0-9]+")) return null
-             if (e.value instanceof Optional) {
-                 return [e.key, e.value.orElseGet({null})]
-             }
-             return e
-         }.findAll {it} .collectEntries(),
-         passedRules: passedRules.collect {r ->
-            [name: r.name, customId: r.customId, decision: r.decision, attrs: r.attrs.collectEntries {e ->
-                String k = e.key
-                def v = e.value
-                if (v instanceof Optional) {v = v.orElseGet({null})}
-                if (!k.matches("[a-zA-Z0-9]+")) {
-                    k = getAm().alias(k)
-                }
-                return [k,v]
+        this.summary = [
+            id: id, occurTime: startup.time, decision: finalDecision,
+            decisionId: ds.决策id, input: input,
+            attrs: data.collect {e ->
+                 if (!e.key.matches("[a-zA-Z0-9]+")) return null
+                 if (e.value instanceof Optional) {
+                     return [e.key, e.value.orElseGet({null})]
+                 }
+                 return e
+            }.findAll {it} .collectEntries(),
+            passedRules: passedRules.collect {r ->
+                [name: r.name, customId: r.customId, decision: r.decision, attrs: r.attrs.collectEntries {e ->
+                    String k = e.key
+                    def v = e.value
+                    if (v instanceof Optional) {v = v.orElseGet({null})}
+                    if (!k.matches("[a-zA-Z0-9]+")) {
+                        k = getAm().alias(k)
+                    }
+                    return [k,v]
             }]}
         ]
         this.summary
