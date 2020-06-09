@@ -11,6 +11,8 @@ import javax.annotation.Resource
 import java.lang.management.ManagementFactory
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.function.BiFunction
+import java.util.function.Function
 
 import static core.Utils.*
 import static java.util.Collections.emptyList
@@ -403,6 +405,12 @@ class AppContext {
             }
             @Override
             EP addListenerSource(Object s) { ep.addListenerSource(s); return this }
+            @Override
+            EP listen(String eName, Runnable fn, boolean async, float order) { ep.listen(eName, fn, async, order) }
+            @Override
+            EP listen(String eName, Function fn, boolean async, float order) { ep.listen(eName, fn, async, order) }
+            @Override
+            EP listen(String eName, BiFunction fn, boolean async, float order) { ep.listen(eName, fn, async, order) }
             @Override
             boolean exist(String... eNames) { return ep.exist(eNames) }
             @Override

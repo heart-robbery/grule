@@ -27,9 +27,11 @@ class AttrManager extends ServerTpl {
      * 数据获取函数. 函数名 -> 函数
      */
     protected final Map<String, Function<DecisionContext, Object>> dataGetterFnMap = new ConcurrentHashMap()
-    //同步属性 值获取 函数名 映射
+    //属性 函数名
     protected final Map<String, String>                            attrFnMap       = new ConcurrentHashMap<>()
-    @Lazy Set<String> ignoreGetAttr = new HashSet<>((getStr('ignoreGetAttr', '')).split(",").toList())
+    @Lazy Set<String> ignoreGetAttr = new HashSet<>(
+        (getStr('ignoreGetAttr', '')).split(",").collect {it.trim()}.findAll{it}
+    )
 
 
     @EL(name = 'jpa_kratos.started', async = true)
@@ -51,18 +53,18 @@ class AttrManager extends ServerTpl {
         if (ignoreGetAttr.contains(key)) return null
         def fnName = attrFnMap.get(key)
         if (fnName == null) {
-            if (alias(key)) log.warn(ctx.logPrefixFn() + "属性'" + key + "'没有对应的取值函数")
+            if (alias(key)) log.warn(ctx.logPrefix() + "属性'" + key + "'没有对应的取值函数")
             return null
         }
         def fn = dataGetterFnMap.get(fnName)
         if (fn) {
             if (ctx.appliedGetterFn.contains(fnName)) return null
             ctx.appliedGetterFn.add(fnName)
-            log.debug(ctx.logPrefixFn() + "Get attr '{}' value apply function: '{}'", key, fnName)
+            log.debug(ctx.logPrefix() + "Get attr '{}' value apply function: '{}'", key, fnName)
             return fn.apply(ctx)
         }
         else {
-            log.debug(ctx.logPrefixFn() + "Not fund attr '{}' mapped getter function", key)
+            log.debug(ctx.logPrefix() + "Not fund attr '{}' mapped getter function '{}'", key, fnName)
             return null
         }
     }
@@ -74,18 +76,28 @@ class AttrManager extends ServerTpl {
      * @param dataCfg 数据配置
      * @param jsonBody 入参json
      * @param resultStr 接口返回结果
+     * @param resolveResult 解析结果
      */
     @EL(name = 'decision.dataCollect')
     void dataCollected(DecisionContext ctx, Map dataCfg, String jsonBody, String resultStr, Map resolveResult) {
-        log.info(ctx.logPrefixFn() + "接口调用: " + dataCfg['display_name'] + ", " + jsonBody + ", " + resultStr + ", " + resolveResult)
+        log.info(ctx.logPrefix() + "接口调用: " + dataCfg['display_name'] + ", " + jsonBody + ", " + resultStr + ", " + resolveResult)
     }
 
 
-    // 数据获取设置
+    /**
+     * 数据获取函数
+     * @param fnName 函数名
+     * @param fn 函数
+     */
     def dataFn(String fnName, Function<DecisionContext, Object> fn) {dataGetterFnMap.put(fnName, fn)}
 
 
-    // 属性获取配置
+    /**
+     * 属性获取配置
+     * @param aName 属性名
+     * @param fnName 获取函数名
+     * @param fn 函数
+     */
     def attrGetConfig(String aName, String fnName, Function<DecisionContext, Object> fn = null) {
         if (fn) {
             def existFn = dataGetterFnMap.get(fnName)
@@ -125,7 +137,7 @@ class AttrManager extends ServerTpl {
         if (value == null) return value
         def t = type(key)
         if (String == t) value = value.toString()
-        else if (Integer == t) value = Integer.valueOf(value)
+        else if (Long == t) value = Long.valueOf(value)
         else if (BigDecimal == t) value = new BigDecimal(value.toString())
         else if (Boolean == t) value = Boolean.valueOf(value)
         return value
@@ -146,9 +158,9 @@ class AttrManager extends ServerTpl {
             attrAlias.put(e['display_name'], e['name'])
 
             Class t = String
-            if (e['type'] == 'INT') t = Integer
+            if (e['type'] == 'INT') t = Long
             else if (e['type'] == 'BOOLEAN') t = Boolean
-            else if (e['type'] == 'DOUBLE') t = BigDecimal
+            else if (e['type'] == 'DOUBLE') t = BigDecimal // 默认高精度计算
             // TODO 其它类型
             attrType.put(e['name'], t)
             attrType.put(e['display_name'], t)
@@ -192,12 +204,12 @@ class AttrManager extends ServerTpl {
                 [jo['requestField'], jo['systemField']]
             }
 
-            dataFn(e['name']) {ctx ->
+            dataFn(e['name']) {ctx -> // 3方接口数据获取
                 // 请求发送的json body
                 String jsonBody
                 // 接口返回的字符串
                 String retStr
-                // 最终要返回的值
+                // 最终要返回的值(解析后的键值对)
                 def ret
                 try {
                     // 解析数据集成里面的输入配置
@@ -208,23 +220,22 @@ class AttrManager extends ServerTpl {
                         ee.value = inValueMap.get(ee.value)
                         if (ee.value == null) itt.remove()
                     }
-                    jsonBody = inTplJo.toString() // 要请求body json字符串
+                    jsonBody = inTplJo.toString() // 请求body json字符串
 
-                    // 接口请求
-                    for (int i = 0; i < 3; i++) { // 重试3次
+                    // 接口请求 超时默认重试3次
+                    for (int i = 0, size = getInteger("retry", 3); i < size; i++) {
                         try {
-                            retStr = http.post(e['url']).jsonBody(jsonBody).execute()
+                            retStr = http.post(e['url']).jsonBody(jsonBody).execute() // 发送http
                             if (retStr == null || retStr.empty) {
                                 ret = [errorCode: 'TD501']
                                 throw new Exception("接口${e['name']}无返回结果")
                             }
-                            ret = []
                             break
                         } catch (Exception ex) {
-                            if (ex instanceof SocketTimeoutException) {
+                            if (ex instanceof SocketTimeoutException || ex instanceof ConnectException) { // 超时则重试
                                 ret = [errorCode: 'TD500']
                                 continue
-                            } //超时则重试
+                            }
                             ret = [errorCode: 'TD504']
                             throw ex
                         }
@@ -235,7 +246,7 @@ class AttrManager extends ServerTpl {
                         def rJo = JSON.parseObject(retStr)
                         if ('0000' == rJo['code']) { // 取清洗结果
                             JSONObject dataJo = rJo.containsKey('data') ? rJo['data'] : rJo['result']
-                            ret = dataJo.collectEntries {ee -> [outAttrMap[(ee.key)], ee.value] }
+                            ret = dataJo.collectEntries { [outAttrMap[(it.key)], it.value] }
                         } else {
                             ret = [errorCode: rJo['code']]
                         }
@@ -245,7 +256,7 @@ class AttrManager extends ServerTpl {
                         else throw ex
                     }
                 } catch (Exception ex) {
-                    log.error(ctx.logPrefixFn() + "数据获取函数 " + e['name']+ " 发生错误: " + ex.message, ex)
+                    log.error(ctx.logPrefix() + "数据获取函数 " + e['name'] + " 发生错误: " + ex.message, ex)
                 } finally {
                     ep.fire("decision.dataCollect", ctx, e, jsonBody, retStr, ret)
                 }
@@ -256,7 +267,7 @@ class AttrManager extends ServerTpl {
             outAttrMap.forEach((n1, n2) -> {
                 if ('errorCode' != n2) {
                     attrGetConfig(n2, e['name'])
-                    String n = attrAlias.get(n2)
+                    String n = alias(n2)
                     if (n && n != n2) attrGetConfig(n, e['name'])
                 }
             })

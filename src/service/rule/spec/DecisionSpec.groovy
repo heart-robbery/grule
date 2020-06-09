@@ -25,6 +25,11 @@ class DecisionSpec {
     }
 
 
+    /**
+     * 根据dsl字符串创建 DecisionSpec 对象
+     * @param dsl dsl 字符串
+     * @return DecisionSpec
+     */
     static DecisionSpec of(String dsl) {
         Binding binding = new Binding()
         def config = new CompilerConfiguration()

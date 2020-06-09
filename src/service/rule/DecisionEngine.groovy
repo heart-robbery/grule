@@ -16,6 +16,7 @@ class DecisionEngine extends ServerTpl {
     @Lazy def http = bean(OkHttpSrv)
 
 
+    // 决策执行结果监听
     @EL(name = 'decision.end', async = true)
     void endDecision(DecisionContext ctx) {
         log.info("end decision: " + JSON.toJSONString(ctx.summary(), SerializerFeature.WriteMapNullValue))
@@ -31,9 +32,9 @@ class DecisionEngine extends ServerTpl {
      * @return
      */
     Map run(String decisionId, boolean async = true, String id = null, Map params = []) {
-        DecisionContext ctx = new DecisionContext()
         def ds = dm.findDecision(decisionId)
         if (ds == null) throw new IllegalArgumentException("未找到决策: " + decisionId)
+        DecisionContext ctx = new DecisionContext()
         ctx.setDs(ds)
         ctx.setId(id?:UUID.randomUUID().toString().replaceAll('-', ''))
         ctx.setPm(pm)
@@ -42,12 +43,12 @@ class DecisionEngine extends ServerTpl {
         ctx.setInput(params)
         // ctx.setExec(exec)
 
-        log.info("Run decision. decisionId: " + decisionId + ", async: " + async + ", id: " + ctx.getId() + ", params: " + params)
+        log.info("Run decision. decisionId: " + decisionId + ", id: " + ctx.getId() + ", async: " + async  + ", params: " + params)
         if (async) super.async {
             ctx.start()
             String cbUrl = params['callback'] // 回调Url
             if (cbUrl && cbUrl.startsWith('http')) {
-                http.post(cbUrl).jsonBody(JSON.toJSONString(ctx.result()), SerializerFeature.WriteMapNullValue).execute()
+                http.post(cbUrl).jsonBody(JSON.toJSONString(ctx.result(), SerializerFeature.WriteMapNullValue)).execute()
             }
         }
         else ctx.start()

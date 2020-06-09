@@ -40,7 +40,7 @@ class OkHttpSrv extends ServerTpl {
      */
     @Lazy OkHttpClient client = {
         new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(getLong('connectTimeout', 8)))
+            .connectTimeout(Duration.ofSeconds(getLong('connectTimeout', 5)))
             .readTimeout(Duration.ofSeconds(getLong('readTimeout', 20)))
             .writeTimeout(Duration.ofSeconds(getLong('writeTimeout', 32)))
             .dispatcher(new Dispatcher(exec))
@@ -244,7 +244,7 @@ class OkHttpSrv extends ServerTpl {
             if (urlStr.endsWith('&') && urlStr.length() > 2) urlStr = urlStr.substring(0, urlStr.length() - 1)
 
             URI uri = URI.create(urlStr)
-            if (getBoolean('enabledIntervalResolve', true)) {
+            if (getBoolean('enabledIntervalResolve', false)) {
                 // 替换集群中的appName 对应的http地址,例: http://gy/test/cus, 找集群中对应gy的应用名所对应的http地址
                 String hp = ep.fire("resolveHttp", uri.host)
                 if (hp) {

@@ -15,7 +15,7 @@ class DecisionManager extends ServerTpl {
     protected final Map<String, DecisionSpec> decisionMap = new ConcurrentHashMap<>()
 
 
-    @EL(name = 'sys.starting')
+    @EL(name = 'sys.starting', async = true)
     void start() {
         load()
     }

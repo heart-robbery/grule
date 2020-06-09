@@ -12,13 +12,14 @@ class PolicyManger extends ServerTpl {
     protected final Map<String, PolicySpec> policyMap = new ConcurrentHashMap<>()
 
 
-    @EL(name = 'sys.starting')
+    @EL(name = 'sys.starting', async = true)
     void start() {
         load()
     }
 
 
     PolicySpec findPolicy(String name) { policyMap.get(name) }
+
 
     /**
      * 创建策略

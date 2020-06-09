@@ -8,6 +8,7 @@
     通过 {
         // 包含的用法
         "$身份证号码".contains('1')
+        // timeoutAttr == 'aa'
     }
 
     操作 {

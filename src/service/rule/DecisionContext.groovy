@@ -30,19 +30,19 @@ class DecisionContext {
                     Decision         finalDecision
                     AttrManager      am
                     PolicyManger     pm
-                    EP               ep
+                    EP  ep
     // 运行状态. TODO 以后做暂停时 running == false
-    protected final def              running         = new AtomicBoolean(false)
+    protected final def running = new AtomicBoolean(false)
     // 是否已启动
-    protected final def              started         = new AtomicBoolean(false)
+    protected final def started = new AtomicBoolean(false)
     // 是否执行结束
-    protected final def                  end = new AtomicBoolean(false)
+    protected final def end     = new AtomicBoolean(false)
     // 输入参数
-    Map input
+    Map                 input
     // 数据属性
-    @Lazy protected Map                  data           = new Data(this)
+    @Lazy protected Map data    = new Data(this)
     // 执行迭代器. 迭代执行的策略和规则
-    @Lazy protected def                  itt = new Itt(this)
+    @Lazy protected def ittr    = new Itt(this)
 
 
     /**
@@ -50,11 +50,11 @@ class DecisionContext {
      */
     void start() {
         if (!started.compareAndSet(false, true)) return
-        log.info(logPrefixFn() + "开始")
+        log.info(logPrefix() + "开始")
         input?.forEach {k, v -> setAttr(k, v) }
-        if (!itt.hasNext()) {
+        if (!ittr.hasNext()) {
             finalDecision = Decision.Reject
-            log.warn(logPrefixFn() + "没有可执行的策略")
+            log.warn(logPrefix() + "没有可执行的策略")
         }
         trigger()
     }
@@ -64,28 +64,28 @@ class DecisionContext {
      * 触发执行流程
      */
     protected final void trigger() {
+        if (end.get()) return
         if (!running.compareAndSet(false, true)) return
         try {
-            while (running.get() && itt.hasNext()) {
-                def r = itt.next()
+            while (running.get() && ittr.hasNext()) {
+                def r = ittr.next()
                 if (!r) break
                 if (!r.enabled) continue
                 finalDecision = decide(r)
-                if (Decision.Reject == finalDecision) break
+                if (Decision.Reject == finalDecision || Decision.Review == finalDecision) break
             }
-            if ((Decision.Reject == finalDecision) || (!itt.hasNext())) {
-                finalDecision = finalDecision?:Decision.Accept
+            if ((Decision.Reject == finalDecision || Decision.Review == finalDecision) || (!ittr.hasNext())) {
+                end.set(true); finalDecision = finalDecision?:Decision.Accept
                 running.set(false); curPolicySpec = null; curPassedRule = null; curRuleSpec = null
-                end.set(true)
-                log.info(logPrefixFn() + "结束成功. 共执行: " + (System.currentTimeMillis() - startup.getTime()) + ".ms "  + result())
+                log.info(logPrefix() + "结束成功. 共执行: " + (System.currentTimeMillis() - startup.getTime()) + ".ms "  + result())
                 ep?.fire("decision.end", this)
                 end()
             }
         } catch (Exception ex) {
-            finalDecision = Decision.Reject
+            end.set(true); finalDecision = Decision.Reject
             running.set(false); curPolicySpec = null; curPassedRule = null; curRuleSpec = null
-            end.set(true); setAttr("errorCode", "EEEE")
-            log.error(logPrefixFn() + "结束错误. 共执行: " + (System.currentTimeMillis() - startup.getTime()) + ".ms " + summary(), ex)
+            setAttr("errorCode", "EEEE")
+            log.error(logPrefix() + "结束错误. 共执行: " + (System.currentTimeMillis() - startup.getTime()) + ".ms " + result(), ex)
             ep?.fire("decision.end", this)
             end()
         }
@@ -98,7 +98,7 @@ class DecisionContext {
 
     /**
      * 规则决策
-     * @param RuleSpec 规则
+     * @param RuleSpec 规则描述
      * @return Decision 决策结果
      */
     protected Decision decide(RuleSpec r) {
@@ -106,37 +106,34 @@ class DecisionContext {
 
         curRuleSpec = r
         curPassedRule = new PassedRule(name: r.规则名, customId: r.规则id); passedRules.add(curPassedRule)
-        log.trace(logPrefixFn() + "开始执行规则")
+        log.trace(logPrefix() + "开始执行规则")
 
         Decision decision
         try {
             def afterRejectFn
             r.decisionFn?.forEach((k, fn) -> {
-                if ("Operate-after-Reject" == k) {
-                    afterRejectFn = fn
-                    return
-                }
+                if ("Operate-after-Reject" == k) {afterRejectFn = fn; return}
                 def d = fn(this.data)
                 if ("Reject" == k) {
                     decision = d
-                    log.trace(logPrefixFn() + "拒绝函数执行结果: " + d)
+                    log.trace(logPrefix() + "拒绝函数执行结果: " + d)
                 } else if ("Accept" == k) {
                     decision = d
-                    log.trace(logPrefixFn() + "通过函数执行结果: " + d)
+                    log.trace(logPrefix() + "通过函数执行结果: " + d)
                 } else if ("Review" == k) {
                     decision = d
-                    log.trace(logPrefixFn() + "人工审核函数执行结果: " + d)
+                    log.trace(logPrefix() + "人工审核函数执行结果: " + d)
                 } else if ("Operate" == k) {
-                    log.trace(logPrefixFn() + "操作函数执行完成")
+                    log.trace(logPrefix() + "操作函数执行完成")
                 } else {
-                    log.trace(logPrefixFn() + k + "函数执行完成. " + d)
+                    log.trace(logPrefix() + k + "函数执行完成. " + d)
                 }
             })
             if (Decision.Reject == decision && afterRejectFn) afterRejectFn(this.data)
-            log.debug(logPrefixFn() + "结束执行规则. decision: " + decision  + ", attrs: " + curPassedRule.attrs)
+            log.debug(logPrefix() + "结束执行规则. decision: " + decision  + ", attrs: " + curPassedRule.attrs)
         } catch (Exception ex) {
             decision = Decision.Reject
-            log.error(logPrefixFn() + "规则执行错误. 拒绝")
+            log.error(logPrefix() + "规则执行错误. 拒绝")
             throw ex
         } finally {
             curPassedRule.setDecision(decision); curRuleSpec = null; curPassedRule = null
@@ -145,14 +142,24 @@ class DecisionContext {
     }
 
 
-    Object getAttr(String key) {
-        boolean f = curPassedRule?.attrs?.containsKey(key)
-        data.get(key)
-        if (!f) curPassedRule?.attrs?.remove(key)
+    /**
+     * 获取属性
+     * @param aName 属性名
+     * @return 属性值
+     */
+    Object getAttr(String aName) {
+        boolean f = curPassedRule?.attrs?.containsKey(aName)
+        data.get(aName)
+        if (!f) curPassedRule?.attrs?.remove(aName)
     }
 
 
-    void setAttr(String name, Object value) { data.put(name, value) }
+    /**
+     * 设置属性
+     * @param aName 属性名
+     * @param value 属性值
+     */
+    void setAttr(String aName, Object value) { data.put(aName, value) }
 
 
     /**
@@ -161,17 +168,17 @@ class DecisionContext {
      * @param value
      */
     protected void ruleAttr(String key, Object value) {
-        if (curPassedRule) curPassedRule.attrs.put(key, value)
+        if (curPassedRule && !end.get()) curPassedRule.attrs.put(key, value)
     }
 
 
     /**
-     * 执行迭代器
+     * 规则执行迭代器
      */
     protected class Itt implements Iterator<RuleSpec> {
         final DecisionContext ctx
 
-        Itt(DecisionContext ctx) {if (ctx == null) throw new NullPointerException("Ctx is null"); this.ctx = ctx}
+        Itt(DecisionContext ctx) {this.ctx = ctx}
 
         // 策略迭代器
         Iterator<PolicySpec> psIt = ctx.getDs().ps
@@ -180,7 +187,7 @@ class DecisionContext {
                 def p = ctx.getPm().findPolicy(s)
                 if (p == null) {
                     curPolicySpec = null
-                    log.warn(ctx.logPrefixFn() + "未找到策略: " + s)
+                    log.warn(ctx.logPrefix() + "未找到策略: " + s)
                 }
                 p
             }).filter(p -> p != null).iterator()
@@ -193,7 +200,7 @@ class DecisionContext {
         RuleSpec next() {
             if ((ctx.curPolicySpec == null || (rIt == null || !rIt.hasNext())) && psIt.hasNext()) {
                 ctx.curPolicySpec = psIt.next()
-                log.debug(logPrefixFn() + "开始执行策略")
+                log.debug(logPrefix() + "开始执行策略")
             }
 
             if (rIt == null || !rIt.hasNext()) rIt = ctx.curPolicySpec.rs.iterator()
@@ -260,7 +267,7 @@ class DecisionContext {
         String    name
         String    customId
         Decision  decision
-        @Lazy Map<String, Object> attrs = new LinkedHashMap(7)
+        @Lazy Map<String, Object> attrs = new LinkedHashMap()
 
         @Override
         String toString() {
@@ -270,7 +277,7 @@ class DecisionContext {
 
 
     // 日志前缀
-    protected String logPrefixFn() {
+    protected String logPrefix() {
         "[${id? "$id, " :''}${ds.决策id? "决策: $ds.决策id" :''}${curPolicySpec? ", 策略: ${curPolicySpec.策略名}" :''}${curRuleSpec ? ", 规则: ${curRuleSpec.规则名}" :''}] -> "
     }
 
@@ -313,7 +320,7 @@ class DecisionContext {
      */
     Map result() {
         [id: id, decision: finalDecision, decisionId: ds.决策id,
-         code: data.get('errorCode'), // 错误码
+         code: data.get('errorCode')?:'0000', // 错误码
          attrs: ds.returnAttrs.collectEntries { n ->
              def v = data.get(n)
              if (v instanceof Optional) {v = v.orElseGet({null})}

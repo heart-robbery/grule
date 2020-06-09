@@ -17,6 +17,12 @@ class PolicySpec {
         return p
     }
 
+
+    /**
+     * 根据dsl字符串创建 PolicySpec 对象
+     * @param dsl
+     * @return PolicySpec 对象
+     */
     static PolicySpec of(String dsl) {
         Binding binding = new Binding()
         def config = new CompilerConfiguration()
