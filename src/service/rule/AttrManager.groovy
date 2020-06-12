@@ -77,10 +77,11 @@ class AttrManager extends ServerTpl {
      * @param jsonBody 入参json
      * @param resultStr 接口返回结果
      * @param resolveResult 解析结果
+     * @param spend 接口调用花费时间
      */
     @EL(name = 'decision.dataCollect')
-    void dataCollected(DecisionContext ctx, Map dataCfg, String jsonBody, String resultStr, Map resolveResult) {
-        log.info(ctx.logPrefix() + "接口调用: " + dataCfg['display_name'] + ", " + jsonBody + ", " + resultStr + ", " + resolveResult)
+    void dataCollected(DecisionContext ctx, Map dataCfg, String jsonBody, String resultStr, Map resolveResult, Long spend) {
+        log.info(ctx.logPrefix() + "接口调用: " + dataCfg['display_name'] + ", spend: " + spend + "ms, params: " + jsonBody + ", returnStr: " + resultStr + ", resolveResult: " + resolveResult)
     }
 
 
@@ -89,7 +90,7 @@ class AttrManager extends ServerTpl {
      * @param fnName 函数名
      * @param fn 函数
      */
-    def dataFn(String fnName, Function<DecisionContext, Object> fn) {dataGetterFnMap.put(fnName, fn)}
+    def dataFn(String fnName, Function<DecisionContext, Object> fn) { dataGetterFnMap.put(fnName, fn) }
 
 
     /**
@@ -102,7 +103,7 @@ class AttrManager extends ServerTpl {
         if (fn) {
             def existFn = dataGetterFnMap.get(fnName)
             if (existFn && existFn != fn) {
-                throw new Exception("覆盖 函数名 '$fnName' 对应的函数. $aName")
+                log.warn("覆盖 函数名 '{}' 对应的函数. {}", fnName, aName)
             }
             dataFn(fnName, fn)
         } else if (dataGetterFnMap.get(fnName) == null) {
@@ -167,10 +168,10 @@ class AttrManager extends ServerTpl {
 
             // 特殊属性值配置
             if ('isOrNotWeekend' == e['name']) { // DYN_申请日期是否周末
-                attrGetConfig(e['name'], 'attr_getter_isOrNotWeekend') {ctx ->
+                attrGetConfig(e['name'], 'getter_isOrNotWeekend') {ctx ->
                     (java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK) - 1) >= 6 ? true : false
                 }
-                attrGetConfig(e['display_name'], 'attr_getter_isOrNotWeekend')
+                attrGetConfig(e['display_name'], 'getter_isOrNotWeekend')
             }
 
 //            if ("idExpiryDateToAppDayNum" == e['name']) { // 身份证到期日距查询当日天数
@@ -211,6 +212,8 @@ class AttrManager extends ServerTpl {
                 String retStr
                 // 最终要返回的值(解析后的键值对)
                 def ret
+                // 接口请求共计花费时间
+                Long spend
                 try {
                     // 解析数据集成里面的输入配置
                     def inValueMap = inAttrMap.collectEntries {['${' + it.key + '}', ctx.getAttr(it.value)]}
@@ -222,6 +225,7 @@ class AttrManager extends ServerTpl {
                     }
                     jsonBody = inTplJo.toString() // 请求body json字符串
 
+                    long start = System.currentTimeMillis()
                     // 接口请求 超时默认重试3次
                     for (int i = 0, size = getInteger("retry", 3); i < size; i++) {
                         try {
@@ -238,6 +242,8 @@ class AttrManager extends ServerTpl {
                             }
                             ret = [errorCode: 'TD504']
                             throw ex
+                        } finally {
+                            spend = System.currentTimeMillis() - start
                         }
                     }
 
@@ -258,7 +264,7 @@ class AttrManager extends ServerTpl {
                 } catch (Exception ex) {
                     log.error(ctx.logPrefix() + "数据获取函数 " + e['name'] + " 发生错误: " + ex.message, ex)
                 } finally {
-                    ep.fire("decision.dataCollect", ctx, e, jsonBody, retStr, ret)
+                    ep.fire("decision.dataCollect", ctx, e, jsonBody, retStr, ret, spend)
                 }
                 return ret
             }

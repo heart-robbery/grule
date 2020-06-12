@@ -34,7 +34,6 @@ app.addSource(new SchedSrv())
 //app.addSource(new Remoter())
 app.addSource(new HibernateSrv('jpa_kratos'))
 app.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl, RuleCtrl))
-//app.addSource(new RuleSrv())
 //app.addSource(new FileUploader())
 app.addSource(new TestService())
 app.addSource(new AttrManager())
@@ -47,6 +46,7 @@ app.start() // 启动系统
 
 @EL(name = 'sys.started', async = true)
 def sysStarted() {
+
     TestService ts = app.bean(TestService)
     // ts.taskTest()
     //ts.wsClientTest()

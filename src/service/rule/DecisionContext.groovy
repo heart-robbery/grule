@@ -39,7 +39,7 @@ class DecisionContext {
     protected final def end     = new AtomicBoolean(false)
     // 输入参数
     Map                 input
-    // 数据属性
+    // 最终数据属性值
     @Lazy protected Map data    = new Data(this)
     // 执行迭代器. 迭代执行的策略和规则
     @Lazy protected def ittr    = new Itt(this)
@@ -77,7 +77,7 @@ class DecisionContext {
             if ((Decision.Reject == finalDecision || Decision.Review == finalDecision) || (!ittr.hasNext())) {
                 end.set(true); finalDecision = finalDecision?:Decision.Accept
                 running.set(false); curPolicySpec = null; curPassedRule = null; curRuleSpec = null
-                log.info(logPrefix() + "结束成功. 共执行: " + (System.currentTimeMillis() - startup.getTime()) + ".ms "  + result())
+                log.info(logPrefix() + "结束成功. 共执行: " + (System.currentTimeMillis() - startup.getTime()) + "ms "  + result())
                 ep?.fire("decision.end", this)
                 end()
             }
@@ -85,7 +85,7 @@ class DecisionContext {
             end.set(true); finalDecision = Decision.Reject
             running.set(false); curPolicySpec = null; curPassedRule = null; curRuleSpec = null
             setAttr("errorCode", "EEEE")
-            log.error(logPrefix() + "结束错误. 共执行: " + (System.currentTimeMillis() - startup.getTime()) + ".ms " + result(), ex)
+            log.error(logPrefix() + "结束错误. 共执行: " + (System.currentTimeMillis() - startup.getTime()) + "ms " + result(), ex)
             ep?.fire("decision.end", this)
             end()
         }
@@ -290,8 +290,8 @@ class DecisionContext {
     Map summary() {
         if (this.summary && end.get()) return this.summary
         this.summary = [
-            id: id, occurTime: startup.time, decision: finalDecision,
-            decisionId: ds.决策id, input: input,
+            id: id, occurTime: startup.time,
+            decision: finalDecision, decisionId: ds.决策id, input: input,
             attrs: data.collect {e ->
                  if (!e.key.matches("[a-zA-Z0-9]+")) return null
                  if (e.value instanceof Optional) {
@@ -307,7 +307,7 @@ class DecisionContext {
                     if (!k.matches("[a-zA-Z0-9]+")) {
                         k = getAm().alias(k)
                     }
-                    return [k,v]
+                    return [k, v]
             }]}
         ]
         this.summary

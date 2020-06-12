@@ -32,6 +32,7 @@ class DecisionManager extends ServerTpl {
     DecisionSpec create(String s) {
         def p = DecisionSpec.of(s)
         decisionMap.put(p.决策id, p)
+        log.debug("添加决策: " + p.决策id)
         p
     }
 

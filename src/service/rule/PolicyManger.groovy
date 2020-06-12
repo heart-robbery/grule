@@ -29,6 +29,7 @@ class PolicyManger extends ServerTpl {
     PolicySpec create(String s) {
         def p = PolicySpec.of(s)
         policyMap.put(p.策略名, p)
+        log.debug("添加策略: " + p.策略名)
         p
     }
 

@@ -94,7 +94,7 @@ class ServerTpl {
     def async(Runnable fn) {
         exec.execute {
             try {fn.run()} catch(Throwable ex) {
-                log.error("Async Error", ex)
+                log.error('', ex)
             }
         }
         fn
