@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory
 
 import javax.annotation.Resource
 import java.util.concurrent.ExecutorService
+import java.util.function.Consumer
 
 class ServerTpl {
     protected final Logger log  = LoggerFactory.getLogger(getClass())
@@ -88,13 +89,15 @@ class ServerTpl {
 
     /**
      * 异步执行. 拦截异常
-     * @param fn
-     * @return
+     * @param fn 异步执行的函数
+     * @param exFn 错误处理函数
+     * @return 执行函数
      */
-    def async(Runnable fn) {
+    def async(Runnable fn, Consumer<Throwable> exFn = null) {
         exec.execute {
             try {fn.run()} catch(Throwable ex) {
-                log.error("Async Error", ex)
+                if (exFn) exFn.accept(ex)
+                else log.error("", ex)
             }
         }
         fn

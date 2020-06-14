@@ -207,7 +207,8 @@ class OkHttpSrv extends ServerTpl {
                 urlStr = Utils.buildUrl(urlStr, params)
                 builder.get()
                 // okHttp get 不能body
-            } else if ('POST' == builder.method) {
+            }
+            else if ('POST' == builder.method) {
                 if (contentType && contentType.containsIgnoreCase('application/json')) {
                     if (jsonBodyStr) builder.post(RequestBody.create(MediaType.get(contentType), (jsonBodyStr == null ? '' : jsonBodyStr)))
                     else if (params) builder.post(RequestBody.create(MediaType.get(contentType), JSON.toJSONString(params)))
@@ -238,13 +239,14 @@ class OkHttpSrv extends ServerTpl {
                     if (bodyStr.endsWith('&') && bodyStr.length() > 2) bodyStr = bodyStr.substring(0, bodyStr.length() - 1)
                     builder.post(RequestBody.create(MediaType.get('application/x-www-form-urlencoded;charset=utf-8'), bodyStr))
                 }
-            } else throw new RuntimeException("not support http method '$builder.method'")
+            }
+            else throw new RuntimeException("not support http method '$builder.method'")
 
             // 删除url最后的&符号
             if (urlStr.endsWith('&') && urlStr.length() > 2) urlStr = urlStr.substring(0, urlStr.length() - 1)
 
             URI uri = URI.create(urlStr)
-            if (getBoolean('enabledIntervalResolve', true)) {
+            if (getBoolean('enabledIntervalResolve', false)) {
                 // 替换集群中的appName 对应的http地址,例: http://gy/test/cus, 找集群中对应gy的应用名所对应的http地址
                 String hp = ep.fire("resolveHttp", uri.host)
                 if (hp) {
@@ -303,7 +305,7 @@ class OkHttpSrv extends ServerTpl {
                         throw new RuntimeException("Http error. code: ${resp.code()}, url: $urlStr, resp: ${Objects.toString(result, '')}")
                     }
                 }
-            } catch(Throwable t) {
+            } catch(Exception t) {
                 ex = t
             }
             if (debug) {
