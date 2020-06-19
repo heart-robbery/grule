@@ -11,6 +11,8 @@ import javax.annotation.Resource
 import java.lang.management.ManagementFactory
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.function.BiFunction
+import java.util.function.Function
 
 import static core.Utils.*
 import static java.util.Collections.emptyList
@@ -26,7 +28,7 @@ class AppContext {
      * 实例Id
      * NOTE: 保证唯一
      */
-    @Lazy String                          id             = env['sys']["id"] ?: ((name ? name + "_" : '') + Utils.random(10))
+    @Lazy String                          id           = env['sys']["id"] ?: ((name ? name + "_" : '') + Utils.random(10))
     /**
      * 系统运行线程池. {@link #initExecutor()}}
      */
@@ -38,19 +40,21 @@ class AppContext {
     /**
      * 服务对象源
      */
-    protected final Map<String, Object>   sourceMap      = new ConcurrentHashMap<>()
+    protected final Map<String, Object>   sourceMap    = new ConcurrentHashMap<>()
     /**
      * 对列执行器映射
      */
-    @Lazy protected Map<String, Devourer> queue2Devourer = new ConcurrentHashMap<>()
+    @Lazy protected Map<String, Devourer> queues       = new ConcurrentHashMap<>()
     /**
      * 启动时间
      */
-    final Date                            startup        = new Date()
+    final Date                            startup      = new Date()
+    // 系统负载值 0 - 10
+    Integer                               sysLoad      = 0
     /**
      * jvm关闭钩子
      */
-    @Lazy protected Thread                shutdownHook   = new Thread({
+    @Lazy protected Thread                shutdownHook = new Thread({
         // 通知各个模块服务关闭
         ep.fire("sys.stopping", EC.of(this).async(false).completeFn({ ec ->
             exec.shutdown()
@@ -103,7 +107,7 @@ class AppContext {
     /**
      * 启动
      */
-    def start() {
+    void start() {
         if (exec) throw new RuntimeException('App is running')
         log.info('Starting Application on {} with PID {}, active profile: ' + (env['profile']?:''), InetAddress.getLocalHost().getHostName(), pid())
         // 1. 初始化
@@ -155,13 +159,13 @@ class AppContext {
      */
     Devourer queue(String qName, Runnable fn = null) {
         if (!qName) throw new IllegalArgumentException('queue name must be not empty')
-        def d = queue2Devourer.get(qName)
+        def d = queues.get(qName)
         if (d == null) {
             synchronized (this) {
-                d = queue2Devourer.get(qName)
+                d = queues.get(qName)
                 if (d == null) {
                     d = new Devourer(qName, exec)
-                    queue2Devourer.put(qName, d)
+                    queues.put(qName, d)
                 }
             }
         }
@@ -245,12 +249,13 @@ class AppContext {
      * NOTE: 如果线程池在不停的创建线程, 有可能是因为 提交的 Runnable 的异常没有被处理.
      * see:  {@link java.util.concurrent.ThreadPoolExecutor#runWorker(java.util.concurrent.ThreadPoolExecutor.Worker)} 这里面当有异常抛出时 1128行代码 {@link java.util.concurrent.ThreadPoolExecutor#processWorkerExit(java.util.concurrent.ThreadPoolExecutor.Worker, boolean)}
      */
-    protected initExecutor() {
+    protected void initExecutor() {
         log.debug("init sys executor ... ")
+        Integer maxSize = Integer.valueOf(env.sys.exec.maximumPoolSize?:32)
         exec = new ThreadPoolExecutor(
-            Integer.valueOf(env.sys.exec.corePoolSize?:8), Integer.valueOf(env.sys.exec.maximumPoolSize?:8),
-            Long.valueOf(env.sys.exec.keepAliveTime?:120), TimeUnit.MINUTES,
-            new LinkedBlockingQueue<>(),
+            Integer.valueOf(env.sys.exec.corePoolSize?:8), maxSize,
+            Long.valueOf(env.sys.exec.keepAliveTime?:2), TimeUnit.HOURS,
+            new LinkedBlockingQueue<>(maxSize * 2),
             new ThreadFactory() {
                 final AtomicInteger i = new AtomicInteger(1)
                 @Override
@@ -259,6 +264,12 @@ class AppContext {
                 }
             }
         ) {
+            @Override
+            protected void beforeExecute(Thread t, Runnable r) {
+                super.beforeExecute(t, r)
+                populateLoad()
+            }
+
             @Override
             void execute(Runnable fn) {
                 try {
@@ -269,8 +280,31 @@ class AppContext {
                     log.error("Task Error", t)
                 }
             }
-        };
-        exec.allowCoreThreadTimeOut(true)
+
+            @Override
+            protected void afterExecute(Runnable r, Throwable t) {
+                super.afterExecute(r, t)
+                populateLoad()
+            }
+
+            int gap1 = corePoolSize / 3
+            int gap2 = (maximumPoolSize - corePoolSize) / 3
+            // 计算线程池负载
+            void populateLoad() {
+                int ac = activeCount
+                if (corePoolSize - ac > gap1 * 2) sysLoad = 2
+                else if (corePoolSize - ac > gap1) sysLoad = 3
+                else if (corePoolSize - ac > 0) sysLoad = 4
+                else if (corePoolSize == ac) sysLoad = 5
+                else if (queue.size() > 0) sysLoad = 6
+                // 超过核心线程的线程数在工作
+                else if (maximumPoolSize - ac > gap2 * 2) sysLoad = 7
+                else if (maximumPoolSize - ac > gap2) sysLoad = 8
+                else if (maximumPoolSize - ac > 0) sysLoad = 9
+                else if (maximumPoolSize == ac) sysLoad = 10
+            }
+        }
+        // exec.allowCoreThreadTimeOut(true)
     }
 
 
@@ -278,7 +312,7 @@ class AppContext {
      * 初始化 EP
      * @return
      */
-    protected initEp() {
+    protected void initEp() {
         log.debug("init ep")
         ep = new EP(exec, LoggerFactory.getLogger(EP.class)) {
             @Override
@@ -372,6 +406,12 @@ class AppContext {
             @Override
             EP addListenerSource(Object s) { ep.addListenerSource(s); return this }
             @Override
+            EP listen(String eName, Runnable fn, boolean async, float order) { ep.listen(eName, fn, async, order) }
+            @Override
+            EP listen(String eName, Function fn, boolean async, float order) { ep.listen(eName, fn, async, order) }
+            @Override
+            EP listen(String eName, BiFunction fn, boolean async, float order) { ep.listen(eName, fn, async, order) }
+            @Override
             boolean exist(String... eNames) { return ep.exist(eNames) }
             @Override
             Object fire(String eName, EC ec) {
@@ -383,5 +423,20 @@ class AppContext {
                 return "wrappedCoreEp: $source.class.simpleName"
             }
         }
+    }
+
+
+    /**
+     * 监控负载值的变化
+     * @param i 新的负载值
+     */
+    protected void setSysLoad(Integer i) {
+        if (sysLoad == i) return
+        if (sysLoad > 5 && i > sysLoad) {
+            log.info("System load average " + sysLoad + " up to " + i)
+        }
+        this.sysLoad = i
+//        if (sysLoad == 10) log.info(exec)
+//        else log.info("===================" + i)
     }
 }

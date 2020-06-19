@@ -264,7 +264,6 @@ class Remoter extends ServerTpl {
      * 同步函数
      * @param next 是否触发下一次
      */
-    @EL(name = '${name}.sync')
     void sync(boolean next = false) {
         try {
             if (!masterHps && !masterName) {

@@ -19,16 +19,21 @@ import java.util.function.Function
 /**
  * hibernate 基本操作方法集
  */
-class BaseRepo extends ServerTpl {
-    protected final Logger         log = LoggerFactory.getLogger(getClass())
+class BaseRepo {
+    protected static final Logger         log = LoggerFactory.getLogger(BaseRepo)
     protected final SessionFactory sf
+    protected final Map attr
 
     // 传过来 不能注入(@Resource注入多数据源有问题)
-    BaseRepo(SessionFactory sf) { this.sf = sf }
+    BaseRepo(SessionFactory sf, Map attr = []) {
+        if (sf == null) throw new NullPointerException("SessionFactory must not be null")
+        this.sf = sf
+        this.attr = attr
+    }
 
 
     // 事务的线程标记
-    static ThreadLocal<Boolean> txFlag = ThreadLocal.withInitial({false})
+    static final ThreadLocal<Boolean> txFlag = ThreadLocal.withInitial({false})
     /**
      * 事务执行方法
      * @param fn
@@ -38,17 +43,17 @@ class BaseRepo extends ServerTpl {
      */
     def <T> T trans(Function<Session, T> fn, Runnable okFn = null, failFn = null) {
         Session s = sf.getCurrentSession()
-        Transaction tx = s.getTransaction()
-        // 当前线程是否有事务存在
+        // 当前线程存在事务
         if (txFlag.get()) return fn.apply(s)
-        else { // 当前线程没有事务则开启新事务
+        else { // 当前线程没有事务,开启新事务
+            Transaction tx = s.getTransaction()
             tx.begin(); txFlag.set(true)
-            Throwable ex = null
+            Exception ex = null
             try {
-                def r = fn.apply(s); tx.commit(); s.close(); txFlag.set(false)
+                def r = fn.apply(s); tx.commit(); txFlag.set(false); s.close()
                 return r
-            } catch (Throwable t) {
-                tx.rollback(); ex = t; s.close(); txFlag.set(false)
+            } catch (t) {
+                tx.rollback(); txFlag.set(false); ex = t; s.close()
                 throw t
             } finally {
                 if (ex) {
@@ -64,11 +69,18 @@ class BaseRepo extends ServerTpl {
     /**
      * 根据实体类, 查表名字
      * @param eType
-     * @return
+     * @return 表名
      */
     String tbName(Class<IEntity> eType) {
         ((AbstractEntityPersister) ((MetamodelImplementor) sf.getMetamodel()).locateEntityPersister(eType)).getRootTableName()
     }
+
+
+    /**
+     * 连接mysql当前数据库的库名
+     * @return 数据库名
+     */
+    String dbName() { sf['jdbcServices']?['jdbcEnvironment']?['currentCatalog']?['text'] }
 
 
     /**

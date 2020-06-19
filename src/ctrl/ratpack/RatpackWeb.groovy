@@ -176,8 +176,11 @@ class RatpackWeb extends ServerTpl {
                 ctx.response.status(503).send("请稍后再试")
                 return
             }
+            if (app.sysLoad == 10) { // 限流
+                ctx.response.status(503).send("服务忙, 请稍后再试!")
+                return
+            }
             ctx.metaClass['propertyMissing'] = {String name -> null} // 随意访问不存在的属性不报错
-            // 限流? TODO
             // 打印请求
             if (!ignoreSuffix.find{ctx.request.path.endsWith(it)}) {
                 log.info("Start Request '{}': {}. from: " + ctx.request.remoteAddress.host, ctx.get(RequestId.TYPE), ctx.request.uri)
