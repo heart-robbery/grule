@@ -18,7 +18,7 @@ import static core.Utils.*
 import static java.util.Collections.emptyList
 
 class AppContext {
-    protected final Logger log = LoggerFactory.getLogger(AppContext.class)
+    protected static final Logger log = LoggerFactory.getLogger(AppContext)
     @Lazy ConfigObject                  env          = initEnv()
     /**
      * 系统名字. 用于多个系统启动区别
@@ -254,7 +254,7 @@ class AppContext {
         Integer maxSize = Integer.valueOf(env.sys.exec.maximumPoolSize?:32)
         exec = new ThreadPoolExecutor(
             Integer.valueOf(env.sys.exec.corePoolSize?:8), maxSize,
-            Long.valueOf(env.sys.exec.keepAliveTime?:2), TimeUnit.HOURS,
+            Long.valueOf(env.sys.exec.keepAliveTime?:1), TimeUnit.HOURS,
             new LinkedBlockingQueue<>(maxSize * 2),
             new ThreadFactory() {
                 final AtomicInteger i = new AtomicInteger(1)
@@ -310,7 +310,6 @@ class AppContext {
 
     /**
      * 初始化 EP
-     * @return
      */
     protected void initEp() {
         log.debug("init ep")

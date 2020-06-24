@@ -30,10 +30,11 @@ class Page<E> {
     }
 
 
-    def setTotalRow(Long totalRow) {
+    Page setTotalRow(Long totalRow) {
         this.totalRow = totalRow
         if (totalRow != null) {
             this.totalPage = (int) (Math.ceil(totalRow / Double.valueOf(this.pageSize)))
         }
+        this
     }
 }

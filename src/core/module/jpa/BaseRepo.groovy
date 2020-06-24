@@ -1,7 +1,6 @@
 package core.module.jpa
 
 import core.Page
-import core.module.ServerTpl
 import org.hibernate.Session
 import org.hibernate.SessionFactory
 import org.hibernate.Transaction
@@ -14,6 +13,7 @@ import javax.persistence.criteria.CriteriaBuilder
 import javax.persistence.criteria.CriteriaQuery
 import javax.persistence.criteria.Predicate
 import javax.persistence.criteria.Root
+import java.util.function.Consumer
 import java.util.function.Function
 
 /**
@@ -41,7 +41,7 @@ class BaseRepo {
      * @param failFn
      * @return
      */
-    def <T> T trans(Function<Session, T> fn, Runnable okFn = null, failFn = null) {
+    def <T> T trans(Function<Session, T> fn, Runnable okFn = null, Consumer<Exception> failFn = null) {
         Session s = sf.getCurrentSession()
         // 当前线程存在事务
         if (txFlag.get()) return fn.apply(s)
@@ -108,7 +108,7 @@ class BaseRepo {
      * @return
      */
     def <T extends IEntity> T findById(Class<T> eType, Serializable id) {
-        if (eType == null) throw new IllegalArgumentException('eType must not be null')
+        if (eType == null) throw new IllegalArgumentException("eType must not be null")
         trans{s -> s.get(eType, id)}
     }
 
@@ -146,7 +146,7 @@ class BaseRepo {
      * @return
      */
     def <E extends IEntity> boolean delete(Class<E> eType, Serializable id) {
-        if (eType == null) throw new IllegalArgumentException('eType must not be null')
+        if (eType == null) throw new IllegalArgumentException("eType must not be null")
         trans{s ->
             // NOTE: 被删除的实体主键名必须为 "id"
             s.createQuery("delete from $eType.simpleName where id=:id")
@@ -165,7 +165,7 @@ class BaseRepo {
      * @return
      */
     def <E extends IEntity> Page<E> findPage(Class<E> eType, Integer page, Integer pageSize, CriteriaSpec spec = null) {
-        if (eType == null) throw new IllegalArgumentException('eType must not be null')
+        if (eType == null) throw new IllegalArgumentException("eType must not be null")
         if (page == null || page < 1) throw new IllegalArgumentException("page: $page, must >=1")
         if (pageSize == null || pageSize < 1) throw new IllegalArgumentException("pageSize: $pageSize, must >=1")
         trans{s ->
@@ -190,7 +190,7 @@ class BaseRepo {
      * @return
      */
     def <E extends IEntity> long count(Class<E> eType, CriteriaSpec spec = null) {
-        if (eType == null) throw new IllegalArgumentException('eType must not be null')
+        if (eType == null) throw new IllegalArgumentException("eType must not be null")
         trans{s ->
             CriteriaBuilder cb = s.getCriteriaBuilder()
             CriteriaQuery<Long> query = cb.createQuery(Long.class)

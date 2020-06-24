@@ -15,6 +15,7 @@ import java.lang.reflect.Method
 import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Consumer
 import java.util.function.Function
@@ -315,7 +316,7 @@ class Utils {
                 // 取结果
                 ret = conn.getInputStream().getText("utf-8")
                 if (200 != responseCode) {
-                    throw new RuntimeException("Http error. code: ${responseCode}, url: $urlStr, resp: ${Objects.toString(ret, "")}")
+                    throw new Exception("Http error. code: ${responseCode}, url: $urlStr, resp: ${Objects.toString(ret, "")}")
                 }
             } finally {
                 conn?.disconnect()
@@ -375,11 +376,22 @@ class Utils {
         private Thread                    th
         private boolean                   stopFlag
         private Function<String, Boolean> lineFn
+        private Executor exec
 
-        // 处理输出行
+        /**
+         * 处理输出行
+         * @param lineFn 函数返回true 继续输出, 返回false则停止输出
+         */
         Tailer handle(Function<String, Boolean> lineFn) {this.lineFn = lineFn; this}
-
-        def stop() {this.stopFlag = true}
+        /**
+         * 设置处理线程池
+         * @param exec
+         */
+        Tailer exec(Executor exec) {this.exec = exec; this}
+        /**
+         * 停止
+         */
+        void stop() {this.stopFlag = true}
 
         /**
          * tail 文件内容监控
@@ -387,51 +399,100 @@ class Utils {
          * @param follow 从最后第几行开始
          * @return
          */
-        Tailer tail(String file, Integer follow = 10) {
-            th = new Thread({run(file, (follow == null ? 0 : follow))}, "Tailer-$file")
-            th.setDaemon(true)
-            th.start()
+        Tailer tail(String file, Integer follow = 5) {
+            if (lineFn == null) lineFn = {println it}
+            Runnable fn = {
+                String tName = Thread.currentThread().name
+                try {
+                    Thread.currentThread().name = "Tailer-$file"
+                    run(file, (follow == null ? 0 : follow))
+                } catch (ex) {
+                    log.error("Tail file " +file+ " error", ex)
+                } finally {
+                    Thread.currentThread().name = tName
+                }
+            }
+            if (exec) {
+                exec.execute { fn() }
+            } else {
+                th = new Thread({fn()}, "Tailer-$file")
+                th.setDaemon(true)
+                th.start()
+            }
             this
         }
 
-        private def run(String file, Integer follow) {
-            if (lineFn == null) throw new IllegalArgumentException("没有行处理函数")
-            RandomAccessFile raf = new RandomAccessFile(file, "r")
-            Queue<String> buffer = new LinkedList<>() // 用来保存最后几行(follow)数据
+//        private void scan(String file, Integer follow) {
+//            new Scanner(file)
+//        }
 
-            // 当前第一次到达文件结尾时,设为true
-            boolean firstEnd
-            String line
-            while (!stopFlag) {
-                try {
-                    line = raf.readLine()
-                    if (line == null) { // 当读到文件结尾时
-                        if (firstEnd) Thread.sleep(1000L)
-                        else { // 第一次到达结尾后, 清理buffer数据
-                            firstEnd = true
+
+        private void run(String file, Integer follow) {
+            try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+                Queue<String> buffer = follow ? new LinkedList<>() : null // 用来保存最后几行(follow)数据
+
+                // 当前第一次到达文件结尾时,设为true
+                boolean firstEnd
+                String line
+                while (!stopFlag) {
+                    line = readLine(raf)
+                    // line = raf.readLine()
+                    if (line == null) { // 当读到文件结尾时(line为空即为文件结尾)
+                        if (firstEnd) {
+                            Thread.sleep(100L * new Random().nextInt(10))
+                            // raf.seek(file.length()) // 重启定位到文件结尾(有可能文件被重新写入了)
+                            continue
+                        }
+                        firstEnd = true
+                        if (buffer) { // 第一次到达结尾后, 清理buffer数据
                             do {
                                 line = buffer.poll()
-                                if (line) stopFlag = lineFn.apply(line)
-                            } while (line)
+                                if (line == null) break
+                                stopFlag = !lineFn.apply(line)
+                            } while (!stopFlag)
                             buffer = null
                         }
-                    } else {
+                    } else { // 读到行有数据
                         if (firstEnd) { // 直接处理行字符串
-                            stopFlag = lineFn.apply(line)
-                            Thread.sleep(200L)
-                        } else {
-                            if (follow > 0) {
-                                buffer.offer(line)
-                                if (buffer.size() >= follow) buffer.poll()
-                            }
+                            stopFlag = !lineFn.apply(line)
+                        } else if (follow > 0) {
+                            buffer.offer(line)
+                            if (buffer.size() > follow) buffer.poll()
                         }
                     }
-                } catch (Throwable ex) {
-                    stopFlag = true
-                    log.error("tail file '" + file + "' error", ex)
                 }
             }
-            raf?.close()
+        }
+
+        private String readLine(RandomAccessFile arf) {
+            StringBuilder sb = new StringBuilder() // 默认的 readLine 用的 StringBuffer
+            int c = -1
+            boolean eol = false
+            int n = '\n'
+            int r = '\r'
+            while (!eol) {
+                switch (c = arf.read()) {
+                    case -1:
+                    case n:
+                        eol = true
+                        break
+                    case r:
+                        eol = true;
+                        long cur = arf.getFilePointer();
+                        if ((arf.read()) != n) {
+                            arf.seek(cur);
+                        }
+                        break;
+                    default:
+                        sb.append((char)c);
+                        break;
+                }
+            }
+
+            if ((c == -1) && (sb.length() == 0)) {
+                return null;
+            }
+            return sb.toString()
         }
     }
 
