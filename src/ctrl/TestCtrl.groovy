@@ -7,6 +7,7 @@ import core.module.OkHttpSrv
 import core.module.SchedSrv
 import core.module.jpa.BaseRepo
 import ctrl.common.FileData
+import dao.entity.Test
 import dao.entity.UploadFile
 import io.netty.handler.codec.http.HttpResponseStatus
 import ratpack.exec.Promise
@@ -240,7 +241,9 @@ class TestCtrl extends CtrlTpl {
     // 测试自定义返回
     def cus(Chain chain) {
         chain.path('cus') {ctx ->
-            ctx.render new JSONObject().fluentPut("code", "0000").toString()
+            def t = bean(BaseRepo).saveOrUpdate(new Test(name: "xxx" + System.currentTimeMillis()))
+            ctx.render(t.id)
+            // ctx.render new JSONObject().fluentPut("code", "0000").toString()
         }
     }
 

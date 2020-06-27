@@ -510,6 +510,7 @@ class Utils {
         private Map<String, String>   propAlias
         private Set<String>           ignore
         private Map<String, Function> valueConverter
+        private Map<String, Map<String, Function>> newProp
         private boolean               showClassProp
         private boolean               ignoreNull = true// 默认忽略空值属性
         private Comparator<String>    comparator
@@ -534,30 +535,51 @@ class Utils {
             valueConverter.put(propName, converter)
             return this
         }
+        ToMap<T> addConverter(String originPropName, String newPropName, Function converter) {
+            if (newProp == null) { newProp = new HashMap<>(); }
+            newProp.computeIfAbsent(originPropName, s -> new HashMap<>(7)).put(newPropName, converter);
+            return this;
+        }
         Map build() {
-            Map map = comparator ? new TreeMap<>(comparator) : new LinkedHashMap()
-            if (bean == null) return map
-            bean.metaPropertyValues.each {pv ->
-                try {
-                    String propName = pv.getName()
-                    if ((ignore != null && ignore.contains(propName)) || (!showClassProp && "class".equals(propName))) return
-                    String aliasName = null
-                    if (propAlias != null && propAlias.containsKey(propName)) aliasName = propAlias.get(propName)
-                    String resultName = (aliasName == null ? propName : aliasName)
-
-                    Object value = pv.value
-                    if (valueConverter != null) {
-                        if (valueConverter.containsKey(propName)) value = valueConverter.get(propName).apply(value)
-                        else if (aliasName != null && valueConverter.containsKey(aliasName)) {
-                            value = valueConverter.get(aliasName).apply(value)
-                        }
-                    }
-                    if (ignoreNull && value != null) map.put(resultName, value)
-                    else if (!ignoreNull) map.put(resultName, value)
-                } catch (Exception e) {
-                    // ignore
+            final Map map = comparator != null ? new TreeMap<>(comparator) : new LinkedHashMap();
+            if (bean == null) return map;
+            def add = {String k, Object v ->
+                if (!ignore.contains(k)) {
+                    if (ignoreNull && v != null) map.put(k, v);
+                    else if (!ignoreNull) map.put(k, v);
                 }
             }
+            iterateMethod(bean.getClass(), m -> {
+                try {
+                    if (void.class != m.getReturnType() && m.getName().startsWith("get") && m.getParameterCount() == 0) { // 属性
+                        String pName = m.getName().replace("get", "").uncapitalize()
+                        String aliasName = null
+                        if (propAlias != null && propAlias.containsKey(pName)) aliasName = propAlias.get(pName)
+                        if ("class" == pName && !showClassProp) return
+                        Object originValue = m.invoke(bean)
+
+                        Object v = originValue
+                        if (valueConverter != null) {
+                            if (valueConverter.containsKey(pName)) {
+                                v = valueConverter.get(pName).apply(originValue);
+                            }
+                            else if (aliasName != null && valueConverter.containsKey(aliasName)) {
+                                v = valueConverter.get(aliasName).apply(originValue)
+                            }
+                        }
+                        add((aliasName == null ? pName : aliasName), v)
+
+                        if (newProp != null && newProp.containsKey(pName)) {
+                            for (Iterator<Map.Entry<String, Function>> it = newProp.get(pName).entrySet().iterator(); it.hasNext(); ) {
+                                Map.Entry<String, Function> e = it.next();
+                                add(e.getKey(), e.getValue().apply(originValue));
+                            }
+                        }
+                    }
+                } catch (Exception ex) {
+                    // ignore
+                }
+            })
             return map
         }
     }

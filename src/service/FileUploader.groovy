@@ -68,7 +68,7 @@ class FileUploader extends ServerTpl {
 
 
     @EL(name = 'deleteFile')
-    def delete(String fileName) {
+    void delete(String fileName) {
         File f = new File(localDir + File.separator + fileName)
         if (f.exists()) f.delete()
         else log.warn("delete file '{}' not exists", fileName)

@@ -143,7 +143,7 @@ class BaseRepo {
      * 根据id删除
      * @param eType
      * @param id
-     * @return
+     * @return true: 删除成功
      */
     def <E extends IEntity> boolean delete(Class<E> eType, Serializable id) {
         if (eType == null) throw new IllegalArgumentException("eType must not be null")
@@ -153,6 +153,25 @@ class BaseRepo {
                 .setParameter('id', id)
                 .executeUpdate() > 0
         }
+    }
+
+
+    /**
+     * 查询多条数据
+     * @param eType 实体类型
+     * @param spec 条件
+     * @return list
+     */
+    def <E extends IEntity> List<E> findList(Class<E> eType, CriteriaSpec spec) {
+        if (eType == null) throw new IllegalArgumentException("eType must not be null");
+        return trans(s -> {
+            CriteriaBuilder cb = s.getCriteriaBuilder()
+            CriteriaQuery<E> query = cb.createQuery(eType)
+            Root<E> root = query.from(eType)
+            Object p = spec == null? null :spec.toPredicate(root, query, cb)
+            if (p instanceof Predicate) query.where((Predicate) p)
+            return s.createQuery(query).list()
+        })
     }
 
 
