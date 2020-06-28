@@ -1,15 +1,20 @@
 package ctrl
 
 import cn.xnatural.enet.event.EL
-import com.alibaba.fastjson.JSONObject
+import com.alibaba.fastjson.JSON
 import core.Page
+import core.Utils
 import core.module.OkHttpSrv
 import core.module.SchedSrv
 import core.module.jpa.BaseRepo
+import ctrl.common.ApiResp
 import ctrl.common.FileData
 import dao.entity.Test
 import dao.entity.UploadFile
+import dao.entity.VersionFile
 import io.netty.handler.codec.http.HttpResponseStatus
+import org.hibernate.query.internal.NativeQueryImpl
+import org.hibernate.transform.Transformers
 import ratpack.exec.Promise
 import ratpack.form.Form
 import ratpack.handling.Chain
@@ -27,6 +32,9 @@ import static ctrl.common.ApiResp.ok
 
 class TestCtrl extends CtrlTpl {
 
+    @Lazy def srv = bean(TestService)
+    @Lazy def repo = bean(BaseRepo)
+    @Lazy def fu = bean(FileUploader)
     final Set<WebSocket> wss = ConcurrentHashMap.newKeySet()
 
     TestCtrl() { prefix = 'test' }
@@ -55,17 +63,31 @@ class TestCtrl extends CtrlTpl {
 
     // dao 测试
     def dao(Chain chain) {
-        def srv = bean(TestService)
-        def repo = bean(BaseRepo)
         chain.get('dao') {ctx ->
             if ('file' == ctx.request.queryParams.type) {
                 ctx.render ok(Page.of(
                     repo.findPage(UploadFile, 0, 10, {root, query, cb -> query.orderBy(cb.desc(root.get('id')))}),
-                    {UploadFile e -> [originName: e.originName, finalName: e.finalName, id: e.id] }
+                    {UploadFile e ->
+                        Utils.toMapper(e).ignore("updateTime")
+                            .addConverter("createTime", {Date d -> d?.getTime()}).build()
+                    }
                 ))
             } else {
                 ctx.render ok(srv?.findTestData())
             }
+            return
+
+            // 转换成map
+            repo.trans{s ->
+                s.createNativeQuery("SELECT * from test")
+                    .unwrap(NativeQueryImpl).setResultTransformer(Transformers.ALIAS_TO_ENTITY_MAP).list()
+            }.collect {
+                Utils.toMapper(it).ignore("update_time")
+                    .addConverter("create_time", {Date d -> d?.getTime()}).build()
+            }
+
+            // 非数字比较大小(时间大小比较)
+            repo.find(Test, {root, query, cb -> cb.greaterThanOrEqualTo(root.get("createTime"), new Date())})
         }
     }
 
@@ -111,30 +133,33 @@ class TestCtrl extends CtrlTpl {
 
     // 接收form 表单提交
     def form(Chain chain) {
-        chain.post('form', {ctx ->
-            ctx.parse(Form.class).then({ form ->
-                // form.file('').fileName // 提取上传的文件
-                ctx.render ok(form)
-            })
+        chain.post('form', {
+            form(it) {fd -> return fd.toMapString()}
         })
     }
 
 
     // 文件上传
     def upload(Chain chain) {
-        def fu = bean(FileUploader)
-        def testSrv = bean(TestService)
         chain.post('upload', {ctx ->
             if (!ctx.request.contentType.type?.contains('multipart/form-data')) {
                 ctx.clientError(HttpResponseStatus.UNSUPPORTED_MEDIA_TYPE.code())
                 return
             }
             ctx.parse(Form.class).then({form ->
-                def ls = testSrv.saveUpload(
-                    fu.save(form.files().values().collect{f -> new FileData(originName: f.fileName, inputStream: f.inputStream)})
-                )
+                def f = form.file("file")
+                if (f == null) {
+                    ctx.render(ApiResp.fail("文件未上传"))
+                    return
+                }
                 // 返回上的文件的访问地址
-                ctx.render ok(ls.collect{fu.toFullUrl(it.finalName)})
+                ctx.render ok(
+                    repo.trans {
+                        fu.save([new FileData(originName: f.fileName, inputStream: f.inputStream)])
+                            .collect {new VersionFile(version: form.get("version"), finalName: it.finalName, originName: it.originName, size: it.size)}
+                            .each { repo.saveOrUpdate(it) }
+                    }.collect{fu.toFullUrl(it.finalName)}
+                )
             })
         })
     }
@@ -143,13 +168,15 @@ class TestCtrl extends CtrlTpl {
     // json 参数
     def json(Chain chain) {
         chain.post('json') {ctx ->
-            if (!ctx.request.contentType.type.contains('application/json')) {
-                ctx.clientError(HttpResponseStatus.UNSUPPORTED_MEDIA_TYPE.code())
-                return
-            }
-            ctx.parse(Map.class).then({ m ->
-                ctx.render ok(m)
-            })
+            json(ctx) {jsonStr -> return JSON.parseObject(jsonStr) }
+        }
+    }
+
+
+    // 接收post string
+    def string(Chain chain) {
+        chain.post("str") {
+            string(it) {s -> return s}
         }
     }
 

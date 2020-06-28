@@ -6,13 +6,15 @@ import org.hibernate.annotations.DynamicUpdate
 import javax.persistence.Entity
 import javax.persistence.Inheritance
 import javax.persistence.InheritanceType
+import javax.persistence.MappedSuperclass
 
 /**
  * 文件上传基本信息实体
  * @author xiangxb, 2018-10-07
  */
-@Inheritance(strategy = InheritanceType.JOINED)
-@Entity
+//@Inheritance(strategy = InheritanceType.JOINED)
+//@Entity
+@MappedSuperclass
 @DynamicUpdate
 class UploadFile extends LongIdEntity {
     /**

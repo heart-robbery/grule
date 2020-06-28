@@ -13,9 +13,7 @@ import core.module.OkHttpSrv
 import core.module.ServerTpl
 import core.module.jpa.BaseRepo
 import core.module.remote.Remoter
-import ctrl.common.FileData
 import dao.entity.Test
-import dao.entity.UploadFile
 
 import java.text.SimpleDateFormat
 import java.util.function.Consumer
@@ -34,21 +32,6 @@ class TestService extends ServerTpl {
                 )
             )
             repo.findPage(Test, 0, 10, { root, query, cb -> query.orderBy(cb.desc(root.get('createTime')))})
-        }
-    }
-
-
-    /**
-     * 记录上传的文件
-     * @param files
-     * @return
-     */
-    List<UploadFile> saveUpload(List<FileData> files) {
-        if (!files) return Collections.emptyList()
-        repo?.trans{
-            files.collect{f ->
-                repo.saveOrUpdate(new UploadFile(originName: f.originName, finalName: f.generatedName, size: f.size))
-            }
         }
     }
 

@@ -542,11 +542,11 @@ class Utils {
         }
         Map build() {
             final Map map = comparator != null ? new TreeMap<>(comparator) : new LinkedHashMap();
-            if (bean == null) return map;
+            if (bean == null) return map
             def add = {String k, Object v ->
                 if (!ignore.contains(k)) {
-                    if (ignoreNull && v != null) map.put(k, v);
-                    else if (!ignoreNull) map.put(k, v);
+                    if (ignoreNull && v != null) map.put(k, v)
+                    else if (!ignoreNull) map.put(k, v)
                 }
             }
             iterateMethod(bean.getClass(), m -> {
