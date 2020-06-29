@@ -7,16 +7,13 @@ import core.Utils
 import core.module.OkHttpSrv
 import core.module.SchedSrv
 import core.module.jpa.BaseRepo
-import ctrl.common.ApiResp
 import ctrl.common.FileData
 import dao.entity.Test
 import dao.entity.UploadFile
 import dao.entity.VersionFile
-import io.netty.handler.codec.http.HttpResponseStatus
 import org.hibernate.query.internal.NativeQueryImpl
 import org.hibernate.transform.Transformers
 import ratpack.exec.Promise
-import ratpack.form.Form
 import ratpack.handling.Chain
 import ratpack.handling.RequestId
 import ratpack.websocket.*
@@ -39,14 +36,15 @@ class TestCtrl extends CtrlTpl {
 
     TestCtrl() { prefix = 'test' }
 
+
     @EL(name = 'testWsMsg')
-    def wsMsg(String msg) {
+    void wsMsg(String msg) {
         wss.each {ws -> ws.send(msg)}
     }
 
 
     // 预处理
-    def all(Chain chain) {
+    void all(Chain chain) {
         chain.all{ctx ->
             // TODO 预处理 #prefix 前缀开头的 接口
             // println "pre process start with $prefix request"
@@ -56,44 +54,46 @@ class TestCtrl extends CtrlTpl {
 
 
     // 测试抛出错误
-    def error(Chain chain) {
+    void error(Chain chain) {
         chain.get('error') {ctx -> throw new RuntimeException('错误测试') }
     }
 
 
     // dao 测试
-    def dao(Chain chain) {
-        chain.get('dao') {ctx ->
-            if ('file' == ctx.request.queryParams.type) {
-                ctx.render ok(Page.of(
-                    repo.findPage(UploadFile, 0, 10, {root, query, cb -> query.orderBy(cb.desc(root.get('id')))}),
-                    {UploadFile e ->
-                        Utils.toMapper(e).ignore("updateTime")
-                            .addConverter("createTime", {Date d -> d?.getTime()}).build()
-                    }
-                ))
-            } else {
-                ctx.render ok(srv?.findTestData())
-            }
-            return
+    void dao(Chain chain) {
+        chain.get('dao') {
+            get(it) {params ->
+                if ('file' == params.type) {
+                    return Page.of(
+                        repo.findPage(UploadFile, 0, 10, {root, query, cb -> query.orderBy(cb.desc(root.get('id')))}),
+                        {UploadFile e ->
+                            Utils.toMapper(e).ignore("updateTime")
+                                .addConverter("createTime", {Date d -> d?.getTime()}).build()
+                        }
+                    )
+                } else {
+                    return srv?.findTestData()
+                }
+                return
 
-            // 转换成map
-            repo.trans{s ->
-                s.createNativeQuery("SELECT * from test")
-                    .unwrap(NativeQueryImpl).setResultTransformer(Transformers.ALIAS_TO_ENTITY_MAP).list()
-            }.collect {
-                Utils.toMapper(it).ignore("update_time")
-                    .addConverter("create_time", {Date d -> d?.getTime()}).build()
-            }
+                // 转换成map
+                repo.trans{s ->
+                    s.createNativeQuery("SELECT * from test")
+                        .unwrap(NativeQueryImpl).setResultTransformer(Transformers.ALIAS_TO_ENTITY_MAP).list()
+                }.collect {
+                    Utils.toMapper(it).ignore("update_time")
+                        .addConverter("create_time", {Date d -> d?.getTime()}).build()
+                }
 
-            // 非数字比较大小(时间大小比较)
-            repo.find(Test, {root, query, cb -> cb.greaterThanOrEqualTo(root.get("createTime"), new Date())})
+                // 非数字比较大小(时间大小比较)
+                repo.find(Test, {root, query, cb -> cb.greaterThanOrEqualTo(root.get("createTime"), new Date())})
+            }
         }
     }
 
 
     // session 测试
-    def session(Chain chain) {
+    void session(Chain chain) {
         chain.get('session') {ctx ->
             ctx?.sData.lastReqId = ctx.get(RequestId.TYPE).toString()
             ctx.render ok([id:ctx?.sData.id])
@@ -102,7 +102,7 @@ class TestCtrl extends CtrlTpl {
 
 
     // websocket
-    def ws(Chain chain) {
+    void ws(Chain chain) {
         chain.get('ws') {ctx ->
             WebSockets.websocket(ctx, new WebSocketHandler<WebSocket>() {
                 @Override
@@ -125,56 +125,47 @@ class TestCtrl extends CtrlTpl {
                 }
             })
         }
-        bean(SchedSrv).cron('0 0/1 * * * ?') {
+        bean(SchedSrv)?.cron('0 0/1 * * * ?') {
             wsMsg(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()))
         }
     }
 
 
     // 接收form 表单提交
-    def form(Chain chain) {
+    void form(Chain chain) {
         chain.post('form', {
-            form(it) {fd -> return fd.toMapString()}
+            form(it) {fd -> fd.toMapString()}
         })
     }
 
 
     // 文件上传
-    def upload(Chain chain) {
+    void upload(Chain chain) {
         chain.post('upload', {ctx ->
-            if (!ctx.request.contentType.type?.contains('multipart/form-data')) {
-                ctx.clientError(HttpResponseStatus.UNSUPPORTED_MEDIA_TYPE.code())
-                return
-            }
-            ctx.parse(Form.class).then({form ->
+            form(ctx) {form ->
                 def f = form.file("file")
-                if (f == null) {
-                    ctx.render(ApiResp.fail("文件未上传"))
-                    return
-                }
+                if (f == null) {throw new IllegalArgumentException('文件未上传')}
                 // 返回上的文件的访问地址
-                ctx.render ok(
-                    repo.trans {
-                        fu.save([new FileData(originName: f.fileName, inputStream: f.inputStream)])
-                            .collect {new VersionFile(version: form.get("version"), finalName: it.finalName, originName: it.originName, size: it.size)}
-                            .each { repo.saveOrUpdate(it) }
-                    }.collect{fu.toFullUrl(it.finalName)}
-                )
-            })
+                repo.trans {
+                    fu.save([new FileData(originName: f.fileName, inputStream: f.inputStream)])
+                        .collect {new VersionFile(version: form.get("version"), finalName: it.finalName, originName: it.originName, size: it.size)}
+                        .each { repo.saveOrUpdate(it) }
+                }.collect{fu.toFullUrl(it.finalName)}
+            }
         })
     }
 
 
     // json 参数
-    def json(Chain chain) {
+    void json(Chain chain) {
         chain.post('json') {ctx ->
-            json(ctx) {jsonStr -> return JSON.parseObject(jsonStr) }
+            json(ctx) {jsonStr -> JSON.parseObject(jsonStr) }
         }
     }
 
 
     // 接收post string
-    def string(Chain chain) {
+    void string(Chain chain) {
         chain.post("str") {
             string(it) {s -> return s}
         }
@@ -182,7 +173,7 @@ class TestCtrl extends CtrlTpl {
 
 
     // 依次从外往里执行多个handler, 例: pre/sub
-    def pre(Chain chain) {
+    void pre(Chain chain) {
         chain.prefix('pre') {ch ->
             ch.with {
                 all({ctx ->
@@ -197,7 +188,7 @@ class TestCtrl extends CtrlTpl {
 
 
     // 下载excel文件
-    def downXlsx(Chain chain) {
+    void downXlsx(Chain chain) {
         chain.post('downXlsx') {ctx ->
             ctx.response.contentType('application/vnd.ms-excel;charset=utf-8')
             ctx.header('Content-Disposition', "attachment;filename=${new SimpleDateFormat("yyyyMMddHHmmss").format(new Date())}.xlsx")
@@ -210,7 +201,7 @@ class TestCtrl extends CtrlTpl {
 
 
     // 异步处理
-    def async(Chain chain) {
+    void async(Chain chain) {
         chain.get('async') {ctx ->
             ctx.render Promise.async{down ->
                 async {
@@ -223,7 +214,7 @@ class TestCtrl extends CtrlTpl {
 
 
     // 测试登录
-    def testLogin(Chain chain) {
+    void testLogin(Chain chain) {
         chain.get('testLogin') {ctx ->
             ctx['sData']['uRoles'] = Arrays.stream(ctx.request.queryParams.role.split(',')).map{it.trim()}.filter{it?true:false}.collect(Collectors.toSet())
             log.warn('用户权限角色被改变. {}', ctx['sData']['uRoles'])
@@ -233,7 +224,7 @@ class TestCtrl extends CtrlTpl {
 
 
     // 权限测试
-    def auth(Chain chain) {
+    void auth(Chain chain) {
         chain.get('auth') {ctx ->
             ctx.auth(ctx.request.queryParams['role'])
             ctx.render ok(ctx['sData'])
@@ -242,7 +233,7 @@ class TestCtrl extends CtrlTpl {
 
 
     // 远程事件调用
-    def remote(Chain chain) {
+    void remote(Chain chain) {
         def ts = bean(TestService)
         chain.path('remote') {ctx ->
             ctx.render Promise.async { down ->
@@ -255,7 +246,7 @@ class TestCtrl extends CtrlTpl {
     }
 
 
-    def http(Chain chain) {
+    void http(Chain chain) {
         def http = bean(OkHttpSrv)
         chain.path("http") {ctx ->
             ctx.render Promise.async {down ->
@@ -266,7 +257,7 @@ class TestCtrl extends CtrlTpl {
 
 
     // 测试自定义返回
-    def cus(Chain chain) {
+    void cus(Chain chain) {
         chain.path('cus') {ctx ->
             def t = bean(BaseRepo).saveOrUpdate(new Test(name: "xxx" + System.currentTimeMillis()))
             ctx.render(t.id)
@@ -274,8 +265,11 @@ class TestCtrl extends CtrlTpl {
         }
     }
 
-    // 超时接口
-    def timeout(Chain chain) {
+    /**@
+     * 超时接口
+     * @param chain
+     */
+    void timeout(Chain chain) {
         chain.path('timeout') {ctx ->
             ctx.render Promise.async{down ->
                 async {
