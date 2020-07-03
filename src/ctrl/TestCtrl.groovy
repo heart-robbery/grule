@@ -13,7 +13,6 @@ import dao.entity.UploadFile
 import dao.entity.VersionFile
 import org.hibernate.query.internal.NativeQueryImpl
 import org.hibernate.transform.Transformers
-import ratpack.exec.Promise
 import ratpack.handling.Chain
 import ratpack.handling.RequestId
 import ratpack.websocket.*
@@ -29,10 +28,11 @@ import static ctrl.common.ApiResp.ok
 
 class TestCtrl extends CtrlTpl {
 
-    @Lazy def srv = bean(TestService)
-    @Lazy def repo = bean(BaseRepo)
-    @Lazy def fu = bean(FileUploader)
-    final Set<WebSocket> wss = ConcurrentHashMap.newKeySet()
+    @Lazy def            ts   = bean(TestService)
+    @Lazy def            repo = bean(BaseRepo)
+    @Lazy def            fu   = bean(FileUploader)
+    @Lazy def            http = bean(OkHttpSrv)
+    final Set<WebSocket> wss  = ConcurrentHashMap.newKeySet()
 
     TestCtrl() { prefix = 'test' }
 
@@ -61,18 +61,18 @@ class TestCtrl extends CtrlTpl {
 
     // dao 测试
     void dao(Chain chain) {
-        chain.get('dao') {
-            get(it) {params ->
+        chain.get('dao') {ctx ->
+            get(ctx) {params, fn ->
                 if ('file' == params.type) {
-                    return Page.of(
+                    fn.accept(ok(Page.of(
                         repo.findPage(UploadFile, 0, 10, {root, query, cb -> query.orderBy(cb.desc(root.get('id')))}),
                         {UploadFile e ->
                             Utils.toMapper(e).ignore("updateTime")
                                 .addConverter("createTime", {Date d -> d?.getTime()}).build()
                         }
-                    )
+                    )))
                 } else {
-                    return srv?.findTestData()
+                    fn.accept(ok(ts?.findTestData()))
                 }
                 return
 
@@ -133,24 +133,26 @@ class TestCtrl extends CtrlTpl {
 
     // 接收form 表单提交
     void form(Chain chain) {
-        chain.post('form', {
-            form(it) {fd -> fd.toMapString()}
-        })
+        chain.post('form') {ctx ->
+            form(ctx) {fd, cb -> cb.accept(ok(fd.toMapString()))}
+        }
     }
 
 
     // 文件上传
     void upload(Chain chain) {
         chain.post('upload', {ctx ->
-            form(ctx) {form ->
+            form(ctx) {form, cb ->
                 def f = form.file("file")
                 if (f == null) {throw new IllegalArgumentException('文件未上传')}
                 // 返回上的文件的访问地址
-                repo.trans {
-                    fu.save([new FileData(originName: f.fileName, inputStream: f.inputStream)])
-                        .collect {new VersionFile(version: form.get("version"), finalName: it.finalName, originName: it.originName, size: it.size)}
-                        .each { repo.saveOrUpdate(it) }
-                }.collect{fu.toFullUrl(it.finalName)}
+                cb.accept(ok(
+                    repo.trans {
+                        fu.save([new FileData(originName: f.fileName, inputStream: f.inputStream)])
+                            .collect {new VersionFile(version: form.get("version"), finalName: it.finalName, originName: it.originName, size: it.size)}
+                            .each { repo.saveOrUpdate(it) }
+                    }.collect{fu.toFullUrl(it.finalName)}
+                ))
             }
         })
     }
@@ -159,7 +161,7 @@ class TestCtrl extends CtrlTpl {
     // json 参数
     void json(Chain chain) {
         chain.post('json') {ctx ->
-            json(ctx) {jsonStr -> JSON.parseObject(jsonStr) }
+            json(ctx) {jsonStr, cb -> cb.accept(JSON.parseObject(jsonStr)) }
         }
     }
 
@@ -167,7 +169,7 @@ class TestCtrl extends CtrlTpl {
     // 接收post string
     void string(Chain chain) {
         chain.post("str") {
-            string(it) {s -> return s}
+            string(it) {jsonStr, cb -> cb.accept(jsonStr)}
         }
     }
 
@@ -190,12 +192,13 @@ class TestCtrl extends CtrlTpl {
     // 下载excel文件
     void downXlsx(Chain chain) {
         chain.post('downXlsx') {ctx ->
-            ctx.response.contentType('application/vnd.ms-excel;charset=utf-8')
-            ctx.header('Content-Disposition', "attachment;filename=${new SimpleDateFormat("yyyyMMddHHmmss").format(new Date())}.xlsx")
-            def wb = org.apache.poi.ss.usermodel.WorkbookFactory.create(true)
-            def bos = new ByteArrayOutputStream(); wb.write(bos)
-            ctx.response.send(bos.toByteArray())
-            // wb.write(ctx.response)
+            form(ctx) {fd, fn ->
+                ctx.response.contentType('application/vnd.ms-excel;charset=utf-8')
+                ctx.header('Content-Disposition', "attachment;filename=${new SimpleDateFormat("yyyyMMddHHmmss").format(new Date())}.xlsx")
+                def wb = org.apache.poi.ss.usermodel.WorkbookFactory.create(true)
+                def bos = new ByteArrayOutputStream(); wb.write(bos)
+                fn.accept(bos.toByteArray())
+            }
         }
     }
 
@@ -203,11 +206,9 @@ class TestCtrl extends CtrlTpl {
     // 异步处理
     void async(Chain chain) {
         chain.get('async') {ctx ->
-            ctx.render Promise.async{down ->
-                async {
-                    Thread.sleep(3000)
-                    down.success(ok('date', new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())))
-                }
+            get(ctx) {params, cb ->
+                Thread.sleep(3000)
+                cb.accept(ok('date', new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())))
             }
         }
     }
@@ -234,23 +235,23 @@ class TestCtrl extends CtrlTpl {
 
     // 远程事件调用
     void remote(Chain chain) {
-        def ts = bean(TestService)
-        chain.path('remote') {ctx ->
-            ctx.render Promise.async { down ->
-                async {ts.remote(ctx.request.queryParams['app']?:"gy", ctx.request.queryParams['event']?:'eName1', ctx.request.queryParams['param']?:'p1',{
-                    if (it instanceof Exception) down.success(fail(it.message))
-                    else down.success ok(it)
-                })}
+        chain.get('remote') {ctx ->
+            get(ctx) {params, fn ->
+                ts.remote(params['app']?:"gy", params['event']?:'eName1', params['param']?:'p1',{
+                    if (it instanceof Exception) fn.accept(fail(it.message))
+                    else fn.accept ok(it)
+                })
             }
         }
     }
 
 
     void http(Chain chain) {
-        def http = bean(OkHttpSrv)
         chain.path("http") {ctx ->
-            ctx.render Promise.async {down ->
-                ctx.render http.get(ctx.request.queryParams['url']?:'http://gy/test/cus').debug().execute()
+            get(ctx) {params, cb ->
+                cb.accept(ok(
+                    http.get(params.getOrDefault('url','http://gy/test/cus')).debug().execute()
+                ))
             }
         }
     }
@@ -258,24 +259,24 @@ class TestCtrl extends CtrlTpl {
 
     // 测试自定义返回
     void cus(Chain chain) {
-        chain.path('cus') {ctx ->
-            def t = bean(BaseRepo).saveOrUpdate(new Test(name: "xxx" + System.currentTimeMillis()))
-            ctx.render(t.id)
-            // ctx.render new JSONObject().fluentPut("code", "0000").toString()
+        chain.get('cus') {ctx ->
+            get(ctx) {params, cb ->
+                def t = repo.saveOrUpdate(new Test(name: "xxx" + System.currentTimeMillis()))
+                cb.accept(t.id)
+            }
         }
     }
 
-    /**@
+
+    /**
      * 超时接口
      * @param chain
      */
     void timeout(Chain chain) {
-        chain.path('timeout') {ctx ->
-            ctx.render Promise.async{down ->
-                async {
-                    Thread.sleep(Integer.valueOf(ctx.request.queryParams['timeout']?:10) * 1000L)
-                    down.success(ok())
-                }
+        chain.get('timeout') {ctx ->
+            get(ctx) {params, cb ->
+                Thread.sleep(Integer.valueOf(params.getOrDefault('timeout', 10)) * 1000L)
+                cb.accept(ok())
             }
         }
     }

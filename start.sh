@@ -12,7 +12,7 @@ fi
 echo start...
 
 # 不写两行的话, docker里面执行的时候多个空格分割的参数会报错
-JAVA_OPTS=$@
+JAVA_OPTS="-Dgroovy.attach.runtime.groovydoc=true $@"
 export JAVA_OPTS
 
 cd src

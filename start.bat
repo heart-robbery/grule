@@ -10,6 +10,6 @@
 )
 
 @echo start ...
-set JAVA_OPTS=%JAVA_OPTS% %*
+set JAVA_OPTS=-Dgroovy.attach.runtime.groovydoc=true %JAVA_OPTS% %*
 cd src/
 ../bin/groovy main.groovy

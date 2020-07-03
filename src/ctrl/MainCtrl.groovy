@@ -1,5 +1,6 @@
 package ctrl
 
+import core.Utils
 import core.module.jpa.BaseRepo
 import dao.entity.Component
 import ratpack.form.Form
@@ -22,13 +23,29 @@ class MainCtrl extends CtrlTpl {
     }
 
 
-    def testHtml(Chain chain) {
+    // 添加 open api(swagger)
+    void swagger(Chain chain) {
+        chain.get('api-doc/data.json') { ctx ->
+            def f = Utils.baseDir("conf/openApi.json")
+            if (f.exists()) {
+                ctx.render(f.getText("utf-8"))
+            }
+        }
+        chain.get('api-doc/:fName') {ctx ->
+            String fName = ctx.pathTokens['fName']?:'index.html'
+            ctx.response.cookie('Cache-Control', "max-age=120")
+            ctx.render ctx.file("static/swagger-ui/$fName")
+        }
+    }
+
+
+    void testHtml(Chain chain) {
         chain.get('test.html') { ctx -> ctx.render ctx.file('static/test.html') }
     }
 
 
     // 获取上传的文件
-    def file(Chain chain) {
+    void file(Chain chain) {
         def fu = bean(FileUploader.class)
         chain.get('file/:fName') {ctx ->
             ctx.response.cookie('Cache-Control', "max-age=120")
@@ -47,7 +64,7 @@ class MainCtrl extends CtrlTpl {
 
 
     // js 文件
-    def js(Chain chain) {
+    void js(Chain chain) {
         chain.get("js/:fName") { ctx ->
             // ctx.response.cookie('Cache-Control', "max-age=60")
             ctx.render ctx.file("static/js/$ctx.pathTokens.fName")
@@ -60,7 +77,7 @@ class MainCtrl extends CtrlTpl {
 
 
     // vue 组件文件
-    def coms(Chain chain) {
+    void coms(Chain chain) {
         chain.get("coms/:fName") { ctx ->
             // ctx.response.cookie('Cache-Control', "max-age=60")
             ctx.render ctx.file("static/coms/$ctx.pathTokens.fName")
@@ -69,7 +86,7 @@ class MainCtrl extends CtrlTpl {
 
 
     // css 文件
-    def css(Chain chain) {
+    void css(Chain chain) {
         chain.get("css/:fName") {ctx ->
             // ctx.response.cookie('Cache-Control', "max-age=60")
             ctx.render ctx.file("static/css/$ctx.pathTokens.fName")
@@ -86,7 +103,7 @@ class MainCtrl extends CtrlTpl {
 
 
     // 登录
-    def login(Chain chain) {
+    void login(Chain chain) {
         chain.post('login') {ctx ->
             ctx?['sData']?['uId'] = 'uid_1'
         }
@@ -94,7 +111,7 @@ class MainCtrl extends CtrlTpl {
 
 
     // 搜索组件
-    def search(Chain chain) {
+    void search(Chain chain) {
         chain.get('search') {ctx ->
             def kw = ctx.request.queryParams.keyword
             if (kw) {

@@ -204,7 +204,7 @@ class RatpackWeb extends ServerTpl {
 
 
     // 权限验证
-    protected auth(Context ctx, String lowestRole) {
+    protected boolean auth(Context ctx, String lowestRole) {
         if (!lowestRole) throw new IllegalArgumentException('lowestRole is empty')
         Set<String> uRoles = ctx['sData']['uRoles'] // 当前用户的角色. 例: role1,role2,role3
         if (!uRoles) {ctx.metaClass['respCode'] = '100'; throw new AccessControlException('需要登录')}
@@ -270,7 +270,7 @@ class RatpackWeb extends ServerTpl {
 
 
     // 处理session
-    protected session(Context ctx) {
+    protected void session(Context ctx) {
         def sId = ctx.request.oneCookie('sId')
 
         if ('redis' == getStr('session.type')) { // session的数据, 用redis 保存 session 数据
@@ -396,7 +396,7 @@ class RatpackWeb extends ServerTpl {
 
 
     @EL(name = ['http.hp', 'web.hp'], async = false)
-    def getHp() {
+    String getHp() {
         String ip = srv.bindHost
         if (ip == 'localhost') {ip = ipv4()}
         ip + ':' + srv.bindPort

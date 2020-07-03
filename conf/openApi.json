@@ -1,0 +1,186 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "GY test API",
+    "description": "GY test",
+    "contact": {
+      "email": "xnatural@msn.cn"
+    },
+    "license": {
+      "name": "Apache 2.0",
+      "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+    },
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:7070",
+      "description": "local"
+    },
+    {
+      "url": "https://virtserver.swaggerhub.com/xnat2/gy1/1.0.0",
+      "description": "SwaggerHub API Auto Mocking"
+    }
+  ],
+  "tags": [
+    {
+      "name": "test",
+      "description": "test ctrl api"
+    },
+    {
+      "name": "main",
+      "description": "main ctrl api"
+    }
+  ],
+  "paths": {
+    "/test/remote": {
+      "get": {
+        "tags": ["test"],
+        "summary": "远程调用",
+        "description": "ep 远程调用",
+        "parameters": [
+          {
+            "name": "url",
+            "in": "query",
+            "description": "代理发送http请求的地址",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "$ref": "#/components/schemas/ApiResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test/http": {
+      "get": {
+        "tags": ["test"],
+        "summary": "http 代理请求",
+        "description": "http 代理请求",
+        "parameters": [
+          {
+            "name": "url",
+            "in": "query",
+            "description": "代理发送http请求的地址",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "$ref": "#/components/schemas/ApiResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test/cus": {
+      "get": {
+        "tags": ["test"],
+        "summary": "自定义返回接口",
+        "description": "返回自定义数据结构",
+        "parameters": [
+
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "$ref": "#/components/schemas/ApiResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test/timeout": {
+      "get": {
+        "tags": ["test"],
+        "summary": "超时接口",
+        "description": "测试超时接口 让接口超时返回",
+        "parameters": [
+          {
+            "name": "timeout",
+            "in": "query",
+            "description": "设置超时时间(接口多久返回) 默认10秒",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "$ref": "#/components/schemas/ApiResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiResp": {
+        "required": ["code"],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "00"
+          },
+          "desc": {
+            "type": "string",
+            "example": "成功"
+          },
+          "data": {
+            "type": "object"
+          },
+          "traceNo": {
+            "type": "string",
+            "format": "uuid",
+            "example": "2d59326c4ad844a6b3c866fba159a44a"
+          }
+        }
+      }
+    }
+  }
+}
