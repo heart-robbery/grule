@@ -544,14 +544,14 @@ class Utils {
             final Map map = comparator != null ? new TreeMap<>(comparator) : new LinkedHashMap();
             if (bean == null) return map
             def add = {String k, Object v ->
-                if (!ignore.contains(k)) {
+                if (ignore == null || !ignore.contains(k)) {
                     if (ignoreNull && v != null) map.put(k, v)
                     else if (!ignoreNull) map.put(k, v)
                 }
             }
             iterateMethod(bean.getClass(), m -> {
                 try {
-                    if (void.class != m.getReturnType() && m.getName().startsWith("get") && m.getParameterCount() == 0) { // 属性
+                    if (void.class != m.returnType && m.getName().startsWith("get") && m.getParameterCount() == 0 && !MetaClass.isAssignableFrom(m.returnType)) { // 属性
                         String pName = m.getName().replace("get", "").uncapitalize()
                         String aliasName = null
                         if (propAlias != null && propAlias.containsKey(pName)) aliasName = propAlias.get(pName)

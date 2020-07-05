@@ -52,14 +52,14 @@ class TCPClient extends ServerTpl {
 
 
     @EL(name = 'sys.starting', async = true)
-    def start() {
+    void start() {
         create()
         ep.fire("${name}.started")
     }
 
 
     @EL(name = 'sys.stopping')
-    def stop() {
+    void stop() {
         boos?.shutdownGracefully()
         boot = null
     }
@@ -113,7 +113,7 @@ class TCPClient extends ServerTpl {
     void send(String appName, String data, String target = 'any') {
         log.trace("Send data to '{}'. data: " + data, appName)
         def group = apps.get(appName)
-        if (group == null) throw new RuntimeException("Not found app '$appName' system online")
+        if (group == null) throw new Exception("Not found app '$appName' system online")
         if ('any' == target) {
             group.sendToAny(data)
         } else if ('all' == target) {
@@ -127,7 +127,7 @@ class TCPClient extends ServerTpl {
     /**
      * 创建 tcp(netty) 客户端
      */
-    protected create() {
+    protected void create() {
         String loopType = getStr("loopType", (isLinux() ? "epoll" : "nio"))
         Class chClz
         if ("epoll".equalsIgnoreCase(loopType)) {
@@ -200,7 +200,7 @@ class TCPClient extends ServerTpl {
      * @param ctx
      * @param dataStr
      */
-    protected receiveReply(ChannelHandlerContext ctx, final String dataStr) {
+    protected void receiveReply(ChannelHandlerContext ctx, final String dataStr) {
         log.trace("Receive reply from '{}': {}", ctx.channel().remoteAddress(), dataStr)
         def jo = JSON.parseObject(dataStr, Feature.OrderedField)
         handlers.each {it.accept(jo)}
@@ -273,7 +273,7 @@ class TCPClient extends ServerTpl {
          * 更新/添加应用节点
          * @param data 应用节点信息
          */
-        def updateNode(final JSONObject data) {
+        void updateNode(final JSONObject data) {
             def (String id, String tcpHp, String httpHp, Long uptime) = [data['id'], data['tcp'], data['http'], data['_uptime']]
             if (!tcpHp) { // tcpHp 不能为空
                 throw new IllegalArgumentException("Node illegal error. $data")
@@ -299,14 +299,17 @@ class TCPClient extends ServerTpl {
          * 发送给所有节点
          * @param data
          */
-        def sendToAll(final String data) {
+        boolean sendToAll(final String data) {
+            boolean f = true
             nodes.values().each {
                 try {
                     it.send(data)
                 } catch (ex) {
+                    f = false
                     log.error("Send data: '{}' fail. Node: '{}'. errMsg: " + (ex.message?:ex.class.simpleName), data, it)
                 }
             }
+            f
         }
 
         /**

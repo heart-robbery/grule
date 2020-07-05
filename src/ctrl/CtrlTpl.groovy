@@ -51,7 +51,7 @@ class CtrlTpl extends ServerTpl {
             ctx.render Promise.async{ down ->
                 async {
                     try {
-                        fn.accept(data?.getText(Charset.forName('utf-8')), {result -> down.success(result)})
+                        fn.accept(data?.getText(Charset.forName('utf-8')), {result -> down.success(result)} as Consumer)
                     } catch (Exception ex) {
                         down.success(ApiResp.of(ctx['respCode']?:'01', (ex.class.name + (ex.message ? ": $ex.message" : ''))))
                         log.info("", ex)
@@ -68,7 +68,7 @@ class CtrlTpl extends ServerTpl {
             ctx.render Promise.async{ down ->
                 async {
                     try {
-                        fn.accept(data?.getText(Charset.forName('utf-8')), {result -> down.success(result)})
+                        fn.accept(data?.getText(Charset.forName('utf-8')), {result -> down.success(result)} as Consumer)
                     } catch (Exception ex) {
                         down.success(ApiResp.of(ctx['respCode']?:'01', (ex.class.name + (ex.message ? ": $ex.message" : ''))))
                         log.info("", ex)
@@ -85,7 +85,7 @@ class CtrlTpl extends ServerTpl {
             ctx.render Promise.async{ down ->
                 async {
                     try {
-                        fn.accept(fd, {result -> down.success(result)})
+                        fn.accept(fd, {result -> down.success(result)} as Consumer)
                     } catch (Exception ex) {
                         down.success(ApiResp.of(ctx['respCode']?:'01', (ex.class.name + (ex.message ? ": $ex.message" : ''))))
                         log.info("", ex)
@@ -101,7 +101,7 @@ class CtrlTpl extends ServerTpl {
         ctx.render Promise.async{ down ->
             async {
                 try {
-                    fn.accept(ctx.request.queryParams, {result -> down.success(result)})
+                    fn.accept(ctx.request.queryParams, {result -> down.success(result)} as Consumer)
                 } catch (Exception ex) {
                     down.success(ApiResp.of(ctx['respCode']?:'01', (ex.class.name + (ex.message ? ": $ex.message" : ''))))
                     log.info("", ex)

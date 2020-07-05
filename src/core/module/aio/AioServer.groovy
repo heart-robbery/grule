@@ -22,7 +22,7 @@ class AioServer extends ServerTpl {
 
 
     @EL(name = 'sys.starting', async = true)
-    def start() {
+    void start() {
         def cg = AsynchronousChannelGroup.withThreadPool(exec)
         ssc = AsynchronousServerSocketChannel.open(cg)
         def port = getInteger('port', 8000)
@@ -33,7 +33,7 @@ class AioServer extends ServerTpl {
 
 
     @EL(name = 'sys.stopping')
-    def stop() {
+    void stop() {
         ssc?.close()
     }
 

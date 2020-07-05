@@ -41,7 +41,7 @@ class Remoter extends ServerTpl {
 
 
     @EL(name = "sys.starting", async = true)
-    def start() {
+    void start() {
         if (tcpClient || tcpServer) throw new RuntimeException("$name is already running")
         if (sched == null) throw new RuntimeException("Need sched Server!")
         if (exec == null) exec = Executors.newFixedThreadPool(2)
@@ -72,14 +72,14 @@ class Remoter extends ServerTpl {
 
 
     @EL(name = "sys.stopping", async = false)
-    def stop() {
+    void stop() {
         localBean(TCPClient)?.stop()
         localBean(TCPServer)?.stop()
     }
 
 
     @EL(name = 'sys.started', async = true)
-    protected started() {
+    protected void started() {
         queue('appUp') { tcpServer.appUp(selfInfo, null) }
         sync(true)
     }

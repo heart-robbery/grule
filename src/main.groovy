@@ -42,7 +42,7 @@ app.start() // 启动系统
 
 
 @EL(name = 'sys.started')
-def sysStarted() {
+void sysStarted() {
 //    app.bean(AioServer).msgFn {s ->
 //        log.info("收到的消息: " + s)
 //        "i received " + System.currentTimeMillis()
