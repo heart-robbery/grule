@@ -19,14 +19,24 @@ class AioServer extends ServerTpl {
     protected final List<Function<String, String>> msgFns = new LinkedList<>()
     protected final CompletionHandler<AsynchronousSocketChannel, AioServer> handler = new AcceptHandler()
     protected AsynchronousServerSocketChannel                        ssc
+    @Lazy Integer port = getInteger('port', 1000)
+
+
+    AioServer() {super('aio')}
 
 
     @EL(name = 'sys.starting', async = true)
     void start() {
         def cg = AsynchronousChannelGroup.withThreadPool(exec)
         ssc = AsynchronousServerSocketChannel.open(cg)
-        def port = getInteger('port', 8000)
-        ssc.bind(new InetSocketAddress(port))
+        ssc.setOption(StandardSocketOptions.SO_REUSEADDR, true)
+        ssc.setOption(StandardSocketOptions.SO_RCVBUF, 64 * 1024)
+
+        def host = getStr('host')
+        def addr = new InetSocketAddress(port)
+        if (host) {addr = new InetSocketAddress(host, port)}
+
+        ssc.bind(addr, getInteger('backlog', 100))
         accept()
         log.info("Start listen TCP(Aio) {}", port)
     }
@@ -78,13 +88,13 @@ class AioServer extends ServerTpl {
             sc.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
         }
 
-        protected read() {
+        protected void read() {
             def buf = ByteBuffer.allocate(1024 * 4)
             sc.read(buf, buf, readHandler)
         }
 
-        protected write(String msg) {
-            if (msg) {
+        protected void write(String msg) {
+            if (msg != null) {
                 sc.write(ByteBuffer.wrap(msg.getBytes('utf-8')).flip())
             }
         }
@@ -112,11 +122,16 @@ class AioServer extends ServerTpl {
 
         @Override
         void completed(final AsynchronousSocketChannel sc, final AioServer srv) {
-            // 继续等待接入(异步)
-            srv.accept()
-            def rAddr = ((InetSocketAddress) sc.remoteAddress)
-            srv.log.info("New TCP(AIO) Connection from: " + rAddr.hostString + ":" + rAddr.port)
-            new IoSession(sc).read()
+            try {
+                def rAddr = ((InetSocketAddress) sc.remoteAddress)
+                srv.log.info("New TCP(AIO) Connection from: " + rAddr.hostString + ":" + rAddr.port)
+                new IoSession(sc).read()
+            } catch (ex) {
+                log.error("", ex)
+            } finally {
+                // 继续接入(异步)
+                srv.accept()
+            }
         }
 
         @Override

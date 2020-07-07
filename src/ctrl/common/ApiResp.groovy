@@ -36,11 +36,6 @@ class ApiResp<T> implements Serializable {
     static <T> ApiResp fail(String errMsg) { new ApiResp(code: '01', desc: errMsg) }
 
 
-    static ApiResp<LinkedHashMap<String, Object>> ok(String aName, Object aValue) {
-        new ApiResp(code: '00', data: [(aName): aValue] as LinkedHashMap)
-    }
-
-
     /**
      * 一般用法 ApiResp.ok().attr("aaa", 111).attr("bbb", 222)
      *
@@ -60,5 +55,11 @@ class ApiResp<T> implements Serializable {
     }
 
 
-    ApiResp desc(Object desc) {this.desc = Objects.toString(desc, null); this}
+    ApiResp<LinkedHashMap<String, Object>> attrs(Map<String, Object> attrs) {
+        attrs?.each {attr(it.key, it.value)}
+        this
+    }
+
+
+    ApiResp desc(String desc) {this.desc = desc; this}
 }
