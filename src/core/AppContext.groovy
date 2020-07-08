@@ -53,6 +53,7 @@ class AppContext {
     Integer                               sysLoad      = 0
     /**
      * jvm关闭钩子
+     * System.exit(0)
      */
     @Lazy protected Thread                shutdownHook = new Thread({
         // 通知各个模块服务关闭

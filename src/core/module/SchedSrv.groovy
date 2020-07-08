@@ -20,7 +20,7 @@ class SchedSrv extends ServerTpl {
 
 
     @EL(name = "sys.starting", async = true)
-    def start() {
+    void start() {
         if (scheduler) throw new RuntimeException("$name is already running")
         if (ep == null) {ep = new EP(exec); ep.addListenerSource(this)}
 
@@ -38,7 +38,7 @@ class SchedSrv extends ServerTpl {
 
 
     @EL(name = "sys.stopping", async = true)
-    def stop() {
+    void stop() {
         log.debug("Shutdown '{}'(Quartz) Server", name)
         scheduler?.shutdown(); scheduler = null
         AgentThreadPool.exec = null
@@ -51,7 +51,7 @@ class SchedSrv extends ServerTpl {
      * @param fn
      */
     @EL(name = "sched.cron", async = false)
-    def cron(String cron, Runnable fn) {
+    void cron(String cron, Runnable fn) {
         if (!scheduler) throw new RuntimeException("$name is not running")
         if (!cron || !fn) throw new IllegalArgumentException("'cron' and 'fn' must not be empty")
         JobDataMap data = new JobDataMap()
@@ -74,7 +74,7 @@ class SchedSrv extends ServerTpl {
      * @param fn
      */
     @EL(name = "sched.after")
-    def after(Duration time, Runnable fn) {
+    void after(Duration time, Runnable fn) {
         if (!scheduler) throw new RuntimeException("$name is not running")
         if (!time || !fn) throw new IllegalArgumentException("'time', 'unit' and 'fn' must not be null")
         JobDataMap data = new JobDataMap()
@@ -99,7 +99,7 @@ class SchedSrv extends ServerTpl {
      * @param fn
      */
     @EL(name = "sched.time")
-    def time(Date time, Runnable fn) {
+    void time(Date time, Runnable fn) {
         if (scheduler) throw new RuntimeException(getName() + " is not running")
         if (!time || !fn) throw new IllegalArgumentException("'time' and 'fn' must not be null")
         JobDataMap data = new JobDataMap()

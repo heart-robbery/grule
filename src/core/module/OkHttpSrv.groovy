@@ -29,7 +29,7 @@ class OkHttpSrv extends ServerTpl {
 
 
     @EL(name = 'sys.starting', async = true)
-    def init() {
+    void init() {
         if (ep == null) {ep = new EP(); ep.addListenerSource(this)}
         exposeBean(client)
     }

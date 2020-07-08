@@ -6,6 +6,7 @@ import core.Page
 import core.Utils
 import core.module.OkHttpSrv
 import core.module.SchedSrv
+import core.module.aio.AioServer
 import core.module.jpa.BaseRepo
 import ctrl.common.FileData
 import dao.entity.Test
@@ -19,6 +20,10 @@ import ratpack.websocket.*
 import service.FileUploader
 import service.TestService
 
+import java.nio.ByteBuffer
+import java.nio.channels.AsynchronousChannelGroup
+import java.nio.channels.AsynchronousSocketChannel
+import java.nio.channels.CompletionHandler
 import java.text.SimpleDateFormat
 import java.util.concurrent.ConcurrentHashMap
 import java.util.stream.Collectors
@@ -177,7 +182,7 @@ class TestCtrl extends CtrlTpl {
     // 依次从外往里执行多个handler, 例: pre/sub
     void pre(Chain chain) {
         chain.prefix('pre') {ch ->
-            ch.with {
+            ch.with(true) {
                 all({ctx ->
                     println('xxxxxxxxxxxxxxxx')
                     ctx.next()
@@ -208,7 +213,7 @@ class TestCtrl extends CtrlTpl {
         chain.get('async') {ctx ->
             get(ctx) {params, cb ->
                 Thread.sleep(3000)
-                cb.accept(ok('date', new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())))
+                cb.accept(ok().attr('date', new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())))
             }
         }
     }
@@ -257,12 +262,50 @@ class TestCtrl extends CtrlTpl {
     }
 
 
+    @Lazy AsynchronousSocketChannel asc = {
+        AsynchronousChannelGroup group = AsynchronousChannelGroup.withThreadPool(exec)
+        AsynchronousSocketChannel asc = AsynchronousSocketChannel.open(group)
+        asc.setOption(StandardSocketOptions.TCP_NODELAY, true)
+        asc.setOption(StandardSocketOptions.SO_REUSEADDR, true)
+        asc.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
+        // asc.bind(new InetSocketAddress('localhost', bean(AioServer).port))
+        asc.connect(new InetSocketAddress('localhost', bean(AioServer).port))
+
+        def bb = ByteBuffer.allocate(1024 * 4)
+        def rh = new CompletionHandler<Integer, ByteBuffer>() {
+
+            @Override
+            void completed(Integer result, ByteBuffer buf) {
+                buf.flip()
+                log.info("client receive: " + new String(buf.array()))
+                asc.read(bb, bb, this)
+            }
+
+            @Override
+            void failed(Throwable ex, ByteBuffer buf) {
+                log.error("", ex)
+            }
+        }
+        asc.read(bb, bb, rh)
+        asc
+    } ()
+
+    // 测试自定义返回
+    void aio(Chain chain) {
+        chain.get('aio') {ctx ->
+            get(ctx) {params, cb ->
+                asc.write(ByteBuffer.wrap(("send " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())).getBytes("utf-8")))
+                cb.accept(ok())
+            }
+        }
+    }
+
     // 测试自定义返回
     void cus(Chain chain) {
         chain.get('cus') {ctx ->
             get(ctx) {params, cb ->
-                def t = repo.saveOrUpdate(new Test(name: "xxx" + System.currentTimeMillis()))
-                cb.accept(t.id)
+                // asc.write(ByteBuffer.wrap(("write " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())).getBytes("utf-8")))
+                cb.accept(ok())
             }
         }
     }

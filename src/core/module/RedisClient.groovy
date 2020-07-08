@@ -18,7 +18,7 @@ class RedisClient extends ServerTpl {
 
 
     @EL(name = 'sys.starting', async = true)
-    def start() {
+    void start() {
         if (pool) throw new RuntimeException("$name is already running")
         if (ep == null) {ep = new EP(); ep.addListenerSource(this)}
 
@@ -43,7 +43,7 @@ class RedisClient extends ServerTpl {
 
 
     @EL(name = "sys.stopping", async = true)
-    def stop() {
+    void stop() {
         log.info("Close '{}' Client", name)
         pool?.close(); pool = null
     }
