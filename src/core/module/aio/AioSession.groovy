@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.CompletionHandler
+import java.util.concurrent.ExecutorService
 import java.util.function.Consumer
 import java.util.function.Function
 
@@ -13,11 +14,17 @@ class AioSession {
     protected static final Logger log = LoggerFactory.getLogger(AioSession)
     protected final AsynchronousSocketChannel sc
     protected final readHandler = new ReadHandler(this)
-    private List<Function<String, String>> handlers = new LinkedList<>()
-    protected def buf = ByteBuffer.allocate(1024 * 4)
+    protected final List<Function<String, String>> handlers = new LinkedList<>()
+    protected final buf = ByteBuffer.allocate(1024 * 20)
+    protected final ExecutorService exec
 
 
-    AioSession(AsynchronousSocketChannel sc) { this.sc = sc }
+    AioSession(AsynchronousSocketChannel sc, ExecutorService exec) {
+        assert sc != null: "sc must not be null"
+        assert exec != null: "exec must not be null"
+        this.sc = sc
+        this.exec = exec
+    }
 
 
     /**
@@ -31,9 +38,13 @@ class AioSession {
     }
 
 
-    void start() {
-        sc.read(buf, buf, readHandler)
-    }
+    /**
+     * 开始数据接收处理
+     */
+    void start() { read() }
+
+
+    void stop() {sc?.close()}
 
 
     /**
@@ -44,6 +55,15 @@ class AioSession {
         if (msg != null) {
             sc.write(ByteBuffer.wrap(msg.getBytes('utf-8')))
         }
+    }
+
+
+    /**
+     * 继续处理接收数据
+     */
+    protected void read() {
+        buf.clear()
+        sc.read(buf, buf, readHandler)
     }
 
 
@@ -67,14 +87,23 @@ class AioSession {
     protected class ReadHandler implements CompletionHandler<Integer, ByteBuffer> {
         final AioSession session
 
-        ReadHandler(AioSession session) { this.session = session }
+        ReadHandler(AioSession session) { assert session != null; this.session = session }
 
         @Override
         void completed(Integer count, ByteBuffer buf) {
-            buf.flip()
-            receive(new String(buf.array(), 'utf-8'), { String msg -> session.send(msg)})
-            sc.read(buf, buf, readHandler)
+            if (count > 0) {
+                buf.flip()
+                byte[] bs = new byte[buf.limit()]
+                buf.get(bs)
+                exec.execute {receive(new String(bs, 'utf-8'), { String reply -> session.send(reply)})}
+                session.read()
+            }
+            else {
+                log.warn("接收字节为空")
+                session.read()
+            }
         }
+
 
         @Override
         void failed(Throwable ex, ByteBuffer buf) {

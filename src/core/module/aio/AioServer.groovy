@@ -35,15 +35,13 @@ class AioServer extends ServerTpl {
         if (host) {addr = new InetSocketAddress(host, port)}
 
         ssc.bind(addr, getInteger('backlog', 100))
-        accept()
         log.info("Start listen TCP(Aio) {}", port)
+        accept()
     }
 
 
     @EL(name = 'sys.stopping', async = true)
-    void stop() {
-        ssc?.close()
-    }
+    void stop() { ssc?.close() }
 
 
     /**
@@ -54,6 +52,9 @@ class AioServer extends ServerTpl {
     AioServer msgFn(Function<String, String> msgFn) {if (msgFn) this.msgFns.add(msgFn); this}
 
 
+    /**
+     * 接收新连接
+     */
     protected void accept() {
         ssc.accept(this, handler)
     }
@@ -63,22 +64,20 @@ class AioServer extends ServerTpl {
 
         @Override
         void completed(final AsynchronousSocketChannel sc, final AioServer srv) {
-            try {
-                def rAddr = ((InetSocketAddress) sc.remoteAddress)
-                srv.log.info("New TCP(AIO) Connection from: " + rAddr.hostString + ":" + rAddr.port)
+            def rAddr = ((InetSocketAddress) sc.remoteAddress)
+            srv.log.info("New TCP(AIO) Connection from: " + rAddr.hostString + ":" + rAddr.port)
 
+            async {
                 sc.setOption(StandardSocketOptions.SO_REUSEADDR, true)
                 sc.setOption(StandardSocketOptions.SO_RCVBUF, 64 * 1024)
                 sc.setOption(StandardSocketOptions.SO_SNDBUF, 64 * 1024)
                 sc.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
-
-                new AioSession(sc).start()
-            } catch (ex) {
-                log.error("", ex)
-            } finally {
-                // 继续接入(异步)
-                srv.accept()
+                def se = new AioSession(sc, srv.exec)
+                msgFns?.each {se.addHandler(it)}
+                se.start()
             }
+            // 继续接入
+            srv.accept()
         }
 
         @Override
