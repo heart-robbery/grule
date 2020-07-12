@@ -1,12 +1,8 @@
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import core.AppContext
-import core.module.EhcacheSrv
-import core.module.OkHttpSrv
-import core.module.RedisClient
-import core.module.SchedSrv
+import core.module.*
 import core.module.jpa.HibernateSrv
-import core.module.remote.Remoter
 import ctrl.MainCtrl
 import ctrl.TestCtrl
 import ctrl.ratpack.RatpackWeb
@@ -21,7 +17,6 @@ import service.TestService
 
 import java.text.SimpleDateFormat
 import java.time.Duration
-
 
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Field final AppContext app = new AppContext()
@@ -41,8 +36,16 @@ app.addSource(this)
 app.start() // 启动系统
 
 
-@EL(name = 'sys.started')
+@EL(name = 'sys.started', async = true)
 void sysStarted() {
+//    (1..100).each {i ->
+//        (1..2).each {j ->
+//            app.bean(OkHttpSrv).get("http://localhost:7070/test/remote?event=eName"+(new Random().nextInt(11) + 1)).debug().execute({s ->
+//                log.info("==============" + s)
+//            }, null)
+//        }
+//        log.info "==========" + app.bean(OkHttpSrv).get("http://localhost:7070/test/remote?event=eName"+(new Random().nextInt(11) + 1)).debug().execute()
+//    }
 //    app.bean(AioServer).msgFn {s ->
 //        log.info("收到的消息: " + s)
 //        "i received " + System.currentTimeMillis()

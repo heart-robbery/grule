@@ -1,41 +1,43 @@
 package core.module.aio
 
+import core.Devourer
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
+import java.nio.channels.ClosedChannelException
 import java.nio.channels.CompletionHandler
 import java.util.concurrent.ExecutorService
-import java.util.function.Consumer
-import java.util.function.Function
+import java.util.function.BiConsumer
 
 class AioSession {
     protected static final Logger log = LoggerFactory.getLogger(AioSession)
     protected final AsynchronousSocketChannel sc
     protected final readHandler = new ReadHandler(this)
-    protected final List<Function<String, String>> handlers = new LinkedList<>()
     protected final buf = ByteBuffer.allocate(1024 * 20)
     protected final ExecutorService exec
-
+    protected final List<BiConsumer<String, AioSession>> msgFns = new LinkedList<>()
+    // 消息发送队列
+    protected final Devourer sendQueue
+    // close 回调函数
+    protected Runnable closeFn
 
     AioSession(AsynchronousSocketChannel sc, ExecutorService exec) {
         assert sc != null: "sc must not be null"
         assert exec != null: "exec must not be null"
         this.sc = sc
         this.exec = exec
+        sendQueue = new Devourer(AioSession.simpleName + ":" + sc.toString(), exec)
     }
 
 
     /**
      * 添加消息处理函数
-     * @param handler 函数入参是消息字符串, 函数返回会被写到客户端
+     * @param msgFn 入参1: 是消息字符串, 入参2: 当前Session
      * @return
      */
-    AioSession addHandler(Function<String, String> handler) {
-        handlers.add(handler)
-        this
-    }
+    AioSession msgFn(BiConsumer<String, AioSession> msgFn) {if (msgFn) this.msgFns << msgFn; this}
 
 
     /**
@@ -44,7 +46,7 @@ class AioSession {
     void start() { read() }
 
 
-    void stop() {sc?.close()}
+    void close() {sc?.close(); msgFns.clear(); closeFn?.run()}
 
 
     /**
@@ -52,10 +54,37 @@ class AioSession {
      * @param msg
      */
     void send(String msg) {
-        if (msg != null) {
-            sc.write(ByteBuffer.wrap(msg.getBytes('utf-8')))
+        if (msg == null) return
+        sendQueue.offer {
+            try {
+                sc.write(ByteBuffer.wrap(msg.getBytes('utf-8'))).get()
+            } catch (ClosedChannelException ex) {
+                log.error("ClosedChannelException " + sc.localAddress.toString() + " ->" + sc.remoteAddress.toString())
+                close()
+            }
         }
     }
+
+
+    boolean busy() { sendQueue.waitingCount > 0 }
+
+
+    /**
+     * 接收消息处理
+     * @param msg
+     */
+    protected void receive(String msg) {
+        msgFns?.each {fn ->
+            exec.execute {
+                try {
+                    fn.accept(msg, this)
+                } catch(ex) {
+                    log.error("数据处理错误. " + msg, ex)
+                }
+            }
+        }
+    }
+
 
 
     /**
@@ -64,23 +93,6 @@ class AioSession {
     protected void read() {
         buf.clear()
         sc.read(buf, buf, readHandler)
-    }
-
-
-    /**
-     * 接收消息处理
-     * @param msg
-     * @param cb 返回消息处理回调函数
-     */
-    protected void receive(String msg, Consumer<String> cb) {
-        handlers?.each {fn ->
-            try {
-                def r = fn.apply(msg)
-                if (r && r instanceof String) {cb.accept(r)}
-            } catch(ex) {
-                log.error("数据处理错误. " + msg, ex)
-            }
-        }
     }
 
 
@@ -95,12 +107,12 @@ class AioSession {
                 buf.flip()
                 byte[] bs = new byte[buf.limit()]
                 buf.get(bs)
-                exec.execute {receive(new String(bs, 'utf-8'), { String reply -> session.send(reply)})}
+                receive(new String(bs, 'utf-8'))
                 session.read()
             }
             else {
-                log.warn("接收字节为空")
-                session.read()
+                log.warn(session.sc.remoteAddress.toString() + "接收字节为空. 关闭")
+                session.close()
             }
         }
 

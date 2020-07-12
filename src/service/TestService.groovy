@@ -10,9 +10,9 @@ import core.mode.task.TaskWrapper
 import core.mode.v.VChain
 import core.mode.v.VProcessor
 import core.module.OkHttpSrv
+import core.module.Remoter
 import core.module.ServerTpl
 import core.module.jpa.BaseRepo
-import core.module.remote.Remoter
 import dao.entity.Test
 
 import java.text.SimpleDateFormat
@@ -108,7 +108,8 @@ class TestService extends ServerTpl {
     }
 
 
-    def taskTest() {
+    @EL(name = "eName11")
+    void taskTest() {
         new TaskContext<>('test ctx')
             .setExecutor(exec)
             .addTask(TaskWrapper.of{log.info("执行任务....")})
@@ -126,16 +127,19 @@ class TestService extends ServerTpl {
     }
 
 
+    @EL(name = "eName10")
     def testObjBuilder() {
         println ObjBuilder.of(Map).add("a", {"b"}).build()
     }
 
 
+    @EL(name = "eName9")
     def testPipe() {
         println new Pipeline(key: 'test pipe').add({ i -> i + "xxx"}).run("qqq")
     }
 
 
+    @EL(name = "eName8")
     def testVChain() {
         new VChain().add(new VProcessor() {
             @Override
@@ -164,7 +168,7 @@ class TestService extends ServerTpl {
     def remote(String app, String eName, String param = 'xx', Consumer fn) {
         // 远程调用
         // fn.accept(bean(Remoter).fire(app?:'gy', eName?:'eName1', ['p1']))
-        bean(Remoter).fireAsync(app?:'gy', eName?:'eName1', fn, [param?:'1'])
+        bean(Remoter).fireAsync(app?:'gy', eName?:'eName1', fn, [])
     }
 
 
@@ -186,7 +190,7 @@ class TestService extends ServerTpl {
 
 
     @EL(name = "eName3")
-    testEvent3(String p) {
+    long testEvent3(String p) {
         repo.count(Test, {root, query, cb -> query.orderBy(cb.desc(root.get("id")))})
     }
 
@@ -199,7 +203,7 @@ class TestService extends ServerTpl {
 
     @EL(name = "eName5")
     void testEvent5(String p) {
-        ep.fire("cache.set","java","java", p)
+        ep.fire("cache.set","java","java", p?:(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())))
     }
 
     @EL(name = "eName6")

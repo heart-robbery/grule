@@ -202,7 +202,7 @@ class OkHttpSrv extends ServerTpl {
         OkHttp debug() {this.debug = true; this}
         // 请求执行
         def execute(Consumer<String> okFn = null, Consumer<Exception> failFn = {throw it}) {
-            List<File> tmpFile
+            List<File> tmpFile = null
             if ('GET' == builder.method) { // get 请求拼装参数
                 urlStr = Utils.buildUrl(urlStr, params)
                 builder.get()
@@ -275,7 +275,7 @@ class OkHttpSrv extends ServerTpl {
                     call.enqueue(new Callback() {
                         @Override
                         void onFailure(Call c, IOException e) {
-                            if (debug) log.error('Send http: {}, params: {}', urlStr, params?:jsonBodyStr)
+                            log.error('Send http: '+urlStr+', params: ' + params?:jsonBodyStr, e)
                             tmpFile?.each {it.delete()}
                             failFn?.accept(e)
                         }
@@ -286,9 +286,7 @@ class OkHttpSrv extends ServerTpl {
                             if (200 != resp.code()) {
                                 log.error('Send http: {}, params: {}, ' + (fileStreams ? "fileStreams: " + fileStreams.join(",") : '') + ' result: ' + Objects.toString(result, ''), urlStr, params?:jsonBodyStr)
                                 tmpFile?.each {it.delete()}
-                                if (failFn) {
-                                    failFn.accept(new RuntimeException("Http error. code: ${resp.code()}, url: $urlStr, resp: ${Objects.toString(result, '')}"))
-                                }
+                                failFn?.accept(new Exception("Http error. code: ${resp.code()}, url: $urlStr, resp: ${Objects.toString(result, '')}"))
                             } else {
                                 log.info('Send http: {}, params: {}, ' + (fileStreams ? "fileStreams: " + fileStreams.join(",") : '') + 'result: ' + Objects.toString(result, ''), urlStr, params?:jsonBodyStr)
                                 tmpFile?.each {it.delete()}
@@ -308,7 +306,7 @@ class OkHttpSrv extends ServerTpl {
             } catch(Exception t) {
                 ex = t
             }
-            if (debug) {
+            if (debug && !okFn) {
                 if (ex) {
                     log.error('Send http: {}, params: {}' + (fileStreams ? ", fileStreams: " + fileStreams.join(",") : ''), urlStr, params?:jsonBodyStr)
                 } else {
