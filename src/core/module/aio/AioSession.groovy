@@ -24,6 +24,8 @@ class AioSession {
     protected Runnable closeFn
     // 数据分割符(半包和粘包) 默认换行符分割
     protected String delimiter = '\n'
+    // 上次读取时间
+    long lastReadTime
 
 
     AioSession(AsynchronousSocketChannel sc, ExecutorService exec) {
@@ -115,6 +117,7 @@ class AioSession {
         @Override
         void completed(Integer count, ByteBuffer buf) {
             if (count > 0) {
+                lastReadTime = System.currentTimeMillis()
                 buf.flip()
                 if (delim == null) { // 没有分割符的时候
                     byte[] bs = new byte[buf.limit()]

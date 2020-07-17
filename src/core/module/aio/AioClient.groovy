@@ -133,7 +133,7 @@ class AioClient extends ServerTpl {
     protected AioSession create(String host, Integer port) {
         String key = "$host:$port"
         // 创建连接
-        def sc = AsynchronousSocketChannel.open(group)
+        final def sc = AsynchronousSocketChannel.open(group)
         sc.setOption(StandardSocketOptions.TCP_NODELAY, true)
         sc.setOption(StandardSocketOptions.SO_REUSEADDR, true)
         sc.setOption(StandardSocketOptions.SO_KEEPALIVE, true)

@@ -1,29 +1,26 @@
-package core.module.aio
+package core.module.http
 
 import cn.xnatural.enet.event.EL
-import core.module.SchedSrv
 import core.module.ServerTpl
+import core.module.aio.AioSession
 
 import java.nio.channels.AsynchronousChannelGroup
 import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.CompletionHandler
 import java.text.SimpleDateFormat
-import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.LongAdder
-import java.util.function.BiConsumer
 
-/**
- * Aio 服务端
- */
-class AioServer extends ServerTpl {
-    protected final List<BiConsumer<String, AioSession>> msgFns = new LinkedList<>()
-    protected final CompletionHandler<AsynchronousSocketChannel, AioServer> handler = new AcceptHandler()
-    protected AsynchronousServerSocketChannel                        ssc
-    @Lazy String hp = getStr('hp', ":7001")
-    @Lazy Integer port = hp.split(":")[1] as Integer
-    @Lazy def sched = bean(SchedSrv)
+class HttpServer extends ServerTpl {
+    protected final CompletionHandler<AsynchronousSocketChannel, HttpServer> handler = new AcceptHandler()
+    protected       AsynchronousServerSocketChannel                         ssc
+    @Lazy           String                                                  hp      = getStr('hp', ":7001")
+    @Lazy           Integer                                                 port    = hp.split(":")[1] as Integer
+
+
+    HttpServer(String name) { super(name) }
+    HttpServer() { super('web') }
 
 
     @EL(name = 'sys.starting', async = true)
@@ -39,33 +36,13 @@ class AioServer extends ServerTpl {
         if (host) {addr = new InetSocketAddress(host, port)}
 
         ssc.bind(addr, getInteger('backlog', 100))
-        log.info("Start listen TCP(Aio) {}", port)
-        msgFns.add {msg, se -> receive(msg, se)}
+        log.info("Start listen HTTP(Aio) {}", port)
         accept()
     }
 
 
     @EL(name = 'sys.stopping', async = true)
     void stop() { ssc?.close() }
-
-
-    /**
-     * 添加消息处理函数
-     * @param msgFn 入参1: 是消息字符串, 入参2: 回响函数
-     * @return
-     */
-    AioServer msgFn(BiConsumer<String, AioSession> msgFn) {if (msgFn) this.msgFns << msgFn; this}
-
-
-    /**
-     * 消息接受处理
-     * @param msg 消息内容
-     * @param se AioSession
-     */
-    protected void receive(String msg, AioSession se) {
-        log.trace("Receive client '{}' data: {}", se.sc.remoteAddress, msg)
-        count() // 统计
-    }
 
 
     /**
@@ -103,41 +80,31 @@ class AioServer extends ServerTpl {
             cal.add(Calendar.HOUR_OF_DAY, -1)
             String lastHour = sdf.format(cal.getTime())
             LongAdder c = hourCount.remove(lastHour)
-            if (c != null) log.info("{} 时共处理 tcp 数据包: {} 个", lastHour, c)
+            if (c != null) log.info("{} 时共处理 http 请求: {} 个", lastHour, c)
         }
     }
 
 
-    protected class AcceptHandler implements CompletionHandler<AsynchronousSocketChannel, AioServer> {
+    protected class AcceptHandler implements CompletionHandler<AsynchronousSocketChannel, HttpServer> {
 
         @Override
-        void completed(final AsynchronousSocketChannel sc, final AioServer srv) {
+        void completed(final AsynchronousSocketChannel sc, final HttpServer srv) {
             async {
                 def rAddr = ((InetSocketAddress) sc.remoteAddress)
-                srv.log.info("New TCP(AIO) Connection from: " + rAddr.hostString + ":" + rAddr.port)
+                srv.log.debug("New HTTP(AIO) Connection from: " + rAddr.hostString + ":" + rAddr.port)
                 sc.setOption(StandardSocketOptions.SO_REUSEADDR, true)
                 sc.setOption(StandardSocketOptions.SO_RCVBUF, 64 * 1024)
                 sc.setOption(StandardSocketOptions.SO_SNDBUF, 64 * 1024)
                 sc.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
-
-                def se = new AioSession(sc, srv.exec)
-                msgFns?.each {se.msgFn(it)}
+                def se = new HttpSession(sc, srv.exec)
                 se.start()
-
-                // 设置过期
-//                def cal = Calendar.getInstance()
-//                sched?.cron("${cal.get(Calendar.SECOND)} ${cal.get(Calendar.MINUTE)}/30 * * * ?") {
-//                    if (System.currentTimeMillis() - se.lastReadTime > Duration.ofMinutes(getInteger("session.maxIdle", 30)).toMillis()) {
-//                        se.close()
-//                    }
-//                }
             }
             // 继续接入
             srv.accept()
         }
 
         @Override
-        void failed(Throwable ex, AioServer srv) {
+        void failed(Throwable ex, HttpServer srv) {
             srv.log.error(ex.message?:ex.class.simpleName, ex)
         }
     }
