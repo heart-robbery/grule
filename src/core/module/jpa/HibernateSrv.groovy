@@ -13,8 +13,8 @@ import org.hibernate.engine.jdbc.connections.spi.ConnectionProvider
 import javax.sql.DataSource
 
 class HibernateSrv extends ServerTpl {
-    protected SessionFactory sf
-    protected DataSource  ds
+    protected SessionFactory    sf
+    protected DataSource        datasource
     @Lazy protected List<Class> entities = new LinkedList<>()
     
     
@@ -35,13 +35,13 @@ class HibernateSrv extends ServerTpl {
         props.put('hibernate.implicit_naming_strategy', ImplicitNaming)
         props.put('hibernate.current_session_context_class', 'thread')
         props.put('hibernate.temp.use_jdbc_metadata_defaults', 'true') // 自动探测连接的数据库信息,该用哪个Dialect
-        props.putAll(attrs()['hibernate'].flatten())
+        props.putAll(attrs('hibernate').flatten())
 
         initDataSource()
         // 创建 SessionFactory
         MetadataSources ms = new MetadataSources(
             new StandardServiceRegistryBuilder()
-                .addService(ConnectionProvider.class, new DatasourceConnectionProviderImpl(dataSource: ds, available: true))
+                .addService(ConnectionProvider.class, new DatasourceConnectionProviderImpl(dataSource: datasource, available: true))
                 .applySettings(props).build()
         )
         entities.each {ms.addAnnotatedClass(it)}
@@ -60,7 +60,7 @@ class HibernateSrv extends ServerTpl {
     @EL(name = 'sys.stopping')
     void stop() {
         log.debug("Shutdown '{}(Hibernate)' Client", name)
-        ds?.invokeMethod('close', null); ds = null
+        datasource?.invokeMethod('close', null); datasource = null
         sf?.close(); sf = null
     }
 
@@ -82,8 +82,8 @@ class HibernateSrv extends ServerTpl {
      * @return
      */
     protected void initDataSource() {
-        if (ds) throw new RuntimeException('DataSource already exist')
-        Map<String, Object> dsAttr = attrs().ds
+        if (datasource) throw new RuntimeException('DataSource already exist')
+        Map<String, Object> dsAttr = attrs('datasource')
         log.debug('Create dataSource properties: {}', dsAttr)
 
         // druid 数据源
@@ -93,36 +93,39 @@ class HibernateSrv extends ServerTpl {
             if (!props.containsKey('validationQuery')) props.put('validationQuery', 'select 1')
             if (!props.containsKey('filters')) { // 默认监控慢sql
                 props.put('filters', 'stat')
-                props.put('connectionProperties', 'druid.stat.slowSqlMillis=5000')
             }
-            ds = (DataSource) Utils.findMethod(Class.forName('com.alibaba.druid.pool.DruidDataSourceFactory'), 'createDataSource', Map.class).invoke(null, props)
+            if (!props.containsKey('connectionProperties')) {
+                // com.alibaba.druid.filter.stat.StatFilter
+                props.put('connectionProperties', 'druid.stat.logSlowSql=true;druid.stat.slowSqlMillis=5000')
+            }
+            datasource = (DataSource) Utils.findMethod(Class.forName('com.alibaba.druid.pool.DruidDataSourceFactory'), 'createDataSource', Map.class).invoke(null, props)
         } catch(ClassNotFoundException ex) {}
 
-        if (!ds) {// Hikari 数据源
+        if (!datasource) {// Hikari 数据源
             try {
-                ds = (DataSource) Class.forName('com.zaxxer.hikari.HikariDataSource').newInstance()
+                datasource = (DataSource) Class.forName('com.zaxxer.hikari.HikariDataSource').newInstance()
                 dsAttr.each {k, v ->
-                    if (ds.hasProperty(k)) {
-                        def t = ds[(k)].getClass()
-                        if (t == Integer || t == int) ds.(k) = Integer.valueOf(v)
-                        else if (t == Long || t == long) ds.(k) = Long.valueOf(v)
-                        else if (t == Boolean || t == boolean) ds.(k) = Boolean.valueOf(v)
-                        else ds.(k) = v
+                    if (datasource.hasProperty(k)) {
+                        def t = datasource[(k)].getClass()
+                        if (t == Integer || t == int) datasource.(k) = Integer.valueOf(v)
+                        else if (t == Long || t == long) datasource.(k) = Long.valueOf(v)
+                        else if (t == Boolean || t == boolean) datasource.(k) = Boolean.valueOf(v)
+                        else datasource.(k) = v
                     }
                 }
             } catch (ClassNotFoundException ex) {}
         }
 
         // dbcp2 数据源
-        if (!ds) {
+        if (!datasource) {
             try {
                 Map props = new HashMap()
                 dsAttr.each {props.put(it.key, Objects.toString(it.value, ''))}
                 if (!props.containsKey('validationQuery')) props.put('validationQuery', 'select 1')
-                ds = (DataSource) Utils.findMethod(Class.forName('org.apache.commons.dbcp2.BasicDataSourceFactory'), 'createDataSource', Properties.class).invoke(null, props)
+                datasource = (DataSource) Utils.findMethod(Class.forName('org.apache.commons.dbcp2.BasicDataSourceFactory'), 'createDataSource', Properties.class).invoke(null, props)
             } catch (ClassNotFoundException ex) {}
         }
-        if (!ds) throw new RuntimeException('Not found DataSource implement class')
-        log.debug('Created datasource for {} Server. {}', name, ds)
+        if (!datasource) throw new RuntimeException('Not found DataSource implement class')
+        log.debug('Created datasource for {} Server. {}', name, datasource)
     }
 }

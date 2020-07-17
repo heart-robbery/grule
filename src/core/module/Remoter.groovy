@@ -290,7 +290,7 @@ class Remoter extends ServerTpl {
             String[] arr = jo.getString("data").split(":")
             // Log.setLevel(arr[0].trim(), arr[1].trim())
             se.send("set log level success")
-        } else if (t.startsWith("ls ")) {
+        } else if (t && t.startsWith("ls ")) {
             // {"type":"ls apps"}$_$
             def arr = t.split(" ")
             if (arr?[1] = "apps") {
@@ -299,8 +299,8 @@ class Remoter extends ServerTpl {
                 se.send(JSON.toJSONString(appInfoMap[arr?[2]]))
             }
         } else {
-            se.close()
             log.error("Not support exchange data type '{}'", t)
+            se.close()
         }
     }
 

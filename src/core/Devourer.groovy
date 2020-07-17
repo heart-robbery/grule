@@ -24,6 +24,11 @@ class Devourer {
     }
 
 
+    /**
+     * 任务入对列
+     * @param fn 任务函数
+     * @return {@link Devourer}
+     */
     Devourer offer(Runnable fn) {
         if (fn == null) return this
         waiting.offer(fn)
@@ -47,7 +52,7 @@ class Devourer {
                 Runnable t = waiting.poll()
                 if (t != null) t.run()
             } catch (Throwable t) {
-                log.error("$Devourer.class.simpleName: " + key, t)
+                log.error(Devourer.simpleName + ": " + key, t)
             } finally {
                 running.set(false)
                 if (!waiting.isEmpty()) trigger()

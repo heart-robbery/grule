@@ -140,7 +140,7 @@ class AioClient extends ServerTpl {
         // asc.bind(new InetSocketAddress('localhost', bean(AioServer).port))
         try {
             sc.connect(new InetSocketAddress(host, port)).get(3000, TimeUnit.SECONDS)
-            log.info("New TCP(Aio) connection to " + key)
+            log.info("New TCP(AIO) connection to " + key)
         } catch(ex) {
             throw new RuntimeException("连接错误. $key", ex)
         }

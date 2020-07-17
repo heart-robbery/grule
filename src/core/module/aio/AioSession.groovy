@@ -15,13 +15,16 @@ class AioSession {
     protected static final Logger log = LoggerFactory.getLogger(AioSession)
     protected final AsynchronousSocketChannel sc
     protected final readHandler = new ReadHandler(this)
-    protected final buf = ByteBuffer.allocate(1024 * 20)
+    protected final buf = ByteBuffer.allocate(1024 * 10)
     protected final ExecutorService exec
     protected final List<BiConsumer<String, AioSession>> msgFns = new LinkedList<>()
     // 消息发送队列
     protected final Devourer sendQueue
     // close 回调函数
     protected Runnable closeFn
+    // 数据分割符(半包和粘包) 默认换行符分割
+    protected String delimiter = '\n'
+
 
     AioSession(AsynchronousSocketChannel sc, ExecutorService exec) {
         assert sc != null: "sc must not be null"
@@ -46,6 +49,9 @@ class AioSession {
     void start() { read() }
 
 
+    /**
+     * 关闭
+     */
     void close() {sc?.close(); msgFns.clear(); closeFn?.run()}
 
 
@@ -55,9 +61,9 @@ class AioSession {
      */
     void send(String msg) {
         if (msg == null) return
-        sendQueue.offer {
+        sendQueue.offer { // 排对发送消息. 避免 WritePendingException
             try {
-                sc.write(ByteBuffer.wrap(msg.getBytes('utf-8'))).get()
+                sc.write(ByteBuffer.wrap((msg + (delimiter?:'')).getBytes('utf-8'))).get()
             } catch (ClosedChannelException ex) {
                 log.error("ClosedChannelException " + sc.localAddress.toString() + " ->" + sc.remoteAddress.toString())
                 close()
@@ -66,6 +72,10 @@ class AioSession {
     }
 
 
+    /**
+     * 当前会话渠道是否忙
+     * @return
+     */
     boolean busy() { sendQueue.waitingCount > 0 }
 
 
@@ -86,7 +96,6 @@ class AioSession {
     }
 
 
-
     /**
      * 继续处理接收数据
      */
@@ -98,6 +107,8 @@ class AioSession {
 
     protected class ReadHandler implements CompletionHandler<Integer, ByteBuffer> {
         final AioSession session
+        @Lazy byte[]     delim  = session.delimiter ? session.delimiter.getBytes('utf-8') : null
+        @Lazy ByteBuffer buffer = ByteBuffer.allocate(buf.capacity() * 2)
 
         ReadHandler(AioSession session) { assert session != null; this.session = session }
 
@@ -105,9 +116,12 @@ class AioSession {
         void completed(Integer count, ByteBuffer buf) {
             if (count > 0) {
                 buf.flip()
-                byte[] bs = new byte[buf.limit()]
-                buf.get(bs)
-                receive(new String(bs, 'utf-8'))
+                if (delim == null) { // 没有分割符的时候
+                    byte[] bs = new byte[buf.limit()]
+                    buf.get(bs)
+                    receive(new String(bs, 'utf-8'))
+                } else delimit(buf)
+                // 避免 ReadPendingException
                 session.read()
             }
             else {
@@ -117,8 +131,52 @@ class AioSession {
         }
 
 
+        /**
+         * 分割 半包和粘包
+         * @param buf
+         */
+        protected void delimit(ByteBuffer buf) {
+            // 存放新数据
+            for (int i = 0; i < buf.limit(); i++) {buffer.put(buf.get())}
+
+            // 分割
+            buffer.flip()
+            do {
+                int delimIndex = getDelimIndex()
+                if (delimIndex < 0) break
+                int readableLength = delimIndex - buffer.position()
+                byte[] bs = new byte[readableLength]
+                buffer.get(bs)
+                receive(new String(bs, 'utf-8'))
+
+                // 跳过 分割符的长度
+                for (int i = 0; i < delim.length; i++) {buffer.get()}
+            } while (true)
+            buffer.compact()
+        }
+
+
+        // 查找分割符所匹配下标
+        protected int getDelimIndex() {
+            byte[] hb = buffer.array()
+            int delimIndex = -1 // 分割符所在的下标
+            for (int i = buffer.position(), size = buffer.limit(); i < size; i++) {
+                boolean match = true // 是否找到和 delim 相同的字节串
+                for (int j = 0; j < delim.length; j++) {
+                    match = match && (i + j < size) && delim[j] == hb[i + j]
+                }
+                if (match) {
+                    delimIndex = i
+                    break
+                }
+            }
+            return delimIndex
+        }
+
+
         @Override
         void failed(Throwable ex, ByteBuffer buf) {
+            if (ex instanceof ClosedChannelException) session.close()
             log.error(ex.message?:ex.class.simpleName, ex)
         }
     }

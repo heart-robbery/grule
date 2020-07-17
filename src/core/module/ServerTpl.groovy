@@ -133,9 +133,9 @@ class ServerTpl {
      * 属性集
      * @return
      */
-    Map attrs(String key = null) {
+    ConfigObject attrs(String key = null) {
         def r = app.env[(name)]
-        if (key)  {
+        if (key) {
             if (key.contains(".")) {
                 key.split("\\.").each {s -> r = r[(s)] }
             } else r = r[(key)]
