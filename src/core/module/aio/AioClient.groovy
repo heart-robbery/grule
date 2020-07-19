@@ -139,10 +139,11 @@ class AioClient extends ServerTpl {
         sc.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
         // asc.bind(new InetSocketAddress('localhost', bean(AioServer).port))
         try {
-            sc.connect(new InetSocketAddress(host, port)).get(3000, TimeUnit.SECONDS)
+            sc.connect(new InetSocketAddress(host, port)).get(3, TimeUnit.SECONDS)
             log.info("New TCP(AIO) connection to " + key)
         } catch(ex) {
-            throw new RuntimeException("连接错误. $key", ex)
+            sc.close()
+            throw new Exception("连接错误. $key", ex)
         }
         def se = new AioSession(sc, exec)
         msgFns?.each {se.msgFn(it)}

@@ -69,7 +69,7 @@ class SchedSrv extends ServerTpl {
             .withSchedule(CronScheduleBuilder.cronSchedule(cron))
             .build()
         Date d = scheduler.scheduleJob(
-            JobBuilder.newJob(JopTpl.class).withIdentity(id).setJobData(data).build(),
+            JobBuilder.newJob(JopTpl.class).withIdentity(id, "cron").setJobData(data).build(),
             trigger
         )
         log.info("add cron '{}' job will execute last time '{}'", id, new SimpleDateFormat("yyyy-MM-dd HH:mm:ss SSS").format(d))
@@ -85,7 +85,7 @@ class SchedSrv extends ServerTpl {
     @EL(name = "sched.after", async = false)
     Trigger after(Duration time, Runnable fn) {
         if (!scheduler) throw new RuntimeException("$name is not running")
-        if (!time || !fn) throw new IllegalArgumentException("'time', 'unit' and 'fn' must not be null")
+        if (!time || !fn) throw new IllegalArgumentException("'time', and 'fn' must not be null")
         final JobDataMap data = new JobDataMap()
         data.put(KEY_FN, fn)
         String id = time.toMillis() + "_" + Utils.random(8)
@@ -96,7 +96,7 @@ class SchedSrv extends ServerTpl {
             .withSchedule(CronScheduleBuilder.cronSchedule(cron))
             .build()
         Date d = scheduler.scheduleJob(
-            JobBuilder.newJob(JopTpl.class).withIdentity(id).setJobData(data).build(),
+            JobBuilder.newJob(JopTpl.class).withIdentity(id, "after").setJobData(data).build(),
             trigger
         )
         log.debug("add after '{}' job will execute at '{}'", id, new SimpleDateFormat("yyyy-MM-dd HH:mm:ss SSS").format(d))
@@ -123,7 +123,7 @@ class SchedSrv extends ServerTpl {
             .withSchedule(CronScheduleBuilder.cronSchedule(cron))
             .build()
         Date d = scheduler.scheduleJob(
-            JobBuilder.newJob(JopTpl.class).withIdentity(id).setJobData(data).build(),
+            JobBuilder.newJob(JopTpl.class).withIdentity(id, "time").setJobData(data).build(),
             trigger
         )
         log.info("add time '{}' job will execute at '{}'", id, new SimpleDateFormat("yyyy-MM-dd HH:mm:ss SSS").format(d))
@@ -148,22 +148,28 @@ class SchedSrv extends ServerTpl {
         def startFireTime = fireDateFn.get()
         assert startFireTime : "函数未算出触发时间"
 
+        def job = JobBuilder.newJob(JopTpl.class).withIdentity(id, "dyn").setJobData(data).build()
+        def triggerKey = new TriggerKey(id, "dyn")
+        def stopFn = {scheduler.unscheduleJob(triggerKey); scheduler.deleteJob(job.key)}
+
         OperableTrigger trigger = new SimpleTriggerImpl() {
+
             @Override
             Date getNextFireTime() {
                 def d = fireDateFn.get()
-                d = d == null ? new Date() : d
-                setNextFireTime(d)
+                if (d == null) {
+                    data.put(KEY_FN, null)
+                    d = super.getNextFireTime()
+                    setNextFireTime(null)
+                    async {stopFn()}
+                } else setNextFireTime(d)
                 return d
             }
         }
-        trigger.setKey(new TriggerKey(id, "dyn"))
+        trigger.setKey(triggerKey)
         trigger.setStartTime(startFireTime)
 
-        Date d = scheduler.scheduleJob(
-            JobBuilder.newJob(JopTpl.class).withIdentity(id).setJobData(data).build(),
-            trigger
-        )
+        Date d = scheduler.scheduleJob(job, trigger)
         log.info("add dyn '{}' job will execute at '{}'", id, new SimpleDateFormat("yyyy-MM-dd HH:mm:ss SSS").format(d))
         trigger
     }
@@ -172,7 +178,7 @@ class SchedSrv extends ServerTpl {
     static class JopTpl implements Job {
         @Override
         void execute(JobExecutionContext ctx) throws JobExecutionException {
-            ((Runnable) ctx.getMergedJobDataMap().get(KEY_FN)).run()
+            ((Runnable) ctx.getMergedJobDataMap().get(KEY_FN))?.run()
         }
     }
 
@@ -190,7 +196,7 @@ class SchedSrv extends ServerTpl {
         }
 
         @Override
-        int blockForAvailableThreads() { return 1 }
+        int blockForAvailableThreads() { return exec['corePoolSize'] }
 
         @Override
         void initialize() throws SchedulerConfigException { }

@@ -38,6 +38,15 @@ app.start() // 启动系统
 
 @EL(name = 'sys.started', async = true)
 void sysStarted() {
+    return
+    app.bean(SchedSrv).dyn({
+        log.info("执行 dyn sched " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()))
+    }, {
+        def cal = Calendar.getInstance()
+        cal.add(Calendar.SECOND, new Random().nextInt(10) + 5)
+        if (cal.get(Calendar.MINUTE) > 54) return null
+        cal.getTime()
+    })
 //    (1..100).each {i ->
 //        (1..2).each {j ->
 //            app.bean(OkHttpSrv).get("http://localhost:7070/test/remote?event=eName"+(new Random().nextInt(11) + 1)).debug().execute({s ->

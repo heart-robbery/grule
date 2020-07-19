@@ -512,7 +512,7 @@ class Utils {
         private Map<String, Function> valueConverter
         private Map<String, Map<String, Function>> newProp
         private boolean               showClassProp
-        private boolean               ignoreNull = true// 默认忽略空值属性
+        private boolean               ignoreNull = false// 默认不忽略空值属性
         private Comparator<String>    comparator
 
         ToMap(T bean) { this.bean = bean }
