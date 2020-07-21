@@ -132,44 +132,42 @@ class SchedSrv extends ServerTpl {
 
 
     /**
-     *
-     * 动态任务调度执行
+     * 动态任务调度执行. 自定义下次执行时间
      * @param fn 任务函数
-     * @param fireDateFn 触发时间函数. 函数返回下次触发时间. 如果返回空 则停止
+     * @param nextDateGetter 下次触发时间计算函数. 函数返回下次触发时间. 如果返回空 则停止
      * @return {@link OperableTrigger}
      */
     @EL(name = "sched.dyn", async = false)
-    OperableTrigger dyn(Runnable fn, Supplier<Date> fireDateFn) {
+    Trigger dyn(Runnable fn, Supplier<Date> nextDateGetter) {
         assert scheduler : "$name is not running"
-        assert fireDateFn : "$fireDateFn must not be null"
+        assert nextDateGetter : "$nextDateGetter must not be null"
         final JobDataMap data = new JobDataMap()
         data.put(KEY_FN, fn)
         String id = "dyn_" + Utils.random(8)
-        def startFireTime = fireDateFn.get()
+        def startFireTime = nextDateGetter.get()
         assert startFireTime : "函数未算出触发时间"
 
-        def job = JobBuilder.newJob(JopTpl.class).withIdentity(id, "dyn").setJobData(data).build()
-        def triggerKey = new TriggerKey(id, "dyn")
-        def stopFn = {scheduler.unscheduleJob(triggerKey); scheduler.deleteJob(job.key)}
-
         OperableTrigger trigger = new SimpleTriggerImpl() {
+            @Override
+            void triggered(Calendar calendar) {
+                log.error("trigger dyn", new Exception())
+                super.triggered(calendar)
+            }
 
             @Override
-            Date getNextFireTime() {
-                def d = fireDateFn.get()
-                if (d == null) {
-                    data.put(KEY_FN, null)
-                    d = super.getNextFireTime()
-                    setNextFireTime(null)
-                    async {stopFn()}
-                } else setNextFireTime(d)
+            Date getFireTimeAfter(Date afterTime) {
+                def d = nextDateGetter.get()
+                if (d != null && d.time < System.currentTimeMillis()) {
+                    log.warn("计算的下次触发时间小于当前时间. 停止. " + id)
+                    d = null
+                }
                 return d
             }
         }
-        trigger.setKey(triggerKey)
+        trigger.setKey(new TriggerKey(id, "dyn"))
         trigger.setStartTime(startFireTime)
 
-        Date d = scheduler.scheduleJob(job, trigger)
+        Date d = scheduler.scheduleJob(JobBuilder.newJob(JopTpl.class).withIdentity(id, "dyn").setJobData(data).build(), trigger)
         log.info("add dyn '{}' job will execute at '{}'", id, new SimpleDateFormat("yyyy-MM-dd HH:mm:ss SSS").format(d))
         trigger
     }

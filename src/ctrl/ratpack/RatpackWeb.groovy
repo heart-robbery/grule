@@ -132,6 +132,7 @@ class RatpackWeb extends ServerTpl {
             void render(Context ctx, ApiResp resp) throws Exception {
                 ctx.response.contentType('application/json')
                 resp.traceNo = ctx.get(RequestId.TYPE).toString()
+                resp.mark = ctx.request.queryParams['mark']
                 def jsonStr = JSON.toJSONString(resp, SerializerFeature.WriteMapNullValue)
 
                 // 接口超时监控

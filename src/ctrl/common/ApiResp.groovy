@@ -22,6 +22,10 @@ class ApiResp<T> implements Serializable {
      * 返回处理流水号
      */
     String traceNo
+    /**
+     * 标记(调用方的入参, 原样返回)
+     */
+    String mark
 
 
     static <T> ApiResp<T> ok() { return new ApiResp(code: '00') }

@@ -5,10 +5,12 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 import java.nio.ByteBuffer
+import java.nio.channels.AsynchronousCloseException
 import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.ClosedChannelException
 import java.nio.channels.CompletionHandler
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.function.BiConsumer
 
 class AioSession {
@@ -25,7 +27,8 @@ class AioSession {
     // 数据分割符(半包和粘包) 默认换行符分割
     protected String delimiter = '\n'
     // 上次读取时间
-    long lastReadTime
+    protected Long lastReadTime
+    protected final AtomicBoolean closed = new AtomicBoolean(false)
 
 
     AioSession(AsynchronousSocketChannel sc, ExecutorService exec) {
@@ -54,7 +57,11 @@ class AioSession {
     /**
      * 关闭
      */
-    void close() {sc?.close(); msgFns.clear(); closeFn?.run()}
+    void close() {
+        if (closed.compareAndSet(false, true)) {
+            sc?.close(); msgFns.clear(); closeFn?.run()
+        }
+    }
 
 
     /**
@@ -62,12 +69,13 @@ class AioSession {
      * @param msg
      */
     void send(String msg) {
+        if (closed.get()) throw new RuntimeException("已关闭 " + this)
         if (msg == null) return
         sendQueue.offer { // 排对发送消息. 避免 WritePendingException
             try {
                 sc.write(ByteBuffer.wrap((msg + (delimiter?:'')).getBytes('utf-8'))).get()
-            } catch (ClosedChannelException ex) {
-                log.error("ClosedChannelException " + sc.localAddress.toString() + " ->" + sc.remoteAddress.toString())
+            } catch (ClosedChannelException | AsynchronousCloseException ex) {
+                log.error(ex.class.simpleName + " " + sc.localAddress.toString() + " ->" + sc.remoteAddress.toString())
                 close()
             }
         }
@@ -102,8 +110,15 @@ class AioSession {
      * 继续处理接收数据
      */
     protected void read() {
+        if (closed.get()) return
         buf.clear()
         sc.read(buf, buf, readHandler)
+    }
+
+
+    @Override
+    String toString() {
+        return getClass().simpleName + "@" + Integer.toHexString(hashCode()) + "[" + sc?.toString() + "]"
     }
 
 
@@ -179,7 +194,7 @@ class AioSession {
 
         @Override
         void failed(Throwable ex, ByteBuffer buf) {
-            if (ex instanceof ClosedChannelException) session.close()
+            if (ex instanceof ClosedChannelException || ex instanceof AsynchronousCloseException) session.close()
             log.error(ex.message?:ex.class.simpleName, ex)
         }
     }

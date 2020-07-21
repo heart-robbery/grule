@@ -5,6 +5,7 @@ import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONArray
+import com.alibaba.fastjson.JSONException
 import com.alibaba.fastjson.JSONObject
 import com.alibaba.fastjson.parser.Feature
 import com.alibaba.fastjson.serializer.SerializerFeature
@@ -253,11 +254,16 @@ class Remoter extends ServerTpl {
      * @param se AioSession
      */
     protected void receiveMsg(final String msg, final AioSession se) {
-        JSONObject jo = JSON.parseObject(msg, Feature.OrderedField)
+        JSONObject msgJo = null
+        try {
+            msgJo = JSON.parseObject(msg, Feature.OrderedField)
+        } catch (JSONException ex) { // 不处理非json格式的消息
+            return
+        }
 
-        String t = jo.getString("type")
+        String t = msgJo.getString("type")
         if ("event" == t) { // 远程事件请求
-            def sJo = jo.getJSONObject('source')
+            def sJo = msgJo.getJSONObject('source')
             if (!sJo) {
                 log.warn("Unknown source. origin data: " + msg); return
             }
@@ -266,9 +272,9 @@ class Remoter extends ServerTpl {
                 se.close()
                 return
             }
-            receiveEventReq(jo.getJSONObject("data"), se)
+            receiveEventReq(msgJo.getJSONObject("data"), se)
         } else if ("appUp" == t) { // 应用注册在线通知
-            def sJo = jo.getJSONObject('source')
+            def sJo = msgJo.getJSONObject('source')
             if (!sJo) {
                 log.warn("Unknown source. origin data: " + msg); return
             }
@@ -279,7 +285,7 @@ class Remoter extends ServerTpl {
             }
             queue('appUp') {
                 JSONObject d
-                try { d = jo.getJSONObject("data"); appUp(d, se) }
+                try { d = msgJo.getJSONObject("data"); appUp(d, se) }
                 catch (Exception ex) {
                     log.error("Register up error!. data: " + d, ex)
                 }
@@ -287,7 +293,7 @@ class Remoter extends ServerTpl {
         } else if ("cmd-log" == t) { // telnet 命令行设置日志等级
             // telnet localhost 8001
             // 例: {"type":"cmd-log", "data": "core.module.remote: debug"}$_$
-            String[] arr = jo.getString("data").split(":")
+            String[] arr = msgJo.getString("data").split(":")
             // Log.setLevel(arr[0].trim(), arr[1].trim())
             se.send("set log level success")
         } else if (t && t.startsWith("ls ")) {

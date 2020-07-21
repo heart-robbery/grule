@@ -11,6 +11,7 @@ import java.nio.channels.CompletionHandler
 import java.text.SimpleDateFormat
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.LongAdder
 import java.util.function.BiConsumer
 
@@ -103,7 +104,7 @@ class AioServer extends ServerTpl {
             cal.add(Calendar.HOUR_OF_DAY, -1)
             String lastHour = sdf.format(cal.getTime())
             LongAdder c = hourCount.remove(lastHour)
-            if (c != null) log.info("{} 时共处理 tcp 数据包: {} 个", lastHour, c)
+            if (c != null) log.info("{} 时共处理 TCP(AIO) 数据包: {} 个", lastHour, c)
         }
     }
 
@@ -124,17 +125,30 @@ class AioServer extends ServerTpl {
                 msgFns?.each {se.msgFn(it)}
                 se.start()
 
-                // 设置过期
-//                def cal = Calendar.getInstance()
-//                sched?.cron("${cal.get(Calendar.SECOND)} ${cal.get(Calendar.MINUTE)}/30 * * * ?") {
-//                    if (System.currentTimeMillis() - se.lastReadTime > Duration.ofMinutes(getInteger("session.maxIdle", 30)).toMillis()) {
-//                        se.close()
-//                    }
-//                }
+                // AioSession过期 则关闭会话
+                handleExpire(se)
             }
-            // 继续接入
+            // 继续接入新连接
             srv.accept()
         }
+
+
+        protected void handleExpire(AioSession se) {
+            long expire = Duration.ofMinutes(getInteger("session.maxIdle", 30)).toMillis()
+            final AtomicBoolean end = new AtomicBoolean(false)
+            long cur = System.currentTimeMillis()
+            sched?.dyn({
+                if (System.currentTimeMillis() - (se.lastReadTime?:cur) > expire && end.compareAndSet(false, true)) {
+                    log.info("Closing expired AioSession: " + se)
+                    se.close()
+                }
+            }, {
+                if (end.get()) return null
+                long left = expire - (System.currentTimeMillis() - (se.lastReadTime?:cur))
+                new Date(System.currentTimeMillis() + (left?:0) + 1000L)
+            })
+        }
+
 
         @Override
         void failed(Throwable ex, AioServer srv) {
