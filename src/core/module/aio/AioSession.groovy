@@ -5,9 +5,7 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 import java.nio.ByteBuffer
-import java.nio.channels.AsynchronousCloseException
 import java.nio.channels.AsynchronousSocketChannel
-import java.nio.channels.ClosedChannelException
 import java.nio.channels.CompletionHandler
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.atomic.AtomicBoolean
@@ -59,7 +57,10 @@ class AioSession {
      */
     void close() {
         if (closed.compareAndSet(false, true)) {
-            sc?.close(); msgFns.clear(); closeFn?.run()
+            try {sc?.shutdownInput()} catch(ex) {}
+            try {sc?.shutdownOutput()} catch(ex) {}
+            try {sc?.close()} catch(ex) {}
+            msgFns.clear(); closeFn?.run()
         }
     }
 
@@ -74,7 +75,7 @@ class AioSession {
         sendQueue.offer { // 排对发送消息. 避免 WritePendingException
             try {
                 sc.write(ByteBuffer.wrap((msg + (delimiter?:'')).getBytes('utf-8'))).get()
-            } catch (ClosedChannelException | AsynchronousCloseException ex) {
+            } catch (ex) {
                 log.error(ex.class.simpleName + " " + sc.localAddress.toString() + " ->" + sc.remoteAddress.toString())
                 close()
             }
@@ -143,7 +144,7 @@ class AioSession {
                 session.read()
             }
             else {
-                log.warn(session.sc.remoteAddress.toString() + "接收字节为空. 关闭")
+                log.warn("接收字节为空. 关闭 " + session.sc.toString())
                 session.close()
             }
         }
@@ -194,8 +195,8 @@ class AioSession {
 
         @Override
         void failed(Throwable ex, ByteBuffer buf) {
-            if (ex instanceof ClosedChannelException || ex instanceof AsynchronousCloseException) session.close()
-            log.error(ex.message?:ex.class.simpleName, ex)
+            log.error("", ex)
+            session.close()
         }
     }
 }

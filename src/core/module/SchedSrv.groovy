@@ -134,7 +134,9 @@ class SchedSrv extends ServerTpl {
     /**
      * 动态任务调度执行. 自定义下次执行时间
      * @param fn 任务函数
-     * @param nextDateGetter 下次触发时间计算函数. 函数返回下次触发时间. 如果返回空 则停止
+     * @param nextDateGetter
+     *      下次触发时间计算函数. 函数返回下次触发时间. 如果返回空 则停止
+     *      NOTE: 执行函数之前会计算下次执行的时间
      * @return {@link OperableTrigger}
      */
     @EL(name = "sched.dyn", async = false)
@@ -147,21 +149,22 @@ class SchedSrv extends ServerTpl {
         def startFireTime = nextDateGetter.get()
         assert startFireTime : "函数未算出触发时间"
 
+        final Queue<Tuple2<Integer, Date>> count = new LinkedList<>()
         OperableTrigger trigger = new SimpleTriggerImpl() {
+            // org.quartz.simpl.RAMJobStore.triggersFired 1567/1568行 此方法连续执行了两遍
+            // 此方法是在每次执行任务之前调用, 用来计算下次执行时间
             @Override
             void triggered(Calendar calendar) {
-                log.error("trigger dyn", new Exception())
-                super.triggered(calendar)
-            }
-
-            @Override
-            Date getFireTimeAfter(Date afterTime) {
-                def d = nextDateGetter.get()
-                if (d != null && d.time < System.currentTimeMillis()) {
-                    log.warn("计算的下次触发时间小于当前时间. 停止. " + id)
-                    d = null
+                setTimesTriggered(getTimesTriggered() + 1)
+                setPreviousFireTime(getNextFireTime())
+                def t = count.find {it.v1 == getTimesTriggered()}
+                if (t) setNextFireTime(t.v2) // 保证两次连续执行时, 计算出来的下次执行时间相同
+                else {
+                    def d = nextDateGetter.get()
+                    setNextFireTime(d)
+                    if (count.size() > 3) count.poll()
+                    count.offer(Tuple.tuple(getTimesTriggered(), d))
                 }
-                return d
             }
         }
         trigger.setKey(new TriggerKey(id, "dyn"))
@@ -194,7 +197,7 @@ class SchedSrv extends ServerTpl {
         }
 
         @Override
-        int blockForAvailableThreads() { return exec['corePoolSize'] }
+        int blockForAvailableThreads() { return 1 } // 为1 就是每次 取一个距离时间最近的一个trigger org.quartz.simpl.RAMJobStore.acquireNextTriggers timeTriggers.first()
 
         @Override
         void initialize() throws SchedulerConfigException { }

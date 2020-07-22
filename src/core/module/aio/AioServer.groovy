@@ -145,7 +145,9 @@ class AioServer extends ServerTpl {
             }, {
                 if (end.get()) return null
                 long left = expire - (System.currentTimeMillis() - (se.lastReadTime?:cur))
-                new Date(System.currentTimeMillis() + (left?:0) + 1000L)
+                if (left < 1000L) return new Date(System.currentTimeMillis() + (1000L * 30)) // 执行函数之前会计算下次执行的时间
+                def d = new Date(System.currentTimeMillis() + (left?:0) + 10L)
+                d
             })
         }
 
