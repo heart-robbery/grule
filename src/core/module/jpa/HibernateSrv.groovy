@@ -28,7 +28,7 @@ class HibernateSrv extends ServerTpl {
         if (ep == null) {ep = new EP(); ep.addListenerSource(this)}
 
         // 创建 hibernate
-        Map props = new HashMap()
+        final Map props = new HashMap()
         // 可配置的属性名 AvailableSettings
         props.put('hibernate.hbm2ddl.auto', 'none')
         props.put('hibernate.physical_naming_strategy', PhysicalNaming)
@@ -38,6 +38,7 @@ class HibernateSrv extends ServerTpl {
         props.putAll(attrs('hibernate').flatten())
 
         initDataSource()
+        // exposeBean(datasource, ["${name}_datasource"])
         // 创建 SessionFactory
         MetadataSources ms = new MetadataSources(
             new StandardServiceRegistryBuilder()
@@ -49,7 +50,7 @@ class HibernateSrv extends ServerTpl {
         exposeBean(sf, ["${name}_sessionFactory", "${name}_entityManagerFactory"])
 
         // 创建hibernate的公共查询
-        BaseRepo repo = new BaseRepo(sf, attrs()['repo'])
+        BaseRepo repo = new BaseRepo(sf, attrs('repo'))
         exposeBean(repo, ["${name}_repo"])
 
         log.info('Created {}(Hibernate) client', name)

@@ -57,9 +57,7 @@ class AioSession {
      */
     void close() {
         if (closed.compareAndSet(false, true)) {
-            try {sc?.shutdownInput()} catch(ex) {}
-            try {sc?.shutdownOutput()} catch(ex) {}
-            try {sc?.close()} catch(ex) {}
+            sc?.shutdownInput(); sc?.shutdownOutput(); sc?.close()
             msgFns.clear(); closeFn?.run()
         }
     }
@@ -99,7 +97,7 @@ class AioSession {
             exec.execute {
                 try {
                     fn.accept(msg, this)
-                } catch(ex) {
+                } catch (ex) {
                     log.error("数据处理错误. " + msg, ex)
                 }
             }

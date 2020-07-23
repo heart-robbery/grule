@@ -33,6 +33,47 @@
     }
   ],
   "paths": {
+    "/test/upload": {
+      "post": {
+        "tags": ["test"],
+        "summary": "文件上传",
+        "description": "文件上传",
+        "requestBody": {
+          "description": "文件",
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "required": true,
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "p1": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "$ref": "#/components/schemas/ApiResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/test/remote": {
       "get": {
         "tags": ["test"],

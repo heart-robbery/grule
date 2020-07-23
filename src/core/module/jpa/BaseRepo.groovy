@@ -4,8 +4,10 @@ import core.Page
 import org.hibernate.Session
 import org.hibernate.SessionFactory
 import org.hibernate.Transaction
+import org.hibernate.engine.jdbc.connections.spi.ConnectionProvider
 import org.hibernate.metamodel.spi.MetamodelImplementor
 import org.hibernate.persister.entity.AbstractEntityPersister
+import org.hibernate.service.ServiceRegistry
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -13,6 +15,7 @@ import javax.persistence.criteria.CriteriaBuilder
 import javax.persistence.criteria.CriteriaQuery
 import javax.persistence.criteria.Predicate
 import javax.persistence.criteria.Root
+import javax.sql.DataSource
 import java.util.function.Consumer
 import java.util.function.Function
 
@@ -80,7 +83,18 @@ class BaseRepo {
      * 连接mysql当前数据库的库名
      * @return 数据库名
      */
-    String dbName() { sf['jdbcServices']?['jdbcEnvironment']?['currentCatalog']?['text'] }
+    String getDbName() { sf['jdbcServices']?['jdbcEnvironment']?['currentCatalog']?['text'] }
+
+
+    /**
+     * 连接 jdbcUrl
+     * @return 连接 jdbcUrl
+     */
+    String getJdbcUrl() {
+        DataSource ds = ((ServiceRegistry) sf['serviceRegistry'])?.getService(ConnectionProvider)?['dataSource']
+        if (ds) return ds['jdbcUrl']?:ds['url']
+        null
+    }
 
 
     /**

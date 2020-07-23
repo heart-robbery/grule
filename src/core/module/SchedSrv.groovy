@@ -133,6 +133,7 @@ class SchedSrv extends ServerTpl {
 
     /**
      * 动态任务调度执行. 自定义下次执行时间
+     * 例: {@link core.module.aio.AioServer.AcceptHandler#handleExpire(core.module.aio.AioSession)}
      * @param fn 任务函数
      * @param nextDateGetter
      *      下次触发时间计算函数. 函数返回下次触发时间. 如果返回空 则停止

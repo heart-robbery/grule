@@ -8,7 +8,7 @@ import ctrl.TestCtrl
 import ctrl.ratpack.RatpackWeb
 import dao.entity.Component
 import dao.entity.Test
-import dao.entity.UploadFile
+import dao.entity.VersionFile
 import groovy.transform.Field
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -28,7 +28,7 @@ app.addSource(new EhcacheSrv())
 app.addSource(new SchedSrv())
 app.addSource(new RedisClient())
 app.addSource(new Remoter())
-app.addSource(new HibernateSrv().entities(Test, UploadFile, Component))
+app.addSource(new HibernateSrv().entities(Test, VersionFile, Component))
 app.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl))
 app.addSource(new FileUploader())
 app.addSource(new TestService())
@@ -43,8 +43,8 @@ void sysStarted() {
         log.info("执行 dyn sched " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()))
     }, {
         def cal = Calendar.getInstance()
-        cal.add(Calendar.SECOND, new Random().nextInt(10) + 5)
-        if (cal.get(Calendar.MINUTE) > 54) return null
+        cal.add(Calendar.SECOND, 5)
+        if (cal.get(Calendar.MINUTE) > 05) return null
         cal.getTime()
     })
 //    (1..100).each {i ->

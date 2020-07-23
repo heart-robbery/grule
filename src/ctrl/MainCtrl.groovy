@@ -28,6 +28,7 @@ class MainCtrl extends CtrlTpl {
         chain.get('api-doc/data.json') { ctx ->
             def f = Utils.baseDir("conf/openApi.json")
             if (f.exists()) {
+                ctx.response.contentType("application/json")
                 ctx.render(f.getText("utf-8"))
             }
         }

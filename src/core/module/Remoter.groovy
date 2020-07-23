@@ -23,19 +23,19 @@ import java.util.function.Consumer
 import static core.Utils.ipv4
 
 class Remoter extends ServerTpl {
-    @Lazy def                 sched      = bean(SchedSrv)
+    @Lazy def                                              sched      = bean(SchedSrv)
     // 集群的服务中心地址 [host]:port,[host1]:port2. 例 :8001 or localhost:8001
-    @Lazy String              masterHps  = getStr('masterHps', null)
+    @Lazy String                                           masterHps  = getStr('masterHps', null)
     // 集群的服务中心应用名
-    @Lazy String              masterName = getStr('masterName', null)
+    @Lazy String                                           masterName = getStr('masterName', null)
     // 是否为master
-    @Lazy boolean             master     = getBoolean('master', false)
+    @Lazy boolean                                          master     = getBoolean('master', false)
     // 保存 app info 的属性信息
-    protected final Map<String, List<Map<String, Object>>> appInfoMap = new ConcurrentHashMap<>()
+    protected final Map<String, List<Map<String, Object>>> appInfos   = new ConcurrentHashMap<>()
     /**
      * ecId -> {@link EC}
      */
-    protected final Map<String, EC> ecMap      = new ConcurrentHashMap<>()
+    protected final Map<String, EC>                        ecMap      = new ConcurrentHashMap<>()
 
     protected AioClient aioClient
     protected AioServer aioServer
@@ -127,7 +127,7 @@ class Remoter extends ServerTpl {
      * @param target 可用值: 'any', 'all'
      */
     Remoter sendMsg(String appName, String msg, String target = 'any') {
-        def ls = appInfoMap.get(appName)
+        def ls = appInfos.get(appName)
         assert ls : "Not found app '$appName' system online"
 
         final def doSend = {Map<String, Object> appInfo ->
@@ -165,7 +165,7 @@ class Remoter extends ServerTpl {
                 if (System.currentTimeMillis() - app.startup.time > 60 * 1000L) {
                     sched.after(Duration.ofSeconds(getInteger('upInterval', 120) + new Random().nextInt(90)), {sync(true)})
                 } else {
-                    sched.after(Duration.ofSeconds(10), {sync(true)})
+                    sched.after(Duration.ofSeconds(new Random().nextInt(10) + 10), {sync(true)})
                 }
             }
         } catch (ex) {
@@ -173,7 +173,6 @@ class Remoter extends ServerTpl {
             log.error("App Up error. " + (ex.message?:ex.class.simpleName), ex)
         }
     }
-
 
 
     /**
@@ -247,7 +246,6 @@ class Remoter extends ServerTpl {
     }
 
 
-
     /**
      * 接收远程发送的消息
      * @param msg 消息内容
@@ -300,9 +298,9 @@ class Remoter extends ServerTpl {
             // {"type":"ls apps"}$_$
             def arr = t.split(" ")
             if (arr?[1] = "apps") {
-                se.send(JSON.toJSONString(appInfoMap))
+                se.send(JSON.toJSONString(appInfos))
             } else if (arr?[1] == 'app' && arr?[2]) {
-                se.send(JSON.toJSONString(appInfoMap[arr?[2]]))
+                se.send(JSON.toJSONString(appInfos[arr?[2]]))
             }
         } else {
             log.error("Not support exchange data type '{}'", t)
@@ -326,7 +324,6 @@ class Remoter extends ServerTpl {
             receiveEventResp(jo.getJSONObject("data"))
         }
     }
-
 
 
     /**
@@ -421,7 +418,7 @@ class Remoter extends ServerTpl {
 
         //1. 先删除之前的数据,再添加新的
         boolean isNew = true
-        final List<Map<String, Object>> apps = appInfoMap.computeIfAbsent(data["name"], {new LinkedList<>()})
+        final List<Map<String, Object>> apps = appInfos.computeIfAbsent(data["name"], {new LinkedList<>()})
         for (final def it = apps.iterator(); it.hasNext(); ) {
             if (it.next()["id"] == data["id"]) {it.remove(); isNew = false; break}
         }
@@ -430,7 +427,7 @@ class Remoter extends ServerTpl {
         // if (data['id'] != app.id) ep.fire("updateAppInfo", data) // 同步信息给本服务器的tcp-client
 
         //2. 遍历所有的数据,删除不必要的数据, 同步注册信息
-        for (final def it = appInfoMap.entrySet().iterator(); it.hasNext(); ) {
+        for (final def it = appInfos.entrySet().iterator(); it.hasNext(); ) {
             def e = it.next()
             for (final def it2 = e.value.iterator(); it2.hasNext(); ) {
                 final def cur = it2.next()
@@ -469,7 +466,6 @@ class Remoter extends ServerTpl {
     }
 
 
-
     /**
      * 更新 app 信息
      * @param data app node信息
@@ -488,7 +484,7 @@ class Remoter extends ServerTpl {
         queue('appUp') {
             boolean add = true
             boolean isNew = true
-            final def apps = appInfoMap.computeIfAbsent(data["name"], {new LinkedList<>()})
+            final def apps = appInfos.computeIfAbsent(data["name"], {new LinkedList<>()})
             for (final def itt = apps.iterator(); itt.hasNext(); ) {
                 final def e = itt.next()
                 if (e["id"] == data["id"]) {
@@ -504,7 +500,7 @@ class Remoter extends ServerTpl {
             if (add) {
                 apps << data
                 if (isNew) log.info("New Node added. Node: '{}'", data)
-                else log.debug("Update app info: {}", data)
+                else log.trace("Update app info: {}", data)
             }
         }
     }
