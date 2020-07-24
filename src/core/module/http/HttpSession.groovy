@@ -1,6 +1,5 @@
 package core.module.http
 
-import core.Devourer
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -9,15 +8,20 @@ import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.ClosedChannelException
 import java.nio.channels.CompletionHandler
 import java.util.concurrent.ExecutorService
+import java.util.function.Consumer
 
+/**
+ * http 连接会话
+ */
 class HttpSession {
-    protected static final Logger                               log         = LoggerFactory.getLogger(HttpSession)
-    protected final        AsynchronousSocketChannel            sc
-    protected final                                             readHandler = new ReadHandler(this)
-    protected final                                             buf         = ByteBuffer.allocate(1024 * 10)
-    protected final        ExecutorService                      exec
+    protected static final Logger                    log         = LoggerFactory.getLogger(HttpSession)
+    protected final        AsynchronousSocketChannel sc
+    protected final                                  readHandler = new ReadHandler(this)
+    protected final                                  buf         = ByteBuffer.allocate(1024 * 10)
+    protected final        ExecutorService           exec
     // close 回调函数
-    protected              Runnable                             closeFn
+    protected              Runnable                  closeFn
+    protected              Consumer<HttpRequest>     handler
 
 
     HttpSession(AsynchronousSocketChannel sc, ExecutorService exec) {
@@ -73,8 +77,7 @@ class HttpSession {
         void completed(Integer count, ByteBuffer buf) {
             if (count > 0) {
                 buf.flip()
-                byte[] bs = new byte[buf.limit()]
-                buf.get(bs)
+                handler?.accept(HttpDecoder.decode(buf))
                 // 避免 ReadPendingException
                 session.read()
             }
@@ -87,8 +90,8 @@ class HttpSession {
 
         @Override
         void failed(Throwable ex, ByteBuffer buf) {
-            if (ex instanceof ClosedChannelException) session.close()
-            log.error(ex.message?:ex.class.simpleName, ex)
+            log.error("", ex)
+            session.close()
         }
     }
 }

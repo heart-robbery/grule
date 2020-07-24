@@ -2,7 +2,6 @@ package core.module.http
 
 import cn.xnatural.enet.event.EL
 import core.module.ServerTpl
-import core.module.aio.AioSession
 
 import java.nio.channels.AsynchronousChannelGroup
 import java.nio.channels.AsynchronousServerSocketChannel
@@ -15,8 +14,9 @@ import java.util.concurrent.atomic.LongAdder
 class HttpServer extends ServerTpl {
     protected final CompletionHandler<AsynchronousSocketChannel, HttpServer> handler = new AcceptHandler()
     protected       AsynchronousServerSocketChannel                         ssc
-    @Lazy           String                                                  hp      = getStr('hp', ":7001")
+    @Lazy           String                                                  hp      = getStr('hp', ":9090")
     @Lazy           Integer                                                 port    = hp.split(":")[1] as Integer
+    protected final Dispatcher dispatcher = new Dispatcher()
 
 
     HttpServer(String name) { super(name) }
@@ -36,13 +36,24 @@ class HttpServer extends ServerTpl {
         if (host) {addr = new InetSocketAddress(host, port)}
 
         ssc.bind(addr, getInteger('backlog', 100))
-        log.info("Start listen HTTP(Aio) {}", port)
+        log.info("Start listen HTTP(AIO) {}", port)
         accept()
     }
 
 
     @EL(name = 'sys.stopping', async = true)
     void stop() { ssc?.close() }
+
+
+    /**
+     * 接收新的 http 请求
+     * @param request
+     * @param session
+     */
+    protected void receive(HttpRequest request, HttpSession session) {
+        log.info("Start Request '{}': {}. from: " + session.sc.remoteAddress.toString(), request.id, request.rowUrl)
+        count()
+    }
 
 
     /**
@@ -55,7 +66,7 @@ class HttpServer extends ServerTpl {
 
 
     /**
-     * 统计每小时的处理 tcp 数据包个数
+     * 统计每小时的处理 http 数据包个数
      * MM-dd HH -> 个数
      */
     protected final Map<String, LongAdder> hourCount = new ConcurrentHashMap<>(3)
@@ -97,6 +108,7 @@ class HttpServer extends ServerTpl {
                 sc.setOption(StandardSocketOptions.SO_SNDBUF, 64 * 1024)
                 sc.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
                 def se = new HttpSession(sc, srv.exec)
+                se.handler = {req -> receive(req, se)}
                 se.start()
             }
             // 继续接入

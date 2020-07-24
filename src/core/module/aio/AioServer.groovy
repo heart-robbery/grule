@@ -40,7 +40,7 @@ class AioServer extends ServerTpl {
         if (host) {addr = new InetSocketAddress(host, port)}
 
         ssc.bind(addr, getInteger('backlog', 100))
-        log.info("Start listen TCP(Aio) {}", port)
+        log.info("Start listen TCP(AIO) {}", port)
         msgFns.add {msg, se -> receive(msg, se)}
         accept()
     }

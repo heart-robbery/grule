@@ -165,7 +165,7 @@ class Remoter extends ServerTpl {
                 if (System.currentTimeMillis() - app.startup.time > 60 * 1000L) {
                     sched.after(Duration.ofSeconds(getInteger('upInterval', 120) + new Random().nextInt(90)), {sync(true)})
                 } else {
-                    sched.after(Duration.ofSeconds(new Random().nextInt(10) + 10), {sync(true)})
+                    sched.after(Duration.ofSeconds(new Random().nextInt(15) + 10), {sync(true)})
                 }
             }
         } catch (ex) {
@@ -401,6 +401,7 @@ class Remoter extends ServerTpl {
 
 
     /**
+     * client -> master
      * 应用上线通知
      * NOTE: 此方法线程已安全
      * 例: {"name": "应用名", "id": "应用实例id", "tcp":"localhost:8001", "http":"localhost:8080", "udp": "localhost:11111"}
@@ -467,6 +468,7 @@ class Remoter extends ServerTpl {
 
 
     /**
+     * master -> client
      * 更新 app 信息
      * @param data app node信息
      *  例: {"name":"rc", "id":"rc_b70d18d52269451291ea6380325e2a84", "tcp":"192.168.56.1:8001","http":"localhost:8000"}
@@ -485,21 +487,27 @@ class Remoter extends ServerTpl {
             boolean add = true
             boolean isNew = true
             final def apps = appInfos.computeIfAbsent(data["name"], {new LinkedList<>()})
-            for (final def itt = apps.iterator(); itt.hasNext(); ) {
-                final def e = itt.next()
+            for (final def iter = apps.iterator(); iter.hasNext(); ) {
+                final def e = iter.next()
                 if (e["id"] == data["id"]) {
                     isNew = false
                     if (data['_uptime'] > e['_uptime']) {
-                        itt.remove()
+                        iter.remove()
                     } else {
                         add = false
                     }
                     break
+                } else if (e['tcp'] == data['tcp']) {
+                    iter.remove()
+                    log.info("Drop same tcp node: {}", e)
+                } else if (System.currentTimeMillis() - e['_uptime'] > getInteger("dropAppTimeout", 15) * 60 * 1000) {
+                    iter.remove()
+                    log.warn("Drop timeout node: {}", e)
                 }
             }
             if (add) {
                 apps << data
-                if (isNew) log.info("New Node added. Node: '{}'", data)
+                if (isNew) log.info("New node added. '{}'", data)
                 else log.trace("Update app info: {}", data)
             }
         }
