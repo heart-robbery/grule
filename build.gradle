@@ -11,6 +11,7 @@ version = '1.2.0'
 //apply plugin: 'java'
 apply plugin: 'groovy'
 
+
 // 修改源目录
 sourceSets {
     main {
@@ -26,9 +27,10 @@ sourceSets {
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
+
 dependencies {
     compile fileTree(dir: 'sysLib', include: ['*.jar'])
-    compile 'org.codehaus.groovy:groovy:3.0.4'
+    compile 'org.codehaus.groovy:groovy:3.0.5'
 
     compile 'com.alibaba:fastjson:1.2.71'
     compile 'ch.qos.logback:logback-classic:1.2.3'
@@ -44,7 +46,7 @@ dependencies {
 
     // compile 'io.netty:netty-all:4.1.49.Final'
     compile 'com.squareup.okhttp3:okhttp:3.14.8'
-    compile('org.apache.httpcomponents:httpclient:4.5.12')
+    // compile('org.apache.httpcomponents:httpclient:4.5.12')
     compile ('org.ehcache:ehcache:3.6.3') {exclude group:'org.slf4j'}
     compile ('org.quartz-scheduler:quartz:2.3.0') {
         exclude group:'org.slf4j'

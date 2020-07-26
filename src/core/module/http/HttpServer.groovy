@@ -53,6 +53,7 @@ class HttpServer extends ServerTpl {
     protected void receive(HttpRequest request, HttpSession session) {
         log.info("Start Request '{}': {}. from: " + session.sc.remoteAddress.toString(), request.id, request.rowUrl)
         count()
+        dispatcher.dispatch(new HttpContext(request, session))
     }
 
 
