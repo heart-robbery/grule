@@ -6,7 +6,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 class HttpResponse {
     protected int status = 200
     protected final Map<String, String> headers = new HashMap<>()
-    protected final AtomicBoolean commit = new AtomicBoolean(false)
+    protected final List<String> cookies = new LinkedList<>()
+    final AtomicBoolean commit = new AtomicBoolean(false)
     static final Map<Integer, String> statusMsg
 
 
@@ -21,12 +22,39 @@ class HttpResponse {
     }
 
 
+    HttpResponse status(int status) {this.status = status; this}
+
+
     /**
      * 设置cookie
-     * @param name
-     * @param value
+     * @param cName cookie 名
+     * @param cValue cookie 值
+     * @param maxAge
+     * @param domain
+     * @param path
+     * @param secure
+     * @param httpOnly
+     * @return
      */
-    HttpResponse cookie(String name, String value, Long maxAge = Long.MIN_VALUE, String domain = null, String path = null) {
+    HttpResponse cookie(
+        String cName, String cValue, Long maxAge = null, String domain = null,
+        String path = null, Boolean secure = null, Boolean httpOnly = null
+    ) {
+        // 删除已存在的
+        for (def it = cookies.iterator(); it.hasNext(); ) {
+            def cookie = it.next()
+            if (cookie.substring(0, cookie.indexOf('=')) == cName) {
+                it.remove()
+            }
+        }
+
+        cookies.add(cName + "=" + (cValue == null ? '' : cValue)
+            + (maxAge == null ? "" : "; max-age="+maxAge)
+            + (domain == null ? '' : "; domain="+domain)
+            + (path == null ? '' : "; path="+path)
+            + (secure ? '' : "; secure")
+            + (httpOnly ? '' : "; httpOnly")
+        )
         this
     }
 
@@ -35,24 +63,37 @@ class HttpResponse {
      * 让 cookie 过期
      * @param name
      */
-    HttpResponse expireCookie(String name) {
+    HttpResponse expireCookie(String name) { cookie(name, '', 0) }
+
+
+    /**
+     * 设置header
+     * @param hName
+     * @param hValue
+     * @return
+     */
+    HttpResponse header(String hName, Object hValue) {
+        headers.put(hName.toLowerCase(), hValue?.toString())
         this
     }
 
 
-    HttpResponse header(String hName, String hValue) {
+    String header(String hName) { return headers.get(hName.toLowerCase()) }
+
+
+    HttpResponse cacheControl(Integer maxAge) {
+        header('cache-control', "max-age=" + maxAge)
         this
     }
 
 
-    String header(String hName) {
-        this
+    HttpResponse contentType(CharSequence contentType) { header('content-type', contentType) }
+
+
+    HttpResponse contentTypeIfNotSet(CharSequence contentType) {
+        if (!headers.containsKey('content-type')) {
+            header('content-type', contentType)
+        }
     }
-
-
-    HttpResponse contentType(CharSequence contentType) { header('Content-Type', contentType) }
-
-
-    HttpResponse contentTypeIfNotSet(CharSequence contentType) { if (!headers.containsKey('Content-Type')) header('Content-Type', contentType) }
 
 }

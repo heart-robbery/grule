@@ -35,6 +35,7 @@ class MainCtrl extends CtrlTpl {
         chain.get('api-doc/:fName') {ctx ->
             String fName = ctx.pathTokens['fName']?:'index.html'
             ctx.response.cookie('Cache-Control', "max-age=120")
+            ctx.response.cookie('sid', "2222")
             ctx.render ctx.file("static/swagger-ui/$fName")
         }
     }

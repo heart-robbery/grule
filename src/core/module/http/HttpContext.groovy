@@ -4,17 +4,18 @@ package core.module.http
  * http 请求 处理上下文
  */
 class HttpContext {
-    final HttpRequest httpRequest
-    final HttpSession httpSession
-    final HttpResponse resp
+    final HttpRequest         request
+    protected final HttpAioSession      aioSession
+    final HttpResponse        response
+    final Map<String, Object> pathToken = new HashMap<>(7)
 
 
-    HttpContext(HttpRequest httpRequest, HttpSession httpSession) {
-        assert httpRequest
-        assert httpSession
-        this.httpRequest = httpRequest
-        this.httpSession = httpSession
-        this.resp = new HttpResponse()
+    HttpContext(HttpRequest request, HttpAioSession aioSession) {
+        assert request
+        assert aioSession
+        this.request = request
+        this.aioSession = aioSession
+        this.response = new HttpResponse()
     }
 
 
@@ -23,41 +24,61 @@ class HttpContext {
      * @param body
      */
     void render(Object body) {
-        boolean f = resp.commit.compareAndSet(false, true)
+        boolean f = response.commit.compareAndSet(false, true)
         if (!f) throw new Exception("已经提交过")
 
-        if (body == null) resp.status = 202
-        else if (body instanceof String) {
-            if (!resp.header('Content-length')) {
-                resp.header('Content-Length', body.getBytes('utf-8').length)
+        if (body instanceof String) {
+            if (!response.header('content-length')) {
+                response.header('content-length', body.getBytes('utf-8').length)
             }
-            if (!resp.header('Content-Type')) {
-                resp.header('Content-Type', 'text/plan; charset=utf-8')
-            }
+            response.contentTypeIfNotSet('text/plan; charset=utf-8')
         } else if (body instanceof File) {
-            if (!resp.header('Content-length')) {
-                resp.header('Content-Length', body.size())
+            if (body.name.endsWith(".html")) {
+                response.contentTypeIfNotSet('text/html')
             }
-            if (!resp.header('Content-Type')) {
-                if (body.name.endsWith(".html")) {
-                    resp.header('Content-Type', 'text/html')
-                }
-                else if (body.name.endsWith(".css")) {
-                    resp.header('Content-Type', 'text/css')
-                }
+            else if (body.name.endsWith(".css")) {
+                response.contentTypeIfNotSet('text/css')
+            }
+            else if (body.name.endsWith(".js")) {
+                response.contentTypeIfNotSet('application/javascript')
+            }
+            if (!response.header('content-length')) {
+                response.header('content-length', body.size())
             }
         } else {
             throw new Exception("不支持的类型 " + body.getClass())
         }
 
         StringBuilder sb = new StringBuilder()
-        sb.append("HTTP/1.1 $resp.status ${HttpResponse.statusMsg[(resp.status)]}\n".toString()) // 起始行
-        resp.headers.each {e ->
+        sb.append("HTTP/1.1 $response.status ${HttpResponse.statusMsg[(response.status)]}\n".toString()) // 起始行
+        response.headers.each { e ->
             sb.append(e.key).append(": ").append(e.value).append("\n")
+        }
+        response.cookies.each { e ->
+            sb.append("set-cookie=").append(e).append("\n")
         }
         sb.append('\r\n')
 
         if (body instanceof String) sb.append(body)
-        httpSession.send(sb.toString())
+        aioSession.send(sb.toString())
+    }
+
+
+    /**
+     * 获取参数
+     * @param pName
+     * @param type
+     * @return
+     */
+    def <T> T param(String pName, Class<T> type) {
+        def v = pathToken.get(pName)
+        if (v != null) return type.cast(v)
+        v = request.queryParams.get(pName)
+        if (v != null) return type.cast(v)
+        v = request.formParams.get(pName)
+        if (v != null) return type.cast(v)
+        v = request.jsonParams.get(pName)
+        if (v != null) return type.cast(v)
+        null
     }
 }

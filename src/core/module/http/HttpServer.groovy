@@ -1,8 +1,14 @@
 package core.module.http
 
 import cn.xnatural.enet.event.EL
+import core.Utils
 import core.module.ServerTpl
+import core.module.http.mvc.Chain
+import core.module.http.mvc.Path
+import ctrl.CtrlTpl
+import ctrl.common.ApiResp
 
+import java.lang.reflect.Method
 import java.nio.channels.AsynchronousChannelGroup
 import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.AsynchronousSocketChannel
@@ -10,13 +16,17 @@ import java.nio.channels.CompletionHandler
 import java.text.SimpleDateFormat
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.LongAdder
+import java.util.function.Consumer
 
 class HttpServer extends ServerTpl {
     protected final CompletionHandler<AsynchronousSocketChannel, HttpServer> handler = new AcceptHandler()
-    protected       AsynchronousServerSocketChannel                         ssc
-    @Lazy           String                                                  hp      = getStr('hp', ":9090")
-    @Lazy           Integer                                                 port    = hp.split(":")[1] as Integer
-    protected final Dispatcher dispatcher = new Dispatcher()
+    protected       AsynchronousServerSocketChannel                          ssc
+    @Lazy           String                                                   hp      = getStr('hp', ":9090")
+    @Lazy           Integer                                                  port    = hp.split(":")[1] as Integer
+    protected final Chain                                                    chain   = new Chain()
+    protected final List<CtrlTpl>                                            ctrls   = new LinkedList<>()
+    // 是否可用
+    boolean                       enabled     = false
 
 
     HttpServer(String name) { super(name) }
@@ -37,6 +47,7 @@ class HttpServer extends ServerTpl {
 
         ssc.bind(addr, getInteger('backlog', 100))
         log.info("Start listen HTTP(AIO) {}", port)
+        initChain()
         accept()
     }
 
@@ -45,15 +56,66 @@ class HttpServer extends ServerTpl {
     void stop() { ssc?.close() }
 
 
+    @EL(name = 'sys.started', async = true)
+    protected void started() { ctrls.each {ep.fire('inject', it)}; enabled = true }
+
+
     /**
      * 接收新的 http 请求
      * @param request
      * @param session
      */
-    protected void receive(HttpRequest request, HttpSession session) {
+    protected void receive(HttpRequest request, HttpAioSession session) {
         log.info("Start Request '{}': {}. from: " + session.sc.remoteAddress.toString(), request.id, request.rowUrl)
         count()
-        dispatcher.dispatch(new HttpContext(request, session))
+        chain.handle(new HttpContext(request, session))
+        // dispatcher.dispatch()
+    }
+
+
+    HttpServer ctrls(Class<CtrlTpl>...clzs) {
+        if (!clzs) return this
+        clzs.each {clz -> ctrls.add(clz.newInstance())}
+        this
+    }
+
+
+    protected void initChain() {
+        def fn = {Object ctrl, Chain ch ->
+            Utils.iterateMethod(ctrl.class, { method ->
+                def anno = method.getAnnotation(Path)
+                if (!anno) return
+
+                // 实际@Path 方法 调用
+                if (anno.path() == null) {
+                    ch.all{invoke(ctrl, it, method)}
+                } else {
+                    if (anno.method() == null) {
+                        ch.path(anno.path()) {invoke(ctrl, it, method)}
+                    } else {
+                        if ('get'.equalsIgnoreCase(anno.method())) {
+                            ch.get(anno.path()) {invoke(ctrl, it, method)}
+                        } else if ('post'.equalsIgnoreCase(anno.method())) {
+                            ch.post(anno.path()) {invoke(ctrl, it, method)}
+                        }
+                    }
+                }
+            })
+        }
+        ctrls?.each {ctrl ->
+            def anno = ctrl.class.getAnnotation(Path)
+            if (anno) {
+                chain.prefix(anno.path(), {ch -> fn(ctrl, ch)})
+            } else {
+                fn(ctrl, chain)
+            }
+        }
+    }
+
+
+    HttpServer buildChain(Consumer<Chain> buildFn) {
+        buildFn.accept(chain)
+        this
     }
 
 
@@ -62,6 +124,25 @@ class HttpServer extends ServerTpl {
      */
     protected void accept() {
         ssc.accept(this, handler)
+    }
+
+
+    protected void invoke(Object ctrl, HttpContext ctx, Method method) {
+        def result
+        try {
+            result = method.invoke(
+                ctrl,
+                method.getParameters().collect {p ->
+                    ctx.param(p.name, p.type)
+                }.toArray()
+            )
+
+        } catch (ex) {
+            result = ApiResp.fail(ex.message)
+        }
+        if (!void.class.isAssignableFrom(method.returnType)) {
+            ctx.render(result)
+        }
     }
 
 
@@ -108,7 +189,7 @@ class HttpServer extends ServerTpl {
                 sc.setOption(StandardSocketOptions.SO_RCVBUF, 64 * 1024)
                 sc.setOption(StandardSocketOptions.SO_SNDBUF, 64 * 1024)
                 sc.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
-                def se = new HttpSession(sc, srv.exec)
+                def se = new HttpAioSession(sc, srv.exec)
                 se.handler = {req -> receive(req, se)}
                 se.start()
             }

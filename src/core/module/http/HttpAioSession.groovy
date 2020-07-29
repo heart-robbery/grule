@@ -13,8 +13,8 @@ import java.util.function.Consumer
 /**
  * http 连接会话
  */
-class HttpSession {
-    protected static final Logger                    log         = LoggerFactory.getLogger(HttpSession)
+class HttpAioSession {
+    protected static final Logger                    log         = LoggerFactory.getLogger(HttpAioSession)
     protected final        AsynchronousSocketChannel sc
     protected final                                  readHandler = new ReadHandler(this)
     protected final                                  buf         = ByteBuffer.allocate(1024 * 10)
@@ -24,7 +24,7 @@ class HttpSession {
     protected              Consumer<HttpRequest>     handler
 
 
-    HttpSession(AsynchronousSocketChannel sc, ExecutorService exec) {
+    HttpAioSession(AsynchronousSocketChannel sc, ExecutorService exec) {
         assert sc != null: "sc must not be null"
         assert exec != null: "exec must not be null"
         this.sc = sc
@@ -69,9 +69,9 @@ class HttpSession {
 
 
     protected class ReadHandler implements CompletionHandler<Integer, ByteBuffer> {
-        final HttpSession session
+        final HttpAioSession session
 
-        ReadHandler(HttpSession session) { assert session != null; this.session = session }
+        ReadHandler(HttpAioSession session) { assert session != null; this.session = session }
 
         @Override
         void completed(Integer count, ByteBuffer buf) {

@@ -1,5 +1,7 @@
 package core.module.http
 
+import com.alibaba.fastjson.JSON
+
 
 /**
  * http 请求 内容
@@ -13,13 +15,53 @@ class HttpRequest {
     protected String rowUrl
     // http协议版本: 1.0/1.1/1.2
     protected String version
+    protected String bodyStr
+    protected final Map<String, String> headers = new HashMap<>()
+
     @Lazy String id = UUID.randomUUID().toString().replace("-", "")
+
     // 查询字符串
     @Lazy String queryStr = {
         int i = rowUrl.indexOf("?")
         i == -1 ? null : rowUrl.substring(i)
     }()
-    protected final Map<String, String> headers = new HashMap<>()
+
+    @Lazy Map<String, String> queryParams = {
+        if (queryStr) {
+            Map<String, String> ret = []
+            queryStr.split("&").each {s ->
+                def arr = s.split("=")
+                ret.put(arr[0], URLDecoder.decode(arr[1], 'utf-8'))
+            }
+            return Collections.unmodifiableMap(ret)
+        }
+        Collections.emptyMap()
+    }()
+
+    @Lazy String path = {
+        int i = rowUrl.indexOf("?")
+        i == -1 ? rowUrl : rowUrl.substring(0, i)
+    }()
+
+    @Lazy Map<String, String> formParams = {
+        if (bodyStr && getHeader('content-type')?.contains('application/x-www-form-urlencoded')) {
+            Map<String, String> ret = []
+            bodyStr.split("&").each {s ->
+                def arr = s.split("=")
+                ret.put(arr[0], URLDecoder.decode(arr[1], 'utf-8'))
+            }
+            return Collections.unmodifiableMap(ret)
+        }
+        Collections.emptyMap()
+    }()
+
+    @Lazy Map<String, Object> jsonParams = {
+        if (bodyStr && getHeader('content-type')?.contains('application/json')) {
+            return JSON.parseObject(bodyStr)
+        }
+        Collections.emptyMap()
+    }()
+
 
     String getHeader(String hName) {headers.get(hName)}
 
@@ -29,4 +71,5 @@ class HttpRequest {
     String getMethod() { return method }
     String getRowUrl() { return rowUrl }
     String getVersion() { return version }
+    String getBodyStr() {return bodyStr}
 }

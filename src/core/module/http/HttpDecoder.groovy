@@ -49,10 +49,10 @@ class HttpDecoder {
             String headerLine = readLine(buf)
             if (!headerLine || '\r' == headerLine) break
             int index = headerLine.indexOf(":")
-            req.headers.put(headerLine.substring(0, index), headerLine.substring(index + 1)?.trim())
+            req.headers.put(headerLine.substring(0, index).toString(), headerLine.substring(index + 1)?.trim())
         } while (true)
         // [Cookie:USER_ID_ANONYMOUS=28f34d1a1137476994fda617d2777b7c; DETECTED_VERSION=1.8.1; MAIN_NAV_ACTIVE_TAB_INDEX=1; PAGINATION_PAGE_SIZE=10; mntLogin=true; name=admin; roles=admin; Cache-Control=max-age=120; uId=4028b88173142d470173142d52700000; JSESSIONID=xPzSn1KxdBnxGU2fp_jYI4vWtdSduKAB2A64Q3R4, Accept:*/*, Connection:keep-alive, User-Agent:Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.25 Safari/537.36 Core/1.70.3766.400 QQBrowser/10.6.4163.400, Host:localhost:9090, Accept-Encoding:gzip, deflate, br, Accept-Language:zh-CN,zh;q=0.9]
-        log.info("headers: " + req.headers)
+        // log.info("headers: " + req.headers)
     }
 
 
@@ -62,7 +62,12 @@ class HttpDecoder {
      * @param buf
      */
     static protected void body(HttpRequest req, ByteBuffer buf) {
-
+        def lStr = req.getHeader('content-length')
+        if (lStr) {
+            byte[] bs = new byte[Integer.valueOf(lStr)]
+            buf.get(bs)
+            req.bodyStr = new String(bs, 'utf-8')
+        }
     }
 
 
