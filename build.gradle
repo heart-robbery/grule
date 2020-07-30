@@ -12,6 +12,11 @@ version = '1.2.0'
 apply plugin: 'groovy'
 
 
+compileGroovy { // 保留方法参数的名字(非arg0/arg1...)
+    groovyOptions.parameters = true
+}
+
+
 // 修改源目录
 sourceSets {
     main {
@@ -85,7 +90,7 @@ dependencies {
     // 异步sql
     // compile 'com.github.jasync-sql:jasync-mysql:1.0.12'
 
-    // compile 'org.t-io:tio-core:3.6.0.v20200315-RELEASE'
+    compile 'org.t-io:tio-core:3.6.0.v20200315-RELEASE'
     // compile 'org.t-io:tio-http-server:3.6.0.v20200315-RELEASE'
     // compile 'org.t-io:tio-websocket-server:3.6.0.v20200315-RELEASE'
 

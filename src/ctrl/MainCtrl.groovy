@@ -9,7 +9,7 @@ import service.FileUploader
 
 import java.util.stream.Collectors
 
-import static ctrl.common.ApiResp.ok
+import static core.module.http.mvc.ApiResp.ok
 
 
 class MainCtrl extends CtrlTpl {

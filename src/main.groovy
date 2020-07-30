@@ -2,9 +2,11 @@ import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import core.AppContext
 import core.module.*
+import core.module.http.HttpServer
 import core.module.jpa.HibernateSrv
 import ctrl.MainCtrl
 import ctrl.TestCtrl
+import ctrl.TestCtrl2
 import ctrl.ratpack.RatpackWeb
 import dao.entity.Component
 import dao.entity.Test
@@ -30,6 +32,7 @@ app.addSource(new RedisClient())
 app.addSource(new Remoter())
 app.addSource(new HibernateSrv().entities(Test, VersionFile, Component))
 app.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl))
+app.addSource(new HttpServer('web2').ctrls(TestCtrl2))
 app.addSource(new FileUploader())
 app.addSource(new TestService())
 app.addSource(this)

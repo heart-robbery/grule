@@ -2,7 +2,7 @@ package ctrl
 
 import core.Utils
 import core.module.ServerTpl
-import ctrl.common.ApiResp
+import core.module.http.mvc.ApiResp
 import io.netty.handler.codec.http.HttpResponseStatus
 import ratpack.exec.Promise
 import ratpack.form.Form

@@ -5,10 +5,7 @@ import core.Utils
 import core.module.ServerTpl
 import core.module.http.mvc.Chain
 import core.module.http.mvc.Path
-import ctrl.CtrlTpl
-import ctrl.common.ApiResp
 
-import java.lang.reflect.Method
 import java.nio.channels.AsynchronousChannelGroup
 import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.AsynchronousSocketChannel
@@ -24,7 +21,7 @@ class HttpServer extends ServerTpl {
     @Lazy           String                                                   hp      = getStr('hp', ":9090")
     @Lazy           Integer                                                  port    = hp.split(":")[1] as Integer
     protected final Chain                                                    chain   = new Chain()
-    protected final List<CtrlTpl>                                            ctrls   = new LinkedList<>()
+    protected final List                                            ctrls   = new LinkedList<>()
     // 是否可用
     boolean                       enabled     = false
 
@@ -57,7 +54,7 @@ class HttpServer extends ServerTpl {
 
 
     @EL(name = 'sys.started', async = true)
-    protected void started() { ctrls.each {ep.fire('inject', it)}; enabled = true }
+    protected void started() { ctrls.each {app.inject(it)}; enabled = true }
 
 
     /**
@@ -73,36 +70,60 @@ class HttpServer extends ServerTpl {
     }
 
 
-    HttpServer ctrls(Class<CtrlTpl>...clzs) {
-        if (!clzs) return this
-        clzs.each {clz -> ctrls.add(clz.newInstance())}
+    /**
+     * 添加
+     * @param clzs
+     * @return
+     */
+    HttpServer ctrls(Class...clzs) {
+        clzs?.each {clz -> ctrls.add(clz.newInstance()) }
         this
     }
 
 
     protected void initChain() {
         def fn = {Object ctrl, Chain ch ->
+            def parantAnno = ctrl.class.getAnnotation(Path)
             Utils.iterateMethod(ctrl.class, { method ->
                 def anno = method.getAnnotation(Path)
                 if (!anno) return
+                log.info("Add request mapping: " + ((parantAnno && parantAnno.path() ? parantAnno.path() + "/" : '') + anno.path()))
 
+                def ps = method.getParameters()
                 // 实际@Path 方法 调用
-                if (anno.path() == null) {
-                    ch.all{invoke(ctrl, it, method)}
-                } else {
-                    if (anno.method() == null) {
-                        ch.path(anno.path()) {invoke(ctrl, it, method)}
-                    } else {
-                        if ('get'.equalsIgnoreCase(anno.method())) {
-                            ch.get(anno.path()) {invoke(ctrl, it, method)}
-                        } else if ('post'.equalsIgnoreCase(anno.method())) {
-                            ch.post(anno.path()) {invoke(ctrl, it, method)}
-                        }
+                def invoke = {HttpContext ctx ->
+                    def result = method.invoke(
+                        ctrl,
+                        ps.collect {p ->
+                            if (p instanceof HttpContext) return ctx
+                            else if (p instanceof Consumer && void.class.isAssignableFrom(method.returnType)) {
+                                return {r -> ctx.render(r)} as Consumer
+                            }
+                            ctx.param(p.name, p.type)
+                        }.toArray()
+                    )
+                    if (!void.class.isAssignableFrom(method.returnType)) {
+                        ctx.render(result)
                     }
+                }
+
+                if (anno.path()) {
+                    if (anno.method()) {
+                        if ('get'.equalsIgnoreCase(anno.method())) {
+                            ch.get(anno.path()) {invoke(it)}
+                        } else if ('post'.equalsIgnoreCase(anno.method())) {
+                            ch.post(anno.path()) {invoke(it)}
+                        }
+                    } else {
+                        ch.path(anno.path()) {invoke(it)}
+                    }
+                } else {
+                    ch.all{invoke(it)}
                 }
             })
         }
         ctrls?.each {ctrl ->
+            ep.addListenerSource(ctrl)
             def anno = ctrl.class.getAnnotation(Path)
             if (anno) {
                 chain.prefix(anno.path(), {ch -> fn(ctrl, ch)})
@@ -119,30 +140,17 @@ class HttpServer extends ServerTpl {
     }
 
 
+    HttpServer errorHandle(Consumer<Exception> errorHandler) {
+        chain.errorHandler = errorHandler
+        this
+    }
+
+
     /**
      * 接收新连接
      */
     protected void accept() {
         ssc.accept(this, handler)
-    }
-
-
-    protected void invoke(Object ctrl, HttpContext ctx, Method method) {
-        def result
-        try {
-            result = method.invoke(
-                ctrl,
-                method.getParameters().collect {p ->
-                    ctx.param(p.name, p.type)
-                }.toArray()
-            )
-
-        } catch (ex) {
-            result = ApiResp.fail(ex.message)
-        }
-        if (!void.class.isAssignableFrom(method.returnType)) {
-            ctx.render(result)
-        }
     }
 
 

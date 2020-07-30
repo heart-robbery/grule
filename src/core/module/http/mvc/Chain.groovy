@@ -10,6 +10,7 @@ class Chain {
     // path 前缀
     protected String prefix
     protected final LinkedList<Handler> handlers = new LinkedList<>()
+    protected Consumer<Exception> errorHandler
 
 
     /**
@@ -22,28 +23,48 @@ class Chain {
             match = h.match(ctx)
             if (match) h.handle(ctx)
             // 找到完全匹配的handler 则退出
-            if ((match && h.path() != null) || ctx.response.commit.get()) break
+            if ((ctx.response.status() != null) || (match && h.path() != null) || ctx.response.commit.get()) break
         }
         if (!match) {
-            ctx.response.status(404)
+            if (ctx.response.status() == null) ctx.response.status(404)
+            ctx.render(null)
+        }
+        else if (ctx.response.status() != null && !ctx.response.commit.get()) {
             ctx.render(null)
         }
     }
 
 
-    Chain all(Handler handler) {
-        if (handler.path() == null) handlers.add(handler)
+    Chain all(final Handler handler) {
+        Handler wrapper = new Handler() { // 包装异常处理
+            @Override
+            void handle(HttpContext ctx) {
+                try {
+                    handler.handle(ctx)
+                } catch (ex) {
+                    if (errorHandler) {
+                        errorHandler.accept(ex)
+                        ctx.close()
+                    }
+                    else {
+                        ctx.close()
+                        throw ex
+                    }
+                }
+            }
+        }
+        if (wrapper.path() == null) handlers.add(wrapper)
         else {
             boolean added = false
             for (def it = handlers.listIterator(); it.hasNext(); ) {
                 def h = it.next()
-                if (h.priority > handler.priority) { // priority 值越小越排前面, 相同的按顺序排
+                if (h.priority > wrapper.priority) { // priority 值越小越排前面, 相同的按顺序排
                     added = true
-                    it.add(handler)
+                    it.add(wrapper)
                 }
             }
             if (!added) {
-                handlers.add(handler)
+                handlers.add(wrapper)
             }
         }
         this
@@ -67,40 +88,40 @@ class Chain {
 
 
     Chain get(String path, Handler handler) {
-        all(new Handler() {
+        path(path, new Handler() {
             @Override
             void handle(HttpContext ctx) {
                 handler.handle(ctx)
             }
             @Override
             boolean match(HttpContext ctx) {
+                boolean f = super.match(ctx)
                 if (!'get'.equalsIgnoreCase(ctx.request.method)) {
+                    ctx.response.status(415)
                     return false
                 }
-                return super.match(ctx)
+                return f
             }
-            @Override
-            String path() { return (prefix == null ? '' : prefix + "/") + path }
         })
         this
     }
 
 
     Chain post(String path, Handler handler) {
-        all(new Handler() {
+        path(path, new Handler() {
             @Override
             void handle(HttpContext ctx) {
                 handler.handle(ctx)
             }
             @Override
             boolean match(HttpContext ctx) {
+                boolean f = super.match(ctx)
                 if (!'post'.equalsIgnoreCase(ctx.request.method)) {
+                    ctx.response.status(415)
                     return false
                 }
-                return super.match(ctx)
+                return f
             }
-            @Override
-            String path() { return (prefix == null ? '' : prefix + "/") + path }
         })
         this
     }
@@ -109,12 +130,12 @@ class Chain {
     Chain prefix(String prefix, Consumer<Chain> handlerBuilder) {
         prefix = Handler.extract(prefix)
         all(new Handler() {
-            @Lazy Chain chain = {
+            final Chain chain = {
                 Chain c = new Chain()
                 handlerBuilder.accept(c)
                 c.prefix = prefix
                 c
-            }
+            }()
 
             @Override
             String path() { return prefix }

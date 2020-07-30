@@ -1,4 +1,4 @@
-package ctrl.common
+package core.module.http.mvc
 
 import groovy.transform.ToString
 

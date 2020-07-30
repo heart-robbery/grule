@@ -4,7 +4,7 @@ import cn.xnatural.enet.event.EL
 import core.Utils
 import core.module.OkHttpSrv
 import core.module.ServerTpl
-import ctrl.common.FileData
+import core.module.http.mvc.FileData
 
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors

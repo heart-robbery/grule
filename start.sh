@@ -16,6 +16,6 @@ JAVA_OPTS="-Dgroovy.attach.runtime.groovydoc=true $@"
 export JAVA_OPTS
 
 cd src
-sh ../bin/groovy main.groovy
+sh ../bin/groovy -pa main.groovy
 
 # nohup sh start.sh [-Dprofile=pro] -Xms128m -Xmx512m > /dev/null 2>&1 &

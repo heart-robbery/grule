@@ -6,7 +6,7 @@ import java.lang.annotation.*
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @interface Path {
-    String path() default null
-    String method() default null
-    String consumer() default null
+    String path() default ''
+    String method() default ''
+    String consumer() default ''
 }

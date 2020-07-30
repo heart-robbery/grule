@@ -7,7 +7,7 @@ import core.module.EhcacheSrv
 import core.module.RedisClient
 import core.module.ServerTpl
 import ctrl.CtrlTpl
-import ctrl.common.ApiResp
+import core.module.http.mvc.ApiResp
 import io.netty.handler.ssl.SslContextBuilder
 import ratpack.error.internal.ErrorHandler
 import ratpack.handling.Chain

@@ -7,6 +7,8 @@ import com.alibaba.fastjson.JSON
  * http 请求 内容
  */
 class HttpRequest {
+    // 请求的创建时间
+    final Date createTime = new Date()
     // HTTP/HTTPS
     protected String protocol
     // GET/POST
@@ -20,15 +22,18 @@ class HttpRequest {
 
     @Lazy String id = UUID.randomUUID().toString().replace("-", "")
 
+    @Lazy String contentType = getHeader('content-type')
+
+
     // 查询字符串
     @Lazy String queryStr = {
         int i = rowUrl.indexOf("?")
-        i == -1 ? null : rowUrl.substring(i)
+        i == -1 ? null : rowUrl.substring(i + 1)
     }()
 
     @Lazy Map<String, String> queryParams = {
         if (queryStr) {
-            Map<String, String> ret = []
+            Map<String, String> ret = new HashMap<>()
             queryStr.split("&").each {s ->
                 def arr = s.split("=")
                 ret.put(arr[0], URLDecoder.decode(arr[1], 'utf-8'))
@@ -43,14 +48,18 @@ class HttpRequest {
         i == -1 ? rowUrl : rowUrl.substring(0, i)
     }()
 
-    @Lazy Map<String, String> formParams = {
-        if (bodyStr && getHeader('content-type')?.contains('application/x-www-form-urlencoded')) {
-            Map<String, String> ret = []
-            bodyStr.split("&").each {s ->
-                def arr = s.split("=")
-                ret.put(arr[0], URLDecoder.decode(arr[1], 'utf-8'))
+    @Lazy Map<String, Object> formParams = {
+        if (bodyStr) {
+            Map<String, Object> data = new HashMap<>()
+            if (contentType?.contains('application/x-www-form-urlencoded')) {
+                bodyStr.split("&").each {s ->
+                    def arr = s.split("=")
+                    data.put(arr[0], URLDecoder.decode(arr[1], 'utf-8'))
+                }
+                return Collections.unmodifiableMap(data)
+            } else if (contentType?.contains('multipart/form-data')) {
+
             }
-            return Collections.unmodifiableMap(ret)
         }
         Collections.emptyMap()
     }()
