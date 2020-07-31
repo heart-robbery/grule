@@ -119,7 +119,8 @@ class AioServer extends ServerTpl {
                 sc.setOption(StandardSocketOptions.SO_REUSEADDR, true)
                 sc.setOption(StandardSocketOptions.SO_RCVBUF, 64 * 1024)
                 sc.setOption(StandardSocketOptions.SO_SNDBUF, 64 * 1024)
-                sc.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
+                sc.setOption(StandardSocketOptions.TCP_NODELAY, true)
+                // sc.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
 
                 def se = new AioSession(sc, srv.exec)
                 msgFns?.each {se.msgFn(it)}
@@ -138,13 +139,13 @@ class AioServer extends ServerTpl {
             final AtomicBoolean end = new AtomicBoolean(false)
             long cur = System.currentTimeMillis()
             sched?.dyn({
-                if (System.currentTimeMillis() - (se.lastReadTime?:cur) > expire && end.compareAndSet(false, true)) {
+                if (System.currentTimeMillis() - (se.lastUsed?:cur) > expire && end.compareAndSet(false, true)) {
                     log.info("Closing expired AioSession: " + se)
                     se.close()
                 }
             }, {
                 if (end.get()) return null
-                long left = expire - (System.currentTimeMillis() - (se.lastReadTime?:cur))
+                long left = expire - (System.currentTimeMillis() - (se.lastUsed?:cur))
                 if (left < 1000L) return new Date(System.currentTimeMillis() + (1000L * 30)) // 执行函数之前会计算下次执行的时间
                 def d = new Date(System.currentTimeMillis() + (left?:0) + 10L)
                 d
