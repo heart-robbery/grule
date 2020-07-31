@@ -23,9 +23,7 @@ class HttpContext {
     }
 
 
-    void close() {
-        aioSession?.close()
-    }
+    void close() { aioSession?.close() }
 
 
     /**
@@ -75,6 +73,20 @@ class HttpContext {
 
         if (body instanceof String) sb.append(body)
         aioSession.send(sb.toString())
+
+        determineClose()
+    }
+
+
+    /**
+     * 判断是否应该关闭此次Http连接会话
+     */
+    protected void determineClose() {
+        String connection = request.getHeader('connection')
+        if (connection?.containsIgnoreCase('close')) {
+            // http/1.1 规定 只有显示 connection:close 才关闭连接
+            close()
+        }
     }
 
 

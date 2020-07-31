@@ -1,5 +1,6 @@
 package core.module.http
 
+import core.module.http.mvc.FileData
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -58,16 +59,71 @@ class HttpDecoder {
 
     /**
      * 解析: 请求体
-     * @param req
+     * @param request
      * @param buf
      */
-    static protected void body(HttpRequest req, ByteBuffer buf) {
-        def lStr = req.getHeader('content-length')
-        if (lStr) {
-            byte[] bs = new byte[Integer.valueOf(lStr)]
+    static protected void body(HttpRequest request, ByteBuffer buf) {
+        if (request.contentType.containsIgnoreCase('application/json') ||
+            request.contentType.containsIgnoreCase('application/x-www-form-urlencoded') ||
+            request.contentType.containsIgnoreCase('text/plain')
+        ) {
+            byte[] bs = new byte[Integer.valueOf(request.getHeader('content-length'))]
             buf.get(bs)
-            req.bodyStr = new String(bs, 'utf-8')
+            request.bodyStr = new String(bs, 'utf-8')
+        } else if (request.contentType.containsIgnoreCase('multipart/form-data')) {
+            // HttpMultiBodyDecoder
+            String boundary = '--' + request.boundary
+            String endLine = boundary + '--'
+
+            part: do {
+                String line = readLine(buf)
+                if (line == endLine) break part
+                if (line == boundary) {
+                    // 读参数名: 从header Content-Disposition 中读取参数名 和文件名
+                    String name
+                    String filename
+                    header: do {
+                        line = readLine(buf)
+                        if ('' == line) break header
+                        else if (line.containsIgnoreCase('Content-Disposition')) {
+                            line.split(': ')[1].split(';').each {entry ->
+                                def arr = entry.split('=')
+                                if (arr.length > 1) {
+                                    if (arr[0] == 'name') name = arr[1]
+                                    else if (arr[0] == 'filename') filename = arr[1]
+                                }
+                            }
+                        }
+                    } while (true)
+
+                    // 读参数值
+                    if (filename) {
+                        int index = getDelimIndex(buf, boundary.getBytes('utf-8'))
+                        request.formParams.put(name, new FileData(originName: filename))
+                    } else {
+                        String value = readLine(buf)
+                        request.formParams.put(name, URLDecoder.decode(value, 'utf-8'))
+                    }
+                }
+            } while (true)
         }
+    }
+
+    // 查找分割符所匹配下标
+    protected static int getDelimIndex(ByteBuffer buffer, byte[] delim) {
+        byte[] hb = buffer.array()
+        int delimIndex = -1 // 分割符所在的下标
+        for (int i = buffer.position(), size = buffer.limit(); i < size; i++) {
+            boolean match = true // 是否找到和 delim 相同的字节串
+            for (int j = 0; j < delim.length; j++) {
+                match = match && (i + j < size) && delim[j] == hb[i + j]
+            }
+            if (match) {
+                delimIndex = i
+                break
+            }
+        }
+        return delimIndex
     }
 
 
@@ -76,14 +132,14 @@ class HttpDecoder {
      * @param buf
      * @return
      */
-    static final byte[] delim = '\n'.getBytes('utf-8')
+    static final byte[] lienDelim = '\n'.getBytes('utf-8')
     static protected String readLine(ByteBuffer buf) {
         int index = getLineIndex(buf)
         int readableLength = index - buf.position()
         byte[] bs = new byte[readableLength]
         buf.get(bs)
         // 跳过 分割符的长度
-        for (int i = 0; i < delim.length; i++) {buf.get()}
+        for (int i = 0; i < lienDelim.length; i++) {buf.get()}
         new String(bs, 'utf-8')
     }
 
@@ -94,8 +150,8 @@ class HttpDecoder {
         int delimIndex = -1 // 分割符所在的下标
         for (int i = buf.position(), size = buf.limit(); i < size; i++) {
             boolean match = true // 是否找到和 delim 相同的字节串
-            for (int j = 0; j < delim.length; j++) {
-                match = match && (i + j < size) && delim[j] == hb[i + j]
+            for (int j = 0; j < lienDelim.length; j++) {
+                match = match && (i + j < size) && lienDelim[j] == hb[i + j]
             }
             if (match) {
                 delimIndex = i

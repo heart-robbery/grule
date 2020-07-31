@@ -18,6 +18,10 @@
       "description": "local"
     },
     {
+      "url": "http://localhost:9090",
+      "description": "local2"
+    },
+    {
       "url": "https://virtserver.swaggerhub.com/xnat2/gy1/1.0.0",
       "description": "SwaggerHub API Auto Mocking"
     }
@@ -48,7 +52,7 @@
                 "properties": {
                   "file": {
                     "required": true,
-                    "type": "string",
+                    "type": "file",
                     "format": "binary"
                   },
                   "p1": {

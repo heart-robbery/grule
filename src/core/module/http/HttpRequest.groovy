@@ -24,6 +24,13 @@ class HttpRequest {
 
     @Lazy String contentType = getHeader('content-type')
 
+    @Lazy String boundary = {
+        if (contentType.containsIgnoreCase('multipart/form-data')) {
+            return contentType.split(";")[1].split("=")[1]
+        }
+        null
+    }()
+
 
     // 查询字符串
     @Lazy String queryStr = {
@@ -49,19 +56,14 @@ class HttpRequest {
     }()
 
     @Lazy Map<String, Object> formParams = {
-        if (bodyStr) {
-            Map<String, Object> data = new HashMap<>()
-            if (contentType?.contains('application/x-www-form-urlencoded')) {
-                bodyStr.split("&").each {s ->
-                    def arr = s.split("=")
-                    data.put(arr[0], URLDecoder.decode(arr[1], 'utf-8'))
-                }
-                return Collections.unmodifiableMap(data)
-            } else if (contentType?.contains('multipart/form-data')) {
-
+        Map<String, Object> data = new HashMap<>()
+        if (bodyStr && contentType?.contains('application/x-www-form-urlencoded')) {
+            bodyStr.split("&").each {s ->
+                def arr = s.split("=")
+                data.put(arr[0], URLDecoder.decode(arr[1], 'utf-8'))
             }
         }
-        Collections.emptyMap()
+        data
     }()
 
     @Lazy Map<String, Object> jsonParams = {

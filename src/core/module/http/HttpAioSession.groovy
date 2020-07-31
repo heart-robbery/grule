@@ -8,6 +8,7 @@ import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.ClosedChannelException
 import java.nio.channels.CompletionHandler
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.function.Consumer
 
 /**
@@ -22,6 +23,9 @@ class HttpAioSession {
     // close 回调函数
     protected              Runnable                  closeFn
     protected              Consumer<HttpRequest>     handler
+    // 上次读写时间
+    protected              Long                      lastUsed
+    protected final        AtomicBoolean             closed      = new AtomicBoolean(false)
 
 
     HttpAioSession(AsynchronousSocketChannel sc, ExecutorService exec) {
@@ -41,7 +45,12 @@ class HttpAioSession {
     /**
      * 关闭
      */
-    void close() {sc?.close(); closeFn?.run()}
+    void close() {
+        if (closed.compareAndSet(false, true)) {
+            sc?.shutdownOutput(); sc?.shutdownInput(); sc?.close()
+            closeFn?.run()
+        }
+    }
 
 
     /**
@@ -50,10 +59,11 @@ class HttpAioSession {
      */
     void send(String msg) {
         if (msg == null) return
+        lastUsed = System.currentTimeMillis()
         try {
             sc.write(ByteBuffer.wrap(msg.getBytes('utf-8'))).get()
-        } catch (ClosedChannelException ex) {
-            log.error("ClosedChannelException " + sc.localAddress.toString() + " ->" + sc.remoteAddress.toString())
+        } catch (ex) {
+            log.error(ex.class.simpleName + " " + sc.localAddress.toString() + " ->" + sc.remoteAddress.toString())
             close()
         }
     }
@@ -63,6 +73,7 @@ class HttpAioSession {
      * 继续处理接收数据
      */
     protected void read() {
+        if (closed.get()) throw new RuntimeException("已关闭 " + this)
         buf.clear()
         sc.read(buf, buf, readHandler)
     }
@@ -70,19 +81,21 @@ class HttpAioSession {
 
     protected class ReadHandler implements CompletionHandler<Integer, ByteBuffer> {
         final HttpAioSession session
+        final ByteBuffer buffer = ByteBuffer.allocate(buf.capacity() * 2)
 
         ReadHandler(HttpAioSession session) { assert session != null; this.session = session }
 
         @Override
         void completed(Integer count, ByteBuffer buf) {
             if (count > 0) {
+                lastUsed = System.currentTimeMillis()
                 buf.flip()
                 handler?.accept(HttpDecoder.decode(buf))
                 // 避免 ReadPendingException
                 session.read()
             }
             else {
-                log.warn(session.sc.remoteAddress.toString() + "接收字节为空. 关闭")
+                log.warn("接收字节为空. 关闭 " + session.sc.toString())
                 session.close()
             }
         }
