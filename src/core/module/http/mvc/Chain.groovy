@@ -1,16 +1,15 @@
 package core.module.http.mvc
 
 import core.module.http.HttpContext
+import org.slf4j.LoggerFactory
 
-import java.util.concurrent.ConcurrentHashMap
+import java.util.function.BiConsumer
 import java.util.function.Consumer
 
 class Chain {
-
-    // path 前缀
-    protected String prefix
+    protected static final def log = LoggerFactory.getLogger(Chain)
     protected final LinkedList<Handler> handlers = new LinkedList<>()
-    protected Consumer<Exception> errorHandler
+    protected BiConsumer<Exception, HttpContext> errorHandler
 
 
     /**
@@ -21,37 +20,47 @@ class Chain {
         boolean match = false
         for (Handler h: handlers) {
             match = h.match(ctx)
+            log.trace((match ? 'Matched' : 'Unmatch') + " {}, {}", h.path(), ctx.request.path)
             if (match) h.handle(ctx)
-            // 找到完全匹配的handler 则退出
-            if ((ctx.response.status() != null) || (match && h.path() != null) || ctx.response.commit.get()) break
+            // 退出条件
+            if ((match && h.path() != null) || // 路径匹配
+                ctx.response.commit.get() // 已经提交
+            ) break
         }
-        if (!match) {
-            if (ctx.response.status() == null) ctx.response.status(404)
-            ctx.render(null)
+        if (ctx.response.commit.get()) return
+        if (!match) { // 未找到匹配
+            ctx.response.statusIfNotSet(404)
+            ctx.render()
         }
-        else if (ctx.response.status() != null && !ctx.response.commit.get()) {
-            ctx.render(null)
+        else if (ctx.response.status != null) { // 已经设置了status
+            ctx.render()
         }
     }
 
 
     Chain all(final Handler handler) {
-        Handler wrapper = new Handler() { // 包装异常处理
+        final Handler wrapper = new Handler() { // 包装异常处理
             @Override
             void handle(HttpContext ctx) {
                 try {
                     handler.handle(ctx)
                 } catch (ex) {
                     if (errorHandler) {
-                        errorHandler.accept(ex)
+                        errorHandler.accept(ex, ctx)
                         ctx.close()
                     }
                     else {
+                        ctx.response.status(500)
+                        ctx.render(null)
                         ctx.close()
                         throw ex
                     }
                 }
             }
+            @Override
+            String path() { handler.path() }
+            @Override
+            boolean match(HttpContext ctx) { handler.match(ctx) }
         }
         if (wrapper.path() == null) handlers.add(wrapper)
         else {
@@ -60,6 +69,7 @@ class Chain {
                 def h = it.next()
                 if (h.priority > wrapper.priority) { // priority 值越小越排前面, 相同的按顺序排
                     added = true
+                    it.previous()
                     it.add(wrapper)
                 }
             }
@@ -80,7 +90,7 @@ class Chain {
                 }
 
                 @Override
-                String path() { return (prefix == null ? '' : prefix + "/") + path }
+                String path() { return path }
             }
         )
         this
@@ -100,6 +110,7 @@ class Chain {
                     ctx.response.status(415)
                     return false
                 }
+                if (415 == ctx.response.status) ctx.response.status(200)
                 return f
             }
         })
@@ -120,6 +131,7 @@ class Chain {
                     ctx.response.status(415)
                     return false
                 }
+                if (415 == ctx.response.status) ctx.response.status(200)
                 return f
             }
         })
@@ -133,7 +145,6 @@ class Chain {
             final Chain chain = {
                 Chain c = new Chain()
                 handlerBuilder.accept(c)
-                c.prefix = prefix
                 c
             }()
 
@@ -142,7 +153,9 @@ class Chain {
 
             @Override
             boolean match(HttpContext ctx) {
-                return extract(ctx.request.path).split('/')[0] == prefix
+                boolean f = ctx.pieces[0] == prefix
+                if (f) ctx.pieces = ctx.pieces.drop(1)
+                f
             }
 
             @Override
@@ -151,32 +164,5 @@ class Chain {
             }
         })
         this
-    }
-
-
-
-    /**
-     * 路径匹配
-     * @param pathTpl 路径模板
-     * @param path 请求路径
-     * @return 是否匹配
-     */
-    protected final Map<String, Map<String, Boolean>> matchResult = new ConcurrentHashMap<>()
-    boolean match(String pathTpl, String path) {
-        Map<String, Boolean> cache = matchResult.computeIfAbsent(pathTpl, {new ConcurrentHashMap<>()})
-        Boolean match = cache.get(path)
-        if (match == null) {
-            path = prefix == null ? path : path.replace(prefix + '/', '')
-            def arr1 = path.split("/")
-            def arr2 = pathTpl.split("/")
-        }
-        match
-    }
-
-
-    protected String[] split(String path) {
-        if (path.endsWith("/")) path = path.substring(0, path.length() - 2)
-        if (path.startsWith("/")) path = path.substring(1)
-        path.split("/")
     }
 }

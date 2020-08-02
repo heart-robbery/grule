@@ -3,6 +3,9 @@ package core.module.http
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.serializer.SerializerFeature
 import core.module.http.mvc.ApiResp
+import core.module.http.mvc.Handler
+
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * http 请求 处理上下文
@@ -10,27 +13,37 @@ import core.module.http.mvc.ApiResp
 class HttpContext {
     final HttpRequest         request
     protected final HttpAioSession      aioSession
+    protected final HttpServer server
     final HttpResponse        response
     final Map<String, Object> pathToken = new HashMap<>(7)
+    // 路径块
+    protected String[] pieces
+    protected final        AtomicBoolean closed      = new AtomicBoolean(false)
 
 
-    HttpContext(HttpRequest request, HttpAioSession aioSession) {
-        assert request
-        assert aioSession
+
+    HttpContext(HttpRequest request, HttpServer server) {
+        assert request : 'request must not be null'
         this.request = request
-        this.aioSession = aioSession
+        this.aioSession = request.session
+        this.server = server
         this.response = new HttpResponse()
+        this.pieces = Handler.extract(request.path).split('/')
     }
 
 
-    void close() { aioSession?.close() }
+    void close() {
+        if (closed.compareAndSet(false, true)) {
+            aioSession?.close()
+        }
+    }
 
 
     /**
      * 响应请求
      * @param body
      */
-    void render(Object body) {
+    void render(Object body = null) {
         boolean f = response.commit.compareAndSet(false, true)
         if (!f) throw new Exception("已经提交过")
 
@@ -56,11 +69,13 @@ class HttpContext {
             if (!response.header('content-length')) {
                 response.header('content-length', body.size())
             }
+        } else if (body == null) {
+            response.statusIfNotSet(202)
         } else {
             throw new Exception("不支持的类型 " + body.getClass())
         }
+        response.statusIfNotSet(200)
 
-        if (response.status() == null) response.status(200)
         StringBuilder sb = new StringBuilder()
         sb.append("HTTP/1.1 $response.status ${HttpResponse.statusMsg[(response.status)]}\n".toString()) // 起始行
         response.headers.each { e ->

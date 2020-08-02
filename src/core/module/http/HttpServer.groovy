@@ -13,6 +13,7 @@ import java.nio.channels.CompletionHandler
 import java.text.SimpleDateFormat
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.LongAdder
+import java.util.function.BiConsumer
 import java.util.function.Consumer
 
 class HttpServer extends ServerTpl {
@@ -43,8 +44,8 @@ class HttpServer extends ServerTpl {
         if (host) {addr = new InetSocketAddress(host, port)}
 
         ssc.bind(addr, getInteger('backlog', 100))
-        log.info("Start listen HTTP(AIO) {}", port)
         initChain()
+        log.info("Start listen HTTP(AIO) {}", port)
         accept()
     }
 
@@ -60,12 +61,11 @@ class HttpServer extends ServerTpl {
     /**
      * 接收新的 http 请求
      * @param request
-     * @param session
      */
-    protected void receive(HttpRequest request, HttpAioSession session) {
-        log.info("Start Request '{}': {}. from: " + session.sc.remoteAddress.toString(), request.id, request.rowUrl)
+    protected void receive(HttpRequest request) {
+        log.info("Start Request '{}': {}. from: " + request.session.sc.remoteAddress.toString(), request.id, request.rowUrl)
         count()
-        chain.handle(new HttpContext(request, session))
+        chain.handle(new HttpContext(request, this))
         // dispatcher.dispatch()
     }
 
@@ -81,6 +81,9 @@ class HttpServer extends ServerTpl {
     }
 
 
+    /**
+     * 初始化Chain
+     */
     protected void initChain() {
         def fn = {Object ctrl, Chain ch ->
             def parantAnno = ctrl.class.getAnnotation(Path)
@@ -140,7 +143,12 @@ class HttpServer extends ServerTpl {
     }
 
 
-    HttpServer errorHandle(Consumer<Exception> errorHandler) {
+    /**
+     * 错误处理
+     * @param errorHandler
+     * @return
+     */
+    HttpServer errorHandle(BiConsumer<Exception, HttpContext> errorHandler) {
         chain.errorHandler = errorHandler
         this
     }
@@ -197,9 +205,7 @@ class HttpServer extends ServerTpl {
                 sc.setOption(StandardSocketOptions.SO_RCVBUF, 64 * 1024)
                 sc.setOption(StandardSocketOptions.SO_SNDBUF, 64 * 1024)
                 sc.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
-                def se = new HttpAioSession(sc, srv.exec)
-                se.handler = {req -> receive(req, se)}
-                se.start()
+                new HttpAioSession(sc, srv).start()
             }
             // 继续接入
             srv.accept()

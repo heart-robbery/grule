@@ -36,8 +36,7 @@ abstract class Handler {
      */
     boolean match(HttpContext ctx) {
         if (path() == null) return true
-        String p = extract(ctx.request.path)
-        String[] pieces2 = p.split('/')
+        String[] pieces2 = ctx.pieces
         if (pieces.length != pieces2.length) return false
         for (int i = 0; i < pieces.length; i++) {
             if (pieces[i].startsWith(":")) {

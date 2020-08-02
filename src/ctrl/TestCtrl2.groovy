@@ -17,6 +17,7 @@ class TestCtrl2 extends ServerTpl {
 
     @Path(path = 'cus')
     String cus(String p1) {
+        log.info("here ================")
         return 'p1: ' + p1 + ", " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())
     }
 }

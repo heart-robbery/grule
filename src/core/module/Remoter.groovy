@@ -500,7 +500,7 @@ class Remoter extends ServerTpl {
                 } else if (e['tcp'] == data['tcp']) {
                     iter.remove()
                     log.info("Drop same tcp node: {}", e)
-                } else if (System.currentTimeMillis() - e['_uptime'] > getInteger("dropAppTimeout", 15) * 60 * 1000) {
+                } else if (System.currentTimeMillis() - e['_uptime'] > getInteger("dropAppTimeout", 15) * 60 * 1000 && e['id'] != app.id) {
                     iter.remove()
                     log.warn("Drop timeout node: {}", e)
                 }

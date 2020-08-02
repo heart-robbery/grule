@@ -21,14 +21,18 @@ class FileData {
      * 大小
      */
     Long                  size
+    /**
+     * 文件扩展名(后缀)
+     */
+    String extension
 
 
     FileData setOriginName(String fName) {
         this.originName = fName
         def extension = FileUploader.extractFileExtension(fName)
+        this.extension = extension
         def id = UUID.randomUUID().toString().replace('-', '')
         finalName = (extension ? (id + '.' + extension) : id)
         this
     }
-
 }

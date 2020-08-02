@@ -5,125 +5,248 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 import java.nio.ByteBuffer
+import java.util.function.Function
 
+/**
+ * 流式解析
+ */
 class HttpDecoder {
-
     static final Logger log = LoggerFactory.getLogger(HttpDecoder)
+    final HttpRequest request
+    // 请求收到的字节长度
+    protected long size
+    // 解析是否完成
+    protected boolean complete
+    protected final Queue<Function<ByteBuffer, Boolean>> steps = new LinkedList<>()
+    protected String charset = 'utf-8'
+    // 保存上传的临时文件
+    protected List<File> tmpFiles = new LinkedList<>()
+    // 当前读到哪个Part
+    protected Part curPart
+    @Lazy String boundary = {
+        if (request.contentType.containsIgnoreCase('multipart/form-data')) {
+            return request.contentType.split(";")[1].split("=")[1]
+        }
+        null
+    }()
+    // 解析几次
+    protected int decodeCount
+
+
+    HttpDecoder(HttpRequest request) {
+        this.request = request
+
+        // 创建3步解析流程
+        steps.offer({startLine(it)} as Function<ByteBuffer, Boolean>)
+        steps.offer({header(it)} as Function<ByteBuffer, Boolean>)
+        steps.offer({body(it)} as Function<ByteBuffer, Boolean>)
+    }
+
 
     /**
      * 解析http请求
      * @param buf
      * @return
      */
-    static HttpRequest decode(ByteBuffer buf) {
-        // HttpMethodDecoder
-        HttpRequest req = new HttpRequest()
-        startLine(req, buf)
-        header(req, buf)
-        body(req, buf)
-        return req
+    void decode(ByteBuffer buf) {
+        decodeCount++
+        do {
+            def step = steps.peek()
+            if (step == null) break
+            if (complete = step.apply(buf)) steps.poll()
+            else {
+                // TODO 验证最大 size
+                break
+            }
+        } while (true)
     }
 
 
     /**
      * 解析: 请求起始行
-     * @param req
      * @param buf
      */
-    static protected void startLine(HttpRequest req, ByteBuffer buf) {
+    protected boolean startLine(ByteBuffer buf) {
         String firstLine = readLine(buf)
+        if (firstLine == null) { // 没有一行数据
+            if (decodeCount > 1) {
+                throw new RuntimeException("HTTP start line too manny")
+            }
+            return false
+        }
         def arr = firstLine.split(" ")
-        req.method = arr[0]
-        req.rowUrl = arr[1]
-        req.protocol = arr[2].split("/")[0]
-        req.version = arr[2].split("/")[1]
+        request.method = arr[0]
+        request.rowUrl = arr[1]
+        request.protocol = arr[2].split("/")[0]
+        request.version = arr[2].split("/")[1]
+
+        // TODO 验证
+        return true
     }
 
 
     /**
      * 解析: 请求头
-     * @param req
      * @param buf
      */
-    static protected void header(HttpRequest req, ByteBuffer buf) {
+    protected boolean header(ByteBuffer buf) {
         do {
             String headerLine = readLine(buf)
-            if (!headerLine || '\r' == headerLine) break
+            if (headerLine == null) break
+            if ('\r' == headerLine) return true // 请求头结束
             int index = headerLine.indexOf(":")
-            req.headers.put(headerLine.substring(0, index).toString(), headerLine.substring(index + 1)?.trim())
+            request.headers.put(headerLine.substring(0, index).toString().toLowerCase(), headerLine.substring(index + 1)?.trim())
         } while (true)
         // [Cookie:USER_ID_ANONYMOUS=28f34d1a1137476994fda617d2777b7c; DETECTED_VERSION=1.8.1; MAIN_NAV_ACTIVE_TAB_INDEX=1; PAGINATION_PAGE_SIZE=10; mntLogin=true; name=admin; roles=admin; Cache-Control=max-age=120; uId=4028b88173142d470173142d52700000; JSESSIONID=xPzSn1KxdBnxGU2fp_jYI4vWtdSduKAB2A64Q3R4, Accept:*/*, Connection:keep-alive, User-Agent:Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.25 Safari/537.36 Core/1.70.3766.400 QQBrowser/10.6.4163.400, Host:localhost:9090, Accept-Encoding:gzip, deflate, br, Accept-Language:zh-CN,zh;q=0.9]
         // log.info("headers: " + req.headers)
+        return false
     }
+
 
 
     /**
      * 解析: 请求体
-     * @param request
      * @param buf
      */
-    static protected void body(HttpRequest request, ByteBuffer buf) {
+    protected boolean body(ByteBuffer buf) {
+        if (!request.contentType) return true // get 请求 有可能没得 body
         if (request.contentType.containsIgnoreCase('application/json') ||
             request.contentType.containsIgnoreCase('application/x-www-form-urlencoded') ||
             request.contentType.containsIgnoreCase('text/plain')
         ) {
-            byte[] bs = new byte[Integer.valueOf(request.getHeader('content-length'))]
-            buf.get(bs)
-            request.bodyStr = new String(bs, 'utf-8')
+            String lengthStr = request.getHeader('content-length')
+            if (lengthStr != null) {
+                int length = Integer.valueOf(lengthStr)
+                if (buf.remaining() < length) return false // 数据没接收完
+                byte[] bs = new byte[length]
+                buf.get(bs)
+                request.bodyStr = new String(bs, charset)
+            }
+            return true
         } else if (request.contentType.containsIgnoreCase('multipart/form-data')) {
-            // HttpMultiBodyDecoder
-            String boundary = '--' + request.boundary
-            String endLine = boundary + '--'
-
-            part: do {
-                String line = readLine(buf)
-                if (line == endLine) break part
-                if (line == boundary) {
-                    // 读参数名: 从header Content-Disposition 中读取参数名 和文件名
-                    String name
-                    String filename
-                    header: do {
-                        line = readLine(buf)
-                        if ('' == line) break header
-                        else if (line.containsIgnoreCase('Content-Disposition')) {
-                            line.split(': ')[1].split(';').each {entry ->
-                                def arr = entry.split('=')
-                                if (arr.length > 1) {
-                                    if (arr[0] == 'name') name = arr[1]
-                                    else if (arr[0] == 'filename') filename = arr[1]
-                                }
-                            }
-                        }
-                    } while (true)
-
-                    // 读参数值
-                    if (filename) {
-                        int index = getDelimIndex(buf, boundary.getBytes('utf-8'))
-                        request.formParams.put(name, new FileData(originName: filename))
-                    } else {
-                        String value = readLine(buf)
-                        request.formParams.put(name, URLDecoder.decode(value, 'utf-8'))
-                    }
-                }
-            } while (true)
+            return readMultipart(buf)
         }
     }
 
-    // 查找分割符所匹配下标
-    protected static int getDelimIndex(ByteBuffer buffer, byte[] delim) {
-        byte[] hb = buffer.array()
-        int delimIndex = -1 // 分割符所在的下标
-        for (int i = buffer.position(), size = buffer.limit(); i < size; i++) {
-            boolean match = true // 是否找到和 delim 相同的字节串
-            for (int j = 0; j < delim.length; j++) {
-                match = match && (i + j < size) && delim[j] == hb[i + j]
-            }
-            if (match) {
-                delimIndex = i
-                break
+
+    /**
+     * 遍历读一个part
+     * @param buf
+     * @return true: 读完, false 未读完(数据不够)
+     */
+    protected boolean readMultipart(ByteBuffer buf) {
+        // HttpMultiBodyDecoder
+        String boundary = '--' + boundary
+        String endLine = boundary + '--'
+        if (curPart == null) {
+            do { // 遍历读每个part
+                String line = readLine(buf)
+                if (line == null) return false
+                if (line == endLine) return true // 结束行
+                curPart = new Part(boundary: line)
+
+                if (line == boundary) {
+                    // 读part的header
+                    boolean f = readMultipartHeader(buf)
+                    if (!f) return false
+                    // 读part的值
+                    f = readMultipartValue(buf)
+                    if (f) {
+                        size += curPart.fd?.size
+                        curPart = null // 下一个 Part
+                    } else return false
+                }
+            } while (true)
+        } else if (!curPart.headerComplete) {
+            boolean f = readMultipartHeader(buf)
+            if (f) readMultipart(buf)
+        } else if (!curPart.valueComplete) {
+            boolean f = readMultipartValue(buf)
+            if (f) {
+                size += curPart.fd?.size
+                curPart = null // 下一个 Part
+                readMultipart(buf)
             }
         }
-        return delimIndex
+        return false
+    }
+
+
+    /**
+     * 读 Multipart 中的 Header部分
+     * @param buf
+     * @return true: 读完, false 未读完(数据不够)
+     */
+    protected boolean readMultipartHeader(ByteBuffer buf) {
+        // 读参数名: 从header Content-Disposition 中读取参数名 和文件名
+        do { // 每个part的header
+            String line = readLine(buf)
+            if (null == line) return false
+            else if ('\t' == line) {curPart.headerComplete = true; return true}
+            else if (line.containsIgnoreCase('Content-Disposition')) {
+                line.split(': ')[1].split(';').each {entry ->
+                    def arr = entry.split('=')
+                    if (arr.length > 1) {
+                        if (arr[0] == 'name') curPart.name = arr[1].replace('"', '')
+                        else if (arr[0] == 'filename') curPart.filename = arr[1].replace('"', '')
+                    }
+                }
+            }
+        } while (true)
+        return false
+    }
+
+
+    /**
+     * 读 Multipart 中的 Value 部分
+     * @param buf
+     * @return true: 读完, false 未读完(数据不够)
+     */
+    protected boolean readMultipartValue(ByteBuffer buf) {
+        if (curPart.filename) { // 当前part 是个文件
+            int index = indexOf(buf, ('--' + boundary).getBytes('utf-8'))
+
+            if (curPart.tmpFile == null) { // 临时存放文件
+                curPart.tmpFile = File.createTempFile(request.id, curPart.fd.extension); tmpFiles.add(curPart.tmpFile)
+                if (request.formParams.containsKey(curPart.name)) { // 有多个值
+                    def v = request.formParams.remove(curPart.name)
+                    if (v instanceof List) v.add(curPart.fd)
+                    else {
+                        request.formParams.put(curPart.name, [v, curPart.fd] as LinkedList)
+                    }
+                } else request.formParams.put(curPart.name, curPart.fd)
+            }
+            if (index == -1) {
+                int length = buf.hasRemaining()
+                try(def os = new FileOutputStream(curPart.tmpFile)) {
+                    for (int i = buf.position(); i < length; i++) {os.write(buf.get())}
+                }
+                curPart.fd.size += length
+                return false
+            } else {
+                int length = buf.limit() - buf.position()
+                try(def os = new FileOutputStream(curPart.tmpFile)) {
+                    for (int i = buf.position(); i < length; i++) {os.write(buf.get())}
+                }
+                curPart.valueComplete = true
+                curPart.fd.size += length
+                return true
+            }
+        } else { // 字符串 Part
+            curPart.value = readLine(buf)
+            if (curPart.value != null) {
+                curPart.valueComplete = true
+                if (request.formParams.containsKey(curPart.name)) { // 有多个值
+                    def v = request.formParams.remove(curPart.name)
+                    if (v instanceof List) v.add(curPart.value)
+                    else {
+                        request.formParams.put(curPart.name, [v, curPart.value] as LinkedList)
+                    }
+                } else request.formParams.put(curPart.name, curPart.value)
+                return true
+            }
+            return false
+        }
     }
 
 
@@ -132,26 +255,34 @@ class HttpDecoder {
      * @param buf
      * @return
      */
-    static final byte[] lienDelim = '\n'.getBytes('utf-8')
-    static protected String readLine(ByteBuffer buf) {
-        int index = getLineIndex(buf)
+    static final byte[] lineDelimiter = '\n'.getBytes('utf-8')
+    protected String readLine(ByteBuffer buf) {
+        int index = indexOf(buf, lineDelimiter)
+        if (index == -1) return null
         int readableLength = index - buf.position()
         byte[] bs = new byte[readableLength]
         buf.get(bs)
+        size += readableLength
         // 跳过 分割符的长度
-        for (int i = 0; i < lienDelim.length; i++) {buf.get()}
+        for (int i = 0; i < lineDelimiter.length; i++) {buf.get()}
+        size += lineDelimiter.length
         new String(bs, 'utf-8')
     }
 
 
-    // 查找行分割符所匹配下标
-    static protected int getLineIndex(ByteBuffer buf) {
+    /**
+     * 查找分割符所匹配下标
+     * @param buf
+     * @param delimiter
+     * @return
+     */
+    static int indexOf(ByteBuffer buf, byte[] delimiter) {
         byte[] hb = buf.array()
         int delimIndex = -1 // 分割符所在的下标
         for (int i = buf.position(), size = buf.limit(); i < size; i++) {
             boolean match = true // 是否找到和 delim 相同的字节串
-            for (int j = 0; j < lienDelim.length; j++) {
-                match = match && (i + j < size) && lienDelim[j] == hb[i + j]
+            for (int j = 0; j < delimiter.length; j++) {
+                match = match && (i + j < size) && delimiter[j] == hb[i + j]
             }
             if (match) {
                 delimIndex = i
@@ -159,5 +290,17 @@ class HttpDecoder {
             }
         }
         return delimIndex
+    }
+
+
+    protected class Part {
+        String boundary
+        String name
+        String filename
+        File tmpFile
+        @Lazy def fd = tmpFile ? new FileData(originName: curPart.filename, inputStream: new FileInputStream(tmpFile)) : null
+        boolean headerComplete
+        String value
+        boolean valueComplete
     }
 }

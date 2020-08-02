@@ -18,21 +18,20 @@ class HttpAioSession {
     protected static final Logger                    log         = LoggerFactory.getLogger(HttpAioSession)
     protected final        AsynchronousSocketChannel sc
     protected final                                  readHandler = new ReadHandler(this)
-    protected final                                  buf         = ByteBuffer.allocate(1024 * 10)
-    protected final        ExecutorService           exec
+    protected final                                  buf         = ByteBuffer.allocate(1024 * 30)
+    protected final        HttpServer           server
     // close 回调函数
     protected              Runnable                  closeFn
-    protected              Consumer<HttpRequest>     handler
     // 上次读写时间
     protected              Long                      lastUsed
     protected final        AtomicBoolean             closed      = new AtomicBoolean(false)
 
 
-    HttpAioSession(AsynchronousSocketChannel sc, ExecutorService exec) {
+    HttpAioSession(AsynchronousSocketChannel sc, HttpServer server) {
         assert sc != null: "sc must not be null"
-        assert exec != null: "exec must not be null"
+        assert server != null: "server must not be null"
         this.sc = sc
-        this.exec = exec
+        this.server = server
     }
 
 
@@ -74,14 +73,14 @@ class HttpAioSession {
      */
     protected void read() {
         if (closed.get()) throw new RuntimeException("已关闭 " + this)
-        buf.clear()
         sc.read(buf, buf, readHandler)
     }
 
 
     protected class ReadHandler implements CompletionHandler<Integer, ByteBuffer> {
         final HttpAioSession session
-        final ByteBuffer buffer = ByteBuffer.allocate(buf.capacity() * 2)
+        // 当前解析的请求
+        HttpRequest request
 
         ReadHandler(HttpAioSession session) { assert session != null; this.session = session }
 
@@ -90,7 +89,21 @@ class HttpAioSession {
             if (count > 0) {
                 lastUsed = System.currentTimeMillis()
                 buf.flip()
-                handler?.accept(HttpDecoder.decode(buf))
+
+                if (request == null) {request = new HttpRequest(session)}
+                try {
+                    request.decoder.decode(buf)
+                } catch (ex) {
+                    log.error("HTTP 解析出错", ex)
+                    close(); return
+                }
+                if (request.decoder.complete) {
+                    def req = request
+                    request = null // 下一个请求
+                    server.receive(req)
+                }
+
+                buf.compact()
                 // 避免 ReadPendingException
                 session.read()
             }

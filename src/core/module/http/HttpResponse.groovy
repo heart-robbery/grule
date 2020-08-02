@@ -4,7 +4,7 @@ package core.module.http
 import java.util.concurrent.atomic.AtomicBoolean
 
 class HttpResponse {
-    protected Integer status
+    Integer status
     protected final Map<String, String> headers = new HashMap<>()
     protected final List<String> cookies = new LinkedList<>()
     final AtomicBoolean commit = new AtomicBoolean(false)
@@ -23,9 +23,8 @@ class HttpResponse {
 
 
     HttpResponse status(int status) {this.status = status; this}
+    HttpResponse statusIfNotSet(int status) {if (this.status == null) this.status = status; this}
 
-
-    Integer status() {status}
 
 
     /**

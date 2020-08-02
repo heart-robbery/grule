@@ -19,17 +19,16 @@ class HttpRequest {
     protected String version
     protected String bodyStr
     protected final Map<String, String> headers = new HashMap<>()
+    protected final HttpDecoder decoder = new HttpDecoder(this)
+    protected final HttpAioSession session
+
+
+    HttpRequest(HttpAioSession session) { this.session = session }
+
 
     @Lazy String id = UUID.randomUUID().toString().replace("-", "")
 
     @Lazy String contentType = getHeader('content-type')
-
-    @Lazy String boundary = {
-        if (contentType.containsIgnoreCase('multipart/form-data')) {
-            return contentType.split(";")[1].split("=")[1]
-        }
-        null
-    }()
 
 
     // 查询字符串
