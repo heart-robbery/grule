@@ -5,6 +5,7 @@ import com.alibaba.fastjson.serializer.SerializerFeature
 import core.module.http.mvc.ApiResp
 import core.module.http.mvc.Handler
 
+import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -19,6 +20,10 @@ class HttpContext {
     // 路径块
     protected String[] pieces
     protected final        AtomicBoolean closed      = new AtomicBoolean(false)
+    /**
+     * 业务 code
+     */
+    String respCode
 
 
 
@@ -49,28 +54,32 @@ class HttpContext {
 
         if (body instanceof ApiResp) {
             body.mark = param('mark')
+            body.traceNo = request.id
             body = JSON.toJSONString(body, SerializerFeature.WriteMapNullValue)
+            response.contentTypeIfNotSet('application/json')
         }
         if (body instanceof String) {
-            if (!response.header('content-length')) {
-                response.header('content-length', body.getBytes('utf-8').length)
-            }
-            response.contentTypeIfNotSet('text/plan; charset=utf-8')
+            response.contentLengthIfNotSet(body.getBytes('utf-8').length)
+            response.contentTypeIfNotSet('text/plan')
         } else if (body instanceof File) {
-            if (body.name.endsWith(".html")) {
-                response.contentTypeIfNotSet('text/html')
-            }
-            else if (body.name.endsWith(".css")) {
-                response.contentTypeIfNotSet('text/css')
-            }
-            else if (body.name.endsWith(".js")) {
-                response.contentTypeIfNotSet('application/javascript')
-            }
-            if (!response.header('content-length')) {
-                response.header('content-length', body.size())
+            if (body.exists()) {
+                if (body.name.endsWith(".html")) {
+                    response.contentTypeIfNotSet('text/html')
+                }
+                else if (body.name.endsWith(".css")) {
+                    response.contentTypeIfNotSet('text/css')
+                }
+                else if (body.name.endsWith(".js")) {
+                    response.contentTypeIfNotSet('application/javascript')
+                }
+                response.contentLengthIfNotSet((int) body.size())
+            } else {
+                response.status(404)
+                response.contentLengthIfNotSet(0)
             }
         } else if (body == null) {
             response.statusIfNotSet(202)
+            response.contentLengthIfNotSet(0)
         } else {
             throw new Exception("不支持的类型 " + body.getClass())
         }
@@ -87,7 +96,23 @@ class HttpContext {
         sb.append('\r\n')
 
         if (body instanceof String) sb.append(body)
-        aioSession.send(sb.toString())
+        // HttpResponseEncoder
+        aioSession.send(ByteBuffer.wrap(sb.toString().getBytes('utf-8')))
+
+        if (body instanceof File && body.exists()) { // 文件发送
+            ByteBuffer buf = ByteBuffer.allocate(1024 * 1024)
+            body.withInputStream {is ->
+                do {
+                    int b = is.read()
+                    if (-1 == b) break
+                    buf.put((byte) b)
+                    if (!buf.hasRemaining()) {
+                        aioSession.send(buf)
+                        buf.clear()
+                    }
+                } while (true)
+            }
+        }
 
         determineClose()
     }

@@ -98,4 +98,10 @@ class HttpResponse {
         }
     }
 
+
+    HttpResponse contentLengthIfNotSet(int length) {
+        if (!headers.containsKey('content-length')) {
+            header('content-length', length)
+        }
+    }
 }

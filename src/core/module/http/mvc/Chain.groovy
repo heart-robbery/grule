@@ -1,15 +1,18 @@
 package core.module.http.mvc
 
 import core.module.http.HttpContext
+import core.module.http.HttpServer
 import org.slf4j.LoggerFactory
 
-import java.util.function.BiConsumer
 import java.util.function.Consumer
 
 class Chain {
     protected static final def log = LoggerFactory.getLogger(Chain)
     protected final LinkedList<Handler> handlers = new LinkedList<>()
-    protected BiConsumer<Exception, HttpContext> errorHandler
+    protected final HttpServer server
+
+
+    Chain(HttpServer server) { this.server = server }
 
 
     /**
@@ -38,6 +41,11 @@ class Chain {
     }
 
 
+    /**
+     * 添加处理Handler
+     * @param handler
+     * @return
+     */
     Chain all(final Handler handler) {
         final Handler wrapper = new Handler() { // 包装异常处理
             @Override
@@ -45,16 +53,7 @@ class Chain {
                 try {
                     handler.handle(ctx)
                 } catch (ex) {
-                    if (errorHandler) {
-                        errorHandler.accept(ex, ctx)
-                        ctx.close()
-                    }
-                    else {
-                        ctx.response.status(500)
-                        ctx.render(null)
-                        ctx.close()
-                        throw ex
-                    }
+                    server.errHandle(ex, ctx)
                 }
             }
             @Override
@@ -81,61 +80,48 @@ class Chain {
     }
 
 
-    Chain path(String path, Handler handler) {
-        all(
-            new Handler() {
-                @Override
-                void handle(HttpContext ctx) {
-                    handler.handle(ctx)
-                }
+    /**
+     * 指定方法,路径处理器
+     * @param method get, post ...
+     * @param path 匹配路径
+     * @param handler 处理器
+     * @return
+     */
+    Chain method(String method, String path, Handler handler) {
+        all(new Handler() {
+            @Override
+            void handle(HttpContext ctx) { handler.handle(ctx) }
 
-                @Override
-                String path() { return path }
+            @Override
+            String path() { path }
+
+            @Override
+            boolean match(HttpContext ctx) {
+                boolean f = super.match(ctx)
+                if (method && !method.equalsIgnoreCase(ctx.request.method)) {
+                    ctx.response.status(415)
+                    return false
+                }
+                if (415 == ctx.response.status) ctx.response.status(200)
+                return f
             }
-        )
+        })
         this
+    }
+
+
+    Chain path(String path, Handler handler) {
+        method(null, path, handler)
     }
 
 
     Chain get(String path, Handler handler) {
-        path(path, new Handler() {
-            @Override
-            void handle(HttpContext ctx) {
-                handler.handle(ctx)
-            }
-            @Override
-            boolean match(HttpContext ctx) {
-                boolean f = super.match(ctx)
-                if (!'get'.equalsIgnoreCase(ctx.request.method)) {
-                    ctx.response.status(415)
-                    return false
-                }
-                if (415 == ctx.response.status) ctx.response.status(200)
-                return f
-            }
-        })
-        this
+        method('get', path, handler)
     }
 
 
     Chain post(String path, Handler handler) {
-        path(path, new Handler() {
-            @Override
-            void handle(HttpContext ctx) {
-                handler.handle(ctx)
-            }
-            @Override
-            boolean match(HttpContext ctx) {
-                boolean f = super.match(ctx)
-                if (!'post'.equalsIgnoreCase(ctx.request.method)) {
-                    ctx.response.status(415)
-                    return false
-                }
-                if (415 == ctx.response.status) ctx.response.status(200)
-                return f
-            }
-        })
-        this
+        method('post', path, handler)
     }
 
 
@@ -143,7 +129,7 @@ class Chain {
         prefix = Handler.extract(prefix)
         all(new Handler() {
             final Chain chain = {
-                Chain c = new Chain()
+                Chain c = new Chain(server)
                 handlerBuilder.accept(c)
                 c
             }()
@@ -163,6 +149,5 @@ class Chain {
                 chain.handle(ctx)
             }
         })
-        this
     }
 }

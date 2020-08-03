@@ -91,7 +91,7 @@ class HibernateSrv extends ServerTpl {
         try {
             Map props = new HashMap()
             dsAttr.each {props.put(it.key, Objects.toString(it.value, ''))}
-            if (!props.containsKey('validationQuery')) props.put('validationQuery', 'select 1')
+            // if (!props.containsKey('validationQuery')) props.put('validationQuery', 'select 1') // oracle
             if (!props.containsKey('filters')) { // 默认监控慢sql
                 props.put('filters', 'stat')
             }

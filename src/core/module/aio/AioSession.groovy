@@ -152,7 +152,6 @@ class AioSession {
          * @param buf
          */
         protected void delimit(ByteBuffer buf) {
-            // 分割
             do {
                 int delimIndex = indexOf(buf)
                 if (delimIndex < 0) break

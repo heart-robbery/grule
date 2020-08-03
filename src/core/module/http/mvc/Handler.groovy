@@ -5,6 +5,10 @@ import core.module.http.HttpContext
 abstract class Handler {
 
 
+    /**
+     * 逻辑处理
+     * @param ctx
+     */
     abstract void handle(HttpContext ctx)
 
 
@@ -36,14 +40,13 @@ abstract class Handler {
      */
     boolean match(HttpContext ctx) {
         if (path() == null) return true
-        String[] pieces2 = ctx.pieces
-        if (pieces.length != pieces2.length) return false
+        if (pieces.length != ctx.pieces.length) return false
         for (int i = 0; i < pieces.length; i++) {
             if (pieces[i].startsWith(":")) {
                 int index = pieces[i].indexOf('.')
-                if (index == -1) ctx.pathToken.put(pieces[i].substring(1), pieces2[i])
-                else ctx.pathToken.put(pieces[i].substring(1, index), pieces2[i])
-            } else if (pieces[i] != pieces2[i]) {
+                if (index == -1) ctx.pathToken.put(pieces[i].substring(1), ctx.pieces[i])
+                else ctx.pathToken.put(pieces[i].substring(1, index), ctx.pieces[i].substring(0, index - 1))
+            } else if (pieces[i] != ctx.pieces[i]) {
                 ctx.pathToken.clear()
                 return false
             }
@@ -64,6 +67,11 @@ abstract class Handler {
     }
 
 
+    /**
+     * 去掉 路径 前后 的 /
+     * @param path
+     * @return
+     */
     static String extract(String path) {
         if (path.endsWith("/")) path = path.substring(0, path.length() - 2)
         if (path.startsWith("/")) path = path.substring(1)

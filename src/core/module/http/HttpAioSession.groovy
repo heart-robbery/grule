@@ -5,11 +5,8 @@ import org.slf4j.LoggerFactory
 
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
-import java.nio.channels.ClosedChannelException
 import java.nio.channels.CompletionHandler
-import java.util.concurrent.ExecutorService
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.function.Consumer
 
 /**
  * http 连接会话
@@ -54,13 +51,13 @@ class HttpAioSession {
 
     /**
      * 发送消息到客户端
-     * @param msg
+     * @param buf
      */
-    void send(String msg) {
-        if (msg == null) return
+    void send(ByteBuffer buf) {
+        if (buf == null) return
         lastUsed = System.currentTimeMillis()
         try {
-            sc.write(ByteBuffer.wrap(msg.getBytes('utf-8'))).get()
+            sc.write(buf).get()
         } catch (ex) {
             log.error(ex.class.simpleName + " " + sc.localAddress.toString() + " ->" + sc.remoteAddress.toString())
             close()
