@@ -66,7 +66,7 @@ class Chain {
             boolean added = false
             for (def it = handlers.listIterator(); it.hasNext(); ) {
                 def h = it.next()
-                if (h.priority > wrapper.priority) { // priority 值越小越排前面, 相同的按顺序排
+                if (h.priority < wrapper.priority) { // priority 值越大越排前面, 相同的按顺序排
                     added = true
                     it.previous()
                     it.add(wrapper)

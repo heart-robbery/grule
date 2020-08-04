@@ -26,6 +26,16 @@ class MainCtrl2 extends ServerTpl {
         null
     }
 
+    @Path(path = 'api-doc/:fName.json')
+    String swagger_data_dyn(String fName, HttpContext ctx) {
+        def f = Utils.baseDir("conf/${fName}.json")
+        if (f.exists()) {
+            ctx.response.contentType("application/json")
+            return f.getText('utf-8')
+        }
+        null
+    }
+
     @Path(path = 'api-doc/:fName')
     File swagger_ui(String fName, HttpContext ctx) {
         ctx.response.cacheControl(120)

@@ -65,7 +65,9 @@ class HttpContext {
             chunked(body, chunkedSize)
         } else { //整体传送
             // HttpResponseEncoder
-            if (body instanceof String) {
+            if (body == null) {
+                aioSession.send(ByteBuffer.wrap(preRespStr().getBytes('utf-8')))
+            } else if (body instanceof String) {
                 aioSession.send(ByteBuffer.wrap((preRespStr() + body).getBytes('utf-8')))
             } else if (body instanceof File) {
                 if (body.exists()) {
@@ -194,7 +196,7 @@ class HttpContext {
                 response.contentLengthIfNotSet(0)
             }
         } else if (body == null) {
-            response.statusIfNotSet(202)
+            response.statusIfNotSet(404)
             response.contentLengthIfNotSet(0)
         } else {
             throw new Exception("不支持的类型 " + body.class.simpleName)

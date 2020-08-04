@@ -127,6 +127,7 @@ class HttpServer extends ServerTpl {
                         }.toArray()
                     )
                     if (!void.class.isAssignableFrom(method.returnType)) {
+                        log.debug("Invoke Handler '" + (ctrl.class.simpleName + '#' + method.name) + "', result: " + result)
                         hCtx.render(result)
                     }
                 }

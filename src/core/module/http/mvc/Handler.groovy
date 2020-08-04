@@ -22,12 +22,16 @@ abstract class Handler {
         extract(p).split('/')
     }()
 
-    // 匹配的先后顺序, 越小越先匹配
-    @Lazy int priority = {
-        if (pieces == null) return 0
-        int i = 0
+    // 匹配的先后顺序, 越大越先匹配
+    @Lazy float priority = {
+        if (pieces == null) return Float.MAX_VALUE
+        float i = pieces.length
         for (String piece: pieces) {
-            if (isVariable(piece)) i++
+            if (piece.startsWith(":")) {
+                if (piece.indexOf('.') > 0) i += 0.01
+                continue
+            }
+            i += 0.1
         }
         return i
     }()
@@ -45,7 +49,12 @@ abstract class Handler {
             if (pieces[i].startsWith(":")) {
                 int index = pieces[i].indexOf('.')
                 if (index == -1) ctx.pathToken.put(pieces[i].substring(1), ctx.pieces[i])
-                else ctx.pathToken.put(pieces[i].substring(1, index), ctx.pieces[i].substring(0, index - 1))
+                else {
+                    int index2 = ctx.pieces[i].indexOf('.')
+                    if (index2 > 0 && pieces[i].substring(index) == ctx.pieces[i].substring(index2)) {
+                        ctx.pathToken.put(pieces[i].substring(1, index), ctx.pieces[i].substring(0, index2))
+                    } else return false
+                }
             } else if (pieces[i] != ctx.pieces[i]) {
                 ctx.pathToken.clear()
                 return false
@@ -54,17 +63,6 @@ abstract class Handler {
         true
     }
 
-
-    /**
-     * 路径中的分片 是否为可变变量字符串
-     * @param piece
-     * @return
-     */
-    protected static boolean isVariable(String piece) {
-        if (piece.startsWith(":")) return true
-        if (piece.startsWith("~")) return true
-        false
-    }
 
 
     /**
