@@ -70,6 +70,7 @@ class Chain {
                     added = true
                     it.previous()
                     it.add(wrapper)
+                    break
                 }
             }
             if (!added) {

@@ -5,6 +5,7 @@ import core.module.*
 import core.module.http.HttpServer
 import core.module.jpa.HibernateSrv
 import ctrl.MainCtrl
+import ctrl.MainCtrl2
 import ctrl.TestCtrl
 import ctrl.TestCtrl2
 import ctrl.ratpack.RatpackWeb
@@ -32,7 +33,7 @@ app.addSource(new RedisClient())
 app.addSource(new Remoter())
 app.addSource(new HibernateSrv().entities(Test, VersionFile, Component))
 app.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl))
-app.addSource(new HttpServer('web2').ctrls(TestCtrl2))
+app.addSource(new HttpServer('web2').ctrls(TestCtrl2, MainCtrl2))
 app.addSource(new FileUploader())
 app.addSource(new TestService())
 app.addSource(this)

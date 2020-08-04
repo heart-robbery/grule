@@ -117,20 +117,17 @@ class HttpServer extends ServerTpl {
                     log.error("@Path path must not be empty. {}#{}", ctrl.class.simpleName, method.name)
                     return
                 }
-                log.info("Request mapping: " + ((aCtrl.prefix() ? aCtrl.prefix() + "/" : '') + aPath.path()))
+                log.info("Request mapping: /" + ((aCtrl.prefix() ? aCtrl.prefix() + "/" : '') + aPath.path()))
                 def ps = method.getParameters(); method.setAccessible(true)
-                chain.method(aPath.method(), aPath.path()) {HttpContext ctx -> // 实际@Path 方法 调用
+                chain.method(aPath.method(), aPath.path()) {HttpContext hCtx -> // 实际@Path 方法 调用
                     def result = method.invoke(ctrl,
                         ps.collect {p ->
-                            if (p instanceof HttpContext) return ctx
-                            else if (p instanceof Consumer && void.class.isAssignableFrom(method.returnType)) {
-                                return {r -> ctx.render(r)} as Consumer
-                            }
-                            ctx.param(p.name, p.type)
+                            if (HttpContext.isAssignableFrom(p.type)) return hCtx
+                            hCtx.param(p.name, p.type)
                         }.toArray()
                     )
                     if (!void.class.isAssignableFrom(method.returnType)) {
-                        ctx.render(result)
+                        hCtx.render(result)
                     }
                 }
                 return
@@ -141,7 +138,7 @@ class HttpServer extends ServerTpl {
                     log.error("@Filter return type must be void. {}#{}", ctrl.class.simpleName, method.name)
                     return
                 }
-                log.info("Request filter: " + (aCtrl.prefix()?:'/'))
+                log.info("Request filter: /" + (aCtrl.prefix()))
                 def ps = method.getParameters(); method.setAccessible(true)
                 chain.all({HttpContext ctx -> // 实际@Filter 方法 调用
                     method.invoke(ctrl,

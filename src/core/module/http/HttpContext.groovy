@@ -58,9 +58,126 @@ class HttpContext {
             body = JSON.toJSONString(body, SerializerFeature.WriteMapNullValue)
             response.contentTypeIfNotSet('application/json')
         }
+
+        fullResponse(body)
+        int chunkedSize = chunkedSize(body)
+        if (chunkedSize > 0) { //分块传送
+            chunked(body, chunkedSize)
+        } else { //整体传送
+            // HttpResponseEncoder
+            if (body instanceof String) {
+                aioSession.send(ByteBuffer.wrap((preRespStr() + body).getBytes('utf-8')))
+            } else if (body instanceof File) {
+                if (body.exists()) {
+                    byte[] bs = preRespStr().getBytes('utf-8')
+                    def buf = ByteBuffer.allocate((int) body.length() + bs.length)
+                    buf.put(bs)
+                    body.withInputStream {is ->
+                        do {
+                            int b = is.read()
+                            if (-1 == b) break
+                            else buf.put((byte) b)
+                        } while (true)
+                    }
+                    buf.flip()
+                    aioSession.send(buf)
+                } else {
+                    aioSession.send(ByteBuffer.wrap(preRespStr().getBytes('utf-8')))
+                }
+            }
+        }
+
+        determineClose()
+    }
+
+
+    /**
+     * 分块传送
+     * @param body
+     * @param chunkedSize
+     */
+    protected void chunked(Object body, int chunkedSize) {
+        aioSession.send(ByteBuffer.wrap(preRespStr().getBytes('utf-8')))
         if (body instanceof String) {
-            response.contentLengthIfNotSet(body.getBytes('utf-8').length)
-            response.contentTypeIfNotSet('text/plan')
+
+        } else if (body instanceof File) {
+            body.withInputStream {is ->
+                ByteBuffer buf = ByteBuffer.allocate(chunkedSize)
+                boolean end = false
+                do {
+                    int b = is.read()
+                    if (-1 == b) end = true
+                    else buf.put((byte) b)
+                    // buf 填满 或者 结束
+                    if (!buf.hasRemaining() || end) {
+                        buf.flip()
+                        byte[] headerBs = (Integer.toHexString(buf.limit()) + '\r\n').getBytes('utf-8')
+                        byte[] endBs = '\r\n'.getBytes('utf-8')
+                        def bb = ByteBuffer.allocate(headerBs.length + buf.limit() + endBs.length)
+                        bb.put(headerBs); bb.put(buf); bb.put(endBs)
+                        bb.flip()
+                        aioSession.send(bb)
+                        buf.clear()
+                    }
+                } while (!end)
+                // 结束chunk
+                aioSession.send(ByteBuffer.wrap('0\r\n\r\n'.getBytes('utf-8')))
+            }
+        }
+    }
+
+
+    /**
+     * 分块传送的大小
+     * @return
+     */
+    protected int chunkedSize(Object body) {
+        int bodyLength
+        if (body instanceof File) bodyLength = body.length()
+        else if (body instanceof String) bodyLength = body.getBytes('utf-8').length
+
+        int chunkedSize = -1
+        if (bodyLength > 1024 * 1024 * 100) { // 大于100M
+            chunkedSize = 1024 * 1024 * 5
+            response.header('Transfer-Encoding', 'chunked')
+        } else if (bodyLength > 1024 * 1024 * 20) { // 大于20M
+            chunkedSize = 1024 * 1024 * 2
+            response.header('Transfer-Encoding', 'chunked')
+        } else if (bodyLength > 1024 * 200) { // 大于200K
+            chunkedSize = 1024 * 100
+            response.header('Transfer-Encoding', 'chunked')
+        } else {
+            chunkedSize = -1
+            response.contentLengthIfNotSet(bodyLength)
+        }
+        chunkedSize
+    }
+
+
+    /**
+     * http 响应的前半部分(起始行和header)
+     * @return
+     */
+    protected String preRespStr() {
+        StringBuilder sb = new StringBuilder()
+        sb.append("HTTP/1.1 $response.status ${HttpResponse.statusMsg[(response.status)]}\r\n".toString()) // 起始行
+        response.headers.each { e ->
+            sb.append(e.key).append(": ").append(e.value).append("\r\n")
+        }
+        response.cookies.each { e ->
+            sb.append("set-cookie=").append(e).append("\r\n")
+        }
+        sb.append('\r\n').toString()
+    }
+
+
+    /**
+     * 填充 response
+     * @param body
+     */
+    protected void fullResponse(Object body) {
+        if (body instanceof String) {
+            response.contentTypeIfNotSet('text/plain')
         } else if (body instanceof File) {
             if (body.exists()) {
                 if (body.name.endsWith(".html")) {
@@ -72,7 +189,6 @@ class HttpContext {
                 else if (body.name.endsWith(".js")) {
                     response.contentTypeIfNotSet('application/javascript')
                 }
-                response.contentLengthIfNotSet((int) body.size())
             } else {
                 response.status(404)
                 response.contentLengthIfNotSet(0)
@@ -81,40 +197,9 @@ class HttpContext {
             response.statusIfNotSet(202)
             response.contentLengthIfNotSet(0)
         } else {
-            throw new Exception("不支持的类型 " + body.getClass())
+            throw new Exception("不支持的类型 " + body.class.simpleName)
         }
         response.statusIfNotSet(200)
-
-        StringBuilder sb = new StringBuilder()
-        sb.append("HTTP/1.1 $response.status ${HttpResponse.statusMsg[(response.status)]}\n".toString()) // 起始行
-        response.headers.each { e ->
-            sb.append(e.key).append(": ").append(e.value).append("\n")
-        }
-        response.cookies.each { e ->
-            sb.append("set-cookie=").append(e).append("\n")
-        }
-        sb.append('\r\n')
-
-        if (body instanceof String) sb.append(body)
-        // HttpResponseEncoder
-        aioSession.send(ByteBuffer.wrap(sb.toString().getBytes('utf-8')))
-
-        if (body instanceof File && body.exists()) { // 文件发送
-            ByteBuffer buf = ByteBuffer.allocate(1024 * 1024)
-            body.withInputStream {is ->
-                do {
-                    int b = is.read()
-                    if (-1 == b) break
-                    buf.put((byte) b)
-                    if (!buf.hasRemaining()) {
-                        aioSession.send(buf)
-                        buf.clear()
-                    }
-                } while (true)
-            }
-        }
-
-        determineClose()
     }
 
 
