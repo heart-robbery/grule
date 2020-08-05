@@ -18,7 +18,9 @@ class HttpDecoder {
     protected long size
     // 解析是否完成
     protected boolean complete
-    protected final Queue<Function<ByteBuffer, Boolean>> steps = new LinkedList<>()
+    protected boolean startLineComplete
+    protected boolean headerComplete
+    protected boolean bodyComplete
     protected String charset = 'utf-8'
     // 保存上传的临时文件
     protected List<File> tmpFiles = new LinkedList<>()
@@ -32,15 +34,12 @@ class HttpDecoder {
     }()
     // 解析几次
     protected int decodeCount
+    // 是否升级到websocket
+    protected boolean websocket
 
 
     HttpDecoder(HttpRequest request) {
         this.request = request
-
-        // 创建3步解析流程
-        steps.offer({startLine(it)} as Function<ByteBuffer, Boolean>)
-        steps.offer({header(it)} as Function<ByteBuffer, Boolean>)
-        steps.offer({body(it)} as Function<ByteBuffer, Boolean>)
     }
 
 
@@ -51,15 +50,22 @@ class HttpDecoder {
      */
     void decode(ByteBuffer buf) {
         decodeCount++
-        do {
-            def step = steps.peek()
-            if (step == null) break
-            if (complete = step.apply(buf)) steps.poll()
-            else {
-                // TODO 验证最大 size
-                break
+        if (!startLineComplete) {
+            startLineComplete = startLine(buf)
+        }
+        if (startLineComplete && !headerComplete) {
+            headerComplete = header(buf)
+            if (headerComplete) {// 判断是否升级为 websocket
+                if ('Upgrade'.equalsIgnoreCase(request.getHeader('Connection')) && 'websocket'.equalsIgnoreCase(request.getHeader('Upgrade'))) {
+                    websocket = true
+                    bodyComplete= true
+                }
             }
-        } while (true)
+        }
+        if (headerComplete && !bodyComplete) {
+            bodyComplete = body(buf)
+        }
+        complete = bodyComplete && headerComplete && startLineComplete
     }
 
 

@@ -247,8 +247,8 @@ class HttpServer extends ServerTpl {
                 def rAddr = ((InetSocketAddress) sc.remoteAddress)
                 srv.log.debug("New HTTP(AIO) Connection from: " + rAddr.hostString + ":" + rAddr.port)
                 sc.setOption(StandardSocketOptions.SO_REUSEADDR, true)
-                sc.setOption(StandardSocketOptions.SO_RCVBUF, 64 * 1024)
-                sc.setOption(StandardSocketOptions.SO_SNDBUF, 64 * 1024)
+                sc.setOption(StandardSocketOptions.SO_RCVBUF, 500 * 1024)
+                sc.setOption(StandardSocketOptions.SO_SNDBUF, 500 * 1024) // 必须大于 chunk 最小值
                 sc.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
                 def se = new HttpAioSession(sc, srv)
                 se.start()

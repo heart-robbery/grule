@@ -77,7 +77,7 @@ class HttpRequest {
     }()
 
 
-    String getHeader(String hName) {headers.get(hName)}
+    String getHeader(String hName) {headers.get(hName.toLowerCase())}
 
 
     // 请求属性集

@@ -5,6 +5,7 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 import java.nio.ByteBuffer
+import java.nio.channels.AsynchronousCloseException
 import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.CompletionHandler
 import java.util.concurrent.ExecutorService
@@ -57,7 +58,9 @@ class AioSession {
      */
     void close() {
         if (closed.compareAndSet(false, true)) {
-            sc?.shutdownOutput(); sc?.shutdownInput(); sc?.close()
+            try {sc?.shutdownOutput()} catch(ex) {}
+            try {sc?.shutdownInput()} catch(ex) {}
+            try {sc?.close()} catch(ex) {}
             msgFns.clear(); closeFn?.run()
         }
     }
@@ -187,6 +190,7 @@ class AioSession {
 
         @Override
         void failed(Throwable ex, ByteBuffer buf) {
+            if (ex instanceof AsynchronousCloseException) return
             log.error("", ex)
             session.close()
         }
