@@ -4,11 +4,8 @@ import core.AppContext
 import core.module.*
 import core.module.http.HttpServer
 import core.module.jpa.HibernateSrv
-import ctrl.MainCtrl
 import ctrl.MainCtrl2
-import ctrl.TestCtrl
 import ctrl.TestCtrl2
-import ctrl.ratpack.RatpackWeb
 import dao.entity.Component
 import dao.entity.Test
 import dao.entity.VersionFile
@@ -21,6 +18,7 @@ import service.TestService
 import java.text.SimpleDateFormat
 import java.time.Duration
 
+
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Field final AppContext app = new AppContext()
 @Lazy @Field EP ep = app.bean(EP)
@@ -32,7 +30,7 @@ app.addSource(new SchedSrv())
 app.addSource(new RedisClient())
 app.addSource(new Remoter())
 app.addSource(new HibernateSrv().entities(Test, VersionFile, Component))
-app.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl))
+//app.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl))
 app.addSource(new HttpServer('web2').ctrls(TestCtrl2, MainCtrl2))
 app.addSource(new FileUploader())
 app.addSource(new TestService())

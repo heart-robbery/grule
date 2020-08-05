@@ -26,7 +26,11 @@ class HttpRequest {
     HttpRequest(HttpAioSession session) { this.session = session }
 
 
-    @Lazy String id = UUID.randomUUID().toString().replace("-", "")
+    @Lazy String id = {
+        String reqId = getHeader('X-Request-ID')
+        if (reqId) return reqId
+        UUID.randomUUID().toString().replace("-", "")
+    }()
 
     @Lazy String contentType = getHeader('content-type')
 

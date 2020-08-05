@@ -2,27 +2,37 @@ package core.module.http
 
 import cn.xnatural.enet.event.EL
 import core.Utils
+import core.module.SchedSrv
 import core.module.ServerTpl
 import core.module.http.mvc.*
 
+import java.lang.reflect.InvocationTargetException
 import java.nio.channels.AsynchronousChannelGroup
 import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.CompletionHandler
 import java.text.SimpleDateFormat
+import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.LongAdder
 import java.util.function.Consumer
 
+import static core.Utils.ipv4
+
+/**
+ * 基于 AIO 的 Http 服务
+ */
 class HttpServer extends ServerTpl {
     protected final CompletionHandler<AsynchronousSocketChannel, HttpServer> handler = new AcceptHandler()
     protected       AsynchronousServerSocketChannel                          ssc
-    @Lazy           String                                                   hp      = getStr('hp', ":9090")
-    @Lazy           Integer                                                  port    = hp.split(":")[1] as Integer
+    private @Lazy           String                                           hpCfg   = getStr('hp', ":9090")
+    @Lazy           Integer                                                  port    = hpCfg.split(":")[1] as Integer
     protected final Chain                                                    chain   = new Chain(this)
-    protected final List                                            ctrls   = new LinkedList<>()
+    protected final List                                                     ctrls   = new LinkedList<>()
     // 是否可用
-    boolean                       enabled     = false
+    boolean                                                                  enabled = false
+    @Lazy def                                                                sched   = bean(SchedSrv)
 
 
     HttpServer(String name) { super(name) }
@@ -37,7 +47,7 @@ class HttpServer extends ServerTpl {
         ssc.setOption(StandardSocketOptions.SO_REUSEADDR, true)
         ssc.setOption(StandardSocketOptions.SO_RCVBUF, getInteger('so_revbuf', 64 * 1024))
 
-        String host = hp.split(":")[0]
+        String host = hpCfg.split(":")[0]
         def addr = new InetSocketAddress(port)
         if (host) {addr = new InetSocketAddress(host, port)}
 
@@ -66,9 +76,10 @@ class HttpServer extends ServerTpl {
         HttpContext hCtx
         try {
             hCtx = new HttpContext(request, this)
-            chain.handle(hCtx)
-        } catch(ex) {
-            log.error("", ex)
+            if (enabled) chain.handle(hCtx)
+            else hCtx.render(ApiResp.fail('请稍候...'))
+        } catch (ex) {
+            log.error("请求处理错误", ex)
             hCtx?.close()
         }
     }
@@ -120,15 +131,19 @@ class HttpServer extends ServerTpl {
                 log.info("Request mapping: /" + ((aCtrl.prefix() ? aCtrl.prefix() + "/" : '') + aPath.path()))
                 def ps = method.getParameters(); method.setAccessible(true)
                 chain.method(aPath.method(), aPath.path()) {HttpContext hCtx -> // 实际@Path 方法 调用
-                    def result = method.invoke(ctrl,
-                        ps.collect {p ->
-                            if (HttpContext.isAssignableFrom(p.type)) return hCtx
-                            hCtx.param(p.name, p.type)
-                        }.toArray()
-                    )
-                    if (!void.class.isAssignableFrom(method.returnType)) {
-                        log.debug("Invoke Handler '" + (ctrl.class.simpleName + '#' + method.name) + "', result: " + result)
-                        hCtx.render(result)
+                    try {
+                        def result = method.invoke(ctrl,
+                            ps.collect {p ->
+                                if (HttpContext.isAssignableFrom(p.type)) return hCtx
+                                hCtx.param(p.name, p.type)
+                            }.toArray()
+                        )
+                        if (!void.class.isAssignableFrom(method.returnType)) {
+                            log.debug("Invoke Handler '" + (ctrl.class.simpleName + '#' + method.name) + "', result: " + result)
+                            hCtx.render(result)
+                        }
+                    } catch (InvocationTargetException ex) {
+                        throw ex.cause
                     }
                 }
                 return
@@ -173,7 +188,7 @@ class HttpServer extends ServerTpl {
      */
     void errHandle(Exception ex, HttpContext ctx) {
         log.error("Request Error '" + ctx.request.id + "', url: " + ctx.request.rowUrl, ex)
-        ctx.render ApiResp.of(ctx.respCode?:'01', (ex.class.name + (ex.message ? ": $ex.message" : '')))
+        ctx.render ApiResp.of(ctx.respCode?:'01', (ex.class.simpleName + (ex.message ? ": $ex.message" : '')))
     }
 
 
@@ -182,6 +197,14 @@ class HttpServer extends ServerTpl {
      */
     protected void accept() {
         ssc.accept(this, handler)
+    }
+
+
+    @EL(name = ['http.hp', 'web.hp'], async = false)
+    String getHp() {
+        String ip = hpCfg.split(":")[0]
+        if (!ip || ip == 'localhost') {ip = ipv4()}
+        ip + ':' + port
     }
 
 
@@ -227,10 +250,30 @@ class HttpServer extends ServerTpl {
                 sc.setOption(StandardSocketOptions.SO_RCVBUF, 64 * 1024)
                 sc.setOption(StandardSocketOptions.SO_SNDBUF, 64 * 1024)
                 sc.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
-                new HttpAioSession(sc, srv).start()
+                def se = new HttpAioSession(sc, srv)
+                se.start()
+                handleExpire(se)
             }
             // 继续接入
             srv.accept()
+        }
+
+        protected void handleExpire(HttpAioSession se) {
+            long expire = Duration.ofMinutes(getInteger("aioSession.maxIdle", 3)).toMillis()
+            final AtomicBoolean end = new AtomicBoolean(false)
+            long cur = System.currentTimeMillis()
+            sched?.dyn({
+                if (System.currentTimeMillis() - (se.lastUsed?:cur) > expire && end.compareAndSet(false, true)) {
+                    log.debug("Closing expired HttpAioSession: " + se)
+                    se.close()
+                }
+            }, {
+                if (end.get()) return null
+                long left = expire - (System.currentTimeMillis() - (se.lastUsed?:cur))
+                if (left < 1000L) return new Date(System.currentTimeMillis() + (1000L * 30)) // 执行函数之前会计算下次执行的时间
+                def d = new Date(System.currentTimeMillis() + (left?:0) + 10L)
+                d
+            })
         }
 
         @Override

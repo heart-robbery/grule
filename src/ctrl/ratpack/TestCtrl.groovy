@@ -1,4 +1,4 @@
-package ctrl
+package ctrl.ratpack
 
 import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON

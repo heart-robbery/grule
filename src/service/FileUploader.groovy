@@ -75,6 +75,11 @@ class FileUploader extends ServerTpl {
     }
 
 
+    FileData save(FileData fd, boolean forwardRemote = false) {
+        save([fd])?[0]
+    }
+
+
     /**
      * 多文件 多线程保存
      * @param fds

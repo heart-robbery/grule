@@ -6,7 +6,6 @@ import com.alibaba.fastjson.serializer.SerializerFeature
 import core.module.EhcacheSrv
 import core.module.RedisClient
 import core.module.ServerTpl
-import ctrl.CtrlTpl
 import core.module.http.mvc.ApiResp
 import io.netty.handler.ssl.SslContextBuilder
 import ratpack.error.internal.ErrorHandler

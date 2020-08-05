@@ -74,6 +74,11 @@ class HttpAioSession {
     }
 
 
+    @Override
+    String toString() {
+        return getClass().simpleName + "@" + Integer.toHexString(hashCode()) + "[" + sc?.toString() + "]"
+    }
+
     protected class ReadHandler implements CompletionHandler<Integer, ByteBuffer> {
         final HttpAioSession session
         // 当前解析的请求

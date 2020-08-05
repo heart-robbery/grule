@@ -160,8 +160,7 @@ class Remoter extends ServerTpl {
                 log.warn("'masterHps' or 'masterName' must config one"); return
             }
             doSyncFn.run()
-            if (next) {
-                // 下次触发策略, upInterval master越多可设置时间越长
+            if (next) { // 下次触发策略, upInterval master越多可设置时间越长
                 if (System.currentTimeMillis() - app.startup.time > 60 * 1000L) {
                     sched.after(Duration.ofSeconds(getInteger('upInterval', 120) + new Random().nextInt(90)), {sync(true)})
                 } else {

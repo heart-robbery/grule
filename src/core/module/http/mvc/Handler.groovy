@@ -30,6 +30,9 @@ abstract class Handler {
             if (piece.startsWith(":")) {
                 if (piece.indexOf('.') > 0) i += 0.01
                 continue
+            } else if (piece.startsWith('~')) {
+                i += 0.001
+                continue
             }
             i += 0.1
         }

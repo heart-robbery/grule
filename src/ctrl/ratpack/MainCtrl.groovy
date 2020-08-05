@@ -1,4 +1,4 @@
-package ctrl
+package ctrl.ratpack
 
 import core.Utils
 import core.module.jpa.BaseRepo

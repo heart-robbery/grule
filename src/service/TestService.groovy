@@ -31,7 +31,7 @@ class TestService extends ServerTpl {
                     age: Integer.valueOf(new SimpleDateFormat('ss').format(new Date()))
                 )
             )
-            repo.findPage(Test, 0, 10, { root, query, cb -> query.orderBy(cb.desc(root.get('createTime')))})
+            repo.findPage(Test, 1, 10, { root, query, cb -> query.orderBy(cb.desc(root.get('createTime')))})
         }
     }
 

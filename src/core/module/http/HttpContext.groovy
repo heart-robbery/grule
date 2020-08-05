@@ -3,6 +3,7 @@ package core.module.http
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.serializer.SerializerFeature
 import core.module.http.mvc.ApiResp
+import core.module.http.mvc.FileData
 import core.module.http.mvc.Handler
 
 import java.nio.ByteBuffer
@@ -138,6 +139,7 @@ class HttpContext {
         if (body instanceof File) bodyLength = body.length()
         else if (body instanceof String) bodyLength = body.getBytes('utf-8').length
 
+        // 下载限速
         int chunkedSize = -1
         if (bodyLength > 1024 * 1024 * 100) { // 大于100M
             chunkedSize = 1024 * 1024 * 5
@@ -218,6 +220,20 @@ class HttpContext {
 
 
     /**
+     * 所有参数: 路径参数, query参数, 表单, json
+     * @return
+     */
+    Map params() {
+        Map params = new HashMap()
+        params.putAll(request.jsonParams)
+        params.putAll(request.formParams)
+        params.putAll(request.queryParams)
+        params.putAll(pathToken)
+        params
+    }
+
+
+    /**
      * 获取参数
      * @param pName
      * @param type
@@ -229,14 +245,16 @@ class HttpContext {
         if (v == null) v = request.formParams.get(pName)
         if (v == null) v = request.jsonParams.get(pName)
         if (v == null || type == null) return v
-        if (type == String) return String.valueOf(v)
+        if (type == String) return v instanceof List ? (v?[0]) : String.valueOf(v)
         else if (type == Integer || type == int) return Integer.valueOf(v)
         else if (type == Long || type == long) return Long.valueOf(v)
         else if (type == Double || type == double) return Double.valueOf(v)
         else if (type == Float || type == float) return Float.valueOf(v)
         else if (type == BigDecimal) return new BigDecimal(v.toString())
+        else if (type == FileData) return v instanceof List ? (v?[0]) : v
         else if (type == URI) return URI.create(v.toString())
         else if (type == URL) return URI.create(v.toString()).toURL()
+        else if (type == List) return v instanceof List ? v : [v]
         else throw new IllegalArgumentException("不支持的类型: " + type.name)
     }
 }

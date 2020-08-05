@@ -14,11 +14,11 @@
   },
   "servers": [
     {
-      "url": "http://localhost:7070",
+      "url": "http://localhost:9090",
       "description": "local"
     },
     {
-      "url": "http://localhost:9090",
+      "url": "http://localhost:7070",
       "description": "local2"
     },
     {
@@ -37,6 +37,117 @@
     }
   ],
   "paths": {
+    "/test/dao": {
+      "post": {
+        "tags": ["test"],
+        "summary": "数据库操作接口",
+        "description": "数据库操作接口",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "description": "type=file 就查文件那个表",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "$ref": "#/components/schemas/ApiResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test/form": {
+      "post": {
+        "tags": ["test"],
+        "summary": "表单接口",
+        "description": "接收表单提交",
+        "requestBody": {
+          "description": "表单数据",
+          "required": false,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "p1": {
+                    "type": "number"
+                  },
+                  "p2": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "$ref": "#/components/schemas/ApiResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test/json": {
+      "post": {
+        "tags": ["test"],
+        "summary": "json接口",
+        "description": "接收json提交",
+        "requestBody": {
+          "description": "json数据",
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "p1": {
+                    "type": "number"
+                  },
+                  "p2": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "$ref": "#/components/schemas/ApiResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/test/upload": {
       "post": {
         "tags": ["test"],
@@ -55,7 +166,7 @@
                     "type": "file",
                     "format": "binary"
                   },
-                  "p1": {
+                  "version": {
                     "type": "string"
                   }
                 }
@@ -85,9 +196,31 @@
         "description": "ep 远程调用",
         "parameters": [
           {
-            "name": "url",
+            "name": "app",
             "in": "query",
-            "description": "代理发送http请求的地址",
+            "description": "app 应用名",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "event",
+            "in": "query",
+            "description": "事件名",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "p1",
+            "in": "query",
+            "description": "参数p1",
             "required": false,
             "style": "form",
             "explode": true,
@@ -144,11 +277,57 @@
         }
       }
     },
+    "/test/async": {
+      "get": {
+        "tags": ["test"],
+        "summary": "异步响应",
+        "description": "后台 异步响应",
+        "parameters": [
+
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "$ref": "#/components/schemas/ApiResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/test/cus": {
       "get": {
         "tags": ["test"],
         "summary": "自定义返回接口",
         "description": "返回自定义数据结构",
+        "parameters": [
+
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "$ref": "#/components/schemas/ApiResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test/error": {
+      "get": {
+        "tags": ["test"],
+        "summary": "测试抛出错误",
+        "description": "抛出错误 接口",
         "parameters": [
 
         ],

@@ -3,6 +3,7 @@ package core.module.http
 import core.module.http.mvc.FileData
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import service.FileUploader
 
 import java.nio.ByteBuffer
 import java.util.function.Function
@@ -135,27 +136,25 @@ class HttpDecoder {
      * @return true: 读完, false 未读完(数据不够)
      */
     protected boolean readMultipart(ByteBuffer buf) {
-        // HttpMultiBodyDecoder
+        // HttpMultiBodyDecoder, HttpPostMultipartRequestDecoder
         String boundary = '--' + boundary
         String endLine = boundary + '--'
         if (curPart == null) {
             do { // 遍历读每个part
                 String line = readLine(buf)
                 if (line == null) return false
-                if (line == endLine) return true // 结束行
+                if (line == endLine || line == (endLine + '\r')) return true // 结束行
                 curPart = new Part(boundary: line)
 
-                if (line == boundary) {
-                    // 读part的header
-                    boolean f = readMultipartHeader(buf)
-                    if (!f) return false
-                    // 读part的值
-                    f = readMultipartValue(buf)
-                    if (f) {
-                        size += curPart.fd?.size
-                        curPart = null // 下一个 Part
-                    } else return false
-                }
+                // 读part的header
+                boolean f = readMultipartHeader(buf)
+                if (!f) return false
+                // 读part的值
+                f = readMultipartValue(buf)
+                if (f) {
+                    size += curPart.fd?.size?:0
+                    curPart = null // 下一个 Part
+                } else return false
             } while (true)
         } else if (!curPart.headerComplete) {
             boolean f = readMultipartHeader(buf)
@@ -163,9 +162,10 @@ class HttpDecoder {
         } else if (!curPart.valueComplete) {
             boolean f = readMultipartValue(buf)
             if (f) {
-                size += curPart.fd?.size
+                size += curPart.fd?.size?:0
                 curPart = null // 下一个 Part
-                readMultipart(buf)
+                f = readMultipart(buf)
+                if (f) return true
             }
         }
         return false
@@ -182,13 +182,13 @@ class HttpDecoder {
         do { // 每个part的header
             String line = readLine(buf)
             if (null == line) return false
-            else if ('\t' == line) {curPart.headerComplete = true; return true}
+            else if ('\r' == line) {curPart.headerComplete = true; return true}
             else if (line.containsIgnoreCase('Content-Disposition')) {
                 line.split(': ')[1].split(';').each {entry ->
                     def arr = entry.split('=')
                     if (arr.length > 1) {
-                        if (arr[0] == 'name') curPart.name = arr[1].replace('"', '')
-                        else if (arr[0] == 'filename') curPart.filename = arr[1].replace('"', '')
+                        if (arr[0].trim() == 'name') curPart.name = arr[1].replace('"', '').replace('\r', '')
+                        else if (arr[0].trim() == 'filename') curPart.filename = arr[1].replace('"', '').replace('\r', '')
                     }
                 }
             }
@@ -204,10 +204,10 @@ class HttpDecoder {
      */
     protected boolean readMultipartValue(ByteBuffer buf) {
         if (curPart.filename) { // 当前part 是个文件
-            int index = indexOf(buf, ('--' + boundary).getBytes('utf-8'))
+            int index = indexOf(buf, ('\r\n--' + boundary).getBytes('utf-8'))
 
             if (curPart.tmpFile == null) { // 临时存放文件
-                curPart.tmpFile = File.createTempFile(request.id, curPart.fd.extension); tmpFiles.add(curPart.tmpFile)
+                curPart.tmpFile = File.createTempFile(request.id, FileUploader.extractFileExtension(curPart.filename)); tmpFiles.add(curPart.tmpFile)
                 if (request.formParams.containsKey(curPart.name)) { // 有多个值
                     def v = request.formParams.remove(curPart.name)
                     if (v instanceof List) v.add(curPart.fd)
@@ -217,23 +217,25 @@ class HttpDecoder {
                 } else request.formParams.put(curPart.name, curPart.fd)
             }
             if (index == -1) {
-                int length = buf.hasRemaining()
-                try(def os = new FileOutputStream(curPart.tmpFile)) {
-                    for (int i = buf.position(); i < length; i++) {os.write(buf.get())}
+                int length = buf.remaining()
+                try(def os = new RandomAccessFile(curPart.tmpFile, "rw")) {
+                    os.write(buf.array())
                 }
                 curPart.fd.size += length
                 return false
             } else {
-                int length = buf.limit() - buf.position()
-                try(def os = new FileOutputStream(curPart.tmpFile)) {
-                    for (int i = buf.position(); i < length; i++) {os.write(buf.get())}
+                int length = index - buf.position()
+                try(def os = new RandomAccessFile(curPart.tmpFile, "rw")) {
+                    byte[] bs = new byte[length]
+                    buf.get(bs) //先读到内存 减少io
+                    os.write(bs)
                 }
                 curPart.valueComplete = true
                 curPart.fd.size += length
                 return true
             }
         } else { // 字符串 Part
-            curPart.value = readLine(buf)
+            curPart.value = readLine(buf)?.replace('\r', '')
             if (curPart.value != null) {
                 curPart.valueComplete = true
                 if (request.formParams.containsKey(curPart.name)) { // 有多个值
@@ -298,7 +300,7 @@ class HttpDecoder {
         String name
         String filename
         File tmpFile
-        @Lazy def fd = tmpFile ? new FileData(originName: curPart.filename, inputStream: new FileInputStream(tmpFile)) : null
+        @Lazy def fd = tmpFile ? new FileData(originName: curPart.filename, inputStream: new FileInputStream(tmpFile), size: 0) : null
         boolean headerComplete
         String value
         boolean valueComplete

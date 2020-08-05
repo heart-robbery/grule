@@ -172,7 +172,7 @@ class SchedSrv extends ServerTpl {
         trigger.setStartTime(startFireTime)
 
         Date d = scheduler.scheduleJob(JobBuilder.newJob(JopTpl.class).withIdentity(id, "dyn").setJobData(data).build(), trigger)
-        log.info("add dyn '{}' job will execute at '{}'", id, new SimpleDateFormat("yyyy-MM-dd HH:mm:ss SSS").format(d))
+        log.debug("add dyn '{}' job will execute at '{}'", id, new SimpleDateFormat("yyyy-MM-dd HH:mm:ss SSS").format(d))
         trigger
     }
     
