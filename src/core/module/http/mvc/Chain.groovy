@@ -15,6 +15,27 @@ class Chain {
     Chain(HttpServer server) { this.server = server }
 
 
+    Chain add(Handler handler) {
+        // 按优先级添加, 相同类型比较, FilterHandler > PathHandler
+        boolean added = false
+        for (def it = handlers.listIterator(); it.hasNext(); ) {
+            def h = it.next()
+            // order 值越大越排前面, 相同的按顺序排
+            if ((h.class == handler.class && h.order() < handler.order())) {
+                added = true
+                it.previous()
+                it.add(handler)
+                break
+            }
+        }
+        if (!added) {
+            if (handler instanceof FilterHandler) handlers.offerFirst(handler)
+            else handlers.offerLast(handler)
+        }
+        this
+    }
+
+
     /**
      * 执行此Chain
      * @param ctx
@@ -22,13 +43,18 @@ class Chain {
     protected void handle(HttpContext ctx) {
         boolean match = false
         for (Handler h: handlers) {
-            match = h.match(ctx)
-            log.trace((match ? 'Matched' : 'Unmatch') + " {}, {}", h.path(), ctx.request.path)
-            if (match) h.handle(ctx)
+            if (h instanceof FilterHandler) {
+                h.handle(ctx)
+            } else if (h instanceof PathHandler) {
+                match = h.match(ctx)
+                log.trace((match ? 'Matched' : 'Unmatch') + " {}, {}", h.path(), ctx.request.path)
+                if (match) {
+                    h.handle(ctx)
+                    break
+                }
+            } else new RuntimeException('未处理Handler类型: ' + h.class.simpleName)
             // 退出条件
-            if ((match && h.path() != null) || // 路径匹配
-                ctx.response.commit.get() // 已经提交
-            ) break
+            if (ctx.response.commit.get()) break
         }
         if (ctx.response.commit.get()) return
         if (!match) { // 未找到匹配
@@ -42,46 +68,6 @@ class Chain {
 
 
     /**
-     * 添加处理Handler
-     * @param handler
-     * @return
-     */
-    Chain all(final Handler handler) {
-        final Handler wrapper = new Handler() { // 包装异常处理
-            @Override
-            void handle(HttpContext ctx) {
-                try {
-                    handler.handle(ctx)
-                } catch (ex) {
-                    server.errHandle(ex, ctx)
-                }
-            }
-            @Override
-            String path() { handler.path() }
-            @Override
-            boolean match(HttpContext ctx) { handler.match(ctx) }
-        }
-        if (wrapper.path() == null) handlers.add(wrapper)
-        else {
-            boolean added = false
-            for (def it = handlers.listIterator(); it.hasNext(); ) {
-                def h = it.next()
-                if (h.priority < wrapper.priority) { // priority 值越大越排前面, 相同的按顺序排
-                    added = true
-                    it.previous()
-                    it.add(wrapper)
-                    break
-                }
-            }
-            if (!added) {
-                handlers.add(wrapper)
-            }
-        }
-        this
-    }
-
-
-    /**
      * 指定方法,路径处理器
      * @param method get, post ...
      * @param path 匹配路径
@@ -89,9 +75,13 @@ class Chain {
      * @return
      */
     Chain method(String method, String path, Handler handler) {
-        all(new Handler() {
+        add(new PathHandler() {
             @Override
-            void handle(HttpContext ctx) { handler.handle(ctx) }
+            void handle(HttpContext ctx) {
+                try {
+                    handler.handle(ctx)
+                } catch (ex) {server.errHandle(ex, ctx)}
+            }
 
             @Override
             String path() { path }
@@ -107,7 +97,26 @@ class Chain {
                 return f
             }
         })
-        this
+    }
+
+
+    /**
+     * 添加Filter, 默认匹配
+     * @param handler
+     * @return
+     */
+    Chain filter(Handler handler, float order = 0) {
+        add(new FilterHandler() {
+            @Override
+            void handle(HttpContext ctx) {
+                try {
+                    handler.handle(ctx)
+                } catch (ex) {server.errHandle(ex, ctx)}
+            }
+
+            @Override
+            float order() { order }
+        })
     }
 
 
@@ -128,7 +137,7 @@ class Chain {
 
     Chain prefix(String prefix, Consumer<Chain> handlerBuilder) {
         prefix = Handler.extract(prefix)
-        all(new Handler() {
+        add(new PathHandler() {
             final Chain chain = {
                 Chain c = new Chain(server)
                 handlerBuilder.accept(c)

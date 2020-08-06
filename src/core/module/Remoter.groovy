@@ -529,7 +529,7 @@ class Remoter extends ServerTpl {
         }.findAll {it && it.v1 && it.v2}
         @Lazy Set<String> localHps = { //忽略的hp
             Set<String> r = new HashSet<>()
-            def port = aioServer.hp?.split(":")[1]
+            def port = aioServer.hpCfg?.split(":")[1]
             if (port) {
                 r.add('localhost:' + port)
                 r.add('127.0.0.1:' + port)
@@ -600,22 +600,10 @@ class Remoter extends ServerTpl {
         final Map info = new LinkedHashMap(5)
         info.put("id", app.id)
         info.put("name", app.name)
-
         // http
-        String http = getStr('exposeHttp', null) // 配置暴露的http
-        info.put("http", http ?: ep.fire("http.hp"))
-
+        info.put("http", getStr('exposeHttp', ep.fire("http.hp")))
         // tcp
-        String tcp = getStr('exposeTcp', null)
-        info.put('tcp', tcp ?: ((aioServer?.hp?.split(":")?[0]) ? aioServer.hp : {
-            def ip = ipv4()
-            if (ip) return ip + aioServer?.hp
-            else {
-                log.error("Can't get local ipv4")
-            }
-            null
-        }()))
-
+        info.put('tcp', getStr('exposeTcp', aioServer.hp))
         info.put('master', master)
         return info
     }

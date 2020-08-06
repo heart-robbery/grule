@@ -8,7 +8,6 @@ import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousCloseException
 import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.CompletionHandler
-import java.util.concurrent.ExecutorService
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.function.BiConsumer
 
@@ -16,26 +15,27 @@ class AioSession {
     protected static final Logger                        log = LoggerFactory.getLogger(AioSession)
     protected final AsynchronousSocketChannel            sc
     protected final                                      readHandler = new ReadHandler(this)
-    protected final                                      buf = ByteBuffer.allocate(1024 * 20)
-    protected final ExecutorService                      exec
-    protected final List<BiConsumer<String, AioSession>> msgFns = new LinkedList<>()
+    protected final AioServer                            server
+    protected final List<BiConsumer<String, AioSession>> msgFns      = new LinkedList<>()
     // 消息发送队列
     protected final Devourer                             sendQueue
     // close 回调函数
     protected Runnable                                   closeFn
-    // 数据分割符(半包和粘包) 默认换行符分割
-    protected String                                     delimiter = '\n'
-    // 上次读写时间
     protected Long                                       lastUsed
-    protected final AtomicBoolean                        closed = new AtomicBoolean(false)
+    // 上次读写时间
+    protected final AtomicBoolean                        closed      = new AtomicBoolean(false)
+    // 数据分割符(半包和粘包) 默认换行符分割
+    @Lazy protected String                               delimiter   = server.getStr('delimiter', '\n')
+    // 每次接收消息的内存空间
+    @Lazy protected             def                      buf         = ByteBuffer.allocate(server.getInteger('maxMsgSize', 1024 * 20))
 
 
-    AioSession(AsynchronousSocketChannel sc, ExecutorService exec) {
+    AioSession(AsynchronousSocketChannel sc, AioServer server) {
         assert sc != null: "sc must not be null"
-        assert exec != null: "exec must not be null"
+        assert server != null: "server must not be null"
         this.sc = sc
-        this.exec = exec
-        sendQueue = new Devourer(AioSession.simpleName + ":" + sc.toString(), exec)
+        this.server = server
+        sendQueue = new Devourer(AioSession.simpleName + ":" + sc.toString(), server.exec)
     }
 
 
@@ -98,7 +98,7 @@ class AioSession {
      */
     protected void receive(String msg) {
         msgFns?.each {fn ->
-            exec.execute {
+            server.async {
                 try {
                     fn.accept(msg, this)
                 } catch (ex) {

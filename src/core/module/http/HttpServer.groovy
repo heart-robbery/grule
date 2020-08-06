@@ -5,6 +5,7 @@ import core.Utils
 import core.module.SchedSrv
 import core.module.ServerTpl
 import core.module.http.mvc.*
+import core.module.http.ws.WebSocket
 
 import java.lang.reflect.InvocationTargetException
 import java.nio.channels.AsynchronousChannelGroup
@@ -15,6 +16,7 @@ import java.text.SimpleDateFormat
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.LongAdder
 import java.util.function.Consumer
 
@@ -26,13 +28,15 @@ import static core.Utils.ipv4
 class HttpServer extends ServerTpl {
     protected final CompletionHandler<AsynchronousSocketChannel, HttpServer> handler = new AcceptHandler()
     protected       AsynchronousServerSocketChannel                          ssc
-    private @Lazy           String                                           hpCfg   = getStr('hp', ":9090")
+    protected  @Lazy   String                                                hpCfg   = getStr('hp', ":9090")
     @Lazy           Integer                                                  port    = hpCfg.split(":")[1] as Integer
     protected final Chain                                                    chain   = new Chain(this)
     protected final List                                                     ctrls   = new LinkedList<>()
     // 是否可用
-    boolean                                                                  enabled = false
+                    boolean                                                  enabled = false
     @Lazy def                                                                sched   = bean(SchedSrv)
+    // 当前连接数
+    protected      final def                                                 connected = new AtomicInteger(0)
 
 
     HttpServer(String name) { super(name) }
@@ -86,6 +90,15 @@ class HttpServer extends ServerTpl {
 
 
     /**
+     * 接收 WebSocket
+     * @param ws
+     */
+    protected void receive(WebSocket ws) {
+
+    }
+
+
+    /**
      * 添加
      * @param clzs
      * @return
@@ -128,6 +141,10 @@ class HttpServer extends ServerTpl {
                     log.error("@Path path must not be empty. {}#{}", ctrl.class.simpleName, method.name)
                     return
                 }
+                if (aCtrl.prefix().contains('/')) {
+                    log.error("@Ctrl prefix can not contains '/'. {}#{}", ctrl.class.simpleName, method.name)
+                    return
+                }
                 log.info("Request mapping: /" + ((aCtrl.prefix() ? aCtrl.prefix() + "/" : '') + aPath.path()))
                 def ps = method.getParameters(); method.setAccessible(true)
                 chain.method(aPath.method(), aPath.path()) {HttpContext hCtx -> // 实际@Path 方法 调用
@@ -156,14 +173,14 @@ class HttpServer extends ServerTpl {
                 }
                 log.info("Request filter: /" + (aCtrl.prefix()))
                 def ps = method.getParameters(); method.setAccessible(true)
-                chain.all({HttpContext ctx -> // 实际@Filter 方法 调用
+                chain.filter({HttpContext ctx -> // 实际@Filter 方法 调用
                     method.invoke(ctrl,
                         ps.collect {p ->
                             if (p instanceof HttpContext) return ctx
                             ctx.param(p.name, p.type)
                         }.toArray()
                     )
-                })
+                }, aFilter.order())
                 return
             }
         })
@@ -244,13 +261,16 @@ class HttpServer extends ServerTpl {
         @Override
         void completed(final AsynchronousSocketChannel sc, final HttpServer srv) {
             async {
+                connected.incrementAndGet()
                 def rAddr = ((InetSocketAddress) sc.remoteAddress)
                 srv.log.debug("New HTTP(AIO) Connection from: " + rAddr.hostString + ":" + rAddr.port)
                 sc.setOption(StandardSocketOptions.SO_REUSEADDR, true)
-                sc.setOption(StandardSocketOptions.SO_RCVBUF, 500 * 1024)
-                sc.setOption(StandardSocketOptions.SO_SNDBUF, 500 * 1024) // 必须大于 chunk 最小值
+                sc.setOption(StandardSocketOptions.SO_RCVBUF, getInteger('so_rcvbuf', 1024 * 1024))
+                sc.setOption(StandardSocketOptions.SO_SNDBUF, getInteger('so_sndbuf', 1024 * 1024)) // 必须大于 chunk 最小值
                 sc.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
+                sc.setOption(StandardSocketOptions.TCP_NODELAY, true)
                 def se = new HttpAioSession(sc, srv)
+                se.closeFn = {connected.decrementAndGet()}
                 se.start()
                 handleExpire(se)
             }
@@ -259,7 +279,9 @@ class HttpServer extends ServerTpl {
         }
 
         protected void handleExpire(HttpAioSession se) {
-            long expire = Duration.ofMinutes(getInteger("aioSession.maxIdle", 3)).toMillis()
+            long expire = Duration.ofMinutes(getInteger("aioSession.maxIdle",
+                connected.get() > 100 ? 1: (connected.get() > 60 ? 2 : (connected.get() > 30 ? 5 : 10))
+            )).toMillis()
             final AtomicBoolean end = new AtomicBoolean(false)
             long cur = System.currentTimeMillis()
             sched?.dyn({
@@ -268,7 +290,7 @@ class HttpServer extends ServerTpl {
                     se.close()
                 }
             }, {
-                if (end.get()) return null
+                if (end.get() || se.websocket) return null
                 long left = expire - (System.currentTimeMillis() - (se.lastUsed?:cur))
                 if (left < 1000L) return new Date(System.currentTimeMillis() + (1000L * 30)) // 执行函数之前会计算下次执行的时间
                 def d = new Date(System.currentTimeMillis() + (left?:0) + 10L)

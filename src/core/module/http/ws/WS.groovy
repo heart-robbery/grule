@@ -1,4 +1,4 @@
-package core.module.http.mvc
+package core.module.http.ws
 
 import java.lang.annotation.Documented
 import java.lang.annotation.ElementType
@@ -9,10 +9,6 @@ import java.lang.annotation.Target
 @Target([ElementType.METHOD])
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
-@interface Filter {
-    /**
-     * 优先级 越大越先执行
-     * @return
-     */
-    float order() default 0
+@interface WS {
+    String path() default ''
 }

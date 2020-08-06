@@ -1,5 +1,6 @@
 package core.module.http
 
+import core.module.http.ws.WebSocket
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -16,13 +17,15 @@ class HttpAioSession {
     protected static final Logger                    log         = LoggerFactory.getLogger(HttpAioSession)
     protected final        AsynchronousSocketChannel sc
     protected final                                  readHandler = new ReadHandler(this)
-    protected final                                  buf         = ByteBuffer.allocate(1024 * 30)
-    protected final        HttpServer           server
+    protected final        HttpServer                server
     // close 回调函数
     protected              Runnable                  closeFn
     // 上次读写时间
     protected              Long                      lastUsed
     protected final        AtomicBoolean             closed      = new AtomicBoolean(false)
+    // 每次接收消息的内存空间
+    @Lazy protected               def                buf         = ByteBuffer.allocate(server.getInteger('maxMsgSize', 1024 * 20))
+    protected boolean websocket
 
 
     HttpAioSession(AsynchronousSocketChannel sc, HttpServer server) {
@@ -82,10 +85,12 @@ class HttpAioSession {
         return getClass().simpleName + "@" + Integer.toHexString(hashCode()) + "[" + sc?.toString() + "]"
     }
 
+
     protected class ReadHandler implements CompletionHandler<Integer, ByteBuffer> {
         final HttpAioSession session
         // 当前解析的请求
         HttpRequest request
+        WebSocket ws
 
         ReadHandler(HttpAioSession session) { assert session != null; this.session = session }
 
@@ -95,17 +100,27 @@ class HttpAioSession {
                 lastUsed = System.currentTimeMillis()
                 buf.flip()
 
-                if (request == null) {request = new HttpRequest(session)}
-                try {
-                    request.decoder.decode(buf)
-                } catch (ex) {
-                    log.error("HTTP 解析出错", ex)
-                    close(); return
-                }
-                if (request.decoder.complete) {
-                    def req = request
-                    request = null // 下一个请求
-                    server.receive(req)
+                if (ws) { // 是 WebSocket的情况
+                    ws.decoder.decode(buf)
+                } else { // 正常 http 请求
+                    if (request == null) {request = new HttpRequest(session)}
+                    try {
+                        request.decoder.decode(buf)
+                    } catch (ex) {
+                        log.error("HTTP 解析出错", ex)
+                        close(); return
+                    }
+                    if (request.decoder.complete) {
+                        if (request.decoder.websocket) { // 创建WebSocket 会话
+                            session.websocket = true
+                            ws = new WebSocket(session)
+                            server.receive(ws)
+                        } else {
+                            def req = request
+                            request = null // 下一个请求
+                            server.receive(req)
+                        }
+                    }
                 }
 
                 buf.compact()
@@ -121,8 +136,7 @@ class HttpAioSession {
 
         @Override
         void failed(Throwable ex, ByteBuffer buf) {
-            if (ex instanceof AsynchronousCloseException) return
-            log.error("", ex)
+            if (!(ex instanceof AsynchronousCloseException)) log.error("", ex)
             session.close()
         }
     }

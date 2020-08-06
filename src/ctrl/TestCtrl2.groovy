@@ -1,5 +1,6 @@
 package ctrl
 
+import cn.xnatural.enet.event.EL
 import core.Page
 import core.Utils
 import core.module.OkHttpSrv
@@ -8,6 +9,8 @@ import core.module.aio.AioClient
 import core.module.aio.AioServer
 import core.module.http.HttpContext
 import core.module.http.mvc.*
+import core.module.http.ws.WS
+import core.module.http.ws.WebSocket
 import core.module.jpa.BaseRepo
 import dao.entity.Test
 import dao.entity.UploadFile
@@ -18,6 +21,7 @@ import service.FileUploader
 import service.TestService
 
 import java.text.SimpleDateFormat
+import java.util.concurrent.ConcurrentHashMap
 
 import static core.module.http.mvc.ApiResp.fail
 import static core.module.http.mvc.ApiResp.ok
@@ -33,6 +37,31 @@ class TestCtrl2 extends ServerTpl {
     @Filter
     void pre(HttpContext ctx) {
         log.info('pre ============')
+    }
+
+    @EL(name = 'testWsMsg')
+    void wsMsg(String msg) {
+        wss.each {ws -> ws.send(msg)}
+    }
+
+
+    final Set<WebSocket> wss = ConcurrentHashMap.newKeySet()
+    @WS
+    void ws(WebSocket ws) {
+        wss.add(ws)
+        ws.listen(new WebSocket.Listener() {
+
+            @Override
+            void onClose(WebSocket wst) {
+                wss.remove(wst)
+            }
+
+            @Override
+            void onMessage(String msg) {
+
+            }
+        })
+        wsMsg(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()))
     }
 
 

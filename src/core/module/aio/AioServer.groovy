@@ -15,16 +15,18 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.LongAdder
 import java.util.function.BiConsumer
 
+import static core.Utils.ipv4
+
 /**
  * Aio 服务端
  */
 class AioServer extends ServerTpl {
-    protected final List<BiConsumer<String, AioSession>> msgFns = new LinkedList<>()
+    protected final List<BiConsumer<String, AioSession>>                    msgFns  = new LinkedList<>()
     protected final CompletionHandler<AsynchronousSocketChannel, AioServer> handler = new AcceptHandler()
-    protected AsynchronousServerSocketChannel                        ssc
-    @Lazy String hp = getStr('hp', ":7001")
-    @Lazy Integer port = hp.split(":")[1] as Integer
-    @Lazy def sched = bean(SchedSrv)
+    protected AsynchronousServerSocketChannel                               ssc
+    private @Lazy String                                                    hpCfg   = getStr('hp', ":7001")
+    @Lazy Integer                                                           port    = hpCfg.split(":")[1] as Integer
+    @Lazy def                                                               sched   = bean(SchedSrv)
 
 
     @EL(name = 'sys.starting', async = true)
@@ -35,7 +37,7 @@ class AioServer extends ServerTpl {
         ssc.setOption(StandardSocketOptions.SO_REUSEADDR, true)
         ssc.setOption(StandardSocketOptions.SO_RCVBUF, getInteger('so_revbuf', 64 * 1024))
 
-        String host = hp.split(":")[0]
+        String host = hpCfg.split(":")[0]
         def addr = new InetSocketAddress(port)
         if (host) {addr = new InetSocketAddress(host, port)}
 
@@ -77,6 +79,13 @@ class AioServer extends ServerTpl {
     }
 
 
+    @EL(name = ['aio.hp', 'tcp.hp'], async = false)
+    String getHp() {
+        String ip = hpCfg.split(":")[0]
+        if (!ip || ip == 'localhost') {ip = ipv4()}
+        ip + ':' + port
+    }
+
 
     /**
      * 统计每小时的处理 tcp 数据包个数
@@ -117,12 +126,12 @@ class AioServer extends ServerTpl {
                 def rAddr = ((InetSocketAddress) sc.remoteAddress)
                 srv.log.info("New TCP(AIO) Connection from: " + rAddr.hostString + ":" + rAddr.port)
                 sc.setOption(StandardSocketOptions.SO_REUSEADDR, true)
-                sc.setOption(StandardSocketOptions.SO_RCVBUF, 64 * 1024)
-                sc.setOption(StandardSocketOptions.SO_SNDBUF, 64 * 1024)
+                sc.setOption(StandardSocketOptions.SO_RCVBUF, getInteger('so_rcvbuf', 200 * 1024))
+                sc.setOption(StandardSocketOptions.SO_SNDBUF, getInteger('so_sndbuf', 200 * 1024))
+                sc.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
                 sc.setOption(StandardSocketOptions.TCP_NODELAY, true)
-                // sc.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
 
-                def se = new AioSession(sc, srv.exec)
+                def se = new AioSession(sc, srv)
                 msgFns?.each {se.msgFn(it)}
                 se.start()
 
