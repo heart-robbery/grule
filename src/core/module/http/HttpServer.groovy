@@ -5,6 +5,7 @@ import core.Utils
 import core.module.SchedSrv
 import core.module.ServerTpl
 import core.module.http.mvc.*
+import core.module.http.ws.WS
 import core.module.http.ws.WebSocket
 
 import java.lang.reflect.InvocationTargetException
@@ -94,7 +95,7 @@ class HttpServer extends ServerTpl {
      * @param ws
      */
     protected void receive(WebSocket ws) {
-
+        // chain.
     }
 
 
@@ -141,10 +142,6 @@ class HttpServer extends ServerTpl {
                     log.error("@Path path must not be empty. {}#{}", ctrl.class.simpleName, method.name)
                     return
                 }
-                if (aCtrl.prefix().contains('/')) {
-                    log.error("@Ctrl prefix can not contains '/'. {}#{}", ctrl.class.simpleName, method.name)
-                    return
-                }
                 log.info("Request mapping: /" + ((aCtrl.prefix() ? aCtrl.prefix() + "/" : '') + aPath.path()))
                 def ps = method.getParameters(); method.setAccessible(true)
                 chain.method(aPath.method(), aPath.path()) {HttpContext hCtx -> // 实际@Path 方法 调用
@@ -171,7 +168,7 @@ class HttpServer extends ServerTpl {
                     log.error("@Filter return type must be void. {}#{}", ctrl.class.simpleName, method.name)
                     return
                 }
-                log.info("Request filter: /" + (aCtrl.prefix()))
+                log.info("Request filter: /" + (aCtrl.prefix()) + ". {}#{}", ctrl.class.simpleName, method.name)
                 def ps = method.getParameters(); method.setAccessible(true)
                 chain.filter({HttpContext ctx -> // 实际@Filter 方法 调用
                     method.invoke(ctrl,
@@ -181,6 +178,34 @@ class HttpServer extends ServerTpl {
                         }.toArray()
                     )
                 }, aFilter.order())
+                return
+            }
+            def aWS = method.getAnnotation(WS)
+            if (aWS) { // WS(websocket) 处理
+                if (!void.class.isAssignableFrom(method.returnType)) {
+                    log.error("@WS return type must be void. {}#{}", ctrl.class.simpleName, method.name)
+                    return
+                }
+                if (!(method.parameterCount == 1 && WebSocket == method.parameters[0].type)) {
+                    log.error("@WS parameter must be WebSocket. {}#{}", ctrl.class.simpleName, method.name)
+                    return
+                }
+                log.info("WebSocket: /" + ((aCtrl.prefix() ? aCtrl.prefix() + "/" : '') + aWS.path()))
+                chain.ws(aWS.path()) {ctx ->
+                    try {
+                        // 响应握手
+                        ctx.response.status(101)
+                        ctx.response.header('Upgrade', 'websocket')
+                        ctx.response.header('Connection', 'Upgrade')
+                        ctx.response.header('Sec-WebSocket-Accept', 'Upgrade')
+                        ctx.response.header('Sec-WebSocket-Location', 'ws://' + ep.fire('web.hp') + '/' + aCtrl.prefix() + '/' + aWS.path())
+                        ctx.render(null)
+
+                        method.invoke(ctrl, ctx.aioSession.ws)
+                    } catch (InvocationTargetException ex) {
+                        throw ex.cause
+                    }
+                }
                 return
             }
         })
@@ -205,7 +230,7 @@ class HttpServer extends ServerTpl {
      */
     void errHandle(Exception ex, HttpContext ctx) {
         log.error("Request Error '" + ctx.request.id + "', url: " + ctx.request.rowUrl, ex)
-        ctx.render ApiResp.of(ctx.respCode?:'01', (ex.class.simpleName + (ex.message ? ": $ex.message" : '')))
+        ctx.render ApiResp.of(ctx.respCode?:'01', ctx.respMsg?:(ex.class.simpleName + (ex.message ? ": $ex.message" : '')))
     }
 
 
@@ -290,7 +315,7 @@ class HttpServer extends ServerTpl {
                     se.close()
                 }
             }, {
-                if (end.get() || se.websocket) return null
+                if (end.get() || se.ws) return null
                 long left = expire - (System.currentTimeMillis() - (se.lastUsed?:cur))
                 if (left < 1000L) return new Date(System.currentTimeMillis() + (1000L * 30)) // 执行函数之前会计算下次执行的时间
                 def d = new Date(System.currentTimeMillis() + (left?:0) + 10L)

@@ -1,6 +1,7 @@
 package core.module.aio
 
 import core.Devourer
+import core.module.ServerTpl
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -15,7 +16,7 @@ class AioSession {
     protected static final Logger                        log = LoggerFactory.getLogger(AioSession)
     protected final AsynchronousSocketChannel            sc
     protected final                                      readHandler = new ReadHandler(this)
-    protected final AioServer                            server
+    protected final ServerTpl                            server
     protected final List<BiConsumer<String, AioSession>> msgFns      = new LinkedList<>()
     // 消息发送队列
     protected final Devourer                             sendQueue
@@ -30,7 +31,7 @@ class AioSession {
     @Lazy protected             def                      buf         = ByteBuffer.allocate(server.getInteger('maxMsgSize', 1024 * 20))
 
 
-    AioSession(AsynchronousSocketChannel sc, AioServer server) {
+    AioSession(AsynchronousSocketChannel sc, ServerTpl server) {
         assert sc != null: "sc must not be null"
         assert server != null: "server must not be null"
         this.sc = sc

@@ -7,12 +7,14 @@ class WebSocket {
     protected Listener             listener
     protected final WsDecoder      decoder = new WsDecoder(this)
 
+
     WebSocket(HttpAioSession session) { this.session = session }
 
 
     void send(String msg) {
-
+        session.send(WsEncoder.encode(msg))
     }
+
 
     void close() {
         session.close()
@@ -21,10 +23,5 @@ class WebSocket {
 
     WebSocket listen(Listener listener) {
         this.listener = listener
-    }
-
-    abstract class Listener {
-        void onClose(WebSocket ws) {}
-        void onMessage(String msg) {}
     }
 }

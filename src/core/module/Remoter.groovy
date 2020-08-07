@@ -51,11 +51,13 @@ class Remoter extends ServerTpl {
         if (exec == null) exec = Executors.newFixedThreadPool(2)
         if (ep == null) {ep = new EP(exec); ep.addListenerSource(this)}
 
+        String delimiter = getStr('delimiter', '\n')
         // 如果系统中没有AioClient, 则创建
         aioClient = bean(AioClient)
         if (aioClient == null) {
             aioClient = new AioClient()
             ep.addListenerSource(aioClient); ep.fire("inject", aioClient)
+            aioClient.attr('delimiter', delimiter)
             exposeBean(aioClient)
         }
 
@@ -64,6 +66,7 @@ class Remoter extends ServerTpl {
         if (aioServer == null) {
             aioServer = new AioServer()
             ep.addListenerSource(aioServer); ep.fire("inject", aioServer)
+            aioServer.attr('delimiter', delimiter)
             exposeBean(aioServer)
             aioServer.start()
         }
@@ -164,7 +167,7 @@ class Remoter extends ServerTpl {
                 if (System.currentTimeMillis() - app.startup.time > 60 * 1000L) {
                     sched.after(Duration.ofSeconds(getInteger('upInterval', 120) + new Random().nextInt(90)), {sync(true)})
                 } else {
-                    sched.after(Duration.ofSeconds(new Random().nextInt(15) + 10), {sync(true)})
+                    sched.after(Duration.ofSeconds(new Random().nextInt(20) + 10), {sync(true)})
                 }
             }
         } catch (ex) {

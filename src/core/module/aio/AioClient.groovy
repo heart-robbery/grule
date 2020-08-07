@@ -145,7 +145,7 @@ class AioClient extends ServerTpl {
             sc.close()
             throw new Exception("连接错误. $key", ex)
         }
-        def se = new AioSession(sc, exec)
+        def se = new AioSession(sc, this)
         msgFns?.each {se.msgFn(it)}
         se.closeFn = {ses.get(key).remove(se)}
         se.start()

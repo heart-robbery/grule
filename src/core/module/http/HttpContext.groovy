@@ -22,9 +22,13 @@ class HttpContext {
     protected String[] pieces
     protected final        AtomicBoolean closed      = new AtomicBoolean(false)
     /**
-     * 业务 code
+     * 接口业务 code
      */
     String respCode
+    /**
+     * 接口业务说明
+     */
+    String respMsg
 
 
 

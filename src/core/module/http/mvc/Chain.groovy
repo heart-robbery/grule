@@ -21,11 +21,17 @@ class Chain {
         for (def it = handlers.listIterator(); it.hasNext(); ) {
             def h = it.next()
             // order 值越大越排前面, 相同的按顺序排
-            if ((h.class == handler.class && h.order() < handler.order())) {
-                added = true
-                it.previous()
-                it.add(handler)
-                break
+            if (h.class == handler.class) {
+                if (h.order() < handler.order()) {
+                    added = true
+                    it.previous()
+                    it.add(handler)
+                    break
+                } else {
+                    added = true
+                    it.add(handler)
+                    break
+                }
             }
         }
         if (!added) {
@@ -101,11 +107,30 @@ class Chain {
 
 
     /**
+     * 添加 websocket Handler
+     * @return
+     */
+    Chain ws(String path, Handler handler) {
+        add(new WSHandler() {
+            @Override
+            void handle(HttpContext ctx) {
+                try {
+                    handler.handle(ctx)
+                } catch (ex) {server.errHandle(ex, ctx)}
+            }
+
+            @Override
+            String path() { path }
+        })
+    }
+
+
+    /**
      * 添加Filter, 默认匹配
      * @param handler
      * @return
      */
-    Chain filter(Handler handler, float order = 0) {
+    Chain filter(Handler handler, float order = 0f) {
         add(new FilterHandler() {
             @Override
             void handle(HttpContext ctx) {
@@ -145,12 +170,16 @@ class Chain {
             }()
 
             @Override
-            String path() { return prefix }
+            String path() { prefix }
 
             @Override
             boolean match(HttpContext ctx) {
-                boolean f = ctx.pieces[0] == prefix
-                if (f) ctx.pieces = ctx.pieces.drop(1)
+                boolean f = false
+                for (int i = 0; i < pieces.length; i++) {
+                    f = (pieces[i] == ctx.pieces[i])
+                    if (!f) break
+                }
+                if (f) ctx.pieces = ctx.pieces.drop(pieces.length)
                 f
             }
 

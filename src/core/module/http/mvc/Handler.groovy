@@ -15,7 +15,7 @@ abstract class Handler {
      * 匹配的顺序, 越大越先匹配
      * @return
      */
-    float order() {0}
+    float order() {0f}
 
 
     /**

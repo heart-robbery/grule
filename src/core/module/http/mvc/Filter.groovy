@@ -14,5 +14,5 @@ import java.lang.annotation.Target
      * 优先级 越大越先执行
      * @return
      */
-    float order() default 0
+    float order() default 0f
 }

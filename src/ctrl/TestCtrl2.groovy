@@ -9,6 +9,7 @@ import core.module.aio.AioClient
 import core.module.aio.AioServer
 import core.module.http.HttpContext
 import core.module.http.mvc.*
+import core.module.http.ws.Listener
 import core.module.http.ws.WS
 import core.module.http.ws.WebSocket
 import core.module.jpa.BaseRepo
@@ -33,23 +34,31 @@ class TestCtrl2 extends ServerTpl {
     @Lazy def            fu   = bean(FileUploader)
     @Lazy def            http = bean(OkHttpSrv)
 
+    final Set<WebSocket> wss = ConcurrentHashMap.newKeySet()
 
-    @Filter
-    void pre(HttpContext ctx) {
-        log.info('pre ============')
+
+    @Filter(order = 1f)
+    void filter1(HttpContext ctx) {
+        log.info('filter1 ============')
     }
 
+    @Filter(order = 0f)
+    void filter2(HttpContext ctx) {
+        log.info('filter2 ============')
+    }
+
+
     @EL(name = 'testWsMsg')
-    void wsMsg(String msg) {
+    void wsMsgBroadcast(String msg) {
         wss.each {ws -> ws.send(msg)}
     }
 
 
-    final Set<WebSocket> wss = ConcurrentHashMap.newKeySet()
-    @WS
-    void ws(WebSocket ws) {
+    @WS(path = 'msg')
+    void wsMsg(WebSocket ws) {
+        log.info('WS connect. {}', ws.session.sc.remoteAddress)
         wss.add(ws)
-        ws.listen(new WebSocket.Listener() {
+        ws.listen(new Listener() {
 
             @Override
             void onClose(WebSocket wst) {
@@ -57,11 +66,11 @@ class TestCtrl2 extends ServerTpl {
             }
 
             @Override
-            void onMessage(String msg) {
-
+            void onText(String msg) {
+                log.info('test ws receive client msg: {}', msg)
             }
         })
-        wsMsg(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()))
+        wsMsgBroadcast(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()))
     }
 
 
@@ -77,7 +86,7 @@ class TestCtrl2 extends ServerTpl {
     ApiResp dao(String type) {
         if ('file' == type) {
             return ok(Page.of(
-                repo.findPage(UploadFile, 1, 10, { root, query, cb -> query.orderBy(cb.desc(root.get('id')))}),
+                repo.findPage(VersionFile, 1, 10, { root, query, cb -> query.orderBy(cb.desc(root.get('id')))}),
                 {UploadFile e ->
                     Utils.toMapper(e).ignore("updateTime")
                         .addConverter("createTime", {Date d -> d?.getTime()}).build()

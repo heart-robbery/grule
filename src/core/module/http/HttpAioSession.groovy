@@ -25,7 +25,8 @@ class HttpAioSession {
     protected final        AtomicBoolean             closed      = new AtomicBoolean(false)
     // 每次接收消息的内存空间
     @Lazy protected               def                buf         = ByteBuffer.allocate(server.getInteger('maxMsgSize', 1024 * 20))
-    protected boolean websocket
+    // 不为空代表是WebSocket
+    WebSocket ws
 
 
     HttpAioSession(AsynchronousSocketChannel sc, HttpServer server) {
@@ -90,7 +91,6 @@ class HttpAioSession {
         final HttpAioSession session
         // 当前解析的请求
         HttpRequest request
-        WebSocket ws
 
         ReadHandler(HttpAioSession session) { assert session != null; this.session = session }
 
@@ -100,8 +100,8 @@ class HttpAioSession {
                 lastUsed = System.currentTimeMillis()
                 buf.flip()
 
-                if (ws) { // 是 WebSocket的情况
-                    ws.decoder.decode(buf)
+                if (session.ws) { // 是 WebSocket的情况
+                    session.ws.decoder.decode(buf)
                 } else { // 正常 http 请求
                     if (request == null) {request = new HttpRequest(session)}
                     try {
@@ -112,9 +112,9 @@ class HttpAioSession {
                     }
                     if (request.decoder.complete) {
                         if (request.decoder.websocket) { // 创建WebSocket 会话
-                            session.websocket = true
-                            ws = new WebSocket(session)
-                            server.receive(ws)
+                            session.ws = new WebSocket(session)
+                            //server.receive(ws)
+                            server.receive(request)
                         } else {
                             def req = request
                             request = null // 下一个请求

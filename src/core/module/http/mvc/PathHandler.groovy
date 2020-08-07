@@ -4,7 +4,7 @@ import core.module.http.HttpContext
 
 abstract class PathHandler extends Handler {
 
-    String path() {null}
+    abstract String path()
 
 
     // 路径块. /test/pp -> ['test', 'pp']
