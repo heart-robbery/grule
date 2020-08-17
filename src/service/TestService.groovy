@@ -11,6 +11,7 @@ import core.mode.v.VChain
 import core.mode.v.VProcessor
 import core.module.OkHttpSrv
 import core.module.Remoter
+import core.module.SchedSrv
 import core.module.ServerTpl
 import core.module.jpa.BaseRepo
 import dao.entity.Test
@@ -21,6 +22,17 @@ import java.util.function.Consumer
 class TestService extends ServerTpl {
     @Lazy def repo = bean(BaseRepo)
     @Lazy def http = bean(OkHttpSrv)
+
+
+    @EL(name = 'sys.started')
+    void sysStarted() {
+
+        // 向测试 web socket 每分钟发送消息
+        long count = 1
+        bean(SchedSrv)?.cron('0 */1 * * * ?') {
+            ep.fire("testWsMsg", (count++) + ': ' + new SimpleDateFormat('yyyy-MM-dd HH:mm:ss').format(new Date()))
+        }
+    }
 
 
     Page findTestData() {

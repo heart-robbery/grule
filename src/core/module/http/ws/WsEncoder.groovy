@@ -4,19 +4,23 @@ import groovy.transform.PackageScope
 
 import java.nio.ByteBuffer
 
+/**
+ * web socket 编码器
+ */
 @PackageScope
 class WsEncoder {
 
 
     /**
      * 编码 响应 文档消息
-     * WsServerEncoder
+     * 编码参考: tio WsServerEncoder
      * @param msg
      * @return
      */
     static ByteBuffer encode(String msg) {
-        encode(msg.getBytes('utf-8'), 1)
+        encode(msg.getBytes('utf-8'), (byte) 1)
     }
+
 
     static ByteBuffer encode(byte[] body, byte opCode) {
         ByteBuffer buf
@@ -43,6 +47,7 @@ class WsEncoder {
             buf.put((byte) (body.length & 0xff))
         }
         buf.put(body)
+        buf.flip()
         buf
     }
 }

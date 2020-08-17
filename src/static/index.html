@@ -216,7 +216,7 @@
         try {
             let protocol = "ws://";
             if (window.location.protocol.startsWith("https")) protocol = "wss://";
-            ws = new WebSocket(protocol + window.location.host + "/test/ws");
+            ws = new WebSocket(protocol + window.location.host + "/test/msg");
         } catch (e) {
             console.log('创建websocket错误');
             setTimeout(function () {

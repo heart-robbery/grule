@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class HttpResponse {
     Integer status
     protected final Map<String, String> headers = new HashMap<>()
-    protected final List<String> cookies = new LinkedList<>()
+    protected final Map<String, String> cookies = new HashMap<>()
     final AtomicBoolean commit = new AtomicBoolean(false)
     static final Map<Integer, String> statusMsg
 
@@ -26,7 +26,6 @@ class HttpResponse {
     HttpResponse statusIfNotSet(int status) {if (this.status == null) this.status = status; this}
 
 
-
     /**
      * 设置cookie
      * @param cName cookie 名
@@ -43,14 +42,10 @@ class HttpResponse {
         String path = null, Boolean secure = null, Boolean httpOnly = null
     ) {
         // 删除已存在的
-        for (def it = cookies.iterator(); it.hasNext(); ) {
-            def cookie = it.next()
-            if (cookie.substring(0, cookie.indexOf('=')) == cName) {
-                it.remove()
-            }
-        }
+        cookies.remove(cName)
 
-        cookies.add(cName + "=" + (cValue == null ? '' : cValue)
+        cookies.put(cName,
+            (cValue == null ? '' : cValue)
             + (maxAge == null ? "" : "; max-age="+maxAge)
             + (domain == null ? '' : "; domain="+domain)
             + (path == null ? '' : "; path="+path)

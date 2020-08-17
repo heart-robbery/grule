@@ -14,12 +14,12 @@
   },
   "servers": [
     {
-      "url": "http://localhost:9090",
+      "url": "http://localhost:8080",
       "description": "local"
     },
     {
       "url": "http://localhost:7070",
-      "description": "local2"
+      "description": "ratpack"
     },
     {
       "url": "https://virtserver.swaggerhub.com/xnat2/gy1/1.0.0",

@@ -7,12 +7,19 @@ import core.module.ServerTpl
 import core.module.http.mvc.*
 import core.module.http.ws.WS
 import core.module.http.ws.WebSocket
+import sun.security.x509.*
 
 import java.lang.reflect.InvocationTargetException
 import java.nio.channels.AsynchronousChannelGroup
 import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.CompletionHandler
+import java.security.AccessControlException
+import java.security.KeyPairGenerator
+import java.security.PrivateKey
+import java.security.SecureRandom
+import java.security.cert.CertificateException
+import java.security.cert.X509Certificate
 import java.text.SimpleDateFormat
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
@@ -29,7 +36,7 @@ import static core.Utils.ipv4
 class HttpServer extends ServerTpl {
     protected final CompletionHandler<AsynchronousSocketChannel, HttpServer> handler = new AcceptHandler()
     protected       AsynchronousServerSocketChannel                          ssc
-    protected  @Lazy   String                                                hpCfg   = getStr('hp', ":9090")
+    protected  @Lazy   String                                                hpCfg   = getStr('hp', ":8080")
     @Lazy           Integer                                                  port    = hpCfg.split(":")[1] as Integer
     protected final Chain                                                    chain   = new Chain(this)
     protected final List                                                     ctrls   = new LinkedList<>()
@@ -38,7 +45,7 @@ class HttpServer extends ServerTpl {
     @Lazy def                                                                sched   = bean(SchedSrv)
     // 当前连接数
     protected      final def                                                 connected = new AtomicInteger(0)
-
+    @Lazy protected Set<String> ignoreSuffix = new HashSet(['.js', '.css', '.html', '.vue', '.png', '.ttf', '.woff', '.woff2', 'favicon.ico', '.js.map', *attrs()['ignorePrintUrlSuffix']?:[]])
 
     HttpServer(String name) { super(name) }
     HttpServer() { super('web') }
@@ -58,7 +65,7 @@ class HttpServer extends ServerTpl {
 
         ssc.bind(addr, getInteger('backlog', 100))
         initChain()
-        log.info("Start listen HTTP(AIO) {}", port)
+        log.info("Start listen HTTP(AIO) {}", hpCfg)
         accept()
     }
 
@@ -68,7 +75,12 @@ class HttpServer extends ServerTpl {
 
 
     @EL(name = 'sys.started', async = true)
-    protected void started() { ctrls.each {app.inject(it)}; enabled = true }
+    protected void started() {
+        ctrls.each {app.inject(it)}; enabled = true
+//        chain.handlers.each {h ->
+//            log.info(((h instanceof PathHandler) ? h.path() : '') + ": " + h.order())
+//        }
+    }
 
 
     /**
@@ -76,12 +88,22 @@ class HttpServer extends ServerTpl {
      * @param request
      */
     protected void receive(HttpRequest request) {
-        log.info("Start Request '{}': {}. from: " + request.session.sc.remoteAddress.toString(), request.id, request.rowUrl)
+        // 打印请求
+        if (!ignoreSuffix.find{request.path.endsWith(it)}) {
+            log.info("Start Request '{}': {}. from: " + request.session.sc.remoteAddress.toString(), request.id, request.rowUrl)
+        }
         count()
         HttpContext hCtx
         try {
             hCtx = new HttpContext(request, this)
-            if (enabled) chain.handle(hCtx)
+            if (enabled) {
+                if (app.sysLoad == 10) { // 限流
+                    hCtx.response.status(503)
+                    hCtx.render(ApiResp.of('503', "服务忙, 请稍后再试!"))
+                    return
+                }
+                chain.handle(hCtx)
+            }
             else hCtx.render(ApiResp.fail('请稍候...'))
         } catch (ex) {
             log.error("请求处理错误", ex)
@@ -89,14 +111,6 @@ class HttpServer extends ServerTpl {
         }
     }
 
-
-    /**
-     * 接收 WebSocket
-     * @param ws
-     */
-    protected void receive(WebSocket ws) {
-        // chain.
-    }
 
 
     /**
@@ -197,13 +211,20 @@ class HttpServer extends ServerTpl {
                         ctx.response.status(101)
                         ctx.response.header('Upgrade', 'websocket')
                         ctx.response.header('Connection', 'Upgrade')
-                        ctx.response.header('Sec-WebSocket-Accept', 'Upgrade')
+
+                        def bs1 = ctx.request.getHeader('Sec-WebSocket-Key').getBytes('utf-8')
+                        def bs2 = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'.getBytes('utf-8')
+                        byte[] bs = new byte[bs1.length + bs2.length]
+                        System.arraycopy(bs1, 0, bs, 0, bs1.length)
+                        System.arraycopy(bs2, 0, bs, bs1.length, bs2.length)
+                        ctx.response.header('Sec-WebSocket-Accept', Base64.encoder.encodeToString(Utils.sha1(bs)))
                         ctx.response.header('Sec-WebSocket-Location', 'ws://' + ep.fire('web.hp') + '/' + aCtrl.prefix() + '/' + aWS.path())
                         ctx.render(null)
 
                         method.invoke(ctrl, ctx.aioSession.ws)
                     } catch (InvocationTargetException ex) {
-                        throw ex.cause
+                        log.error("", ex.cause)
+                        ctx.close()
                     }
                 }
                 return
@@ -230,6 +251,10 @@ class HttpServer extends ServerTpl {
      */
     void errHandle(Exception ex, HttpContext ctx) {
         log.error("Request Error '" + ctx.request.id + "', url: " + ctx.request.rowUrl, ex)
+        if (ex instanceof AccessControlException) {
+            ctx.render ApiResp.of(ctx.respCode?:'403', (ex.message ? ": $ex.message" : ''))
+            return
+        }
         ctx.render ApiResp.of(ctx.respCode?:'01', ctx.respMsg?:(ex.class.simpleName + (ex.message ? ": $ex.message" : '')))
     }
 
@@ -237,9 +262,7 @@ class HttpServer extends ServerTpl {
     /**
      * 接收新连接
      */
-    protected void accept() {
-        ssc.accept(this, handler)
-    }
+    protected void accept() { ssc.accept(this, handler) }
 
 
     @EL(name = ['http.hp', 'web.hp'], async = false)
@@ -247,6 +270,52 @@ class HttpServer extends ServerTpl {
         String ip = hpCfg.split(":")[0]
         if (!ip || ip == 'localhost') {ip = ipv4()}
         ip + ':' + port
+    }
+
+
+
+    /**
+     * https
+     * @return
+     */
+    protected Tuple2<PrivateKey, X509Certificate> security() {
+        SecureRandom random = new SecureRandom()
+        def gen = KeyPairGenerator.getInstance("RSA")
+        gen.initialize(2048, random)
+        def pair = gen.genKeyPair()
+
+        X509CertInfo info = new X509CertInfo()
+        X500Name owner = new X500Name("C=x,ST=x,L=x,O=x,OU=x,CN=x")
+        info.set(X509CertInfo.VERSION, new CertificateVersion(CertificateVersion.V3))
+        info.set(X509CertInfo.SERIAL_NUMBER, new CertificateSerialNumber(new BigInteger(64, random)))
+        try {
+            info.set(X509CertInfo.SUBJECT, new CertificateSubjectName(owner))
+        } catch (CertificateException ignore) {
+            info.set(X509CertInfo.SUBJECT, owner)
+        }
+        try {
+            info.set(X509CertInfo.ISSUER, new CertificateIssuerName(owner));
+        } catch (CertificateException ignore) {
+            info.set(X509CertInfo.ISSUER, owner);
+        }
+        info.set(X509CertInfo.VALIDITY, new CertificateValidity(
+            new Date(System.currentTimeMillis() - 86400000L * 365),
+            new Date(253402300799000L))
+        )
+        info.set(X509CertInfo.KEY, new CertificateX509Key(pair.getPublic()));
+        info.set(X509CertInfo.ALGORITHM_ID, new CertificateAlgorithmId(new AlgorithmId(AlgorithmId.sha256WithRSAEncryption_oid)));
+
+        // Sign the cert to identify the algorithm that's used.
+        X509CertImpl cert = new X509CertImpl(info)
+        cert.sign(pair.private, "SHA256withRSA");
+
+        // Update the algorithm and sign again.
+        info.set(CertificateAlgorithmId.NAME + '.' + CertificateAlgorithmId.ALGORITHM, cert.get(X509CertImpl.SIG_ALG))
+        cert = new X509CertImpl(info);
+        cert.sign(pair.private, "SHA256withRSA")
+        cert.verify(pair.public)
+
+        return Tuple.tuple(pair.private, cert)
     }
 
 
@@ -304,6 +373,7 @@ class HttpServer extends ServerTpl {
         }
 
         protected void handleExpire(HttpAioSession se) {
+            if (se.ws) return
             long expire = Duration.ofMinutes(getInteger("aioSession.maxIdle",
                 connected.get() > 100 ? 1: (connected.get() > 60 ? 2 : (connected.get() > 30 ? 5 : 10))
             )).toMillis()

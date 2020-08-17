@@ -1,7 +1,15 @@
 package core
 
+import groovy.transform.ToString
+
 import java.util.function.Function
 
+
+/**
+ * 分页数据集
+ * @param <E>
+ */
+@ToString(includePackage = false)
 class Page<E> {
     // 当前页码: 从1开始
     Integer       page

@@ -34,6 +34,9 @@ class HttpRequest {
 
     @Lazy String contentType = getHeader('content-type')
 
+    @Lazy Map<String, String> cookies = getHeader('Cookie').split(';').collectEntries {entry ->
+        entry?.trim()?.split('=')
+    }
 
     // 查询字符串
     @Lazy String queryStr = {
@@ -77,7 +80,20 @@ class HttpRequest {
     }()
 
 
+    /**
+     * 取Header值
+     * @param hName
+     * @return
+     */
     String getHeader(String hName) {headers.get(hName.toLowerCase())}
+
+
+    /**
+     * 取cookie值
+     * @param cName cookie 名
+     * @return cookie 值
+     */
+    String cookie(String cName) { cookies.get(cName) }
 
 
     // 请求属性集

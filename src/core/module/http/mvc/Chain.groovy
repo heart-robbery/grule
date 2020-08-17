@@ -18,20 +18,24 @@ class Chain {
     Chain add(Handler handler) {
         // 按优先级添加, 相同类型比较, FilterHandler > PathHandler
         boolean added = false
+        int i = 0
         for (def it = handlers.listIterator(); it.hasNext(); ) {
             def h = it.next()
-            // order 值越大越排前面, 相同的按顺序排
-            if (h.class == handler.class) {
-                if (h.order() < handler.order()) {
-                    added = true
-                    it.previous()
-                    it.add(handler)
-                    break
-                } else {
-                    added = true
-                    it.add(handler)
-                    break
+            if (h.type() == handler.type()) {
+                if (h.order() < handler.order()) { // order 值越大越排前面, 相同的按顺序排
+                    it.previous() // 相同类型 不是第一个 插入前面, 第一个插在第一个后面
+                    it.add(handler); added = true; break
+                } else if (h.order() == handler.order()) {
+                    it.add(handler); added = true; break
+                } else { // 小于
+                    if (i == 0 && it.hasNext() && (h = it.next())) { // 和handler同类型的只有一个时, 插在后边
+                        if (h.type() != handler.type()) {
+                            it.previous()
+                            it.add(handler); added = true; break
+                        } else it.previous()
+                    }
                 }
+                i++
             }
         }
         if (!added) {
@@ -130,7 +134,7 @@ class Chain {
      * @param handler
      * @return
      */
-    Chain filter(Handler handler, float order = 0f) {
+    Chain filter(Handler handler, int order = 0) {
         add(new FilterHandler() {
             @Override
             void handle(HttpContext ctx) {
@@ -140,7 +144,7 @@ class Chain {
             }
 
             @Override
-            float order() { order }
+            double order() { Double.valueOf(order) }
         })
     }
 
@@ -160,6 +164,12 @@ class Chain {
     }
 
 
+    /**
+     * 前缀
+     * @param prefix
+     * @param handlerBuilder
+     * @return Chain
+     */
     Chain prefix(String prefix, Consumer<Chain> handlerBuilder) {
         prefix = Handler.extract(prefix)
         add(new PathHandler() {

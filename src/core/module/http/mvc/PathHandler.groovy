@@ -14,26 +14,31 @@ abstract class PathHandler extends Handler {
         extract(p).split('/')
     }()
 
+
     // 匹配的先后顺序, 越大越先匹配
-    @Lazy float priority = {
-        if (pieces == null) return Float.MAX_VALUE
-        float i = pieces.length
+    @Lazy double priority = {
+        if (pieces == null) return Double.MAX_VALUE
+        double i = pieces.length
         for (String piece: pieces) {
             if (piece.startsWith(":")) {
-                if (piece.indexOf('.') > 0) i += 0.01
+                if (piece.indexOf('.') > 0) i += 0.01d
                 continue
             } else if (piece.startsWith('~')) {
-                i += 0.001
+                i += 0.001d
                 continue
             }
-            i += 0.1
+            i += 0.1d
         }
         return i
     }()
 
 
     @Override
-    float order() {priority}
+    double order() {priority}
+
+
+    @Override
+    String type() { PathHandler.simpleName }
 
 
     @Override

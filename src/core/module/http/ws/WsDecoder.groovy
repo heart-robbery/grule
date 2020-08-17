@@ -3,8 +3,12 @@ package core.module.http.ws
 
 import java.nio.ByteBuffer
 
+/**
+ * web socket 解码器
+ */
 class WsDecoder {
     final WebSocket ws
+    // 当前正在被解码的消息
     protected WsMsg curMsg
 
     WsDecoder(WebSocket ws) { this.ws = ws }
@@ -13,7 +17,7 @@ class WsDecoder {
 
     /**
      * 接收消息
-     * WsServerDecoder
+     * 解码参考自: tio WsServerDecoder
      * @param buf
      */
     void decode(ByteBuffer buf) {
@@ -38,12 +42,17 @@ class WsDecoder {
             ws.listener?.onBinary(msgBs)
         }
 
-        if (buf.hasRemaining()) {
+        if (buf.hasRemaining()) { // 如果还有剩余, 则继续解码
             decode(buf)
         }
     }
 
 
+    /**
+     * 解析消息头
+     * @param buf
+     * @return true: 消息头解析完成
+     */
     protected boolean head(ByteBuffer buf) {
         // 第一阶段解析
         int initPosition = buf.position()
@@ -74,8 +83,8 @@ class WsDecoder {
         } else if (curMsg.opCode == (byte) 10) {
 
         }
-        byte second = buf.get(); // 向后读取一个字节
-        curMsg.hasMask = (second & 0xFF) >> 7 == 1; // 用于标识PayloadData是否经过掩码处理。如果是1，Masking-key域的数据即是掩码密钥，用于解码PayloadData。客户端发出的数据帧需要进行掩码处理，所以此位是1。
+        curMsg.second = buf.get(); // 向后读取一个字节
+        curMsg.hasMask = (curMsg.second & 0xFF) >> 7 == 1; // 用于标识PayloadData是否经过掩码处理。如果是1，Masking-key域的数据即是掩码密钥，用于解码PayloadData。客户端发出的数据帧需要进行掩码处理，所以此位是1。
 
         // Client data must be masked
         if (!curMsg.hasMask) { // 第9为为mask,必须为1

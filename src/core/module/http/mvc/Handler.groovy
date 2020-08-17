@@ -11,11 +11,19 @@ abstract class Handler {
      */
     abstract void handle(HttpContext ctx)
 
+
     /**
      * 匹配的顺序, 越大越先匹配
      * @return
      */
-    float order() {0f}
+    double order() {0d}
+
+
+    /**
+     * Handler 类型
+     * @return
+     */
+    String type() {Handler.simpleName}
 
 
     /**
@@ -24,7 +32,6 @@ abstract class Handler {
      * @return
      */
     boolean match(HttpContext ctx) {false}
-
 
 
     /**

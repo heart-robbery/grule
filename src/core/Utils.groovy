@@ -12,6 +12,7 @@ import javax.net.ssl.X509TrustManager
 import java.lang.management.ManagementFactory
 import java.lang.reflect.Field
 import java.lang.reflect.Method
+import java.security.MessageDigest
 import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
 import java.util.concurrent.ConcurrentHashMap
@@ -73,6 +74,25 @@ class Utils {
         }
         null
     }
+
+
+    /**
+     * sha1 加密
+     * @param str
+     * @return
+     */
+    static byte[] sha1(byte[] bs) {
+        MessageDigest digest = java.security.MessageDigest.getInstance('SHA-1')
+        digest.update(bs)
+        return digest.digest()
+    }
+
+
+//    String md5Hex(String str) {
+//        def md = MessageDigest.getInstance('MD5')
+//        def bs = md.update(str.getBytes('utf-8'))
+//
+//    }
 
 
     static final char[] CS = ['0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z']

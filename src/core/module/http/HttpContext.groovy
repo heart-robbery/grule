@@ -2,25 +2,35 @@ package core.module.http
 
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.serializer.SerializerFeature
+import core.module.EhcacheSrv
 import core.module.http.mvc.ApiResp
 import core.module.http.mvc.FileData
 import core.module.http.mvc.Handler
 
 import java.nio.ByteBuffer
+import java.security.AccessControlException
+import java.time.Duration
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * http 请求 处理上下文
  */
 class HttpContext {
-    final HttpRequest         request
-    protected final HttpAioSession      aioSession
+    final HttpRequest request
+    protected final HttpAioSession aioSession
     protected final HttpServer server
-    final HttpResponse        response
+    final HttpResponse response
     final Map<String, Object> pathToken = new HashMap<>(7)
     // 路径块
     protected String[] pieces
-    protected final        AtomicBoolean closed      = new AtomicBoolean(false)
+    protected final AtomicBoolean closed = new AtomicBoolean(false)
+    @Lazy protected Map<String, Object> attrs = new ConcurrentHashMap<>()
+    @Lazy protected def ehcache = server.bean(EhcacheSrv)
+    // session id
+    String sId
+    // session 数据
+    protected Map<String, Object> sData
     /**
      * 接口业务 code
      */
@@ -29,7 +39,6 @@ class HttpContext {
      * 接口业务说明
      */
     String respMsg
-
 
 
     HttpContext(HttpRequest request, HttpServer server) {
@@ -42,10 +51,120 @@ class HttpContext {
     }
 
 
+    /**
+     * 关闭
+     */
     void close() {
         if (closed.compareAndSet(false, true)) {
             aioSession?.close()
         }
+    }
+
+
+    /**
+     * 设置请求属性
+     * @param key
+     * @param value
+     * @return
+     */
+    HttpContext setAttr(String key, Object value) {
+        attrs.put(key, value)
+        this
+    }
+
+
+    /**
+     * 获取请求属性
+     * @param key
+     * @param type
+     * @return
+     */
+    def <T> T getAttr(String key, Class<T> type = null) {
+        def v = attrs.get(key)
+        if (type) return type.cast(v)
+        v
+    }
+
+
+    /**
+     * 设置session属性
+     * @param key
+     * @param value
+     * @return
+     */
+    HttpContext setSessionAttr(String key, Object value) {
+        getOrCreateSData()
+        sData.put(key, value)
+        this
+    }
+
+
+    /**
+     * 获取请求属性
+     * @param key
+     * @param type
+     * @return
+     */
+    def <T> T getSessionAttr(String key, Class<T> type = null) {
+        getOrCreateSData()
+        def v = sData.get(key)
+        if (type) return type.cast(v)
+        v
+    }
+
+
+    /**
+     * 获取 或 创建 session 数据集
+     */
+    protected void getOrCreateSData() {
+        if (sData != null) return
+        if (sId == null) sId = request.cookie('sId')
+        if (sId == null) {
+            def cache = ehcache.getOrCreateCache('session',
+                Duration.ofMinutes(server.getInteger('session.expire', 30)),
+                server.getInteger('session.maxLimit', 100000), null
+            )
+            synchronized (cache) {
+                if (sId == null || !cache.containsKey(sId)) {
+                    sId = UUID.randomUUID().toString().replace('-', '')
+                    sData = new ConcurrentHashMap()
+                    cache.put(sId, sData)
+                    server.log.info("New session '{}'", sId)
+                }
+            }
+        }
+        if (sData == null) {
+            sData = ehcache.get('session', sId)
+        }
+    }
+
+
+    /**
+     * 权限验证
+     * @param authority 权限名
+     * @return true: 验证通过
+     */
+    boolean auth(String authority) {
+        if (!authority) throw new IllegalArgumentException('authority is empty')
+        def doAuth = {Set<String> uAuthorities -> // 权限验证函数
+            if (uAuthorities.contains(authority)) return true
+            else throw new AccessControlException('没有权限')
+        }
+
+        Set<String> uAuthorities = getSessionAttr('uAuthorities', Set) // 当前用户的所有权限. 例: auth1,auth2,auth3
+        if (uAuthorities != null) {
+            def f = doAuth(uAuthorities)
+            if (f) return true
+        }
+        else uAuthorities = ConcurrentHashMap.newKeySet(); setSessionAttr('uAuthorities', uAuthorities)
+
+        // 收集用户权限
+        Set<String> uRoles = getSessionAttr('uRoles', Set) // 当前用户的角色. 例: role1,role2,role3
+        if (uRoles == null) throw new AccessControlException('没有权限')
+        uRoles.each {role ->
+            server.attr('role')[(role)].each {String auth -> uAuthorities.add(auth)}
+        }
+        doAuth(uAuthorities)
     }
 
 
@@ -66,7 +185,7 @@ class HttpContext {
 
         fullResponse(body)
         int chunkedSize = chunkedSize(body)
-        if (chunkedSize > 0) { //分块传送
+        if (chunkedSize > 0 && body !instanceof String) { //分块传送
             chunked(body, chunkedSize)
         } else { //整体传送
             // HttpResponseEncoder
@@ -173,7 +292,7 @@ class HttpContext {
             sb.append(e.key).append(": ").append(e.value).append("\r\n")
         }
         response.cookies.each { e ->
-            sb.append("set-cookie=").append(e).append("\r\n")
+            sb.append("set-cookie=").append(e.key).append('=').append(e.value).append("\r\n")
         }
         sb.append('\r\n').toString()
     }

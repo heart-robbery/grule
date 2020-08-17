@@ -37,12 +37,12 @@ class TestCtrl2 extends ServerTpl {
     final Set<WebSocket> wss = ConcurrentHashMap.newKeySet()
 
 
-    @Filter(order = 1f)
+    @Filter(order = 1)
     void filter1(HttpContext ctx) {
         log.info('filter1 ============')
     }
 
-    @Filter(order = 0f)
+    @Filter(order = 0)
     void filter2(HttpContext ctx) {
         log.info('filter2 ============')
     }
@@ -57,7 +57,6 @@ class TestCtrl2 extends ServerTpl {
     @WS(path = 'msg')
     void wsMsg(WebSocket ws) {
         log.info('WS connect. {}', ws.session.sc.remoteAddress)
-        wss.add(ws)
         ws.listen(new Listener() {
 
             @Override
@@ -70,7 +69,8 @@ class TestCtrl2 extends ServerTpl {
                 log.info('test ws receive client msg: {}', msg)
             }
         })
-        wsMsgBroadcast(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()))
+        wsMsgBroadcast('上线: ' + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()))
+        wss.add(ws)
     }
 
 
