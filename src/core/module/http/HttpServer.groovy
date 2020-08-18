@@ -158,7 +158,7 @@ class HttpServer extends ServerTpl {
                 }
                 log.info("Request mapping: /" + ((aCtrl.prefix() ? aCtrl.prefix() + "/" : '') + aPath.path()))
                 def ps = method.getParameters(); method.setAccessible(true)
-                chain.method(aPath.method(), aPath.path()) {HttpContext hCtx -> // 实际@Path 方法 调用
+                chain.method(aPath.method(), aPath.path(), aPath.consumer()) {HttpContext hCtx -> // 实际@Path 方法 调用
                     try {
                         def result = method.invoke(ctrl,
                             ps.collect {p ->
@@ -250,11 +250,12 @@ class HttpServer extends ServerTpl {
      * @param ctx
      */
     void errHandle(Exception ex, HttpContext ctx) {
-        log.error("Request Error '" + ctx.request.id + "', url: " + ctx.request.rowUrl, ex)
         if (ex instanceof AccessControlException) {
+            log.error("Request Error '" + ctx.request.id + "', url: " + ctx.request.rowUrl + ", " + ex.message)
             ctx.render ApiResp.of(ctx.respCode?:'403', (ex.message ? ": $ex.message" : ''))
             return
         }
+        log.error("Request Error '" + ctx.request.id + "', url: " + ctx.request.rowUrl, ex)
         ctx.render ApiResp.of(ctx.respCode?:'01', ctx.respMsg?:(ex.class.simpleName + (ex.message ? ": $ex.message" : '')))
     }
 

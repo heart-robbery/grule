@@ -64,6 +64,11 @@ class EhcacheSrv extends ServerTpl {
     }
 
 
+    Cache<Object, Object> getCache(final String cName) {
+        cm.getCache(cName, Object.class, Object.class)
+    }
+
+
     @EL(name = ['${name}.set', "cache.set"], async = false)
     def set(String cName, Object key, Object value) {
         log.trace(name + ".set. cName: {}, key: {}, value: " + value, cName, key)
@@ -73,21 +78,21 @@ class EhcacheSrv extends ServerTpl {
 
     @EL(name = ['${name}.get', "cache.get"], async = false)
     Object get(String cName, Object key) {
-        cm.getCache(cName, Object.class, Object.class)?.get(key)
+        getCache(cName)?.get(key)
     }
 
 
     @EL(name = ['${name}.evict', "cache.evict"], async = false)
     def evict(String cName, Object key) {
         log.debug(name + ".evict. cName: {}, key: {}", cName, key)
-        cm.getCache(cName, Object.class, Object.class)?.remove(key)
+        getCache(cName)?.remove(key)
     }
 
 
     @EL(name = ['${name}.clear', "cache.clear"], async = false)
     def clear(String cName) {
         log.info("{}.clear. cName: {}", name, cName)
-        cm.getCache(cName, Object.class, Object.class)?.clear()
+        getCache(cName)?.clear()
     }
 
 

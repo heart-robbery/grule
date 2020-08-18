@@ -84,7 +84,7 @@ class RedisClient extends ServerTpl {
 
 
     @EL(name = '${name}.hexists', async = false)
-    boolean hexists(String cName, String key) { exec{it.hexists(cName, key)} }
+    boolean hexists(String cName, String key) { if (key == null) return false else exec{it.hexists(cName, key)} }
 
 
     @EL(name = '${name}.exists', async = false)

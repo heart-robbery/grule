@@ -3,6 +3,7 @@ package core.module.http
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.serializer.SerializerFeature
 import core.module.EhcacheSrv
+import core.module.RedisClient
 import core.module.http.mvc.ApiResp
 import core.module.http.mvc.FileData
 import core.module.http.mvc.Handler
@@ -27,6 +28,7 @@ class HttpContext {
     protected final AtomicBoolean closed = new AtomicBoolean(false)
     @Lazy protected Map<String, Object> attrs = new ConcurrentHashMap<>()
     @Lazy protected def ehcache = server.bean(EhcacheSrv)
+    @Lazy def                     redis       = server.bean(RedisClient)
     // session id
     String sId
     // session 数据
@@ -94,7 +96,8 @@ class HttpContext {
      */
     HttpContext setSessionAttr(String key, Object value) {
         getOrCreateSData()
-        sData.put(key, value)
+        if (value == null) sData.remove(key)
+        else sData.put(key, value)
         this
     }
 
@@ -119,29 +122,88 @@ class HttpContext {
     protected void getOrCreateSData() {
         if (sData != null) return
         if (sId == null) sId = request.cookie('sId')
-        if (sId == null) {
-            def cache = ehcache.getOrCreateCache('session',
-                Duration.ofMinutes(server.getInteger('session.expire', 30)),
-                server.getInteger('session.maxLimit', 100000), null
-            )
-            synchronized (cache) {
-                if (sId == null || !cache.containsKey(sId)) {
-                    sId = UUID.randomUUID().toString().replace('-', '')
-                    sData = new ConcurrentHashMap()
-                    cache.put(sId, sData)
-                    server.log.info("New session '{}'", sId)
+        def expire = Duration.ofMinutes(server.getInteger('session.expire', 30))
+        if ('redis' == server.getStr('session.type')) { // session的数据, 用redis 保存 session 数据
+            String cKey
+            if (!sId || ((cKey = 'session_' + sId) && !redis.exists(cKey))) {
+                sId = UUID.randomUUID().toString().replace('-', '')
+                cKey = 'session_' + sId
+                server.log.info("New session '{}'", sId)
+            }
+            sData = new Map<String, Object>() {
+                @Override
+                int size() { redis.exec {jedis -> jedis.hkeys(cKey).size()} }
+                @Override
+                boolean isEmpty() { redis.exec {jedis -> jedis.hkeys(cKey).isEmpty()} }
+                @Override
+                boolean containsKey(Object key) { redis.hexists(cKey, key?.toString()) }
+                @Override
+                boolean containsValue(Object value) { redis.exec {jedis-> jedis.hvals(cKey).contains(value)} }
+                @Override
+                Object get(Object key) { redis.hget(cKey, key?.toString()) }
+                @Override
+                Object put(String key, Object value) { redis.hset(cKey, key?.toString(), value?.toString(), expire.seconds.intValue()) }
+                @Override
+                Object remove(Object key) { redis.hdel(cKey, key?.toString()) }
+                @Override
+                void putAll(Map<? extends String, ?> m) { m?.each {e -> redis.hset(cKey, e.key, e.value.toString(), expire.seconds.intValue())} }
+                @Override
+                void clear() { redis.del(cKey) }
+                @Override
+                Set<String> keySet() { redis.exec {jedis-> jedis.hkeys(cKey)} }
+                @Override
+                Collection<Object> values() { redis.exec {jedis-> jedis.hvals(cKey)} }
+                @Override
+                Set<Map.Entry<String, Object>> entrySet() {
+                    redis.exec {jedis -> jedis.hgetAll(cKey).entrySet()}
                 }
             }
+        } else { // 默认用ehcache 做session 数据管理
+            String cKey
+            if (!sId || ((cKey = 'session_' + sId) && ehcache.getCache(cKey) == null)) {
+                sId = UUID.randomUUID().toString().replace('-', '')
+                cKey = 'session_' + sId
+                server.log.info("New session '{}'", sId)
+            }
+
+            def cache = ehcache.getOrCreateCache(cKey, expire,
+                server.getInteger('session.maxLimit', 100000), null
+            )
+            cache.put('id', sId)
+            sData = new Map<String, Object>() {
+                @Override
+                int size() { cache.size() }
+                @Override
+                boolean isEmpty() { size() == 0 }
+                @Override
+                boolean containsKey(Object key) { cache.containsKey(key) }
+                @Override
+                boolean containsValue(Object value) { cache.find {it.value == value} }
+                @Override
+                Object get(Object key) { cache.get(key) }
+                @Override
+                Object put(String key, Object value) { cache.put(key, value) }
+                @Override
+                Object remove(Object key) { cache.remove(key) }
+                @Override
+                void putAll(Map<? extends String, ?> m) { cache.putAll(m) }
+                @Override
+                void clear() { cache.clear() }
+                @Override
+                Set<String> keySet() { cache.iterator().collect {it.key}.toSet() }
+                @Override
+                Collection<Object> values() { cache.iterator().collect {it.value} }
+                @Override
+                Set<Map.Entry<String, Object>> entrySet() { cache.iterator().collect {it}.toSet() }
+            }
         }
-        if (sData == null) {
-            sData = ehcache.get('session', sId)
-        }
+        response.cookie('sId', sId, expire.seconds)
     }
 
 
     /**
      * 权限验证
-     * @param authority 权限名
+     * @param authority 权限名 验证用户是否有此权限
      * @return true: 验证通过
      */
     boolean auth(String authority) {
@@ -193,6 +255,8 @@ class HttpContext {
                 aioSession.send(ByteBuffer.wrap(preRespStr().getBytes('utf-8')))
             } else if (body instanceof String) {
                 aioSession.send(ByteBuffer.wrap((preRespStr() + body).getBytes('utf-8')))
+            } else if (body instanceof byte[]) {
+                aioSession.send(ByteBuffer.wrap(body))
             } else if (body instanceof File) {
                 if (body.exists()) {
                     byte[] bs = preRespStr().getBytes('utf-8')
@@ -260,6 +324,10 @@ class HttpContext {
     protected int chunkedSize(Object body) {
         int bodyLength
         if (body instanceof File) bodyLength = body.length()
+        else if (body instanceof byte[]) {
+            bodyLength = body.length
+            return -1
+        }
         else if (body instanceof String) bodyLength = body.getBytes('utf-8').length
 
         // 下载限速
@@ -292,7 +360,7 @@ class HttpContext {
             sb.append(e.key).append(": ").append(e.value).append("\r\n")
         }
         response.cookies.each { e ->
-            sb.append("set-cookie=").append(e.key).append('=').append(e.value).append("\r\n")
+            sb.append("Set-Cookie: ").append(e.key).append('=').append(e.value).append("\r\n")
         }
         sb.append('\r\n').toString()
     }

@@ -81,10 +81,11 @@ class Chain {
      * 指定方法,路径处理器
      * @param method get, post ...
      * @param path 匹配路径
+     * @param contentType application/json, multipart/form-data, application/x-www-form-urlencoded
      * @param handler 处理器
      * @return
      */
-    Chain method(String method, String path, Handler handler) {
+    Chain method(String method, String path, String contentType = null, Handler handler) {
         add(new PathHandler() {
             @Override
             void handle(HttpContext ctx) {
@@ -103,7 +104,11 @@ class Chain {
                     ctx.response.status(415)
                     return false
                 }
-                if (415 == ctx.response.status) ctx.response.status(200)
+                if (contentType && !contentType.split(';')[0].equalsIgnoreCase(ctx.request.contentType.split(';')[0])) {
+                    ctx.response.status(405)
+                    return false
+                }
+                if (415 == ctx.response.status || 405 == ctx.response.status) ctx.response.status(200)
                 return f
             }
         })

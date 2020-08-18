@@ -49,8 +49,8 @@ class HttpResponse {
             + (maxAge == null ? "" : "; max-age="+maxAge)
             + (domain == null ? '' : "; domain="+domain)
             + (path == null ? '' : "; path="+path)
-            + (secure ? '' : "; secure")
-            + (httpOnly ? '' : "; httpOnly")
+            + (secure ? "; secure": '')
+            + (httpOnly ? "; httpOnly": '')
         )
         this
     }

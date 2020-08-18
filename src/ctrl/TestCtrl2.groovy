@@ -113,14 +113,14 @@ class TestCtrl2 extends ServerTpl {
 
     // 接收form 表单提交
     @Path(path = 'form')
-    ApiResp form(HttpContext ctx) {
+    ApiResp form(String param1, HttpContext ctx) {
         ok(ctx.request.formParams)
     }
 
 
     // json 参数
     @Path(path = 'json')
-    ApiResp json(HttpContext ctx) {
+    ApiResp json(String param1, HttpContext ctx) {
         ok(ctx.request.jsonParams)
     }
 
@@ -148,6 +148,25 @@ class TestCtrl2 extends ServerTpl {
         ctx.render(
             ok('p1: ' + p1 + ", " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()))
         )
+    }
+
+
+    // 测试登录
+    @Path(path = 'login')
+    ApiResp login(String role, HttpContext ctx) {
+        ctx.setSessionAttr('uAuthorities', null)
+        ctx.setSessionAttr('uRoles',
+            role.split(',').toList().collect {it.trim()}.findAll {it}.toSet()
+        )
+        ok()
+    }
+
+
+    // 权限测试
+    @Path(path = 'auth')
+    ApiResp auth(String auth, HttpContext ctx) {
+        ctx.auth(auth?:'auth1')
+        ok()
     }
 
 
@@ -185,6 +204,16 @@ class TestCtrl2 extends ServerTpl {
         def t = (timeout?:10)
         Thread.sleep(t * 1000L)
         ok().desc("超时: ${t}s" )
+    }
+
+
+    // 下载excel文件
+    void downXlsx(HttpContext ctx) {
+        ctx.response.contentType('application/vnd.ms-excel;charset=utf-8')
+        ctx.response.header('Content-Disposition', "attachment;filename=${new SimpleDateFormat("yyyyMMddHHmmss").format(new Date())}.xlsx")
+        def wb = org.apache.poi.ss.usermodel.WorkbookFactory.create(true)
+        def bos = new ByteArrayOutputStream(); wb.write(bos)
+        ctx.render(bos.toByteArray())
     }
 
 
