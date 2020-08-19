@@ -4,12 +4,12 @@ import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
 import core.Page
 import core.Utils
-import core.module.OkHttpSrv
-import core.module.SchedSrv
-import core.module.aio.AioClient
-import core.module.aio.AioServer
-import core.module.jpa.BaseRepo
-import core.module.http.mvc.FileData
+import core.OkHttpSrv
+import core.SchedSrv
+import core.aio.AioClient
+import core.aio.AioServer
+import core.jpa.BaseRepo
+import core.http.mvc.FileData
 import dao.entity.Test
 import dao.entity.UploadFile
 import dao.entity.VersionFile
@@ -25,8 +25,8 @@ import java.text.SimpleDateFormat
 import java.util.concurrent.ConcurrentHashMap
 import java.util.stream.Collectors
 
-import static core.module.http.mvc.ApiResp.fail
-import static core.module.http.mvc.ApiResp.ok
+import static core.http.mvc.ApiResp.fail
+import static core.http.mvc.ApiResp.ok
 
 class TestCtrl extends CtrlTpl {
 

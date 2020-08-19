@@ -83,11 +83,11 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "p1": {
-                    "type": "number"
+                  "param1": {
+                    "type": "string"
                   },
                   "p2": {
-                    "type": "string"
+                    "type": "number"
                   }
                 }
               }

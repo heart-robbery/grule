@@ -1,9 +1,13 @@
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import core.AppContext
-import core.module.*
-import core.module.http.HttpServer
-import core.module.jpa.HibernateSrv
+import core.EhcacheSrv
+import core.OkHttpSrv
+import core.RedisClient
+import core.Remoter
+import core.SchedSrv
+import core.http.HttpServer
+import core.jpa.HibernateSrv
 import ctrl.MainCtrl2
 import ctrl.TestCtrl2
 import dao.entity.Component
@@ -17,7 +21,6 @@ import service.TestService
 
 import java.text.SimpleDateFormat
 import java.time.Duration
-
 
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Field final AppContext app = new AppContext()
@@ -41,14 +44,15 @@ app.start() // 启动系统
 @EL(name = 'sys.started', async = true)
 void sysStarted() {
     return
-    app.bean(SchedSrv).dyn({
-        log.info("执行 dyn sched " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()))
-    }, {
-        def cal = Calendar.getInstance()
-        cal.add(Calendar.SECOND, 5)
-        if (cal.get(Calendar.MINUTE) > 05) return null
-        cal.getTime()
-    })
+//    app.bean(SchedSrv).dyn({
+//        log.info("执行 dyn sched " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()))
+//    }, {
+//        def cal = Calendar.getInstance()
+//        cal.add(Calendar.SECOND, 5)
+//        if (cal.get(Calendar.MINUTE) > 05) return null
+//        cal.getTime()
+//    })
+
 //    (1..100).each {i ->
 //        (1..2).each {j ->
 //            app.bean(OkHttpSrv).get("http://localhost:7070/test/remote?event=eName"+(new Random().nextInt(11) + 1)).debug().execute({s ->

@@ -1,7 +1,7 @@
 package ctrl.ratpack
 
 import core.Utils
-import core.module.jpa.BaseRepo
+import core.jpa.BaseRepo
 import dao.entity.Component
 import ratpack.form.Form
 import ratpack.handling.Chain
@@ -9,7 +9,7 @@ import service.FileUploader
 
 import java.util.stream.Collectors
 
-import static core.module.http.mvc.ApiResp.ok
+import static core.http.mvc.ApiResp.ok
 
 
 class MainCtrl extends CtrlTpl {

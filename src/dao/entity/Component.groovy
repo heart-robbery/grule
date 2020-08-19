@@ -1,6 +1,6 @@
 package dao.entity
 
-import core.module.jpa.GUIDEntity
+import core.jpa.GUIDEntity
 
 import javax.persistence.Entity
 

@@ -1,10 +1,10 @@
 package ctrl
 
 import core.Utils
-import core.module.ServerTpl
-import core.module.http.HttpContext
-import core.module.http.mvc.Ctrl
-import core.module.http.mvc.Path
+import core.ServerTpl
+import core.http.HttpContext
+import core.http.mvc.Ctrl
+import core.http.mvc.Path
 import service.FileUploader
 
 @Ctrl

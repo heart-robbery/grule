@@ -3,16 +3,16 @@ package ctrl
 import cn.xnatural.enet.event.EL
 import core.Page
 import core.Utils
-import core.module.OkHttpSrv
-import core.module.ServerTpl
-import core.module.aio.AioClient
-import core.module.aio.AioServer
-import core.module.http.HttpContext
-import core.module.http.mvc.*
-import core.module.http.ws.Listener
-import core.module.http.ws.WS
-import core.module.http.ws.WebSocket
-import core.module.jpa.BaseRepo
+import core.OkHttpSrv
+import core.ServerTpl
+import core.aio.AioClient
+import core.aio.AioServer
+import core.http.HttpContext
+import core.http.mvc.*
+import core.http.ws.Listener
+import core.http.ws.WS
+import core.http.ws.WebSocket
+import core.jpa.BaseRepo
 import dao.entity.Test
 import dao.entity.UploadFile
 import dao.entity.VersionFile
@@ -24,8 +24,8 @@ import service.TestService
 import java.text.SimpleDateFormat
 import java.util.concurrent.ConcurrentHashMap
 
-import static core.module.http.mvc.ApiResp.fail
-import static core.module.http.mvc.ApiResp.ok
+import static core.http.mvc.ApiResp.fail
+import static core.http.mvc.ApiResp.ok
 
 @Ctrl(prefix = 'test')
 class TestCtrl2 extends ServerTpl {
@@ -112,14 +112,14 @@ class TestCtrl2 extends ServerTpl {
 
 
     // 接收form 表单提交
-    @Path(path = 'form')
+    @Path(path = 'form', consumer = 'application/x-www-form-urlencoded')
     ApiResp form(String param1, HttpContext ctx) {
         ok(ctx.request.formParams)
     }
 
 
     // json 参数
-    @Path(path = 'json')
+    @Path(path = 'json', consumer = 'application/json')
     ApiResp json(String param1, HttpContext ctx) {
         ok(ctx.request.jsonParams)
     }

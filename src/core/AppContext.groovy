@@ -3,7 +3,6 @@ package core
 import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
-import core.module.ServerTpl
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 

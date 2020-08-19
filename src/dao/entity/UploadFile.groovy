@@ -1,6 +1,6 @@
 package dao.entity
 
-import core.module.jpa.LongIdEntity
+import core.jpa.LongIdEntity
 import org.hibernate.annotations.DynamicUpdate
 
 import javax.persistence.Entity

@@ -1,8 +1,8 @@
 package ctrl.ratpack
 
 import core.Utils
-import core.module.ServerTpl
-import core.module.http.mvc.ApiResp
+import core.ServerTpl
+import core.http.mvc.ApiResp
 import io.netty.handler.codec.http.HttpResponseStatus
 import ratpack.exec.Promise
 import ratpack.form.Form
