@@ -206,43 +206,39 @@
 
 
     // web socket
-    let ws = null;
-    function createWs() {
+    function createWs(onMsg) {
+        // web socket
+        let ws = null;
         if (ws && (ws.readyState == 1 || ws.readyState == 2)) {
             console.log('Websocket连接可用不用重创建. state: ' + ws.readyState);
             return;
         }
-        console.log('create websocket ...');
-        try {
-            let protocol = "ws://";
-            if (window.location.protocol.startsWith("https")) protocol = "wss://";
-            ws = new WebSocket(protocol + window.location.host + "/test/msg");
-        } catch (e) {
-            console.log('创建websocket错误');
-            setTimeout(function () {
-                createWs()
-            }, (1000 * 60 * 2)); // 每两分钟重试
-            return
-        }
-        ws.onclose = function () {
-            setTimeout(function () {
-                createWs()
-            }, (1000 * 60 * 1)); // 每两分钟重试
-        };
-        ws.onmessage = function (e) {
-            let jo = toJSON(e.data);
-            if (jo) {
-                // 消息类型
-            } else {
-                app.$Notice.info({title: '后台提示', desc: e.data, duration: 7})
+        function doCreate() {
+            console.log('create websocket ...');
+            try {
+                let protocol = "ws://";
+                if (window.location.protocol.startsWith("https")) protocol = "wss://";
+                ws = new WebSocket(protocol + window.location.host + "/policyCopy/msg");
+            } catch (e) {
+                console.log('创建websocket错误', e);
+                setTimeout(function () {
+                    createWs()
+                }, (1000 * 60 * 2)); // 每两分钟重试
+                return
             }
-        };
-        ws.onopen = function() {
-            console.log('websocket onopen');
-            ws.send('成功连接...')
-        };
+            ws.onclose = function () {
+                setTimeout(function () {
+                    createWs()
+                }, (1000 * 60 * 2)); // 每两分钟重试
+            };
+            ws.onmessage = onMsg;
+            ws.onopen = function() {
+                console.log('websocket onopen');
+                ws.send('成功连接...')
+            };
+        }
+        doCreate()
     }
-    createWs();
 
     function toJSON(str) {
         if (typeof str == 'string') {

@@ -3,7 +3,6 @@ package core.http
 import core.http.mvc.FileData
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import service.FileUploader
 
 import java.nio.ByteBuffer
 
@@ -212,7 +211,7 @@ class HttpDecoder {
             int index = indexOf(buf, ('\r\n--' + boundary).getBytes('utf-8'))
 
             if (curPart.tmpFile == null) { // 临时存放文件
-                curPart.tmpFile = File.createTempFile(request.id, FileUploader.extractFileExtension(curPart.filename)); tmpFiles.add(curPart.tmpFile)
+                curPart.tmpFile = File.createTempFile(request.id, extractFileExtension(curPart.filename)); tmpFiles.add(curPart.tmpFile)
                 if (request.formParams.containsKey(curPart.name)) { // 有多个值
                     def v = request.formParams.remove(curPart.name)
                     if (v instanceof List) v.add(curPart.fd)
@@ -297,6 +296,19 @@ class HttpDecoder {
             }
         }
         return delimIndex
+    }
+
+
+    /**
+     *  返回文件名的扩展名
+     * @param fileName
+     * @return
+     */
+    static String extractFileExtension(String fileName) {
+        if (!fileName) return ''
+        int i = fileName.lastIndexOf(".")
+        if (i == -1) return ''
+        return fileName.substring(i + 1)
     }
 
 

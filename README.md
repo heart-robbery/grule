@@ -46,7 +46,7 @@ remoter {
 
 #### 安装教程
 
-jdk8, gradle5+
+jdk8, gradle6.5+
 
 #### 使用说明
 

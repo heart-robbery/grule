@@ -356,10 +356,11 @@ class Utils {
         if (!params) return urlStr
         params.each {
             if (it.value != null) {
-                if (urlStr.endsWith('?')) urlStr += (it.key + '=' + it.value + '&')
-                else if (urlStr.endsWith('&')) urlStr += (it.key + '=' + it.value + '&')
-                else if (urlStr.contains("?")) urlStr += ("&" + it.key + '=' + it.value + '&')
-                else urlStr += ('?' + it.key + '=' + it.value + '&')
+                def v = URLEncoder.encode(it.value, 'utf-8')
+                if (urlStr.endsWith('?')) urlStr += (it.key + '=' + v + '&')
+                else if (urlStr.endsWith('&')) urlStr += (it.key + '=' + v + '&')
+                else if (urlStr.contains("?")) urlStr += ("&" + it.key + '=' + v + '&')
+                else urlStr += ('?' + it.key + '=' + v + '&')
             }
         }
         return urlStr
