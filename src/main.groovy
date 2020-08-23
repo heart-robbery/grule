@@ -1,16 +1,10 @@
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
-import core.AppContext
-import core.EhcacheSrv
-import core.OkHttpSrv
-import core.RedisClient
-import core.Remoter
-import core.SchedSrv
+import core.*
 import core.http.HttpServer
 import core.jpa.HibernateSrv
-import ctrl.MainCtrl2
-import ctrl.TestCtrl2
-import dao.entity.Component
+import ctrl.MainCtrl
+import ctrl.TestCtrl
 import dao.entity.Test
 import dao.entity.VersionFile
 import groovy.transform.Field
@@ -22,6 +16,7 @@ import service.TestService
 import java.text.SimpleDateFormat
 import java.time.Duration
 
+
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Field final AppContext app = new AppContext()
 @Lazy @Field EP ep = app.bean(EP)
@@ -32,9 +27,9 @@ app.addSource(new EhcacheSrv())
 app.addSource(new SchedSrv())
 app.addSource(new RedisClient())
 app.addSource(new Remoter())
-app.addSource(new HibernateSrv().entities(Test, VersionFile, Component))
+app.addSource(new HibernateSrv().entities(Test, VersionFile))
 //app.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl))
-app.addSource(new HttpServer().ctrls(TestCtrl2, MainCtrl2))
+app.addSource(new HttpServer().ctrls(TestCtrl, MainCtrl))
 app.addSource(new FileUploader())
 app.addSource(new TestService())
 app.addSource(this)

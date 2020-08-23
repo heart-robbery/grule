@@ -112,9 +112,9 @@ class HttpContext {
         def v = sData.get(key)
         if (type) {
             if (Set.isAssignableFrom(type) && v instanceof String) {
-                return v.toString().split(',').toList().toSet()
+                return v == '' ? null : v.toString().split(',').toList().toSet()
             } else if (List.isAssignableFrom(List) && v instanceof String) {
-                return v.toString().split(',').toList()
+                return v == '' ? null : v.toString().split(',').toList()
             }
             return type.cast(v)
         }
@@ -255,7 +255,7 @@ class HttpContext {
 
         fullResponse(body)
         int chunkedSize = chunkedSize(body)
-        if (chunkedSize > 0 && body !instanceof String) { //分块传送
+        if (chunkedSize > 0) { //分块传送
             chunked(body, chunkedSize)
         } else { //整体传送
             // HttpResponseEncoder
@@ -296,9 +296,7 @@ class HttpContext {
      */
     protected void chunked(Object body, int chunkedSize) {
         aioSession.send(ByteBuffer.wrap(preRespStr().getBytes('utf-8')))
-        if (body instanceof String) {
-
-        } else if (body instanceof File) {
+        if (body instanceof File) { // 文件分块传送
             body.withInputStream {is ->
                 ByteBuffer buf = ByteBuffer.allocate(chunkedSize)
                 boolean end = false
@@ -321,7 +319,7 @@ class HttpContext {
                 // 结束chunk
                 aioSession.send(ByteBuffer.wrap('0\r\n\r\n'.getBytes('utf-8')))
             }
-        }
+        } else throw new Exception("不支持类型'$body.class.simpleName' chunked 传送")
     }
 
 
@@ -333,21 +331,30 @@ class HttpContext {
         int bodyLength
         if (body instanceof File) bodyLength = body.length()
         else if (body instanceof byte[]) {
-            bodyLength = body.length
+            if (body.length > 1024 * 1024 * 4) {
+                close()
+                throw new RuntimeException('body 响应太大: ' + body.length)
+            }
+            response.contentLengthIfNotSet(bodyLength)
             return -1
         }
-        else if (body instanceof String) bodyLength = body.getBytes('utf-8').length
+        else if (body instanceof String) {
+            bodyLength = body.getBytes('utf-8').length
+            if (bodyLength >  1024 * 1024 * 4) {
+                close()
+                throw new RuntimeException('暂时不支持大字符串响应: ' + bodyLength)
+            }
+            response.contentLengthIfNotSet(bodyLength)
+            return -1
+        }
 
-        // 下载限速
+        // TODO 下载限速
         int chunkedSize = -1
-        if (bodyLength > 1024 * 1024 * 100) { // 大于100M
-            chunkedSize = 1024 * 1024 * 5
+        if (bodyLength > 1024 * 1024 * 50) { // 大于50M
+            chunkedSize = 1024 * 1024 * 4
             response.header('Transfer-Encoding', 'chunked')
-        } else if (bodyLength > 1024 * 1024 * 20) { // 大于20M
-            chunkedSize = 1024 * 1024 * 2
-            response.header('Transfer-Encoding', 'chunked')
-        } else if (bodyLength > 1024 * 200) { // 大于200K
-            chunkedSize = 1024 * 100
+        } else if (bodyLength > 1024 * 1024) { // 大于1M
+            chunkedSize = 1024 * 1024
             response.header('Transfer-Encoding', 'chunked')
         } else {
             chunkedSize = -1
@@ -399,6 +406,8 @@ class HttpContext {
         } else if (body == null) {
             response.statusIfNotSet(404)
             response.contentLengthIfNotSet(0)
+        } else if (body instanceof byte[]) {
+            response.contentLengthIfNotSet(body.length)
         } else {
             throw new Exception("不支持的类型 " + body.class.simpleName)
         }

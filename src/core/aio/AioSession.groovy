@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousCloseException
 import java.nio.channels.AsynchronousSocketChannel
+import java.nio.channels.ClosedChannelException
 import java.nio.channels.CompletionHandler
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.function.BiConsumer
@@ -28,7 +29,7 @@ class AioSession {
     // 数据分割符(半包和粘包) 默认换行符分割
     @Lazy protected String                               delimiter   = server.getStr('delimiter', '\n')
     // 每次接收消息的内存空间
-    @Lazy protected             def                      buf         = ByteBuffer.allocate(server.getInteger('maxMsgSize', 1024 * 20))
+    @Lazy protected             def                      buf         = ByteBuffer.allocate(server.getInteger('maxMsgSize', 1024 * 1024))
 
 
     AioSession(AsynchronousSocketChannel sc, ServerTpl server) {
@@ -62,7 +63,7 @@ class AioSession {
             try {sc?.shutdownOutput()} catch(ex) {}
             try {sc?.shutdownInput()} catch(ex) {}
             try {sc?.close()} catch(ex) {}
-            msgFns.clear(); closeFn?.run()
+            closeFn?.run()
         }
     }
 
@@ -79,7 +80,9 @@ class AioSession {
             try {
                 sc.write(ByteBuffer.wrap((msg + (delimiter?:'')).getBytes('utf-8'))).get()
             } catch (ex) {
-                log.error(ex.class.simpleName + " " + sc.localAddress.toString() + " ->" + sc.remoteAddress.toString())
+                if (ex !instanceof ClosedChannelException) {
+                    log.error(ex.class.simpleName + " " + sc.localAddress.toString() + " ->" + sc.remoteAddress.toString())
+                }
                 close()
             }
         }
@@ -191,8 +194,9 @@ class AioSession {
 
         @Override
         void failed(Throwable ex, ByteBuffer buf) {
-            if (ex instanceof AsynchronousCloseException) return
-            log.error("", ex)
+            if (ex !instanceof ClosedChannelException) {
+                log.error("", ex)
+            }
             session.close()
         }
     }

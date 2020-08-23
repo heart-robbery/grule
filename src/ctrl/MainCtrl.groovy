@@ -8,7 +8,7 @@ import core.http.mvc.Path
 import service.FileUploader
 
 @Ctrl
-class MainCtrl2 extends ServerTpl {
+class MainCtrl extends ServerTpl {
 
     @Lazy def fu = bean(FileUploader)
 
@@ -32,6 +32,8 @@ class MainCtrl2 extends ServerTpl {
         fu.findFile(fName)
     }
 
+
+    // ====================== api-doc =========================
 
     @Path(path = 'api-doc/data.json')
     String swagger_data(HttpContext ctx) {
@@ -58,6 +60,8 @@ class MainCtrl2 extends ServerTpl {
     }
 
 
+    // ==========================js =====================
+
     @Path(path = 'js/:fName')
     File js(String fName, HttpContext ctx) {
         ctx.response.cacheControl(10)
@@ -69,6 +73,8 @@ class MainCtrl2 extends ServerTpl {
         Utils.baseDir("src/static/js/lib/$fName")
     }
 
+
+    // =======================css ========================
 
     @Path(path = 'css/:fName')
     File css(String fName, HttpContext ctx) {
@@ -84,5 +90,10 @@ class MainCtrl2 extends ServerTpl {
     File css_lib(String fName, HttpContext ctx) {
         ctx.response.cacheControl(120)
         Utils.baseDir("src/static/css/lib/$fName")
+    }
+    @Path(path = 'css/lib/fonts/:fName')
+    File css_lib_fonts(String fName, HttpContext ctx) {
+        ctx.response.cacheControl(120)
+        Utils.baseDir("src/static/css/lib/fonts/$fName")
     }
 }

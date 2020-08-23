@@ -57,7 +57,7 @@ class HttpServer extends ServerTpl {
         def cg = AsynchronousChannelGroup.withThreadPool(exec)
         ssc = AsynchronousServerSocketChannel.open(cg)
         ssc.setOption(StandardSocketOptions.SO_REUSEADDR, true)
-        ssc.setOption(StandardSocketOptions.SO_RCVBUF, getInteger('so_revbuf', 64 * 1024))
+        ssc.setOption(StandardSocketOptions.SO_RCVBUF, getInteger('so_revbuf', 1024 * 1024 * 4))
 
         String host = hpCfg.split(":")[0]
         def addr = new InetSocketAddress(port)
@@ -360,8 +360,8 @@ class HttpServer extends ServerTpl {
                 def rAddr = ((InetSocketAddress) sc.remoteAddress)
                 srv.log.debug("New HTTP(AIO) Connection from: " + rAddr.hostString + ":" + rAddr.port)
                 sc.setOption(StandardSocketOptions.SO_REUSEADDR, true)
-                sc.setOption(StandardSocketOptions.SO_RCVBUF, getInteger('so_rcvbuf', 1024 * 1024))
-                sc.setOption(StandardSocketOptions.SO_SNDBUF, getInteger('so_sndbuf', 1024 * 1024)) // 必须大于 chunk 最小值
+                sc.setOption(StandardSocketOptions.SO_RCVBUF, getInteger('so_rcvbuf', 1024 * 1024 * 2))
+                sc.setOption(StandardSocketOptions.SO_SNDBUF, getInteger('so_sndbuf', 1024 * 1024 * 6)) // 必须大于 chunk 最小值
                 sc.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
                 sc.setOption(StandardSocketOptions.TCP_NODELAY, true)
                 def se = new HttpAioSession(sc, srv)
@@ -376,7 +376,7 @@ class HttpServer extends ServerTpl {
         protected void handleExpire(HttpAioSession se) {
             if (se.ws) return
             long expire = Duration.ofMinutes(getInteger("aioSession.maxIdle",
-                connected.get() > 100 ? 1: (connected.get() > 60 ? 2 : (connected.get() > 30 ? 5 : 10))
+                connected.get() > 100 ? 2: (connected.get() > 60 ? 5 : (connected.get() > 30 ? 10 : 20))
             )).toMillis()
             final AtomicBoolean end = new AtomicBoolean(false)
             long cur = System.currentTimeMillis()

@@ -20,8 +20,6 @@ class HttpDecoder {
     protected boolean headerComplete
     protected boolean bodyComplete
     protected String charset = 'utf-8'
-    // 保存上传的临时文件
-    protected List<File> tmpFiles = new LinkedList<>()
     // 当前读到哪个Part
     protected Part curPart
     @Lazy String boundary = {
@@ -147,6 +145,7 @@ class HttpDecoder {
             do { // 遍历读每个part
                 String line = readLine(buf)
                 if (line == null) return false
+                if (line == '\r') continue
                 if (line == endLine || line == (endLine + '\r')) return true // 结束行
                 curPart = new Part(boundary: line)
 
@@ -207,11 +206,12 @@ class HttpDecoder {
      * @return true: 读完, false 未读完(数据不够)
      */
     protected boolean readMultipartValue(ByteBuffer buf) {
-        if (curPart.filename) { // 当前part 是个文件
+        if (curPart.filename != null) { // 当前part 是个文件, filename  可能是个空字符串
             int index = indexOf(buf, ('\r\n--' + boundary).getBytes('utf-8'))
 
             if (curPart.tmpFile == null) { // 临时存放文件
-                curPart.tmpFile = File.createTempFile(request.id, extractFileExtension(curPart.filename)); tmpFiles.add(curPart.tmpFile)
+                curPart.tmpFile = File.createTempFile(request.id, extractFileExtension(curPart.filename))
+                request.session.tmpFiles.add(curPart.tmpFile)
                 if (request.formParams.containsKey(curPart.name)) { // 有多个值
                     def v = request.formParams.remove(curPart.name)
                     if (v instanceof List) v.add(curPart.fd)
@@ -222,20 +222,32 @@ class HttpDecoder {
             }
             if (index == -1) {
                 int length = buf.remaining()
-                try(def os = new RandomAccessFile(curPart.tmpFile, "rw")) {
-                    os.write(buf.array())
+                try(def os = new FileOutputStream(curPart.tmpFile, true)) {
+                    byte[] bs = new byte[length]
+                    buf.get(bs) //先读到内存 减少io
+                    os.write(bs)
                 }
                 curPart.fd.size += length
                 return false
             } else {
                 int length = index - buf.position()
-                try(def os = new RandomAccessFile(curPart.tmpFile, "rw")) {
-                    byte[] bs = new byte[length]
-                    buf.get(bs) //先读到内存 减少io
-                    os.write(bs)
+                if (length == 0 && curPart.filename == '') {// 未上传的情况
+                    request.session.tmpFiles.remove(curPart.tmpFile)
+                    curPart.tmpFile.delete()
+                    def v = request.formParams.remove(curPart.name)
+                    if (v instanceof List) v.remove(curPart.fd)
+                    else {
+                        request.formParams.put(curPart.name, null)
+                    }
+                } else {
+                    try(def os = new FileOutputStream(curPart.tmpFile, true)) {
+                        byte[] bs = new byte[length]
+                        buf.get(bs) //先读到内存 减少io
+                        os.write(bs)
+                    }
+                    curPart.fd.size += length
                 }
                 curPart.valueComplete = true
-                curPart.fd.size += length
                 return true
             }
         } else { // 字符串 Part

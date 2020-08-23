@@ -1,13 +1,11 @@
 package ctrl
 
 import cn.xnatural.enet.event.EL
-import core.Page
-import core.Utils
-import core.OkHttpSrv
-import core.ServerTpl
+import core.*
 import core.aio.AioClient
 import core.aio.AioServer
 import core.http.HttpContext
+import core.http.HttpServer
 import core.http.mvc.*
 import core.http.ws.Listener
 import core.http.ws.WS
@@ -22,13 +20,14 @@ import service.FileUploader
 import service.TestService
 
 import java.text.SimpleDateFormat
+import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
 import static core.http.mvc.ApiResp.fail
 import static core.http.mvc.ApiResp.ok
 
 @Ctrl(prefix = 'test')
-class TestCtrl2 extends ServerTpl {
+class TestCtrl extends ServerTpl {
     @Lazy def            ts   = bean(TestService)
     @Lazy def            repo = bean(BaseRepo)
     @Lazy def            fu   = bean(FileUploader)
@@ -135,10 +134,69 @@ class TestCtrl2 extends ServerTpl {
     // 文件上传
     @Path(path = 'upload')
     ApiResp upload(FileData file, String version) {
-        if (file == null) {throw new IllegalArgumentException('文件未上传')}
+        if (file == null) return ApiResp.fail('文件未上传')
         fu.save(file)
         repo.saveOrUpdate(new VersionFile(version: version, finalName: file.finalName, originName: file.originName, size: file.size))
         ok(fu.toFullUrl(file.finalName))
+    }
+
+
+
+    @Lazy protected Map<String, Tuple2<File, FileData>> tmpFiles = new ConcurrentHashMap<>()
+
+    @EL(name = 'sys.started', async = true)
+    void stop() {tmpFiles?.each {it.value.v1.delete()}}
+
+    /**
+     * 文件上传: 持续上传/分片上传
+     * @param filePiece 文件片
+     * @param fileId 文件id
+     * @param originName 文件原名
+     * @param totalPiece 总片数
+     * @param currentPiece 当前第几片
+     * @return
+     */
+    @Path(path = 'pieceUpload')
+    ApiResp pieceUpload(FileData filePiece, String fileId, String originName, Integer totalPiece, Integer currentPiece) {
+        if (filePiece == null) {throw new IllegalArgumentException('文件片未上传')}
+        if (!fileId) {throw new IllegalArgumentException('参数错误: fileId 不能为空')}
+        if (!originName && currentPiece == 1) {throw new IllegalArgumentException('参数错误: originName 不能为空')}
+        if (!totalPiece) {throw new IllegalArgumentException('参数错误: totalPiece 不能为空')}
+        if (totalPiece < 2) {throw new IllegalArgumentException('参数错误: totalPiece >= 2')}
+        if (currentPiece == null) {throw new IllegalArgumentException('参数错误: currentPiece 不能为空')}
+        if (currentPiece < 1) {throw new IllegalArgumentException('参数错误: currentPiece >= 1')}
+        if (totalPiece < currentPiece) {throw new IllegalArgumentException('参数错误: totalPiece >= currentPiece')}
+        if (currentPiece == 1) { // 第一个分片
+            def fd = new FileData(originName: originName)
+            def f = File.createTempFile(fd.finalName, '')
+            tmpFiles.put(fileId, Tuple.tuple(f, fd))
+            bean(SchedSrv)?.after(Duration.ofMinutes(bean(HttpServer).getInteger('pieceUpload.maxKeep', 120))) {
+                tmpFiles.remove(fileId)
+                f.delete()
+            }
+        }
+        def fileInfo = tmpFiles.get(fileId)
+        if (fileInfo == null) return ApiResp.of('404', '文件未找到: ' + fileId).attr('originName', originName)
+
+        try(def os = new FileOutputStream(fileInfo.v1, true)) { // 把每个分片文件 写入到 最终文件
+            os.write(filePiece.inputStream.bytes)
+        }
+        long maxSize = bean(HttpServer).getLong('pieceUpload.maxFileSize', 1024 * 1024 * 200)
+        if (fileInfo.v1.length() > maxSize) { // 大小验证
+            fileInfo = tmpFiles.remove(fileId)
+            fileInfo.v1.delete()
+            return ApiResp.fail('上传文件太大, <=' + maxSize)
+        }
+        if (totalPiece == currentPiece) { // 最后一个分片
+            fileInfo = tmpFiles.remove(fileId)
+            fileInfo.v2.size = fileInfo.v1.length()
+            def fd = fileInfo.v2
+            fd.setInputStream(new FileInputStream(fileInfo.v1))
+            fu.save(fd); fileInfo.v1.delete()
+            repo.saveOrUpdate(new VersionFile(version: '', finalName: fd.finalName, originName: fd.originName, size: fd.size))
+            return ok(fu.toFullUrl(fd.finalName))
+        }
+        ok()
     }
 
 

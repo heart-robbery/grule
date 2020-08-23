@@ -35,7 +35,7 @@ class AioServer extends ServerTpl {
         def cg = AsynchronousChannelGroup.withThreadPool(exec)
         ssc = AsynchronousServerSocketChannel.open(cg)
         ssc.setOption(StandardSocketOptions.SO_REUSEADDR, true)
-        ssc.setOption(StandardSocketOptions.SO_RCVBUF, getInteger('so_revbuf', 64 * 1024))
+        ssc.setOption(StandardSocketOptions.SO_RCVBUF, getInteger('so_revbuf', 1024 * 1024))
 
         String host = hpCfg.split(":")[0]
         def addr = new InetSocketAddress(port)
@@ -126,8 +126,8 @@ class AioServer extends ServerTpl {
                 def rAddr = ((InetSocketAddress) sc.remoteAddress)
                 srv.log.info("New TCP(AIO) Connection from: " + rAddr.hostString + ":" + rAddr.port)
                 sc.setOption(StandardSocketOptions.SO_REUSEADDR, true)
-                sc.setOption(StandardSocketOptions.SO_RCVBUF, getInteger('so_rcvbuf', 200 * 1024))
-                sc.setOption(StandardSocketOptions.SO_SNDBUF, getInteger('so_sndbuf', 200 * 1024))
+                sc.setOption(StandardSocketOptions.SO_RCVBUF, getInteger('so_rcvbuf', 1024 * 1024))
+                sc.setOption(StandardSocketOptions.SO_SNDBUF, getInteger('so_sndbuf', 1024 * 1024))
                 sc.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
                 sc.setOption(StandardSocketOptions.TCP_NODELAY, true)
 

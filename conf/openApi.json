@@ -189,6 +189,58 @@
         }
       }
     },
+    "/test/pieceUpload": {
+      "post": {
+        "tags": ["test"],
+        "summary": "分片上传",
+        "description": "文件上传: 持续上传/分片上传",
+        "requestBody": {
+          "description": "文件",
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "filePiece": {
+                    "required": true,
+                    "type": "file",
+                    "format": "binary"
+                  },
+                  "fileId": {
+                    "type": "string"
+                  },
+                  "originName": {
+                    "type": "string"
+                  },
+                  "totalPiece": {
+                    "type": "number",
+                    "format": "int"
+                  },
+                  "currentPiece": {
+                    "type": "number",
+                    "format": "int"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "$ref": "#/components/schemas/ApiResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/test/remote": {
       "get": {
         "tags": ["test"],

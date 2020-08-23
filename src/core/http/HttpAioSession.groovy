@@ -5,8 +5,8 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 import java.nio.ByteBuffer
-import java.nio.channels.AsynchronousCloseException
 import java.nio.channels.AsynchronousSocketChannel
+import java.nio.channels.ClosedChannelException
 import java.nio.channels.CompletionHandler
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -23,10 +23,11 @@ class HttpAioSession {
     // 上次读写时间
     protected              Long                      lastUsed
     protected final        AtomicBoolean             closed      = new AtomicBoolean(false)
-    // 每次接收消息的内存空间
-    @Lazy protected               def                buf         = ByteBuffer.allocate(server.getInteger('maxMsgSize', 1024 * 20))
+    // 每次接收消息的内存空间(文件上传大小限制)
+    @Lazy protected               def                buf         = ByteBuffer.allocate(server.getInteger('maxMsgSize', 1024 * 1024 * 2))
     // 不为空代表是WebSocket
     WebSocket ws
+    @Lazy protected List<File> tmpFiles = new LinkedList<>()
 
 
     HttpAioSession(AsynchronousSocketChannel sc, HttpServer server) {
@@ -51,6 +52,7 @@ class HttpAioSession {
             try {sc?.shutdownOutput()} catch(ex) {}
             try {sc?.shutdownInput()} catch(ex) {}
             try {sc?.close()} catch(ex) {}
+            tmpFiles.each {f -> try {f.delete()} catch (ex) {}}
             closeFn?.run()
         }
     }
@@ -66,7 +68,9 @@ class HttpAioSession {
         try {
             sc.write(buf).get()
         } catch (ex) {
-            log.error(ex.class.simpleName + " " + sc.localAddress.toString() + " ->" + sc.remoteAddress.toString())
+            if (ex !instanceof ClosedChannelException) {
+                log.error(ex.class.simpleName + " " + sc.localAddress.toString() + " ->" + sc.remoteAddress.toString())
+            }
             close()
         }
     }
@@ -108,15 +112,14 @@ class HttpAioSession {
                         request.decoder.decode(buf)
                     } catch (ex) {
                         log.error("HTTP 解析出错", ex)
-                        close(); return
+                        session.close(); return
                     }
                     if (request.decoder.complete) {
                         if (request.decoder.websocket) { // 创建WebSocket 会话
                             session.ws = new WebSocket(session)
                             server.receive(request)
                         } else {
-                            def req = request
-                            request = null // 下一个请求
+                            def req = request; request = null // 接收下一个请求
                             server.receive(req)
                         }
                     }
@@ -125,8 +128,8 @@ class HttpAioSession {
                 buf.compact()
                 // 避免 ReadPendingException
                 session.read()
-            }
-            else {
+            } else {
+                //1. 有可能文件上传一次大于 buf 的容量
                 log.warn("接收字节为空. 关闭 " + session.sc.toString())
                 session.close()
             }
@@ -135,7 +138,7 @@ class HttpAioSession {
 
         @Override
         void failed(Throwable ex, ByteBuffer buf) {
-            if (!(ex instanceof AsynchronousCloseException)) log.error("", ex)
+            if (ex !instanceof ClosedChannelException) log.error("", ex)
             session.close()
         }
     }

@@ -37,13 +37,13 @@ dependencies {
     compile fileTree(dir: 'sysLib', include: ['*.jar'])
     compile 'org.codehaus.groovy:groovy:3.0.5'
 
-    compile 'com.alibaba:fastjson:1.2.71'
+    compile 'com.alibaba:fastjson:1.2.73'
     compile 'ch.qos.logback:logback-classic:1.2.3'
     compile 'cn.xnatural.enet:enet-event:0.0.14'
-    compile 'org.hibernate:hibernate-core:5.4.17.Final'
+    compile 'org.hibernate:hibernate-core:5.4.20.Final'
 
     // 连接池
-    compile 'com.alibaba:druid:1.1.22'
+    compile 'com.alibaba:druid:1.1.23'
     // compile 'com.zaxxer:HikariCP:3.4.1'
     // compile 'org.apache.commons:commons-dbcp2:2.7.0'
     // compile 'mysql:mysql-connector-java:5.1.34'
@@ -52,8 +52,8 @@ dependencies {
     // compile 'io.netty:netty-all:4.1.49.Final'
     compile 'com.squareup.okhttp3:okhttp:3.14.8'
     // compile('org.apache.httpcomponents:httpclient:4.5.12')
-    compile ('org.ehcache:ehcache:3.6.3') {exclude group:'org.slf4j'}
-    compile ('org.quartz-scheduler:quartz:2.3.0') {
+    compile ('org.ehcache:ehcache:3.8.1') {exclude group:'org.slf4j'}
+    compile ('org.quartz-scheduler:quartz:2.3.2') {
         exclude group:'org.slf4j'
         exclude group:'com.mchange'
         exclude group:'com.zaxxer'
@@ -61,14 +61,14 @@ dependencies {
     compile 'redis.clients:jedis:3.3.0'
 
     // web 相关
-    compile ('io.ratpack:ratpack-core:1.8.0') {
-        exclude group: 'io.ratpack', module: 'ratpack-guice'
-        // exclude group: 'io.netty'
-        //exclude group: 'com.google.guava'
-        //exclude group: 'com.fasterxml.jackson.core'
-        //exclude group: 'com.fasterxml.jackson.datatype'
-        //exclude group: 'com.fasterxml.jackson.dataformat'
-    }
+//    compile ('io.ratpack:ratpack-core:1.8.0') {
+//        exclude group: 'io.ratpack', module: 'ratpack-guice'
+//        // exclude group: 'io.netty'
+//        //exclude group: 'com.google.guava'
+//        //exclude group: 'com.fasterxml.jackson.core'
+//        //exclude group: 'com.fasterxml.jackson.datatype'
+//        //exclude group: 'com.fasterxml.jackson.dataformat'
+//    }
 
     // compile('org.smartboot.http:smart-http-server:1.0.14')
 
