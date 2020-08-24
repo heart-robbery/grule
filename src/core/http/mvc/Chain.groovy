@@ -6,6 +6,9 @@ import org.slf4j.LoggerFactory
 
 import java.util.function.Consumer
 
+/**
+ * mvc Handler 执行链路
+ */
 class Chain {
     protected static final def log = LoggerFactory.getLogger(Chain)
     protected final LinkedList<Handler> handlers = new LinkedList<>()
@@ -15,44 +18,13 @@ class Chain {
     Chain(HttpServer server) { this.server = server }
 
 
-    Chain add(Handler handler) {
-        // 按优先级添加, 相同类型比较, FilterHandler > PathHandler
-        boolean added = false
-        int i = 0
-        for (def it = handlers.listIterator(); it.hasNext(); ) {
-            def h = it.next()
-            if (h.type() == handler.type()) {
-                if (h.order() < handler.order()) { // order 值越大越排前面, 相同的按顺序排
-                    it.previous() // 相同类型 不是第一个 插入前面, 第一个插在第一个后面
-                    it.add(handler); added = true; break
-                } else if (h.order() == handler.order()) {
-                    it.add(handler); added = true; break
-                } else { // 小于
-                    if (i == 0 && it.hasNext() && (h = it.next())) { // 和handler同类型的只有一个时, 插在后边
-                        if (h.type() != handler.type()) {
-                            it.previous()
-                            it.add(handler); added = true; break
-                        } else it.previous()
-                    }
-                }
-                i++
-            }
-        }
-        if (!added) {
-            if (handler instanceof FilterHandler) handlers.offerFirst(handler)
-            else handlers.offerLast(handler)
-        }
-        this
-    }
-
-
     /**
      * 执行此Chain
      * @param ctx
      */
     protected void handle(HttpContext ctx) {
         boolean match = false
-        for (Handler h: handlers) {
+        for (Handler h: handlers) { // 遍历查找匹配的Handler
             if (h instanceof FilterHandler) {
                 h.handle(ctx)
             } else if (h instanceof PathHandler) {
@@ -70,10 +42,46 @@ class Chain {
         if (!match) { // 未找到匹配
             ctx.response.statusIfNotSet(404)
             ctx.render()
-        }
-        else if (ctx.response.status != null) { // 已经设置了status
+        } else if (ctx.response.status != null) { // 已经设置了status
             ctx.render()
         }
+    }
+
+
+    /**
+     * 添加Handler
+     * 按优先级添加, 相同类型比较, FilterHandler > PathHandler
+     * [filter2, filter1, path3, path2, path1]
+     * @param handler
+     * @return
+     */
+    Chain add(Handler handler) {
+        boolean added = false
+        int i = 0
+        for (def it = handlers.listIterator(); it.hasNext(); ) {
+            def h = it.next()
+            if (h.type() == handler.type()) { // 添加类型的按优先级排在一起
+                if (h.order() < handler.order()) { // order 值越大越排前面
+                    it.previous() // 相同类型 不是第一个 插入前面, 第一个插在第一个后面
+                    it.add(handler); added = true; break
+                } else if (h.order() == handler.order()) {// 相同的order 按顺序排
+                    it.add(handler); added = true; break
+                } else { // 小于
+                    if (i == 0 && it.hasNext() && (h = it.next())) { // 和handler同类型的只有一个时, 插在后边
+                        if (h.type() != handler.type()) {
+                            it.previous()
+                            it.add(handler); added = true; break
+                        } else it.previous()
+                    }
+                }
+                i++
+            }
+        }
+        if (!added) {
+            if (handler instanceof FilterHandler) handlers.offerFirst(handler)
+            else handlers.offerLast(handler)
+        }
+        this
     }
 
 
@@ -179,7 +187,7 @@ class Chain {
 
 
     /**
-     * 前缀
+     * 前缀(一组Handler)
      * @param prefix
      * @param handlerBuilder
      * @return Chain

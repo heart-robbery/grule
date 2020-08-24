@@ -2,6 +2,10 @@ package core.http.mvc
 
 import groovy.transform.ToString
 
+/**
+ * 接口响应数据结构
+ * @param <T>
+ */
 @ToString(includePackage = false, ignoreNulls = true, allNames = true)
 class ApiResp<T> implements Serializable {
     /**

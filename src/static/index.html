@@ -94,7 +94,7 @@
             // upload: httpVueLoader('coms/Upload.vue')()
         },
         mounted: function () {
-            // this.initWs();
+            ws()
         },
         watch: {
             keyword: function (v) {this.search(v)},
@@ -200,7 +200,7 @@
 
 
     // web socket
-    function createWs(onMsg) {
+    function ws(cfg) {
         // web socket
         let ws = null;
         if (ws && (ws.readyState == 1 || ws.readyState == 2)) {
@@ -212,21 +212,32 @@
             try {
                 let protocol = "ws://";
                 if (window.location.protocol.startsWith("https")) protocol = "wss://";
-                ws = new WebSocket(protocol + window.location.host + "/policyCopy/msg");
+                ws = new WebSocket(protocol + window.location.host + (cfg.path || "/test/msg"));
             } catch (e) {
                 console.log('创建websocket错误', e);
                 setTimeout(function () {
-                    createWs()
-                }, (1000 * 60 * 2)); // 每两分钟重试
+                    ws(cfg)
+                }, cfg.reconnection || (1000 * 60 * 2)); // 每两分钟重试
                 return
             }
-            ws.onclose = function () {
+            ws.onclose = cfg.onClose || function () {
                 setTimeout(function () {
-                    createWs()
-                }, (1000 * 60 * 2)); // 每两分钟重试
+                    ws(cfg)
+                }, cfg.reconnection || (1000 * 60 * 2)); // 每两分钟重试
             };
-            ws.onmessage = onMsg;
-            ws.onopen = function() {
+            ws.onmessage = cfg.onMsg || function (e) { //接收websocket 消息
+                let jo = toJSON(e.data);
+                if (jo) {
+                    // {type: 'xxx': data: null}
+                    // if (jo.type == 'xxx') {}
+                    if (jo.data.msg) {
+                        app.$Notice.info({title: '后台提示', desc: jo.data.msg, duration: 5})
+                    }
+                } else {
+                    app.$Notice.info({title: '后台提示', desc: e.data, duration: 7})
+                }
+            };
+            ws.onopen = cfg.onOpen || function() {
                 console.log('websocket onopen');
                 ws.send('成功连接...')
             };

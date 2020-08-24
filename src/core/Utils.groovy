@@ -111,6 +111,26 @@ class Utils {
     }
 
 
+    /**
+     * 类型转换
+     * @param v
+     * @param type
+     * @return
+     */
+    static <T> T to(Object v, Class<T> type) {
+        if (type == null) return v
+        if (v == null) return type.cast(v)
+        else if (type == String) return v.toString()
+        else if (type == Integer || type == int) return Integer.valueOf(v)
+        else if (type == Long || type == long) return Long.valueOf(v)
+        else if (type == Double || type == double) return Double.valueOf(v)
+        else if (type == Float || type == float) return Float.valueOf(v)
+        else if (type == BigDecimal) return new BigDecimal(v.toString())
+        else if (type == URI) return URI.create(v.toString())
+        else if (type == URL) return URI.create(v.toString()).toURL()
+        else throw new IllegalArgumentException("不支持转换类型: $type.simpleName")
+    }
+
 
     /**
      * 查找方法

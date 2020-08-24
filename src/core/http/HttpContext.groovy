@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.serializer.SerializerFeature
 import core.EhcacheSrv
 import core.RedisClient
+import core.Utils
 import core.http.mvc.ApiResp
 import core.http.mvc.FileData
 import core.http.mvc.Handler
@@ -253,6 +254,11 @@ class HttpContext {
             response.contentTypeIfNotSet('application/json')
         }
 
+        long spend = System.currentTimeMillis() - request.createTime.time
+        if (server.getInteger('warnTimeout', 5)) { // 请求超时警告
+            server.log.warn("Request timeout '" + request.id + "', path: " + request.path + " , spend: " + spend + "ms")
+        }
+
         fullResponse(body)
         int chunkedSize = chunkedSize(body)
         if (chunkedSize > 0) { //分块传送
@@ -452,17 +458,25 @@ class HttpContext {
         if (v == null) v = request.queryParams.get(pName)
         if (v == null) v = request.formParams.get(pName)
         if (v == null) v = request.jsonParams.get(pName)
-        if (v == null || type == null) return v
-        if (type == String) return v instanceof List ? (v?[0]) : String.valueOf(v)
+        if (type == null) return v
+        if (v == null) return type.cast(v)
+        else if (type == String) return v instanceof List ? (v?[0]) : String.valueOf(v)
         else if (type == Integer || type == int) return Integer.valueOf(v)
         else if (type == Long || type == long) return Long.valueOf(v)
         else if (type == Double || type == double) return Double.valueOf(v)
         else if (type == Float || type == float) return Float.valueOf(v)
         else if (type == BigDecimal) return new BigDecimal(v.toString())
         else if (type == FileData) return v instanceof List ? (v?[0]) : v
+        else if (type == FileData[]) return v instanceof List ? v.toArray() : [v].toArray()
         else if (type == URI) return URI.create(v.toString())
         else if (type == URL) return URI.create(v.toString()).toURL()
-        else if (type == List) return v instanceof List ? v : [v]
+        else if (type.isArray()) {
+            if (v instanceof List) {
+                return v.collect { Utils.to(it, type.componentType)}.toArray()
+            } else {
+                return [Utils.to(v, type.componentType)].toArray()
+            }
+        }
         else throw new IllegalArgumentException("不支持的类型: " + type.name)
     }
 }

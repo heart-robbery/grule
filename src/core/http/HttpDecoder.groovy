@@ -213,7 +213,7 @@ class HttpDecoder {
                 curPart.tmpFile = File.createTempFile(request.id, extractFileExtension(curPart.filename))
                 request.session.tmpFiles.add(curPart.tmpFile)
                 if (request.formParams.containsKey(curPart.name)) { // 有多个值
-                    def v = request.formParams.remove(curPart.name)
+                    def v = request.formParams.get(curPart.name)
                     if (v instanceof List) v.add(curPart.fd)
                     else {
                         request.formParams.put(curPart.name, [v, curPart.fd] as LinkedList)
@@ -255,7 +255,7 @@ class HttpDecoder {
             if (curPart.value != null) {
                 curPart.valueComplete = true
                 if (request.formParams.containsKey(curPart.name)) { // 有多个值
-                    def v = request.formParams.remove(curPart.name)
+                    def v = request.formParams.get(curPart.name)
                     if (v instanceof List) v.add(curPart.value)
                     else {
                         request.formParams.put(curPart.name, [v, curPart.value] as LinkedList)
