@@ -255,7 +255,7 @@ class HttpContext {
         }
 
         long spend = System.currentTimeMillis() - request.createTime.time
-        if (server.getInteger('warnTimeout', 5)) { // 请求超时警告
+        if (spend > server.getInteger('warnTimeout', 5) * 1000) { // 请求超时警告
             server.log.warn("Request timeout '" + request.id + "', path: " + request.path + " , spend: " + spend + "ms")
         }
 
