@@ -9,13 +9,12 @@ import core.mode.task.TaskContext
 import core.mode.task.TaskWrapper
 import core.mode.v.VChain
 import core.mode.v.VProcessor
-import core.module.OkHttpSrv
-import core.module.ServerTpl
-import core.module.jpa.BaseRepo
-import core.module.remote.Remoter
-import ctrl.common.FileData
+import core.OkHttpSrv
+import core.Remoter
+import core.SchedSrv
+import core.ServerTpl
+import core.jpa.BaseRepo
 import dao.entity.Test
-import dao.entity.UploadFile
 
 import java.text.SimpleDateFormat
 import java.util.function.Consumer
@@ -23,6 +22,17 @@ import java.util.function.Consumer
 class TestService extends ServerTpl {
     @Lazy def repo = bean(BaseRepo)
     @Lazy def http = bean(OkHttpSrv)
+
+
+    @EL(name = 'sys.started')
+    void sysStarted() {
+
+        // 向测试 web socket 每分钟发送消息
+        long count = 1
+        bean(SchedSrv)?.cron('0 */1 * * * ?') {
+            ep.fire("testWsMsg", (count++) + ': ' + new SimpleDateFormat('yyyy-MM-dd HH:mm:ss').format(new Date()))
+        }
+    }
 
 
     Page findTestData() {
@@ -33,22 +43,7 @@ class TestService extends ServerTpl {
                     age: Integer.valueOf(new SimpleDateFormat('ss').format(new Date()))
                 )
             )
-            repo.findPage(Test, 0, 10, { root, query, cb -> query.orderBy(cb.desc(root.get('createTime')))})
-        }
-    }
-
-
-    /**
-     * 记录上传的文件
-     * @param files
-     * @return
-     */
-    List<UploadFile> saveUpload(List<FileData> files) {
-        if (!files) return Collections.emptyList()
-        repo?.trans{
-            files.collect{f ->
-                repo.saveOrUpdate(new UploadFile(originName: f.originName, finalName: f.generatedName, size: f.size))
-            }
+            repo.findPage(Test, 1, 10, { root, query, cb -> query.orderBy(cb.desc(root.get('createTime')))})
         }
     }
 
@@ -125,7 +120,8 @@ class TestService extends ServerTpl {
     }
 
 
-    def taskTest() {
+    @EL(name = "eName11")
+    void taskTest() {
         new TaskContext<>('test ctx')
             .setExecutor(exec)
             .addTask(TaskWrapper.of{log.info("执行任务....")})
@@ -143,16 +139,19 @@ class TestService extends ServerTpl {
     }
 
 
+    @EL(name = "eName10")
     def testObjBuilder() {
         println ObjBuilder.of(Map).add("a", {"b"}).build()
     }
 
 
+    @EL(name = "eName9")
     def testPipe() {
         println new Pipeline(key: 'test pipe').add({ i -> i + "xxx"}).run("qqq")
     }
 
 
+    @EL(name = "eName8")
     def testVChain() {
         new VChain().add(new VProcessor() {
             @Override
@@ -181,7 +180,7 @@ class TestService extends ServerTpl {
     def remote(String app, String eName, String param = 'xx', Consumer fn) {
         // 远程调用
         // fn.accept(bean(Remoter).fire(app?:'gy', eName?:'eName1', ['p1']))
-        bean(Remoter).fireAsync(app?:'gy', eName?:'eName1', fn, [param?:'1'])
+        bean(Remoter).fireAsync(app?:'gy', eName?:'eName1', fn, [])
     }
 
 
@@ -203,7 +202,7 @@ class TestService extends ServerTpl {
 
 
     @EL(name = "eName3")
-    testEvent3(String p) {
+    long testEvent3(String p) {
         repo.count(Test, {root, query, cb -> query.orderBy(cb.desc(root.get("id")))})
     }
 
@@ -216,7 +215,7 @@ class TestService extends ServerTpl {
 
     @EL(name = "eName5")
     void testEvent5(String p) {
-        ep.fire("cache.set","java","java", p)
+        ep.fire("cache.set","java","java", p?:(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())))
     }
 
     @EL(name = "eName6")

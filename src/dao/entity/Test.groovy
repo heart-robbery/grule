@@ -1,7 +1,7 @@
 package dao.entity
 
 
-import core.module.jpa.UUIDEntity
+import core.jpa.UUIDEntity
 
 import javax.persistence.Entity
 

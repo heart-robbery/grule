@@ -11,7 +11,7 @@ groovy 快速开发代码
 前端文件 src/static
 
 ###### 集常用功能: 
-    ratpackweb, sched(quartz), cache(ehcache), 
+    httpServer, sched(quartz), cache(ehcache), 
     redis, jpa(hibernate), OkHttpClient, Remoter(多应用tcp通信)
 
 
@@ -34,6 +34,41 @@ remoter {
     同步调用: fire(应用名, 事件名, 参数...)
     异步调用: fireAsync(应用名, 事件名, 回调函数, 参数...)
     例: bean(Remoter).fire('gy', 'eName1', ['p1'])
+    
+#### http server
+    @Ctrl: 标明类是个Ctroller层类
+    
+    @Path: 标明是个路径匹配的处理器
+        例:
+        @Path(path = 'js/:fName')
+        File js(String fName, HttpContext ctx) {
+            ctx.response.cacheControl(10)
+            Utils.baseDir("src/static/js/$fName")
+        }
+    
+    @Filter: 标明是个filter
+        例:
+        @Filter(order = 1)
+        void filter1(HttpContext ctx) {
+            log.info('filter1 ============')
+        }
+
+    @WS: 标明是个websocket处理器
+        例:
+        @WS(path = 'msg')
+        void wsMsg(WebSocket ws) {
+            log.info('WS connect. {}', ws.session.sc.remoteAddress)
+            ws.listen(new Listener() {
+                @Override
+                void onClose(WebSocket wst) {
+                    wss.remove(wst)
+                }
+                @Override
+                void onText(String msg) {
+                    log.info('test ws receive client msg: {}', msg)
+                }
+            })
+        }
 
 #### OkHttpSrv http客户端api封装
     get请求:  get("localhost:8080/test/cus?p1=111").param("p2", "222").execute()
@@ -46,7 +81,7 @@ remoter {
 
 #### 安装教程
 
-jdk8, gradle5+
+jdk8, gradle6.5+
 
 #### 使用说明
 

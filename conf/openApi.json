@@ -1,0 +1,462 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "GY test API",
+    "description": "GY test",
+    "contact": {
+      "email": "xnatural@msn.cn"
+    },
+    "license": {
+      "name": "Apache 2.0",
+      "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+    },
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "local"
+    },
+    {
+      "url": "http://localhost:7070",
+      "description": "ratpack"
+    },
+    {
+      "url": "https://virtserver.swaggerhub.com/xnat2/gy1/1.0.0",
+      "description": "SwaggerHub API Auto Mocking"
+    }
+  ],
+  "tags": [
+    {
+      "name": "test",
+      "description": "test ctrl api"
+    },
+    {
+      "name": "main",
+      "description": "main ctrl api"
+    }
+  ],
+  "paths": {
+    "/test/dao": {
+      "post": {
+        "tags": ["test"],
+        "summary": "数据库操作接口",
+        "description": "数据库操作接口",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "description": "type=file 就查文件那个表",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "$ref": "#/components/schemas/ApiResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test/form": {
+      "post": {
+        "tags": ["test"],
+        "summary": "表单接口",
+        "description": "接收表单提交",
+        "requestBody": {
+          "description": "表单数据",
+          "required": false,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "param1": {
+                    "type": "string"
+                  },
+                  "p2": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "$ref": "#/components/schemas/ApiResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test/json": {
+      "post": {
+        "tags": ["test"],
+        "summary": "json接口",
+        "description": "接收json提交",
+        "requestBody": {
+          "description": "json数据",
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "p1": {
+                    "type": "number"
+                  },
+                  "p2": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "$ref": "#/components/schemas/ApiResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test/upload": {
+      "post": {
+        "tags": ["test"],
+        "summary": "文件上传",
+        "description": "文件上传",
+        "requestBody": {
+          "description": "文件",
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "required": true,
+                    "type": "file",
+                    "format": "binary"
+                  },
+                  "version": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "$ref": "#/components/schemas/ApiResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test/pieceUpload": {
+      "post": {
+        "tags": ["test"],
+        "summary": "分片上传",
+        "description": "文件上传: 持续上传/分片上传",
+        "requestBody": {
+          "description": "文件",
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "filePiece": {
+                    "required": true,
+                    "type": "file",
+                    "format": "binary"
+                  },
+                  "fileId": {
+                    "type": "string"
+                  },
+                  "originName": {
+                    "type": "string"
+                  },
+                  "totalPiece": {
+                    "type": "number",
+                    "format": "int"
+                  },
+                  "currentPiece": {
+                    "type": "number",
+                    "format": "int"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "$ref": "#/components/schemas/ApiResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test/remote": {
+      "get": {
+        "tags": ["test"],
+        "summary": "远程调用",
+        "description": "ep 远程调用",
+        "parameters": [
+          {
+            "name": "app",
+            "in": "query",
+            "description": "app 应用名",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "event",
+            "in": "query",
+            "description": "事件名",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "p1",
+            "in": "query",
+            "description": "参数p1",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "$ref": "#/components/schemas/ApiResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test/http": {
+      "get": {
+        "tags": ["test"],
+        "summary": "http 代理请求",
+        "description": "http 代理请求",
+        "parameters": [
+          {
+            "name": "url",
+            "in": "query",
+            "description": "代理发送http请求的地址",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "$ref": "#/components/schemas/ApiResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test/async": {
+      "get": {
+        "tags": ["test"],
+        "summary": "异步响应",
+        "description": "后台 异步响应",
+        "parameters": [
+
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "$ref": "#/components/schemas/ApiResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test/cus": {
+      "get": {
+        "tags": ["test"],
+        "summary": "自定义返回接口",
+        "description": "返回自定义数据结构",
+        "parameters": [
+
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "$ref": "#/components/schemas/ApiResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test/error": {
+      "get": {
+        "tags": ["test"],
+        "summary": "测试抛出错误",
+        "description": "抛出错误 接口",
+        "parameters": [
+
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "$ref": "#/components/schemas/ApiResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test/timeout": {
+      "get": {
+        "tags": ["test"],
+        "summary": "超时接口",
+        "description": "测试超时接口 让接口超时返回",
+        "parameters": [
+          {
+            "name": "timeout",
+            "in": "query",
+            "description": "设置超时时间(接口多久返回) 默认10秒",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "$ref": "#/components/schemas/ApiResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiResp": {
+        "required": ["code"],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "00"
+          },
+          "desc": {
+            "type": "string",
+            "example": "成功"
+          },
+          "data": {
+            "type": "object"
+          },
+          "traceNo": {
+            "type": "string",
+            "format": "uuid",
+            "example": "2d59326c4ad844a6b3c866fba159a44a"
+          }
+        }
+      }
+    }
+  }
+}

@@ -3,7 +3,6 @@ package core
 import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
-import core.module.ServerTpl
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -18,7 +17,7 @@ import static core.Utils.*
 import static java.util.Collections.emptyList
 
 class AppContext {
-    protected final Logger log = LoggerFactory.getLogger(AppContext.class)
+    protected static final Logger log = LoggerFactory.getLogger(AppContext)
     @Lazy ConfigObject                  env          = initEnv()
     /**
      * 系统名字. 用于多个系统启动区别
@@ -28,7 +27,7 @@ class AppContext {
      * 实例Id
      * NOTE: 保证唯一
      */
-    @Lazy String                          id             = env['sys']["id"] ?: ((name ? name + "_" : '') + Utils.random(10))
+    @Lazy String                          id           = env['sys']["id"] ?: ((name ? name + "_" : '') + Utils.random(10))
     /**
      * 系统运行线程池. {@link #initExecutor()}}
      */
@@ -40,21 +39,22 @@ class AppContext {
     /**
      * 服务对象源
      */
-    protected final Map<String, Object>   sourceMap      = new ConcurrentHashMap<>()
+    protected final Map<String, Object>   sourceMap    = new ConcurrentHashMap<>()
     /**
      * 对列执行器映射
      */
-    @Lazy protected Map<String, Devourer> queue2Devourer = new ConcurrentHashMap<>()
+    @Lazy protected Map<String, Devourer> queues       = new ConcurrentHashMap<>()
     /**
      * 启动时间
      */
-    final Date                            startup        = new Date()
+    final Date                            startup      = new Date()
     // 系统负载值 0 - 10
-    Integer sysLoad = 0
+    Integer                               sysLoad      = 0
     /**
      * jvm关闭钩子
+     * System.exit(0)
      */
-    @Lazy protected Thread                shutdownHook   = new Thread({
+    @Lazy protected Thread                shutdownHook = new Thread({
         // 通知各个模块服务关闭
         ep.fire("sys.stopping", EC.of(this).async(false).completeFn({ ec ->
             exec.shutdown()
@@ -107,7 +107,7 @@ class AppContext {
     /**
      * 启动
      */
-    def start() {
+    void start() {
         if (exec) throw new RuntimeException('App is running')
         log.info('Starting Application on {} with PID {}, active profile: ' + (env['profile']?:''), InetAddress.getLocalHost().getHostName(), pid())
         // 1. 初始化
@@ -159,13 +159,13 @@ class AppContext {
      */
     Devourer queue(String qName, Runnable fn = null) {
         if (!qName) throw new IllegalArgumentException('queue name must be not empty')
-        def d = queue2Devourer.get(qName)
+        def d = queues.get(qName)
         if (d == null) {
             synchronized (this) {
-                d = queue2Devourer.get(qName)
+                d = queues.get(qName)
                 if (d == null) {
                     d = new Devourer(qName, exec)
-                    queue2Devourer.put(qName, d)
+                    queues.put(qName, d)
                 }
             }
         }
@@ -249,12 +249,12 @@ class AppContext {
      * NOTE: 如果线程池在不停的创建线程, 有可能是因为 提交的 Runnable 的异常没有被处理.
      * see:  {@link java.util.concurrent.ThreadPoolExecutor#runWorker(java.util.concurrent.ThreadPoolExecutor.Worker)} 这里面当有异常抛出时 1128行代码 {@link java.util.concurrent.ThreadPoolExecutor#processWorkerExit(java.util.concurrent.ThreadPoolExecutor.Worker, boolean)}
      */
-    protected initExecutor() {
+    protected void initExecutor() {
         log.debug("init sys executor ... ")
         Integer maxSize = Integer.valueOf(env.sys.exec.maximumPoolSize?:32)
         exec = new ThreadPoolExecutor(
             Integer.valueOf(env.sys.exec.corePoolSize?:8), maxSize,
-            Long.valueOf(env.sys.exec.keepAliveTime?:2), TimeUnit.HOURS,
+            Long.valueOf(env.sys.exec.keepAliveTime?:1), TimeUnit.HOURS,
             new LinkedBlockingQueue<>(maxSize * 2),
             new ThreadFactory() {
                 final AtomicInteger i = new AtomicInteger(1)
@@ -304,15 +304,14 @@ class AppContext {
                 else if (maximumPoolSize == ac) sysLoad = 10
             }
         }
-        exec.allowCoreThreadTimeOut(true)
+        // exec.allowCoreThreadTimeOut(true)
     }
 
 
     /**
      * 初始化 EP
-     * @return
      */
-    protected initEp() {
+    protected void initEp() {
         log.debug("init ep")
         ep = new EP(exec, LoggerFactory.getLogger(EP.class)) {
             @Override

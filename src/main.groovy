@@ -1,14 +1,13 @@
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
-import core.AppContext
-import core.module.EhcacheSrv
-import core.module.OkHttpSrv
-import core.module.SchedSrv
-import core.module.jpa.HibernateSrv
+import core.*
+import core.http.HttpServer
+import core.jpa.HibernateSrv
 import ctrl.MainCtrl
 import ctrl.RuleCtrl
 import ctrl.TestCtrl
-import ctrl.ratpack.RatpackWeb
+import dao.entity.Test
+import dao.entity.VersionFile
 import groovy.transform.Field
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -17,6 +16,8 @@ import service.rule.AttrManager
 import service.rule.PolicyManger
 import service.rule.DecisionManager
 import service.rule.DecisionEngine
+import service.FileUploader
+import service.TestService
 
 import java.text.SimpleDateFormat
 import java.time.Duration
@@ -33,7 +34,7 @@ app.addSource(new SchedSrv())
 //app.addSource(new RedisClient())
 //app.addSource(new Remoter())
 app.addSource(new HibernateSrv('jpa_kratos'))
-app.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl, RuleCtrl))
+//app.addSource(new RatpackWeb().ctrls(TestCtrl, MainCtrl, RuleCtrl))
 //app.addSource(new FileUploader())
 app.addSource(new TestService())
 app.addSource(new AttrManager())

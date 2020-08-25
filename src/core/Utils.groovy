@@ -12,9 +12,11 @@ import javax.net.ssl.X509TrustManager
 import java.lang.management.ManagementFactory
 import java.lang.reflect.Field
 import java.lang.reflect.Method
+import java.security.MessageDigest
 import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Consumer
 import java.util.function.Function
@@ -74,14 +76,33 @@ class Utils {
     }
 
 
+    /**
+     * sha1 加密
+     * @param str
+     * @return
+     */
+    static byte[] sha1(byte[] bs) {
+        MessageDigest digest = java.security.MessageDigest.getInstance('SHA-1')
+        digest.update(bs)
+        return digest.digest()
+    }
+
+
+//    String md5Hex(String str) {
+//        def md = MessageDigest.getInstance('MD5')
+//        def bs = md.update(str.getBytes('utf-8'))
+//
+//    }
+
+
     static final char[] CS = ['0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z']
     /**
      * 随机字符串(区分大小写)
-     * @param l 长度
+     * @param length 长度
      */
-    static String random(int l) {
-        if (l < 1) throw new IllegalArgumentException("length must le 1")
-        final cs = new char[l]
+    static String random(int length) {
+        if (length < 1) throw new IllegalArgumentException("length must le 1")
+        final cs = new char[length]
         def r = new Random()
         for (int i = 0; i < cs.length; i++) {
             cs[i] = CS[r.nextInt(CS.length)]
@@ -89,6 +110,26 @@ class Utils {
         return String.valueOf(cs)
     }
 
+
+    /**
+     * 类型转换
+     * @param v
+     * @param type
+     * @return
+     */
+    static <T> T to(Object v, Class<T> type) {
+        if (type == null) return v
+        if (v == null) return type.cast(v)
+        else if (type == String) return v.toString()
+        else if (type == Integer || type == int) return Integer.valueOf(v)
+        else if (type == Long || type == long) return Long.valueOf(v)
+        else if (type == Double || type == double) return Double.valueOf(v)
+        else if (type == Float || type == float) return Float.valueOf(v)
+        else if (type == BigDecimal) return new BigDecimal(v.toString())
+        else if (type == URI) return URI.create(v.toString())
+        else if (type == URL) return URI.create(v.toString()).toURL()
+        else throw new IllegalArgumentException("不支持转换类型: $type.simpleName")
+    }
 
 
     /**
@@ -315,7 +356,7 @@ class Utils {
                 // 取结果
                 ret = conn.getInputStream().getText("utf-8")
                 if (200 != responseCode) {
-                    throw new RuntimeException("Http error. code: ${responseCode}, url: $urlStr, resp: ${Objects.toString(ret, "")}")
+                    throw new Exception("Http error. code: ${responseCode}, url: $urlStr, resp: ${Objects.toString(ret, "")}")
                 }
             } finally {
                 conn?.disconnect()
@@ -335,10 +376,11 @@ class Utils {
         if (!params) return urlStr
         params.each {
             if (it.value != null) {
-                if (urlStr.endsWith('?')) urlStr += (it.key + '=' + it.value + '&')
-                else if (urlStr.endsWith('&')) urlStr += (it.key + '=' + it.value + '&')
-                else if (urlStr.contains("?")) urlStr += ("&" + it.key + '=' + it.value + '&')
-                else urlStr += ('?' + it.key + '=' + it.value + '&')
+                def v = URLEncoder.encode(it.value, 'utf-8')
+                if (urlStr.endsWith('?')) urlStr += (it.key + '=' + v + '&')
+                else if (urlStr.endsWith('&')) urlStr += (it.key + '=' + v + '&')
+                else if (urlStr.contains("?")) urlStr += ("&" + it.key + '=' + v + '&')
+                else urlStr += ('?' + it.key + '=' + v + '&')
             }
         }
         return urlStr
@@ -375,11 +417,22 @@ class Utils {
         private Thread                    th
         private boolean                   stopFlag
         private Function<String, Boolean> lineFn
+        private Executor exec
 
-        // 处理输出行
+        /**
+         * 处理输出行
+         * @param lineFn 函数返回true 继续输出, 返回false则停止输出
+         */
         Tailer handle(Function<String, Boolean> lineFn) {this.lineFn = lineFn; this}
-
-        def stop() {this.stopFlag = true}
+        /**
+         * 设置处理线程池
+         * @param exec
+         */
+        Tailer exec(Executor exec) {this.exec = exec; this}
+        /**
+         * 停止
+         */
+        void stop() {this.stopFlag = true}
 
         /**
          * tail 文件内容监控
@@ -387,51 +440,100 @@ class Utils {
          * @param follow 从最后第几行开始
          * @return
          */
-        Tailer tail(String file, Integer follow = 10) {
-            th = new Thread({run(file, (follow == null ? 0 : follow))}, "Tailer-$file")
-            th.setDaemon(true)
-            th.start()
+        Tailer tail(String file, Integer follow = 5) {
+            if (lineFn == null) lineFn = {println it}
+            Runnable fn = {
+                String tName = Thread.currentThread().name
+                try {
+                    Thread.currentThread().name = "Tailer-$file"
+                    run(file, (follow == null ? 0 : follow))
+                } catch (ex) {
+                    log.error("Tail file " +file+ " error", ex)
+                } finally {
+                    Thread.currentThread().name = tName
+                }
+            }
+            if (exec) {
+                exec.execute { fn() }
+            } else {
+                th = new Thread({fn()}, "Tailer-$file")
+                th.setDaemon(true)
+                th.start()
+            }
             this
         }
 
-        private def run(String file, Integer follow) {
-            if (lineFn == null) throw new IllegalArgumentException("没有行处理函数")
-            RandomAccessFile raf = new RandomAccessFile(file, "r")
-            Queue<String> buffer = new LinkedList<>() // 用来保存最后几行(follow)数据
+//        private void scan(String file, Integer follow) {
+//            new Scanner(file)
+//        }
 
-            // 当前第一次到达文件结尾时,设为true
-            boolean firstEnd
-            String line
-            while (!stopFlag) {
-                try {
-                    line = raf.readLine()
-                    if (line == null) { // 当读到文件结尾时
-                        if (firstEnd) Thread.sleep(1000L)
-                        else { // 第一次到达结尾后, 清理buffer数据
-                            firstEnd = true
+
+        private void run(String file, Integer follow) {
+            try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+                Queue<String> buffer = follow ? new LinkedList<>() : null // 用来保存最后几行(follow)数据
+
+                // 当前第一次到达文件结尾时,设为true
+                boolean firstEnd
+                String line
+                while (!stopFlag) {
+                    line = readLine(raf)
+                    // line = raf.readLine()
+                    if (line == null) { // 当读到文件结尾时(line为空即为文件结尾)
+                        if (firstEnd) {
+                            Thread.sleep(100L * new Random().nextInt(10))
+                            // raf.seek(file.length()) // 重启定位到文件结尾(有可能文件被重新写入了)
+                            continue
+                        }
+                        firstEnd = true
+                        if (buffer) { // 第一次到达结尾后, 清理buffer数据
                             do {
                                 line = buffer.poll()
-                                if (line) stopFlag = lineFn.apply(line)
-                            } while (line)
+                                if (line == null) break
+                                stopFlag = !lineFn.apply(line)
+                            } while (!stopFlag)
                             buffer = null
                         }
-                    } else {
+                    } else { // 读到行有数据
                         if (firstEnd) { // 直接处理行字符串
-                            stopFlag = lineFn.apply(line)
-                            Thread.sleep(200L)
-                        } else {
-                            if (follow > 0) {
-                                buffer.offer(line)
-                                if (buffer.size() >= follow) buffer.poll()
-                            }
+                            stopFlag = !lineFn.apply(line)
+                        } else if (follow > 0) {
+                            buffer.offer(line)
+                            if (buffer.size() > follow) buffer.poll()
                         }
                     }
-                } catch (Throwable ex) {
-                    stopFlag = true
-                    log.error("tail file '" + file + "' error", ex)
                 }
             }
-            raf?.close()
+        }
+
+        private String readLine(RandomAccessFile arf) {
+            StringBuilder sb = new StringBuilder() // 默认的 readLine 用的 StringBuffer
+            int c = -1
+            boolean eol = false
+            int n = '\n'
+            int r = '\r'
+            while (!eol) {
+                switch (c = arf.read()) {
+                    case -1:
+                    case n:
+                        eol = true
+                        break
+                    case r:
+                        eol = true;
+                        long cur = arf.getFilePointer();
+                        if ((arf.read()) != n) {
+                            arf.seek(cur);
+                        }
+                        break;
+                    default:
+                        sb.append((char)c);
+                        break;
+                }
+            }
+
+            if ((c == -1) && (sb.length() == 0)) {
+                return null;
+            }
+            return sb.toString()
         }
     }
 
@@ -449,8 +551,9 @@ class Utils {
         private Map<String, String>   propAlias
         private Set<String>           ignore
         private Map<String, Function> valueConverter
+        private Map<String, Map<String, Function>> newProp
         private boolean               showClassProp
-        private boolean               ignoreNull = true// 默认忽略空值属性
+        private boolean               ignoreNull = false// 默认不忽略空值属性
         private Comparator<String>    comparator
 
         ToMap(T bean) { this.bean = bean }
@@ -473,30 +576,51 @@ class Utils {
             valueConverter.put(propName, converter)
             return this
         }
+        ToMap<T> addConverter(String originPropName, String newPropName, Function converter) {
+            if (newProp == null) { newProp = new HashMap<>(); }
+            newProp.computeIfAbsent(originPropName, s -> new HashMap<>(7)).put(newPropName, converter);
+            return this;
+        }
         Map build() {
-            Map map = comparator ? new TreeMap<>(comparator) : new LinkedHashMap()
+            final Map map = comparator != null ? new TreeMap<>(comparator) : new LinkedHashMap();
             if (bean == null) return map
-            bean.metaPropertyValues.each {pv ->
-                try {
-                    String propName = pv.getName()
-                    if ((ignore != null && ignore.contains(propName)) || (!showClassProp && "class".equals(propName))) return
-                    String aliasName = null
-                    if (propAlias != null && propAlias.containsKey(propName)) aliasName = propAlias.get(propName)
-                    String resultName = (aliasName == null ? propName : aliasName)
-
-                    Object value = pv.value
-                    if (valueConverter != null) {
-                        if (valueConverter.containsKey(propName)) value = valueConverter.get(propName).apply(value)
-                        else if (aliasName != null && valueConverter.containsKey(aliasName)) {
-                            value = valueConverter.get(aliasName).apply(value)
-                        }
-                    }
-                    if (ignoreNull && value != null) map.put(resultName, value)
-                    else if (!ignoreNull) map.put(resultName, value)
-                } catch (Exception e) {
-                    // ignore
+            def add = {String k, Object v ->
+                if (ignore == null || !ignore.contains(k)) {
+                    if (ignoreNull && v != null) map.put(k, v)
+                    else if (!ignoreNull) map.put(k, v)
                 }
             }
+            iterateMethod(bean.getClass(), m -> {
+                try {
+                    if (void.class != m.returnType && m.getName().startsWith("get") && m.getParameterCount() == 0 && !MetaClass.isAssignableFrom(m.returnType)) { // 属性
+                        String pName = m.getName().replace("get", "").uncapitalize()
+                        String aliasName = null
+                        if (propAlias != null && propAlias.containsKey(pName)) aliasName = propAlias.get(pName)
+                        if ("class" == pName && !showClassProp) return
+                        Object originValue = m.invoke(bean)
+
+                        Object v = originValue
+                        if (valueConverter != null) {
+                            if (valueConverter.containsKey(pName)) {
+                                v = valueConverter.get(pName).apply(originValue);
+                            }
+                            else if (aliasName != null && valueConverter.containsKey(aliasName)) {
+                                v = valueConverter.get(aliasName).apply(originValue)
+                            }
+                        }
+                        add((aliasName == null ? pName : aliasName), v)
+
+                        if (newProp != null && newProp.containsKey(pName)) {
+                            for (Iterator<Map.Entry<String, Function>> it = newProp.get(pName).entrySet().iterator(); it.hasNext(); ) {
+                                Map.Entry<String, Function> e = it.next();
+                                add(e.getKey(), e.getValue().apply(originValue));
+                            }
+                        }
+                    }
+                } catch (Exception ex) {
+                    // ignore
+                }
+            })
             return map
         }
     }

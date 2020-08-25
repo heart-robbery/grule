@@ -2,9 +2,9 @@ package service
 
 import cn.xnatural.enet.event.EL
 import core.Utils
-import core.module.OkHttpSrv
-import core.module.ServerTpl
-import ctrl.common.FileData
+import core.OkHttpSrv
+import core.ServerTpl
+import core.http.mvc.FileData
 
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -68,10 +68,15 @@ class FileUploader extends ServerTpl {
 
 
     @EL(name = 'deleteFile')
-    def delete(String fileName) {
+    void delete(String fileName) {
         File f = new File(localDir + File.separator + fileName)
         if (f.exists()) f.delete()
         else log.warn("delete file '{}' not exists", fileName)
+    }
+
+
+    FileData save(FileData fd, boolean forwardRemote = false) {
+        save([fd])?[0]
     }
 
 
@@ -92,11 +97,11 @@ class FileUploader extends ServerTpl {
                 // oss.putObject('path', fd.generatedName, fd.inputStream)
 
                 // 2. 个人http文件服务器例子
-                if (remoteUrl) http?.post(remoteUrl).fileStream('file', fd.generatedName, fd.inputStream).execute()
+                if (remoteUrl) http?.post(remoteUrl).fileStream('file', fd.finalName, fd.inputStream).execute()
             } else {
                 new File(localDir).mkdirs() // 确保文件夹在
                 // 创建本地文件并写入
-                def f = new File(localDir + File.separator + fd.generatedName)
+                def f = new File(localDir + File.separator + fd.finalName)
                 f.withOutputStream {os ->
                     def bs = new byte[4096]
                     int n
