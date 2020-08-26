@@ -74,7 +74,11 @@ class HttpRequest {
 
     @Lazy Map<String, Object> jsonParams = {
         if (bodyStr && getHeader('content-type')?.contains('application/json')) {
-            return JSON.parseObject(bodyStr)
+            try {
+                return JSON.parseObject(bodyStr)
+            } catch (ex) {
+                session.server.log.error("Request body is not a JSON: " + bodyStr)
+            }
         }
         Collections.emptyMap()
     }()

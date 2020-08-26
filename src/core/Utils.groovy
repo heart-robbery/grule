@@ -387,24 +387,24 @@ class Utils {
     }
 
 
-    // 脚本类缓存
-    protected static final Map<String, Script> scriptCache  = new ConcurrentHashMap<>()
-    // 类名计数
-    protected static final AtomicInteger       clzNameCount = new AtomicInteger(0)
-    /**
-     * 执行一段groovy脚本
-     * 避免OOM: java.lang.ClassLoader#getClassLoadingLock (只增不减的map)
-     * @param scriptText
-     * @param ctx
-     * @return
-     */
-    static Object eval(String scriptText, Map ctx = new LinkedHashMap()) {
-        if (scriptText == null || scriptText.isEmpty()) throw new IllegalArgumentException("scriptText must not be empty")
-        scriptCache.computeIfAbsent(
-            scriptText,
-            {InvokerHelper.createScript(gcl.parseClass(scriptText, "GroovyDynClz_${clzNameCount.getAndIncrement()}"), new Binding(ctx))}
-        ).run()
-    }
+//    // 脚本类缓存
+//    protected static final Map<String, Script> scriptCache  = new ConcurrentHashMap<>()
+//    // 类名计数
+//    protected static final AtomicInteger       clzNameCount = new AtomicInteger(0)
+//    /**
+//     * 执行一段groovy脚本
+//     * 避免OOM: java.lang.ClassLoader#getClassLoadingLock (只增不减的map)
+//     * @param scriptText
+//     * @param ctx
+//     * @return
+//     */
+//    static Object eval(String scriptText, Map ctx = new LinkedHashMap()) {
+//        if (scriptText == null || scriptText.isEmpty()) throw new IllegalArgumentException("scriptText must not be empty")
+//        scriptCache.computeIfAbsent(
+//            scriptText,
+//            {InvokerHelper.createScript(gcl.parseClass(scriptText, "GroovyDynClz_${clzNameCount.getAndIncrement()}"), new Binding(ctx))}
+//        ).run()
+//    }
 
 
     /**

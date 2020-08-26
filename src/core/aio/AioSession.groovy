@@ -6,7 +6,6 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 import java.nio.ByteBuffer
-import java.nio.channels.AsynchronousCloseException
 import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.ClosedChannelException
 import java.nio.channels.CompletionHandler
@@ -73,8 +72,7 @@ class AioSession {
      * @param msg
      */
     void send(String msg) {
-        if (closed.get()) throw new RuntimeException("已关闭 " + this)
-        if (msg == null) return
+        if (closed.get() || msg == null) return
         lastUsed = System.currentTimeMillis()
         sendQueue.offer { // 排对发送消息. 避免 WritePendingException
             try {
