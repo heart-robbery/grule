@@ -63,7 +63,7 @@ class HttpAioSession {
      * @param buf
      */
     void send(ByteBuffer buf) {
-        if (buf == null) return
+        if (closed.get() || buf == null) return
         lastUsed = System.currentTimeMillis()
         try {
             sc.write(buf).get()
@@ -80,7 +80,7 @@ class HttpAioSession {
      * 继续处理接收数据
      */
     protected void read() {
-        if (closed.get()) throw new RuntimeException("已关闭 " + this)
+        if (closed.get()) return
         sc.read(buf, buf, readHandler)
     }
 

@@ -144,15 +144,15 @@ class OkHttpSrv extends ServerTpl {
 
     class OkHttp {
         // 宿主
-        protected final Request.Builder                           builder
-        protected       String                                    urlStr
-        protected       Map<String, Object>                       params
+        protected final Request.Builder                      builder
+        protected       String                               urlStr
+        protected       Map<String, Object>                  params
         // 文件流:(属性名, 文件名, 文件内容)
-        protected       List<Tuple3<String, String, Object>>      fileStreams
-        protected       Map<String, Object>                       cookies
-        protected       String                                    contentType
-        protected       String                                    jsonBodyStr
-        protected       boolean                                   debug
+        protected       List<Tuple3<String, String, Object>> fileStreams
+        protected       Map<String, Object>                  cookies
+        protected       String                               contentType
+        protected       String                               bodyStr
+        protected       boolean                              debug
 
         protected OkHttp(String urlStr, Request.Builder builder) {
             if (builder == null) throw new NullPointerException('builder == null')
@@ -179,8 +179,13 @@ class OkHttpSrv extends ServerTpl {
             this
         }
         OkHttp jsonBody(String jsonBodyStr) {
-            this.jsonBodyStr = jsonBodyStr
+            this.bodyStr = jsonBodyStr
             if (contentType == null) contentType = 'application/json;charset=utf-8'
+            this
+        }
+        OkHttp bodyStr(String bodyStr) {
+            this.bodyStr = bodyStr
+            if (contentType == null) contentType = 'text/plain;charset=utf-8'
             this
         }
         OkHttp contentType(String contentType) {
@@ -208,8 +213,11 @@ class OkHttpSrv extends ServerTpl {
                 // okHttp get 不能body
             }
             else if ('POST' == builder.method) {
-                if (contentType && contentType.containsIgnoreCase('application/json')) {
-                    if (jsonBodyStr) builder.post(RequestBody.create(MediaType.get(contentType), (jsonBodyStr == null ? '' : jsonBodyStr)))
+                if (contentType &&
+                    (contentType.containsIgnoreCase('application/json') ||
+                        contentType.containsIgnoreCase('text/plain'))
+                ) {
+                    if (bodyStr) builder.post(RequestBody.create(MediaType.get(contentType), (bodyStr == null ? '' : bodyStr)))
                     else if (params) builder.post(RequestBody.create(MediaType.get(contentType), JSON.toJSONString(params)))
                 } else if (contentType && contentType.containsIgnoreCase('multipart/form-data')) {
                     def b = new MultipartBody.Builder().setType(MediaType.get(contentType))
@@ -274,7 +282,7 @@ class OkHttpSrv extends ServerTpl {
                     call.enqueue(new Callback() {
                         @Override
                         void onFailure(Call c, IOException e) {
-                            log.error('Send http: '+urlStr+', params: ' + params?:jsonBodyStr, e)
+                            log.error('Send http: '+urlStr+', params: ' + params?:bodyStr, e)
                             tmpFile?.each {it.delete()}
                             failFn?.accept(e)
                         }
@@ -283,11 +291,11 @@ class OkHttpSrv extends ServerTpl {
                         void onResponse(Call c, Response resp) throws IOException {
                             result = resp.body()?.string()
                             if (200 != resp.code()) {
-                                log.error('Send http: {}, params: {}, ' + (fileStreams ? "fileStreams: " + fileStreams.join(",") : '') + ' result: ' + Objects.toString(result, ''), urlStr, params?:jsonBodyStr)
+                                log.error('Send http: {}, params: {}, ' + (fileStreams ? "fileStreams: " + fileStreams.join(",") : '') + ' result: ' + Objects.toString(result, ''), urlStr, params?:bodyStr)
                                 tmpFile?.each {it.delete()}
                                 failFn?.accept(new Exception("Http error. code: ${resp.code()}, url: $urlStr, resp: ${Objects.toString(result, '')}"))
                             } else {
-                                log.info('Send http: {}, params: {}, ' + (fileStreams ? "fileStreams: " + fileStreams.join(",") : '') + 'result: ' + Objects.toString(result, ''), urlStr, params?:jsonBodyStr)
+                                log.info('Send http: {}, params: {}, ' + (fileStreams ? "fileStreams: " + fileStreams.join(",") : '') + 'result: ' + Objects.toString(result, ''), urlStr, params?:bodyStr)
                                 tmpFile?.each {it.delete()}
                                 okFn?.accept(result)
                             }
@@ -307,9 +315,9 @@ class OkHttpSrv extends ServerTpl {
             }
             if (debug && !okFn) {
                 if (ex) {
-                    log.error('Send http: {}, params: {}' + (fileStreams ? ", fileStreams: " + fileStreams.join(",") : ''), urlStr, params?:jsonBodyStr)
+                    log.error('Send http: {}, params: {}' + (fileStreams ? ", fileStreams: " + fileStreams.join(",") : ''), urlStr, params?:bodyStr)
                 } else {
-                    log.info('Send http: {}, params: {}, ' + (fileStreams ? "fileStreams: " + fileStreams.join(";") : '') + ' result: ' + Objects.toString(result, ''), urlStr, params?:jsonBodyStr)
+                    log.info('Send http: {}, params: {}, ' + (fileStreams ? "fileStreams: " + fileStreams.join(";") : '') + ' result: ' + Objects.toString(result, ''), urlStr, params?:bodyStr)
                 }
             }
             if (ex) throw ex
