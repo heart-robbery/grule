@@ -4,9 +4,10 @@ import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONException
 import com.alibaba.fastjson.JSONObject
-import core.module.OkHttpSrv
-import core.module.ServerTpl
-import core.module.jpa.BaseRepo
+import core.OkHttpSrv
+import core.ServerTpl
+import core.Utils
+import core.jpa.BaseRepo
 import org.hibernate.query.internal.NativeQueryImpl
 import org.hibernate.transform.Transformers
 
@@ -53,19 +54,34 @@ class AttrManager extends ServerTpl {
         if (ignoreGetAttr.contains(key)) return null
         def fnName = attrFnMap.get(key)
         if (fnName == null) {
-            if (alias(key)) log.warn(ctx.logPrefix() + "属性'" + key + "'没有对应的取值函数")
+            log.warn(ctx.logPrefix() + "属性'" + key + "'没有对应的取值函数")
             return null
         }
+
+        // 函数执行
+        def doApply = {Function<DecisionContext, Object> fn ->
+            log.debug(ctx.logPrefix() + "Get attr '{}' value apply function: '{}'", key, fnName)
+            fn.apply(ctx)
+        }
+
         def fn = dataGetterFnMap.get(fnName)
         if (fn) {
-            if (ctx.appliedGetterFn.contains(fnName)) return null
-            ctx.appliedGetterFn.add(fnName)
-            log.debug(ctx.logPrefix() + "Get attr '{}' value apply function: '{}'", key, fnName)
-            return fn.apply(ctx)
-        }
-        else {
-            log.debug(ctx.logPrefix() + "Not fund attr '{}' mapped getter function '{}'", key, fnName)
-            return null
+            return doApply(fn)
+        } else {
+            dataCollect( // 重新去数据库中查找
+                repo.trans{se ->
+                    se.createNativeQuery("select * from data_collector where name=:n")
+                        .setParameter('n', fnName)
+                        .unwrap(NativeQueryImpl).setResultTransformer(Transformers.ALIAS_TO_ENTITY_MAP)
+                        .setMaxResults(1).uniqueResult()
+                }
+            )
+            fn = dataGetterFnMap.get(fnName)
+            if (fn) return doApply(fn)
+            else {
+                log.debug(ctx.logPrefix() + "Not fund attr '{}' mapped getter function '{}'", key, fnName)
+                return null
+            }
         }
     }
 
@@ -81,7 +97,7 @@ class AttrManager extends ServerTpl {
      */
     @EL(name = 'decision.dataCollect')
     void dataCollected(DecisionContext ctx, Map dataCfg, String jsonBody, String resultStr, Map resolveResult, Long spend) {
-        log.info(ctx.logPrefix() + "接口调用: " + dataCfg['display_name'] + ", spend: " + spend + "ms, params: " + jsonBody + ", returnStr: " + resultStr + ", resolveResult: " + resolveResult)
+        log.info(ctx.logPrefix() + "接口调用: " + dataCfg['name'] + ", spend: " + spend + "ms, params: " + jsonBody + ", returnStr: " + resultStr + ", resolveResult: " + resolveResult)
     }
 
 
@@ -90,7 +106,7 @@ class AttrManager extends ServerTpl {
      * @param fnName 函数名
      * @param fn 函数
      */
-    def dataFn(String fnName, Function<DecisionContext, Object> fn) { dataGetterFnMap.put(fnName, fn) }
+    Function<DecisionContext, Object> dataFn(String fnName, Function<DecisionContext, Object> fn) { dataGetterFnMap.put(fnName, fn) }
 
 
     /**
@@ -116,16 +132,9 @@ class AttrManager extends ServerTpl {
     /**
      * 得到属性对应的别名
      * @param attr
-     * @return
+     * @return null: 没有别名
      */
-    String alias(String attr) {def r = attrAlias.get(attr); (r == null ? attr : r)}
-
-    /**
-     * 获取属性值类型
-     * @param attr
-     * @return
-     */
-    protected Class type(String attr) {attrType.get(attr)}
+    String alias(String attr) { attrAlias.get(attr) }
 
 
     /**
@@ -136,12 +145,7 @@ class AttrManager extends ServerTpl {
      */
     Object convert(String key, Object value) {
         if (value == null) return value
-        def t = type(key)
-        if (String == t) value = value.toString()
-        else if (Long == t) value = Long.valueOf(value)
-        else if (BigDecimal == t) value = new BigDecimal(value.toString())
-        else if (Boolean == t) value = Boolean.valueOf(value)
-        return value
+        Utils.to(value, attrType.get(key))
     }
 
 
@@ -166,7 +170,7 @@ class AttrManager extends ServerTpl {
             attrType.put(e['name'], t)
             attrType.put(e['display_name'], t)
 
-            // 特殊属性值配置
+            // =================特殊属性值函数配置=====================
             if ('isOrNotWeekend' == e['name']) { // DYN_申请日期是否周末
                 attrGetConfig(e['name'], 'getter_isOrNotWeekend') {ctx ->
                     (java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK) - 1) >= 6 ? true : false
@@ -174,12 +178,15 @@ class AttrManager extends ServerTpl {
                 attrGetConfig(e['display_name'], 'getter_isOrNotWeekend')
             }
 
-//            if ("idExpiryDateToAppDayNum" == e['name']) { // 身份证到期日距查询当日天数
-//                attrGetConfig(e['name'], 'attr_getter_idExpiryDateToAppDayNum') {ctx ->
-//                    String id = ctx.getAttr("idNumber")
-//                }
-//                attrGetConfig(e['display_name'], 'attr_getter_idExpiryDateToAppDayNum')
-//            }
+            if ('sex' == e['name']) { // 性别判断
+                attrGetConfig(e['name'], 'getter_sex') {ctx ->
+                    String idNum = ctx.getAttr('idNumber')
+                    if (idNum.length() >= 17) {
+                        Integer.parseInt(idNum.substring(16, 17)) % 2 == 0 ? 'F' : 'M'
+                    } else null
+                }
+                attrGetConfig(e['display_name'], 'getter_sex')
+            }
         }
     }
 
@@ -189,94 +196,102 @@ class AttrManager extends ServerTpl {
      */
     protected void loadDataCollector() {
         log.info("加载数据集成配置")
-        def http = bean(OkHttpSrv)
         repo.trans{se ->
             se.createNativeQuery("select * from data_collector")
                 .unwrap(NativeQueryImpl).setResultTransformer(Transformers.ALIAS_TO_ENTITY_MAP)
                 .list()
-        }.each {e ->
-            // 忽略接口
-            if ('_modelPlatform' == e['name']) return
+        }.each {dataCollect(it)}
+    }
 
-            Map<String, String> outAttrMap = JSON.parseArray(e['output_config']).collectEntries {JSONObject jo ->
-                [jo['responseField'], jo['systemField']]
-            }
-            Map<String, String> inAttrMap = JSON.parseArray(e['input_config']).collectEntries {JSONObject jo ->
-                [jo['requestField'], jo['systemField']]
-            }
 
-            dataFn(e['name']) {ctx -> // 3方接口数据获取
-                // 请求发送的json body
-                String jsonBody
-                // 接口返回的字符串
-                String retStr
-                // 最终要返回的值(解析后的键值对)
-                def ret
-                // 接口请求共计花费时间
-                Long spend
-                try {
-                    // 解析数据集成里面的输入配置
-                    def inValueMap = inAttrMap.collectEntries {['${' + it.key + '}', ctx.getAttr(it.value)]}
-                    def inTplJo = JSON.parseObject(e['input_template'])
-                    for (def itt = inTplJo.iterator(); itt.hasNext(); ) {
-                        def ee = itt.next()
-                        ee.value = inValueMap.get(ee.value)
-                        if (ee.value == null) itt.remove()
-                    }
-                    jsonBody = inTplJo.toString() // 请求body json字符串
+    /**
+     * 数据集成中的每个接口设置获取函数
+     * @param record
+     */
+    protected void dataCollect(Map record) {
+        if (record == null) return
+        // 忽略接口
+        if ('_modelPlatform' == record['name']) return
 
-                    long start = System.currentTimeMillis()
-                    // 接口请求 超时默认重试3次
-                    for (int i = 0, size = getInteger("retry", 3); i < size; i++) {
-                        try {
-                            retStr = http.post(e['url']).jsonBody(jsonBody).execute() // 发送http
-                            if (retStr == null || retStr.empty) {
-                                ret = [errorCode: 'TD501']
-                                throw new Exception("接口${e['name']}无返回结果")
-                            }
-                            break
-                        } catch (Exception ex) {
-                            if (ex instanceof SocketTimeoutException || ex instanceof ConnectException) { // 超时则重试
-                                ret = [errorCode: 'TD500']
-                                continue
-                            }
-                            ret = [errorCode: 'TD504']
-                            throw ex
-                        } finally {
-                            spend = System.currentTimeMillis() - start
-                        }
-                    }
-
-                    // 处理接口返回的结果
-                    try {
-                        def rJo = JSON.parseObject(retStr)
-                        if ('0000' == rJo['code']) { // 取清洗结果
-                            JSONObject dataJo = rJo.containsKey('data') ? rJo['data'] : rJo['result']
-                            ret = dataJo.collectEntries { [outAttrMap[(it.key)], it.value] }
-                        } else {
-                            ret = [errorCode: rJo['code']]
-                        }
-                    } catch (Exception ex) {
-                        ret = [errorCode: 'TD503']
-                        if (ex instanceof JSONException) throw new Exception("接口${e['name']}返回的不是Json. " + retStr, ex)
-                        else throw ex
-                    }
-                } catch (Exception ex) {
-                    log.error(ctx.logPrefix() + "数据获取函数 " + e['name'] + " 发生错误: " + ex.message, ex)
-                } finally {
-                    ep.fire("decision.dataCollect", ctx, e, jsonBody, retStr, ret, spend)
-                }
-                return ret
-            }
-
-            // 属性取值函数配置
-            outAttrMap.forEach((n1, n2) -> {
-                if ('errorCode' != n2) {
-                    attrGetConfig(n2, e['name'])
-                    String n = alias(n2)
-                    if (n && n != n2) attrGetConfig(n, e['name'])
-                }
-            })
+        Map<String, String> outAttrMap = JSON.parseArray(record['output_config']).collectEntries {JSONObject jo ->
+            [jo['responseField'], jo['systemField']]
         }
+        Map<String, String> inAttrMap = JSON.parseArray(record['input_config']).collectEntries {JSONObject jo ->
+            [jo['requestField'], jo['systemField']]
+        }
+        def http = bean(OkHttpSrv)
+        dataFn(record['name']) {ctx -> // 3方接口数据获取
+            // 请求发送的json body
+            String jsonBody
+            // 接口返回的字符串
+            String retStr
+            // 最终要返回的值(解析后的键值对)
+            def ret
+            // 接口请求共计花费时间
+            Long spend
+            try {
+                // 解析数据集成里面的输入配置
+                def inValueMap = inAttrMap.collectEntries {['${' + it.key + '}', ctx.getAttr(it.value)]}
+                def inTplJo = JSON.parseObject(record['input_template'])
+                for (def itt = inTplJo.iterator(); itt.hasNext(); ) {
+                    def ee = itt.next()
+                    ee.value = inValueMap.get(ee.value)
+                    if (ee.value == null) itt.remove()
+                }
+                jsonBody = inTplJo.toString() // 请求body json字符串
+
+                long start = System.currentTimeMillis()
+                // 接口请求 超时默认重试3次
+                for (int i = 0, size = getInteger("retry", 3); i < size; i++) {
+                    try {
+                        ret = null
+                        retStr = http.post(record['url']).jsonBody(jsonBody).execute() // 发送http
+                        if (retStr == null || retStr.empty) {
+                            ret = [errorCode: 'TD501']
+                            throw new Exception("接口${record['name']}无返回结果")
+                        }
+                        break
+                    } catch (ex) {
+                        if (ex instanceof SocketTimeoutException || ex instanceof ConnectException) { // 超时则重试
+                            ret = [errorCode: 'TD500']
+                            continue
+                        }
+                        ret = [errorCode: 'TD504']
+                        throw ex
+                    } finally {
+                        spend = System.currentTimeMillis() - start
+                    }
+                }
+
+                // 处理接口返回的结果
+                try {
+                    def rJo = JSON.parseObject(retStr)
+                    if ('0000' == rJo['code']) { // 取清洗结果
+                        JSONObject dataJo = rJo.containsKey('data') ? rJo['data'] : rJo['result']
+                        ret = dataJo.collectEntries { [outAttrMap[(it.key)], it.value] }
+                    } else {
+                        ret = [errorCode: rJo['code']]
+                    }
+                } catch (ex) {
+                    ret = [errorCode: 'TD503']
+                    if (ex instanceof JSONException) throw new Exception("接口${record['name']}返回的不是Json. " + retStr, ex)
+                    else throw ex
+                }
+            } catch (ex) {
+                log.error(ctx.logPrefix() + "数据获取函数 " + record['name'] + " 发生错误: " + ex.message, ex)
+            } finally {
+                ep.fire("decision.dataCollect", ctx, record, jsonBody, retStr, ret, spend)
+            }
+            return ret
+        }
+
+        // 属性取值函数配置
+        outAttrMap.forEach((n1, n2) -> {
+            if ('errorCode' != n2) {
+                attrGetConfig(n2, record['name'])
+                String n = alias(n2)
+                if (n && n != n2) attrGetConfig(n, record['name'])
+            }
+        })
     }
 }

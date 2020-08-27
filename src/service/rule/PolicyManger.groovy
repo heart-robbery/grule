@@ -2,7 +2,7 @@ package service.rule
 
 import cn.xnatural.enet.event.EL
 import core.Utils
-import core.module.ServerTpl
+import core.ServerTpl
 import service.rule.spec.PolicySpec
 
 import java.util.concurrent.ConcurrentHashMap

@@ -13,6 +13,6 @@ import javax.persistence.MappedSuperclass
 class SnowFlakeIdEntity extends BaseEntity {
     @Id
     @GeneratedValue(generator = "snowFlakeId")
-    @GenericGenerator(name = "snowFlakeId", strategy = "core.module.jpa.SnowFlakeIdGenerator")
+    @GenericGenerator(name = "snowFlakeId", strategy = "core.jpa.SnowFlakeIdGenerator")
     private Long id;
 }

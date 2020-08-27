@@ -3,6 +3,9 @@ package service.rule.spec
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.ImportCustomizer
 
+/**
+ * 策略定义 spec
+ */
 class PolicySpec {
     String 策略名
     String 策略描述

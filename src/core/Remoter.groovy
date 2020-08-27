@@ -289,7 +289,7 @@ class Remoter extends ServerTpl {
             }
         } else if ("cmd-log" == t) { // telnet 命令行设置日志等级
             // telnet localhost 8001
-            // 例: {"type":"cmd-log", "data": "core.module.remote: debug"}$_$
+            // 例: {"type":"cmd-log", "data": "core.remote: debug"}$_$
             String[] arr = msgJo.getString("data").split(":")
             // Log.setLevel(arr[0].trim(), arr[1].trim())
             se.send("set log level success")
