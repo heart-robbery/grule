@@ -23,7 +23,7 @@ abstract class PathHandler extends Handler {
             if (piece.startsWith(":")) {
                 if (piece.indexOf('.') > 0) i += 0.01d
                 continue
-            } else if (piece.startsWith('~')) {
+            } else if (piece.startsWith('~:')) {
                 i += 0.001d
                 continue
             }
@@ -43,11 +43,17 @@ abstract class PathHandler extends Handler {
 
     @Override
     boolean match(HttpContext ctx) {
-        if (pieces.length != ctx.pieces.length) return false
+        if (pieces.length > ctx.pieces.length) return false
         for (int i = 0; i < pieces.length; i++) {
             if (pieces[i].startsWith(":")) {
                 int index = pieces[i].indexOf('.')
-                if (index == -1) ctx.pathToken.put(pieces[i].substring(1), ctx.pieces[i])
+                if (index == -1) {
+                    String v
+                    if ((i + 1) == pieces.length && ctx.pieces.length > pieces.length) { // 最后一个
+                        v = ctx.pieces.drop(i).join('/')
+                    } else v = ctx.pieces[i]
+                    ctx.pathToken.put(pieces[i].substring(1), v)
+                }
                 else {
                     int index2 = ctx.pieces[i].indexOf('.')
                     if (index2 > 0 && pieces[i].substring(index) == ctx.pieces[i].substring(index2)) {

@@ -27,8 +27,12 @@ app.addSource(new EhcacheSrv())
 app.addSource(new SchedSrv())
 app.addSource(new RedisClient())
 app.addSource(new Remoter())
-app.addSource(new HibernateSrv().entities(Test, VersionFile))
-app.addSource(new HttpServer().ctrls(TestCtrl, MainCtrl))
+app.addSource(new HibernateSrv().entities(
+    Test, VersionFile
+))
+app.addSource(new HttpServer().ctrls(
+    TestCtrl, MainCtrl
+))
 app.addSource(new FileUploader())
 app.addSource(new TestService())
 app.addSource(this)

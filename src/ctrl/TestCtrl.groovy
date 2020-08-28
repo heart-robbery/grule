@@ -76,7 +76,7 @@ class TestCtrl extends ServerTpl {
     // 测试抛出错误
     @Path(path = 'error')
     def error() {
-        throw new RuntimeException('错误测试')
+        throw new Exception('错误测试')
     }
 
 
