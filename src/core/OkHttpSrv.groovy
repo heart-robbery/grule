@@ -178,12 +178,12 @@ class OkHttpSrv extends ServerTpl {
             } else throw new IllegalArgumentException("Not support file body type: " + body.class.name)
             this
         }
-        OkHttp jsonBody(String jsonBodyStr) {
-            this.bodyStr = jsonBodyStr
+        OkHttp jsonBody(String bodyStr) {
+            this.bodyStr = bodyStr
             if (contentType == null) contentType = 'application/json;charset=utf-8'
             this
         }
-        OkHttp bodyStr(String bodyStr) {
+        OkHttp textBody(String bodyStr) {
             this.bodyStr = bodyStr
             if (contentType == null) contentType = 'text/plain;charset=utf-8'
             this

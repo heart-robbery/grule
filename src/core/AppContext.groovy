@@ -17,25 +17,29 @@ import static core.Utils.*
 import static java.util.Collections.emptyList
 
 class AppContext {
-    protected static final Logger log = LoggerFactory.getLogger(AppContext)
-    @Lazy ConfigObject                  env          = initEnv()
+    protected static final Logger log     = LoggerFactory.getLogger(AppContext)
+    @Lazy ConfigObject            env     = initEnv()
+    /**
+     * profile 属性
+     */
+    @Lazy String                  profile = env['profile']
     /**
      * 系统名字. 用于多个系统启动区别
      */
-    @Lazy String                        name         = env['sys']['name'] ?: "gy"
+    @Lazy String                  name    = env['sys']['name'] ?: "gy"
     /**
      * 实例Id
      * NOTE: 保证唯一
      */
-    @Lazy String                          id           = env['sys']["id"] ?: ((name ? name + "_" : '') + Utils.random(10))
+    @Lazy String                  id      = env['sys']["id"] ?: ((name ? name + "_" : '') + Utils.random(10))
     /**
      * 系统运行线程池. {@link #initExecutor()}}
      */
-    protected ThreadPoolExecutor          exec
+    protected ThreadPoolExecutor  exec
     /**
      * 事件中心 {@link #initEp()}}
      */
-    protected EP                          ep
+    protected EP                  ep
     /**
      * 服务对象源
      */
