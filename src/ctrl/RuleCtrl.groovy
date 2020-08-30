@@ -75,4 +75,9 @@ class RuleCtrl extends ServerTpl {
         // ctx.response.cacheControl(2)
         Utils.baseDir("src/static/rule/index.html")
     }
+    @Path(path = 'ext6.2/:fName')
+    File extjs(HttpContext ctx, String fName) {
+        ctx.response.cacheControl(1800)
+        Utils.baseDir("src/static/ext6.2/$fName")
+    }
 }
