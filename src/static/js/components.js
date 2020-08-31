@@ -12,7 +12,7 @@ Vue.component('date-item', {
 });
 
 // 异步加载组件
-['Upload']
+['Upload', 'Admin', 'Login']
     .forEach(function (item, i) {
         Vue.component(item, function (resolve, reject) {
             httpVueLoader('components/'+ item +'.vue')().then(function (r) {

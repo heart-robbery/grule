@@ -1,7 +1,6 @@
 package ctrl
 
 import core.ServerTpl
-import core.Utils
 import core.http.HttpContext
 import core.http.mvc.ApiResp
 import core.http.mvc.Ctrl
@@ -66,18 +65,5 @@ class RuleCtrl extends ServerTpl {
     ApiResp loadAttrCfg() {
         async {bean(AttrManager).init()}
         ApiResp.ok('加载中...')
-    }
-
-
-    // ===================mnt===============
-    @Path(path = 'rule/index.html')
-    File index(HttpContext ctx) {
-        // ctx.response.cacheControl(2)
-        Utils.baseDir("src/static/rule/index.html")
-    }
-    @Path(path = 'ext6.2/:fName')
-    File extjs(HttpContext ctx, String fName) {
-        ctx.response.cacheControl(1800)
-        Utils.baseDir("src/static/ext6.2/$fName")
     }
 }

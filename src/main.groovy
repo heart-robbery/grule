@@ -4,6 +4,7 @@ import core.*
 import core.http.HttpServer
 import core.jpa.HibernateSrv
 import ctrl.MainCtrl
+import ctrl.MntCtrl
 import ctrl.RuleCtrl
 import ctrl.TestCtrl
 import groovy.transform.Field
@@ -30,7 +31,7 @@ app.addSource(new Remoter())
 //app.addSource(new HibernateSrv('jpa_kratos'))
 app.addSource(new HibernateSrv())
 app.addSource(new HttpServer().ctrls(
-    TestCtrl, MainCtrl, RuleCtrl
+    TestCtrl, MainCtrl, RuleCtrl, MntCtrl
 ))
 app.addSource(new FileUploader())
 app.addSource(new TestService())
