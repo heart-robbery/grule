@@ -171,11 +171,11 @@
 			}
 
 			return Promise.resolve(this.module.exports)
-			.then(httpVueLoader.scriptExportsHandler.bind(this))
-			.then(function(exports) {
+				.then(httpVueLoader.scriptExportsHandler.bind(this))
+				.then(function(exports) {
 
-				this.module.exports = exports;
-			}.bind(this));
+					this.module.exports = exports;
+				}.bind(this));
 		}
 	};
 
@@ -247,31 +247,31 @@
 		load: function(componentURL) {
 
 			return httpVueLoader.httpRequest(componentURL)
-			.then(function(responseText) {
+				.then(function(responseText) {
 
-				this.baseURI = componentURL.substr(0, componentURL.lastIndexOf('/')+1);
-				var doc = document.implementation.createHTMLDocument('');
+					this.baseURI = componentURL.substr(0, componentURL.lastIndexOf('/')+1);
+					var doc = document.implementation.createHTMLDocument('');
 
-				// IE requires the <base> to come with <style>
-				doc.body.innerHTML = (this.baseURI ? '<base href="'+this.baseURI+'">' : '') + responseText;
+					// IE requires the <base> to come with <style>
+					doc.body.innerHTML = (this.baseURI ? '<base href="'+this.baseURI+'">' : '') + responseText;
 
-				for ( var it = doc.body.firstChild; it; it = it.nextSibling ) {
+					for ( var it = doc.body.firstChild; it; it = it.nextSibling ) {
 
-					switch ( it.nodeName ) {
-						case 'TEMPLATE':
-							this.template = new TemplateContext(this, it);
-							break;
-						case 'SCRIPT':
-							this.script = new ScriptContext(this, it);
-							break;
-						case 'STYLE':
-							this.styles.push(new StyleContext(this, it));
-							break;
+						switch ( it.nodeName ) {
+							case 'TEMPLATE':
+								this.template = new TemplateContext(this, it);
+								break;
+							case 'SCRIPT':
+								this.script = new ScriptContext(this, it);
+								break;
+							case 'STYLE':
+								this.styles.push(new StyleContext(this, it));
+								break;
+						}
 					}
-				}
 
-				return this;
-			}.bind(this));
+					return this;
+				}.bind(this));
 		},
 
 		_normalizeSection: function(eltCx) {
@@ -284,29 +284,29 @@
 			} else {
 
 				p = httpVueLoader.httpRequest(eltCx.elt.getAttribute('src'))
-				.then(function(content) {
+					.then(function(content) {
 
-					eltCx.elt.removeAttribute('src');
-					return content;
-				});
+						eltCx.elt.removeAttribute('src');
+						return content;
+					});
 			}
 
 			return p
-			.then(function(content) {
+				.then(function(content) {
 
-				if ( eltCx !== null && eltCx.elt.hasAttribute('lang') ) {
+					if ( eltCx !== null && eltCx.elt.hasAttribute('lang') ) {
 
-					var lang = eltCx.elt.getAttribute('lang');
-					eltCx.elt.removeAttribute('lang');
-					return httpVueLoader.langProcessor[lang.toLowerCase()].call(this, content === null ? eltCx.getContent() : content);
-				}
-				return content;
-			}.bind(this))
-			.then(function(content) {
+						var lang = eltCx.elt.getAttribute('lang');
+						eltCx.elt.removeAttribute('lang');
+						return httpVueLoader.langProcessor[lang.toLowerCase()].call(this, content === null ? eltCx.getContent() : content);
+					}
+					return content;
+				}.bind(this))
+				.then(function(content) {
 
-				if ( content !== null )
-					eltCx.setContent(content);
-			});
+					if ( content !== null )
+						eltCx.setContent(content);
+				});
 		},
 
 		normalize: function() {
@@ -316,10 +316,10 @@
 				this._normalizeSection(this.script),
 				this.styles.map(this._normalizeSection)
 			))
-			.then(function() {
+				.then(function() {
 
-				return this;
-			}.bind(this));
+					return this;
+				}.bind(this));
 		},
 
 		compile: function() {
@@ -329,10 +329,10 @@
 				this.script && this.script.compile(),
 				this.styles.map(function(style) { return style.compile(); })
 			))
-			.then(function() {
+				.then(function() {
 
-				return this;
-			}.bind(this));
+					return this;
+				}.bind(this));
 		}
 	};
 
@@ -373,29 +373,29 @@
 		return function() {
 
 			return new Component(name).load(url)
-			.then(function(component) {
+				.then(function(component) {
 
-				return component.normalize();
-			})
-			.then(function(component) {
+					return component.normalize();
+				})
+				.then(function(component) {
 
-				return component.compile();
-			})
-			.then(function(component) {
+					return component.compile();
+				})
+				.then(function(component) {
 
-				var exports = component.script !== null ? component.script.module.exports : {};
+					var exports = component.script !== null ? component.script.module.exports : {};
 
-				if ( component.template !== null )
-					exports.template = component.template.getContent();
+					if ( component.template !== null )
+						exports.template = component.template.getContent();
 
-				if ( exports.name === undefined )
-					if ( component.name !== undefined )
-						exports.name = component.name;
+					if ( exports.name === undefined )
+						if ( component.name !== undefined )
+							exports.name = component.name;
 
-				exports._baseURI = component.baseURI;
+					exports._baseURI = component.baseURI;
 
-				return exports;
-			});
+					return exports;
+				});
 		};
 	};
 
@@ -442,8 +442,8 @@
 		return new Promise(function(resolve, reject) {
 
 			var xhr = new XMLHttpRequest();
-            		xhr.responseType = 'text';
 			xhr.open('GET', url);
+			xhr.responseType = 'text';
 
 			xhr.onreadystatechange = function() {
 

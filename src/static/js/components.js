@@ -10,8 +10,13 @@ Vue.component('date-item', {
         }
     }
 });
-Vue.component('Upload', function (resolve, reject) {
-    httpVueLoader('coms/Upload.vue')().then(function (r) {
-        resolve(r)
-    })
-})
+
+// 异步加载组件
+['Upload']
+    .forEach(function (item, i) {
+        Vue.component(item, function (resolve, reject) {
+            httpVueLoader('components/'+ item +'.vue')().then(function (r) {
+                resolve(r)
+            })
+        });
+    });
