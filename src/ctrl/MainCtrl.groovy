@@ -68,6 +68,12 @@ class MainCtrl extends ServerTpl {
         Utils.baseDir("src/static/js/lib/$fName")
     }
 
+    @Path(path = 'components/:fName')
+    File components(String fName, HttpContext ctx) {
+        // ctx.response.cacheControl(1800)
+        Utils.baseDir("src/static/components/$fName")
+    }
+
 
     // =======================css ========================
 
