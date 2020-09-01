@@ -133,9 +133,7 @@ class HttpContext {
         if ('redis' == server.getStr('session.type')) { // session的数据, 用redis 保存 session 数据
             def redis = server.bean(RedisClient)
             String cKey
-            boolean isNew = false
             if (!sId || ((cKey = 'session:' + sId) && !redis.exists(cKey))) {
-                isNew = true
                 sId = UUID.randomUUID().toString().replace('-', '')
                 cKey = 'session:' + sId
                 server.log.info("New session '{}'", sId)
@@ -168,7 +166,6 @@ class HttpContext {
                     redis.exec {jedis -> jedis.hgetAll(cKey).entrySet()}
                 }
             }
-            if (isNew) sData.put('id', sId)
         } else { // 默认用ehcache 做session 数据管理
             String cKey
             if (!sId || ((cKey = 'session_' + sId) && ehcache.getCache(cKey) == null)) {
@@ -180,7 +177,6 @@ class HttpContext {
             def cache = ehcache.getOrCreateCache(cKey, expire,
                 server.getInteger('session.maxLimit', 100000), null
             )
-            cache.put('id', sId)
             sData = new Map<String, Object>() {
                 @Override
                 int size() { cache.size() }
