@@ -1,6 +1,7 @@
 <style scoped>
     .h-layout {
         background: #f0f2f5;
+        min-height: 100vh;
     }
 
     .layout-logo {
@@ -16,21 +17,21 @@
     }
 </style>
 <template>
-    <div class="layout-demo-3-vue">
-        <h-layout :siderFixed="siderFixed" :siderCollapsed="siderCollapsed">
+    <div>
+        <h-layout :sider-fixed="siderFixed" :sider-collapsed="siderCollapsed">
             <h-sider theme="dark">
                 <div class="layout-logo"></div>
-                <h-menu style="margin-top: 20px;" class="h-menu-dark" :datas="menuDatas" :inlineCollapsed="siderCollapsed"></h-menu>
+                <h-menu style="margin-top: 20px;" class="h-menu-dark" :datas="menuDatas" :inline-collapsed="siderCollapsed"></h-menu>
             </h-sider>
-            <h-layout :headerFixed="headerFixed">
+            <h-layout :header-fixed="headerFixed">
                 <h-header theme="white">
                     <div style="width:100px;float:left;">
-                        <h-button icon="h-icon-menu" size="l" noBorder style="font-size: 20px" @click="siderCollapsed=!siderCollapsed"></h-button>
+                        <h-button icon="h-icon-menu" size="l" no-border style="font-size: 20px" @click="siderCollapsed=!siderCollapsed"></h-button>
                     </div>
                 </h-header>
                 <h-content style="padding: 0px 30px;">
 <!--                    <h-breadcrumb :datas="datas" style="margin: 16px 0px;"></h-breadcrumb>-->
-                    <div style="background: rgb(255, 255, 255); padding: 24px; min-height: 280px;">
+                    <div style="background: rgb(255, 255, 255); padding: 24px; min-height: 100vh;">
                         <p>
                             <h-switch v-model="siderFixed">固定Sider</h-switch>
                         </p>
@@ -42,7 +43,7 @@
                         </p>
                     </div>
                     <h-footer class="text-center">Copyright © {{year}}
-                        <a href="http://www.ch-un.com" target="_blank">Lan</a>
+                        <a href="https://gitee.com/xnat/gy" target="_blank">xxb</a>
                     </h-footer>
                 </h-content>
             </h-layout>
@@ -63,6 +64,9 @@
                     { title: '首页', key: 'welcome', icon: 'h-icon-home' },
                     { title: '查询', key: 'search', icon: 'h-icon-search' },
                     { title: '收藏', key: 'favor', icon: 'h-icon-star', count: 100, children: [{ title: '收藏-1', key: 'favor2-1' }] },
+                    { title: '配置中心', key: 'config', icon: 'h-icon-setting', count: 100, children: [
+                        { title: '策略中心', key: 'config-decision' },
+                        ] },
                     { title: '任务', icon: 'h-icon-task', key: 'task' }
                 ],
                 datas: [

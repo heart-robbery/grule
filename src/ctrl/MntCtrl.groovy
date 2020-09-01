@@ -19,7 +19,10 @@ class MntCtrl extends ServerTpl {
      */
     @Path(path = 'login')
     ApiResp login(String username, String password, HttpContext ctx) {
+        if (!username) return ApiResp.fail('username must not be empty')
+        if (!password) return ApiResp.fail('password must not be empty')
         ctx.setSessionAttr('name', username)
+        ctx.setSessionAttr('id', username)
         ApiResp.ok().attr('name', username)
     }
 

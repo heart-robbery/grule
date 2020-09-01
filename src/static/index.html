@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <title>Rule Engine</title>
-    <link rel="stylesheet" href="../css/lib/heyui.css" />
-    <script src="../js/lib/vue.js"></script>
-    <script src="../js/lib/heyui.js"></script>
-    <script src="../js/lib/httpVueLoader.js"></script>
-    <script src="../js/components.js"></script>
-    <script src="../js/lib/jquery-3.4.1.js"></script>
+    <link rel="stylesheet" href="css/lib/heyui.css" />
+    <script src="js/lib/vue.js"></script>
+    <script src="js/lib/heyui.js"></script>
+    <script src="js/lib/jquery-3.4.1.js"></script>
+    <script src="js/lib/httpVueLoader.js"></script>
+    <script src="js/components.js"></script>
 </head>
 <body>
 <div id="app">
-    <Admin v-show="user"></Admin>
-    <Login v-show="!user"></Login>
+    <Admin v-if="user"></Admin>
+    <Login v-else></Login>
 </div>
 </body>
 <script>
@@ -48,6 +48,5 @@
             }
         }
     });
-
 </script>
 </html>
