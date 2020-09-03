@@ -12,7 +12,7 @@ import java.util.concurrent.ExecutorService
 import java.util.function.Consumer
 
 class ServerTpl {
-    protected final Logger log  = LoggerFactory.getLogger(getClass())
+    protected final Logger log  = LoggerFactory.getLogger(getClass().name.contains('$') ? getClass().superclass : getClass())
     /**
      * 服务名字标识.(保证唯一)
      * 可用于命名空间:

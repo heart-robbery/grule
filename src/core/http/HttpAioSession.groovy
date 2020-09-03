@@ -130,8 +130,10 @@ class HttpAioSession {
                 session.read()
             } else {
                 //1. 有可能文件上传一次大于 buf 的容量
-                log.warn("接收字节为空. 关闭 " + session.sc.toString())
-                session.close()
+                //2. 浏览器老发送空的字节
+                // TODO 待研究
+                // log.warn("接收字节为空. 关闭 " + session.sc.toString())
+                // session.close()
             }
         }
 
