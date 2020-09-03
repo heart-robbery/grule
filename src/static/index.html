@@ -17,6 +17,7 @@
 </div>
 </body>
 <script>
+    // HeyUI.config({});
     let app = new Vue({
         el: '#app',
         data: {
@@ -28,18 +29,20 @@
         },
         methods: {
             getCurrentUser: function () {
-                let _this = this;
                 $.ajax({
                     url: 'mnt/getCurrentUser',
-                    success: function (res) {
+                    success: (res) => {
                         if (res.code == '00') {
-                            _this.user = res.data
-                        } else _this.$Notice({type: 'error', content: res.desc, timeout: 5})
+                            this.user = res.data
+                        } else this.$Notice.error({content: res.desc, timeout: 5})
                     }
                 })
             }
         }
     });
+
+    // 设置全局自动关闭时间为1秒
+    app.$Notice.config({timeout: 5000});
 
     $.ajaxSetup({
         complete: function(xhr,status) {
