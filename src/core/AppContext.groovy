@@ -140,7 +140,7 @@ class AppContext {
      */
     void addSource(
         Object source,
-        String name = source instanceof ServerTpl ? source['name'] : (source?.class.simpleName.uncapitalize())
+        String name = source instanceof ServerTpl ? source['name'] : (source?.class?.simpleName?.uncapitalize())
     ) {
         if (!source || !name) throw new IllegalArgumentException('source and name must be not empty')
         if ("sys".equalsIgnoreCase(name) || "env".equalsIgnoreCase(name) || "log".equalsIgnoreCase(name)) {

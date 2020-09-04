@@ -56,8 +56,8 @@
                 this.fs.splice(this.fs.indexOf(f), 1)
             },
             change: function(e) {
-                var t = $(e.target)
-                var files = t[0].files
+                var t = $(e.target);
+                var files = t[0].files;
                 for (var i = 0; i < files.length; i++) {
                     this.preReadFile(files[i], this.fs)
                 }
@@ -75,15 +75,14 @@
                 } else fs.push(f)
             },
             submit: function () {
-                var _this = this
-                if (_this.fs.length < 1) {
-                    _this.$Notice.warning({title: '错误提示', desc: '没有文件需要上传', duration: 7})
+                if (this.fs.length < 1) {
+                    this.$Message('没有文件需要上传');
                     return
                 }
-                var fd = new FormData()
-                _this.fs.forEach(function (item, index) {
+                var fd = new FormData();
+                this.fs.forEach(function (item, index) {
                     fd.append('file', item)
-                })
+                });
                 $.ajax({
                     timeout: 1000 * 60 * 7, // 7分钟
                     url: 'test/upload',
@@ -91,11 +90,11 @@
                     type: "POST",
                     processData: false,
                     contentType: false,
-                    success: function (resp) {
+                    success: (resp) => {
                         if (resp.code == '00') {
-                            _this.$Notice.success({title: '成功提示', desc: '添加成功'})
+                            this.$Message('添加成功');
                         } else {
-                            _this.$Notice.error({title: '失败提示', desc: resp.desc, duration: 7})
+                            this.$Notice({type: 'error', title: '失败提示', content: resp.desc, duration: 7})
                         }
                     }
                 })
