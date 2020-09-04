@@ -71,10 +71,13 @@ class DecisionContext {
                 def r = ruleItt.next()
                 if (!r) break
                 if (!r.enabled) continue
-                finalDecision = decide(r)
-                if (Decision.Reject == finalDecision || Decision.Review == finalDecision) break
+                def decision = decide(r)
+                if (finalDecision == Decision.Review && decision == Decision.Accept) {
+                    // 保留decision并继续往下执行
+                } else finalDecision = decision
+                if (Decision.Reject == finalDecision) break
             }
-            if ((Decision.Reject == finalDecision || Decision.Review == finalDecision) || (!ruleItt.hasNext())) {
+            if (Decision.Reject == finalDecision || (!ruleItt.hasNext())) {
                 end.set(true); finalDecision = finalDecision?:Decision.Accept
                 running.set(false); curPolicySpec = null; curPassedRule = null; curRuleSpec = null
                 log.info(logPrefix() + "结束成功. 共执行: " + (System.currentTimeMillis() - startup.getTime()) + "ms "  + result())
@@ -171,30 +174,21 @@ class DecisionContext {
         RuleIterator(DecisionContext ctx) {this.ctx = ctx}
 
         // 策略迭代器
-        Iterator<PolicySpec> psIt = ctx.getDecisionSpec().ps
-            .stream()
-            .map(s -> {
-                def p = ctx.getPolicyManager().findPolicy(s)
-                if (p == null) {
-                    curPolicySpec = null
-                    log.warn(ctx.logPrefix() + "未找到策略: " + s)
-                }
-                p
-            }).filter(p -> p != null).iterator()
+        Iterator<PolicySpec> policyItt = ctx.getDecisionSpec().policies.iterator()
         // 规则迭代器
         Iterator<RuleSpec>   itt
 
         @Override
-        boolean hasNext() { (itt && itt.hasNext()) || psIt.hasNext() }
+        boolean hasNext() { (itt && itt.hasNext()) || policyItt.hasNext() }
 
         @Override
         RuleSpec next() {
-            if ((ctx.curPolicySpec == null || (itt == null || !itt.hasNext())) && psIt.hasNext()) {
-                ctx.curPolicySpec = psIt.next()
+            if ((ctx.curPolicySpec == null || (itt == null || !itt.hasNext())) && policyItt.hasNext()) {
+                ctx.curPolicySpec = policyItt.next()
                 log.debug(logPrefix() + "开始执行策略")
             }
 
-            if (itt == null || !itt.hasNext()) itt = ctx.curPolicySpec.rs.iterator()
+            if (itt == null || !itt.hasNext()) itt = ctx.curPolicySpec.rules.iterator()
             if (itt.hasNext()) return itt.next()
             return null
         }

@@ -13,18 +13,19 @@ Vue.component('date-item', {
 });
 
 // 异步加载组件
-let m = new Map();
-m.set('Upload', 'Upload.vue');
-m.set('Admin', 'Admin.vue');
-m.set('Login', 'Login.vue');
-m.set('Dashboard', 'Dashboard.vue');
-m.set('PolicyCenter', 'config/PolicyCenter.vue');
-m.set('DecisionConfig', 'config/DecisionConfig.vue');
-m.set('PolicyConfig', 'config/PolicyConfig.vue');
-m.set('RuleConfig', 'config/RuleConfig.vue');
-m.set('DecisionDetail', 'config/DecisionDetail.vue');
-m.set('PolicyDetail', 'config/PolicyDetail.vue');
-m.set('RuleDetail', 'config/RuleDetail.vue');
+let m = new Map([
+    ['Upload', 'Upload.vue'],
+    ['Admin', 'Admin.vue'],
+    ['Login', 'Login.vue'],
+    ['Dashboard', 'Dashboard.vue'],
+    ['PolicyCenter', 'config/PolicyCenter.vue'],
+    ['DecisionConfig', 'config/DecisionConfig.vue'],
+    ['PolicyConfig', 'config/PolicyConfig.vue'],
+    ['RuleConfig', 'config/RuleConfig.vue'],
+    ['DecisionDetail', 'config/DecisionDetail.vue'],
+    ['PolicyDetail', 'config/PolicyDetail.vue'],
+    ['RuleDetail', 'config/RuleDetail.vue'],
+]);
 m.forEach(function(value, key) {
     Vue.component(key, function (resolve, reject) {
         httpVueLoader('components/'+ value)().then(function (r) {

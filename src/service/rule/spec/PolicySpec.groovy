@@ -7,9 +7,9 @@ import org.codehaus.groovy.control.customizers.ImportCustomizer
  * 策略定义 spec
  */
 class PolicySpec {
-    String 策略名
-    String 策略描述
-    protected final List<RuleSpec> rs = new LinkedList<>()
+    String                         策略名
+    String                         策略描述
+    protected final List<RuleSpec> rules = new LinkedList<>()
 
 
     static PolicySpec of(@DelegatesTo(PolicySpec) Closure cl) {
@@ -38,10 +38,10 @@ class PolicySpec {
     }
 
 
-    PolicySpec 规则定义(@DelegatesTo(value = RuleSpec, strategy = Closure.DELEGATE_FIRST) Closure cl) {
-        RuleSpec rule = new RuleSpec(); rs.add(rule)
-        def code = cl.rehydrate(cl, rule, this)
-        cl.resolveStrategy = Closure.DELEGATE_FIRST
+    PolicySpec 规则定义(@DelegatesTo(RuleSpec) Closure cl) {
+        RuleSpec rule = new RuleSpec(); rules.add(rule)
+        def code = cl.rehydrate(rule, cl, this)
+        code.resolveStrategy = Closure.DELEGATE_FIRST
         code()
         this
     }

@@ -21,7 +21,7 @@ class RuleSpec {
 
     def 拒绝(Closure<Boolean> 条件) {
         decisionFn << Tuple.tuple('Reject', { Map ctx ->
-            def cl = 条件.rehydrate(ctx, 条件, ctx)
+            def cl = 条件.rehydrate(ctx, 条件, this)
             if (cl()) return Decision.Reject
             null
         })
@@ -30,7 +30,7 @@ class RuleSpec {
 
     def 通过(Closure<Boolean> 条件) {
         decisionFn << Tuple.tuple('Accept', { Map ctx ->
-            def cl = 条件.rehydrate(ctx, 条件, ctx)
+            def cl = 条件.rehydrate(ctx, 条件, this)
             if (cl()) return Decision.Accept
             null
         })
@@ -39,7 +39,7 @@ class RuleSpec {
 
     def 人工审核(Closure<Boolean> 条件) {
         decisionFn << Tuple.tuple('Review', { Map ctx ->
-            def cl = 条件.rehydrate(ctx, 条件, ctx)
+            def cl = 条件.rehydrate(ctx, 条件, this)
             if (cl()) return Decision.Review
             null
         })
@@ -48,7 +48,7 @@ class RuleSpec {
 
     def 操作(Closure 操作) {
         decisionFn << Tuple.tuple('Operate', { Map ctx ->
-            def cl = 操作.rehydrate(ctx, 操作, ctx)
+            def cl = 操作.rehydrate(ctx, 操作, this)
             cl.resolveStrategy = Closure.DELEGATE_FIRST
             cl()
             null

@@ -39,6 +39,8 @@ class DecisionManager extends ServerTpl {
 
     protected void load() {
         log.info("加载决策")
+        create(Utils.baseDir("/src/service/rule/policy/test1.decision").getText('utf-8'))
+        return
         Utils.baseDir("/src/service/rule/policy/").eachFileRecurse {f ->
             if (f.name.endsWith(".decision")) {
                 create(f.getText('utf-8'))

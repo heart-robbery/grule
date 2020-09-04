@@ -3,22 +3,33 @@ package service.rule.spec
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.ImportCustomizer
 
+/**
+ * 决策 DSL
+ */
 class DecisionSpec {
     String 决策id
     String 决策描述
 
-    @Lazy List<String> ps = new LinkedList<>()
-    @Lazy Set<String> returnAttrs = new LinkedHashSet<>()
+    // 策略集: 顺序执行
+    @Lazy List<PolicySpec> policies    = new LinkedList<>()
+    @Lazy Set<String>      returnAttrs = new LinkedHashSet<>()
 
 
-    DecisionSpec 添加策略(String 策略名) { ps.add(策略名); this }
+    DecisionSpec 策略定义(@DelegatesTo(PolicySpec) Closure cl) {
+        PolicySpec policy = new PolicySpec(); policies.add(policy)
+        def code = cl.rehydrate(policy, cl, this)
+        code.resolveStrategy = Closure.DELEGATE_FIRST
+        code()
+        this
+    }
+
 
     DecisionSpec 返回属性(String 属性名) { returnAttrs.add(属性名); this }
 
 
     static DecisionSpec of(@DelegatesTo(DecisionSpec) Closure cl) {
         def p = new DecisionSpec()
-        def code = cl.rehydrate(p, this, this)
+        def code = cl.rehydrate(p, cl, this)
         code.resolveStrategy = Closure.DELEGATE_FIRST
         code()
         return p
