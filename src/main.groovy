@@ -7,6 +7,9 @@ import ctrl.MainCtrl
 import ctrl.MntCtrl
 import ctrl.RuleCtrl
 import ctrl.TestCtrl
+import dao.entity.Decision
+import dao.entity.Policy
+import dao.entity.Rule
 import groovy.transform.Field
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -29,7 +32,9 @@ app.addSource(new SchedSrv())
 //app.addSource(new RedisClient())
 app.addSource(new Remoter())
 //app.addSource(new HibernateSrv('jpa_kratos'))
-app.addSource(new HibernateSrv())
+app.addSource(new HibernateSrv('jpa_rule').entities(
+     Decision
+))
 app.addSource(new HttpServer().ctrls(
     TestCtrl, MainCtrl, RuleCtrl, MntCtrl
 ))

@@ -48,6 +48,7 @@
                 if (validResult.result) {
                     $.ajax({
                         url: 'mnt/login',
+                        type: 'post',
                         data: this.model,
                         success: (res) => {
                             this.isLoading = true;

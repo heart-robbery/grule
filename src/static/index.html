@@ -8,7 +8,7 @@
     <script src="js/lib/heyui.js"></script>
     <script src="js/lib/jquery-3.4.1.js"></script>
     <script src="js/lib/httpVueLoader.js"></script>
-    <script src="js/components.js"></script>
+    <script src="js/common.js"></script>
 </head>
 <body>
 <div id="app">
@@ -26,11 +26,13 @@
         },
         mounted: function () {
             this.getCurrentUser()
+            ws({path: '/mnt/ws'})
         },
         methods: {
-            getCurrentUser: function () {
+            getCurrentUser() {
                 $.ajax({
                     url: 'mnt/getCurrentUser',
+                    async: false,
                     success: (res) => {
                         if (res.code == '00') {
                             this.user = res.data
@@ -41,7 +43,7 @@
         }
     });
 
-    // 设置全局自动关闭时间为1秒
+    // 设置全局自动关闭时间为5秒
     app.$Notice.config({timeout: 5000});
 
     $.ajaxSetup({

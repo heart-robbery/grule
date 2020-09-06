@@ -10,7 +10,7 @@ class RuleSpec {
             String                        规则名
             String                        规则id
             String                        规则描述
-    private @Lazy List<Tuple2<String, Closure>> decisionFn = new LinkedList<>()
+    @Lazy private List<Tuple2<String, Closure>> decisionFn = new LinkedList<>()
 
 
     def 启用() {enabled = true}

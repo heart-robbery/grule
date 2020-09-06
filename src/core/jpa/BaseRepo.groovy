@@ -176,7 +176,7 @@ class BaseRepo {
      * @param spec 条件
      * @return list
      */
-    def <E extends IEntity> List<E> findList(Class<E> eType, CriteriaSpec spec) {
+    def <E extends IEntity> List<E> findList(Class<E> eType, CriteriaSpec spec = null) {
         if (eType == null) throw new IllegalArgumentException("eType must not be null");
         return trans(s -> {
             CriteriaBuilder cb = s.getCriteriaBuilder()

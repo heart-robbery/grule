@@ -2,8 +2,15 @@ package dao.entity
 
 import core.jpa.UUIDEntity
 
+import javax.persistence.CascadeType
 import javax.persistence.Entity
+import javax.persistence.FetchType
+import javax.persistence.OneToMany
 
+
+/**
+ * 决策
+ */
 @Entity
 class Decision extends UUIDEntity {
     /**
@@ -19,7 +26,12 @@ class Decision extends UUIDEntity {
      */
     String comment
     /**
-     * 决策内容
+     * 完整 DSL
      */
-    String body
+    String dsl
+//    /**
+//     * 关联的决策
+//     */
+//    @OneToMany(mappedBy = 'decision', cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+//    List<Policy> policies
 }

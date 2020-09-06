@@ -4,30 +4,48 @@
 <template>
     <div class="h-panel">
         <div class="h-panel-bar">
-            <span class="h-panel-title">决策详情</span>
-            <span v-color:gray v-font="13">说明~~</span>
+            <span class="h-panel-title">决策({{name}})DSL</span>
             <div class="h-panel-right">
-                <h-search placeholder="查询" v-width="200"></h-search>
-                <i class="h-split"></i>
-                <button class="h-btn h-btn-green h-btn-m">查询</button>
             </div>
         </div>
         <div class="h-panel-body">
+            <div id="dslEditor" style="height: 500px; width: 500px">{{dsl}}</div>
         </div>
     </div>
 </template>
-<script>
-    module.exports = {
-        prop: ['decisionId'],
-        data() {
-            return {
 
-            }
+<script>
+    let data = {name: null, dsl: '', ace: null, editor: null};
+    if (window.ace == undefined) {
+        loadJs('ace',() =>{data.ace = window.ace;});
+    }
+    module.exports = {
+        props: ['decisionId'],
+        data() {
+            return data
         },
         mounted() {
-            this.load()
+            this.load();
+            if (window.ace) {
+                this.$nextTick(this.initEditor)
+            }
+        },
+        watch: {
+            ace() {
+                if (ace) this.initEditor()
+            },
+            dsl() {
+                this.editor.setValue(this.dsl);
+            }
         },
         methods: {
+            initEditor() {
+                this.editor = ace.edit("dslEditor");
+                this.editor.resize();
+                this.editor.on('onchange', (e) => {
+                    console.log(e)
+                })
+            },
             load() {
                 if (!this.decisionId) {
                     this.$Message.error('参数错误: decisionId');
@@ -37,8 +55,8 @@
                     url: 'mnt/decisionDetail/' + this.decisionId,
                     success: (res) => {
                         if (res.code == '00') {
-
-                        } else this.$Notice({type: 'error', content: res.desc, timeout: 5})
+                            $.extend(data, res.data);
+                        } else this.$Message.error(res.desc)
                     }
                 })
             }
