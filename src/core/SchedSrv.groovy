@@ -147,7 +147,9 @@ class SchedSrv extends ServerTpl {
         data.put(KEY_FN, fn)
         String id = "dyn_" + Utils.random(8)
         def startFireTime = nextDateGetter.get()
-        assert startFireTime : "函数未算出触发时间"
+        if (startFireTime == null) {
+            log.warn("函数未算出触发时间"); return null
+        }
 
         final Queue<Tuple2<Integer, Date>> count = new LinkedList<>()
         OperableTrigger trigger = new SimpleTriggerImpl() {

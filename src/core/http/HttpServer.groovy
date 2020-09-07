@@ -381,7 +381,7 @@ class HttpServer extends ServerTpl {
             final AtomicBoolean end = new AtomicBoolean(false)
             long cur = System.currentTimeMillis()
             sched?.dyn({
-                if (System.currentTimeMillis() - (se.lastUsed?:cur) > expire && end.compareAndSet(false, true)) {
+                if (!se.ws && System.currentTimeMillis() - (se.lastUsed?:cur) > expire && end.compareAndSet(false, true)) {
                     log.debug("Closing expired HttpAioSession: " + se)
                     se.close()
                 }
