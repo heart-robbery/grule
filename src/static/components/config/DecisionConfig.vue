@@ -1,5 +1,5 @@
 <style scoped>
-    .dsl-model{
+    .editor-size{
         width: 80vw;
         height: 80vh;
         overflow-y: auto;
@@ -9,8 +9,9 @@
     <div class="h-panel">
         <div class="h-panel-bar">
             <span class="h-panel-title">决策集</span>
-            <span v-color:gray v-font="13">说明~~</span>
-            <i class="h-icon-plus" @click="add"></i>
+<!--            <span v-color:gray v-font="13">说明~~</span>-->
+            &nbsp;&nbsp;
+            <h-button @click="add"><i class="h-icon-plus"></i></h-button>
             <div class="h-panel-right">
                 <h-search placeholder="查询" v-width="200" v-model="kw" show-search-button search-text="搜索" @search="load"></h-search>
 <!--                <i class="h-split"></i>-->
@@ -22,7 +23,7 @@
                 <h-collapse v-model="collapse" accordion @change="showEditor">
                     <h-collapseitem v-for="item in decision.list" :key="item.decisionId" :name="item.decisionId" :title="item.name + '(' + item.decisionId + ')' + (item.comment ? ': ' + item.comment : '')">
                         <div style="height: 650px; width: 100vh">
-                            <div v-if="collapse && collapse.length > 0 && collapse[0] == item.decisionId " id="dslEditor" style="height: 650px; width: 800px"></div>
+                            <div v-if="collapse && collapse.length > 0 && collapse[0] == item.decisionId " ref="dslEditor" style="height: 650px; width: 800px"></div>
                         </div>
                     </h-collapseitem>
                 </h-collapse>
@@ -67,92 +68,117 @@
     // let detail
     // httpVueLoader('components/config/DecisionDetail.vue')().then((r) => detail = r);
     let list = [
-        {decisionId: 'decision_1', name:'决策1', comment:'', dsl: 'xxxxxxx'},
-        {decisionId: 'decision_2', name:'决策2', comment:'decisionId2', dsl: 'xxxxxxxxxxx'},
-        {decisionId: 'decision_3', name:'决策3', comment:'decisionId3'},
+        {id:'', decisionId: 'decision_1', name:'决策1', comment:'', dsl: 'xxxxxxx'},
+        {id:'', decisionId: 'decision_2', name:'决策2', comment:'decisionId2', dsl: 'xxxxxxxxxxx'},
+        {id:'', decisionId: 'decision_3', name:'决策3', comment:'decisionId3'},
     ];
-    let data = {
-        decisionLoading: false,
-        decision: {
-            page: 1,
-            pageSize: 2,
-            totalRow: list.length,
-            list: list
-        },
-        collapse: null, curDecision: null,
-        kw: '',
-    };
     module.exports = {
         props: ['tabs'],
         data() {
-            return data;
+            return {
+                decisionLoading: false,
+                decision: {
+                    page: 1,
+                    pageSize: 2,
+                    totalRow: list.length,
+                    list: list
+                },
+                collapse: null, curDecision: null,
+                kw: '',
+            };
         },
         mounted: function () {
-            //this.load()
+            this.load()
         },
         watch: {
         },
         methods: {
             initEditor() {
-                // ace.require("ace/ext/language_tools");
-                this.editor = ace.edit("dslEditor");
-                console.log(this.editor);
-                //this.editor.setTheme("ace/theme/twilight");
-                this.editor.resize();
-                // this.editor.keyBinding.addCommand({
-                //     name: 'myCommand',
-                //     bindKey: {win: 'Ctrl-S', mac: 'Command-S'},
-                //     exec(editor) {
-                //         console.log('save: ' + editor.session.getValue());
-                //     }
-                // });
-                //console.log(CommandManager);
-                // this.editor.onChange = (e) => {
-                //     console.log(e)
-                // };
-                // this.editor.session.setMode("ace/mode/groovy");
-                // this.editor.setMode("ace/mode/javascript");
-                this.editor.on('change', (e) => {
-                    console.log(e)
+                let languageTools = ace.require("ace/ext/language_tools");
+                // if (this.editor) {this.editor.destroy()}
+                this.editor = ace.edit(this.$refs.dslEditor[0]);
+                console.log('editor: ', this.editor);
+                this.editor.session.setValue(this.curDecision.dsl);
+                this.editor.setOptions({
+                    enableBasicAutoCompletion: true,
+                    enableSnippets: true,
+                    enableLiveAutoCompletion: true
                 });
-                // this.editor.addCommandKeyListener({
-                //     name: 'myCommand',
-                //     bindKey: {win: 'Ctrl-S', mac: 'Command-S'},
-                //     exec(editor) {
-                //         console.log('save: ' + editor.session.getValue());
+                this.editor.on('change', (e) => {
+                    //console.log('change: ', e);
+                    this.curDecision.dsl = this.editor.session.getValue()
+                });
+                this.editor.commands.addCommand({
+                    name: 'save',
+                    bindKey: {win: 'Ctrl-S', mac: 'Command-S'},
+                    exec: (editor) => {
+                        this.curDecision.dsl = editor.session.getValue();
+                        this.save()
+                    },
+                    // readOnly: false // 如果不需要使用只读模式，这里设置false
+                });
+
+//                 let languageTools = ace.require("ace/ext/language_tools");
+                console.log('languageTools', languageTools);
+                // languageTools.addCompleter({
+                //     getCompletions: function(editor, session, pos, prefix, callback) {
+                //         callback(null,  [
+                //             {
+                //                 name : "第一行", //名称
+                //                 value : "Select",//值，这就是匹配我们输入的内容，比如输入s或者select,这一行就会出现在提示框里，可根据自己需求修改，就是你想输入什么显示出北京呢，就改成什么
+                //                 caption: "北京",//字幕，下拉提示左侧内容,这也就是我们输入前缀匹配出来的内容，所以这里必须包含我们的前缀
+                //                 meta: "", //类型，下拉提示右侧内容
+                //                 type: "local",//可写为keyword
+                //                 score : 1000 // 让它排在最上面，类似权值的概念
+                //             }
+                //         ]);
                 //     }
-                // });
-                // this.editor.commands.addCommand({
-                //     name: 'myCommand',
-                //     bindKey: {win: 'Ctrl-S', mac: 'Command-S'},
-                //     exec(editor) {
-                //         console.log('save: ' + editor.session.getValue());
-                //     },
-                //     // readOnly: false // 如果不需要使用只读模式，这里设置false
                 // });
             },
             save() {
-
+                this.$Message('保存中...');
+                let decision = this.curDecision;
+                $.ajax({
+                    url: 'setDecision',
+                    type: 'post',
+                    data: {id: decision.id, dsl: decision.dsl},
+                    success: (res) => {
+                        if (res.code == '00') {
+                            if (decision.id) {
+                                $.extend(decision, res.data);
+                                this.$Message.success('保存成功: ' + decision.decisionId);
+                            } else {
+                                this.load();
+                                this.$Message.success('保存成功: ' + res.data.decisionId);
+                            }
+                        } else this.$Notice({type: 'error', content: res.desc, timeout: 5})
+                    }
+                })
             },
             add() {
+                let decisionId = 'decision_' + Date.now();
                 this.decision.list.unshift({
-                    decisionId: 'decision_',
+                    decisionId: decisionId,
                     name: '决策名',
-                    dsl: `
-// 唯一
-决策id = 'decision_'
-决策名 = '决策名'
+                    dsl:
+`// 决策编辑: Ctrl+s 保存
+// 决策id: 必须唯一
+决策id = '${decisionId}'
+决策名 = '${decisionId}'
 决策描述 = ''
 
+// 返回的调用决策方的结果属性值
 返回属性 '身份证号码'
 
 策略定义 {
+    策略id = ''
     策略名 = ''
     策略描述 = ''
 
     规则定义 {
         规则名 = ''
         规则id = ''
+        规则描述 = ''
 
         拒绝 {
             身份证号码 == null
@@ -163,15 +189,21 @@
                 })
             },
             showEditor(e) {
+                console.log('showEditor', e);
                 if (e && e.length > 0) {
+                    this.decision.list.forEach((v, i) => {
+                        if (v.decisionId == e[0]) {
+                            this.curDecision = v;
+                        }
+                    });
                     if (window.ace == undefined) {
                         loadJs('ace', this.initEditor);
                         // loadJs('ace', () => {
                         //     loadJs('ace-mode-groovy', this.initEditor)
                         // });
                     } else {
+                        // 必须用$nextTick 保证dom节点渲染完成
                         this.$nextTick(this.initEditor)
-                        // this.initEditor()
                     }
                 }
             },

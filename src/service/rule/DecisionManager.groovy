@@ -17,19 +17,13 @@ class DecisionManager extends ServerTpl {
     protected final Map<String, DecisionSpec> decisionMap = new ConcurrentHashMap<>()
 
 
-    @EL(name = 'sys.starting', async = true)
+    @EL(name = 'jpa_rule.started', async = true)
     void start() {
         load()
     }
 
 
-    DecisionSpec findDecision(String id) { decisionMap.get(id) }
-
-
-    String dsl(String decisionId) {
-        repo.find(Decision) {root, query, cb -> cb.equal(root.get('decisionId'), decisionId)}
-        ''
-    }
+    DecisionSpec findDecision(String decisionId) { decisionMap.get(decisionId) }
 
 
 //    /**
@@ -81,6 +75,6 @@ class DecisionManager extends ServerTpl {
     protected void load() {
         log.info("加载决策")
         create(Utils.baseDir("/src/service/rule/policy/test1.decision").getText('utf-8'))
-        // repo.findList(dao.entity.Decision).each { create(toDsl(it)) }
+        repo.findList(dao.entity.Decision).each { create(it.dsl) }
     }
 }

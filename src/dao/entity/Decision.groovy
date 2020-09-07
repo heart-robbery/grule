@@ -1,8 +1,10 @@
 package dao.entity
 
 import core.jpa.UUIDEntity
+import org.hibernate.annotations.DynamicUpdate
 
 import javax.persistence.CascadeType
+import javax.persistence.Column
 import javax.persistence.Entity
 import javax.persistence.FetchType
 import javax.persistence.OneToMany
@@ -12,6 +14,7 @@ import javax.persistence.OneToMany
  * 决策
  */
 @Entity
+@DynamicUpdate
 class Decision extends UUIDEntity {
     /**
      * 决策id
@@ -28,6 +31,7 @@ class Decision extends UUIDEntity {
     /**
      * 完整 DSL
      */
+    @Column(length = 5000)
     String dsl
 //    /**
 //     * 关联的决策

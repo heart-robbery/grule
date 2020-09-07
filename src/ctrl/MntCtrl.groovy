@@ -89,7 +89,7 @@ class MntCtrl extends ServerTpl {
         ApiResp.ok(
             Page.of(
                 repo.findPage(Decision, page, 10) {root, query, cb ->
-                    query.orderBy(cb.desc(root.get('createTime')))
+                    query.orderBy(cb.desc(root.get('updateTime')))
                     if (kw) cb.like(root.get('dsl'), '%' + kw + '%')
                     else if (decisionId) cb.equal(root.get('decisionId'), decisionId)
                 },

@@ -8,6 +8,7 @@ import org.codehaus.groovy.control.customizers.ImportCustomizer
  */
 class DecisionSpec {
     String 决策id
+    String 决策名
     String 决策描述
 
     // 策略集: 顺序执行

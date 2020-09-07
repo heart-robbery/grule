@@ -7,6 +7,7 @@ import org.codehaus.groovy.control.customizers.ImportCustomizer
  * 策略定义 spec
  */
 class PolicySpec {
+    String                         策略id
     String                         策略名
     String                         策略描述
     protected final List<RuleSpec> rules = new LinkedList<>()
