@@ -32,7 +32,7 @@ class ApiResp<T> implements Serializable {
     String mark
 
 
-    static <T> ApiResp<T> ok() { return new ApiResp(code: '00') }
+    static <T> ApiResp<T> ok() { new ApiResp(code: '00') }
 
 
     static <T> ApiResp ok(T data) { new ApiResp(code: '00', data: data) }
@@ -53,7 +53,7 @@ class ApiResp<T> implements Serializable {
      */
     ApiResp<LinkedHashMap<String, Object>> attr(String attrName, Object attrValue) {
         if (!data) {
-            data = new LinkedHashMap<String, Object>(5)
+            data = new LinkedHashMap<String, Object>(7)
         }
         if (data && !(data instanceof Map)) {
             throw new IllegalArgumentException("data类型必须为Map类型")

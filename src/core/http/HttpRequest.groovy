@@ -49,7 +49,7 @@ class HttpRequest {
             Map<String, String> ret = new HashMap<>()
             queryStr.split("&").each {s ->
                 def arr = s.split("=")
-                ret.put(arr[0], URLDecoder.decode(arr[1], 'utf-8'))
+                ret.put(arr[0], arr.length > 1 ? URLDecoder.decode(arr[1], 'utf-8') : null)
             }
             return Collections.unmodifiableMap(ret)
         }
@@ -66,7 +66,7 @@ class HttpRequest {
         if (bodyStr && contentType?.contains('application/x-www-form-urlencoded')) {
             bodyStr.split("&").each {s ->
                 def arr = s.split("=")
-                data.put(arr[0], URLDecoder.decode(arr[1], 'utf-8'))
+                data.put(arr[0], arr.length > 1 ? URLDecoder.decode(arr[1], 'utf-8') : null)
             }
         }
         data
