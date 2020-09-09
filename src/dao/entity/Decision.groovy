@@ -1,24 +1,21 @@
 package dao.entity
 
-import core.jpa.UUIDEntity
+import core.jpa.LongIdEntity
 import org.hibernate.annotations.DynamicUpdate
 
-import javax.persistence.CascadeType
 import javax.persistence.Column
 import javax.persistence.Entity
-import javax.persistence.FetchType
-import javax.persistence.OneToMany
-
 
 /**
  * 决策
  */
 @Entity
 @DynamicUpdate
-class Decision extends UUIDEntity {
+class Decision extends LongIdEntity {
     /**
      * 决策id
      */
+    @Column(unique = true)
     String decisionId
     /**
      * 决策名
@@ -33,9 +30,4 @@ class Decision extends UUIDEntity {
      */
     @Column(length = 5000)
     String dsl
-//    /**
-//     * 关联的决策
-//     */
-//    @OneToMany(mappedBy = 'decision', cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-//    List<Policy> policies
 }

@@ -1,9 +1,7 @@
 package ctrl
 
 import cn.xnatural.enet.event.EL
-import core.Page
 import core.ServerTpl
-import core.Utils
 import core.http.HttpContext
 import core.http.mvc.ApiResp
 import core.http.mvc.Ctrl
@@ -13,7 +11,7 @@ import core.http.ws.WS
 import core.http.ws.WebSocket
 import core.jpa.BaseRepo
 import dao.entity.Decision
-import service.rule.DecisionManager
+import dao.entity.RuleField
 
 import java.util.concurrent.ConcurrentHashMap
 
@@ -26,10 +24,7 @@ class MntCtrl extends ServerTpl {
 
 
     @EL(name = 'wsMsg')
-    void wsMsgBroadcast(String msg) {
-        wss.each {ws -> ws.send(msg)}
-    }
-
+    void wsMsgBroadcast(String msg) { wss.each {ws -> ws.send(msg)} }
 
     @WS(path = 'ws')
     void receiveWs(WebSocket ws) {
@@ -63,6 +58,7 @@ class MntCtrl extends ServerTpl {
         if (!password) return ApiResp.fail('password must not be empty')
         ctx.setSessionAttr('name', username)
         ctx.setSessionAttr('id', username)
+        ctx.setSessionAttr('uRoles', ['admin'] as Set)
         ApiResp.ok().attr('name', username)
     }
 
@@ -87,15 +83,43 @@ class MntCtrl extends ServerTpl {
     @Path(path = 'decisionPage')
     ApiResp decisionPage(Integer page, String kw, String decisionId) {
         ApiResp.ok(
-            Page.of(
-                repo.findPage(Decision, page, 10) {root, query, cb ->
-                    query.orderBy(cb.desc(root.get('updateTime')))
-                    if (kw) cb.like(root.get('dsl'), '%' + kw + '%')
-                    else if (decisionId) cb.equal(root.get('decisionId'), decisionId)
-                },
-                {Utils.toMapper(it).ignore('policies').build()}
-            )
+            repo.findPage(Decision, page, 10) {root, query, cb ->
+                query.orderBy(cb.desc(root.get('updateTime')))
+                if (kw) cb.like(root.get('dsl'), '%' + kw + '%')
+                else if (decisionId) cb.equal(root.get('decisionId'), decisionId)
+            }
         )
+    }
+
+
+    @Path(path = 'fieldPage')
+    ApiResp fieldPage(Integer page, String kw) {
+        ApiResp.ok(
+            repo.findPage(RuleField, page, 10) { root, query, cb ->
+                query.orderBy(cb.desc(root.get('updateTime')))
+                if (kw) {
+                    cb.or(
+                        cb.like(root.get('enName'), '%' + kw + '%'),
+                        cb.like(root.get('cnName'), '%' + kw + '%'),
+                        cb.like(root.get('comment'), '%' + kw + '%')
+                    )
+                }
+            }
+        )
+    }
+
+
+    @Path(path = 'delDecision/:decisionId')
+    ApiResp delDecision(String decisionId) {
+        repo.delete(repo.find(Decision) {root, query, cb -> cb.equal(root.get('decisionId'), decisionId)})
+        ApiResp.ok()
+    }
+
+
+    @Path(path = 'delField/:enName')
+    ApiResp delField(String enName) {
+        repo.delete(repo.find(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)})
+        ApiResp.ok()
     }
 
 
