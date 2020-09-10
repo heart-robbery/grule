@@ -82,5 +82,12 @@ let jsMap = new Map([
     ['moment', 'js/lib/moment.min.js'],
 ]);
 function loadJs(name, cb) {
-    $.getScript(jsMap.get(name), cb);
+    let arr = jsMap.get(name);
+    if (arr.forEach) {
+        let length = arr.length;
+        arr.forEach((v, i) => {$.getScript(v, () => {
+            length--;
+            if (length == 0) cb();
+        })})
+    } else $.getScript(arr, cb)
 }

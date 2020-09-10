@@ -97,7 +97,7 @@ class HttpContext {
     HttpContext setSessionAttr(String key, Object value) {
         getOrCreateSData()
         if (value == null) sData.remove(key)
-        else sData.put(key, value instanceof Collection ? value.join(',') : value?.toString())
+        else sData.put(key, value)
         this
     }
 
@@ -112,7 +112,9 @@ class HttpContext {
         getOrCreateSData()
         def v = sData.get(key)
         if (type) {
-            if (Set.isAssignableFrom(type) && v instanceof String) {
+            if (Set.isAssignableFrom(type) && v instanceof Set) {
+                return v
+            } else if (Set.isAssignableFrom(type) && v instanceof String) {
                 return v == '' ? null : v.toString().split(',').toList().toSet()
             } else if (List.isAssignableFrom(List) && v instanceof String) {
                 return v == '' ? null : v.toString().split(',').toList()
@@ -150,7 +152,7 @@ class HttpContext {
                 @Override
                 Object get(Object key) { redis.hget(cKey, key?.toString()) }
                 @Override
-                Object put(String key, Object value) { redis.hset(cKey, key?.toString(), value?.toString(), expire.seconds.intValue()) }
+                Object put(String key, Object value) { redis.hset(cKey, key?.toString(), value instanceof Collection ? value.join(',') : value?.toString(), expire.seconds.intValue()) }
                 @Override
                 Object remove(Object key) { redis.hdel(cKey, key?.toString()) }
                 @Override
@@ -436,8 +438,8 @@ class HttpContext {
      * 所有参数: 路径参数, query参数, 表单, json
      * @return
      */
-    Map params() {
-        Map params = new HashMap()
+    Map<String, Object> params() {
+        Map<String, Object> params = new HashMap()
         params.putAll(request.jsonParams)
         params.putAll(request.formParams)
         params.putAll(request.queryParams)
@@ -469,6 +471,7 @@ class HttpContext {
         else if (type == FileData[]) return v instanceof List ? v.toArray() : [v].toArray()
         else if (type == URI) return URI.create(v.toString())
         else if (type == URL) return URI.create(v.toString()).toURL()
+        else if (type.isEnum()) return type.enumConstants.find {it.name() == v}
         else if (type.isArray()) {
             if (v instanceof List) {
                 return v.collect { Utils.to(it, type.componentType)}.toArray()

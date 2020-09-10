@@ -55,19 +55,33 @@ class RedisClient extends ServerTpl {
     }
 
 
-    @EL(name = '${name}.set')
+    @EL(name = '${name}.expire')
+    void expire(String key, Integer seconds) {
+        log.trace(name + ".hset.expire, key: {}, seconds: {}", key, seconds)
+        exec{ it.expire(key, seconds == null ? getExpire(key).seconds.intValue() : seconds)}
+    }
+
+
     def set(String key, String value, Integer seconds) {
         log.trace(name + ".set. key: {}, value: {}, seconds: " + seconds, key, value)
         if (value != null) {
             exec{c ->
                 c.set(key, value)
-                c.expire(seconds == null ? getExpire(key).seconds.intValue() : seconds)
+                c.expire(key, seconds == null ? getExpire(key).seconds.intValue() : seconds)
             }
         }
     }
 
 
-    @EL(name = '${name}.hset')
+    @EL(name = '${name}.set')
+    def set(String key, String value) {
+        log.trace(name + ".set. key: {}, value: {}", key, value)
+        if (value != null) {
+            exec{it.set(key, value)}
+        }
+    }
+
+
     def hset(String cName, String key, String value, Integer seconds) {
         log.trace(name + ".hset. cName: "+ cName +", key: {}, value: {}, seconds: " + seconds, key, value)
         if (value != null) {
@@ -75,6 +89,15 @@ class RedisClient extends ServerTpl {
                 c.hset(cName, key, value)
                 c.expire(cName, seconds == null ? getExpire(cName).seconds.intValue() : seconds)
             }
+        }
+    }
+
+
+    @EL(name = '${name}.hset')
+    def hset(String cName, String key, String value) {
+        log.trace(name + ".hset. cName: "+ cName +", key: {}, value: {}", key, value)
+        if (value != null) {
+            exec{ it.hset(cName, key, value)}
         }
     }
 

@@ -228,7 +228,7 @@ class AppContext {
         Object bean
         if (bName && bType) {
             bean = sourceMap.get(bName)
-            if (!bean && !bType.isAssignableFrom(bean.getClass())) bean = null
+            if (bean && !bType.isAssignableFrom(bean.getClass())) bean = null
         } else if (bName && !bType) {
             bean = sourceMap.get(bName)
         } else if (!bName && bType) {
