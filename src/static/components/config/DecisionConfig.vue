@@ -165,8 +165,8 @@
                         this.$Message.error('取消');
                     });
                 } else {
-                    let i = this.decision.list.indexOf(item);
-                    this.decision.list.splice(i, 1);
+                    let index = this.decision.list.indexOf(item);
+                    this.decision.list.splice(index, 1);
                 }
             },
             save() {

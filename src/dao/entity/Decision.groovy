@@ -1,6 +1,7 @@
 package dao.entity
 
-import core.jpa.LongIdEntity
+
+import core.jpa.UUIDEntity
 import org.hibernate.annotations.DynamicUpdate
 
 import javax.persistence.Column
@@ -11,7 +12,7 @@ import javax.persistence.Entity
  */
 @Entity
 @DynamicUpdate
-class Decision extends LongIdEntity {
+class Decision extends UUIDEntity {
     /**
      * 决策id
      */
@@ -28,6 +29,6 @@ class Decision extends LongIdEntity {
     /**
      * 完整 DSL
      */
-    @Column(length = 5000)
+    @Column(length = 10000)
     String dsl
 }

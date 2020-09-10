@@ -10,7 +10,9 @@ import core.http.ws.Listener
 import core.http.ws.WS
 import core.http.ws.WebSocket
 import core.jpa.BaseRepo
+import dao.entity.DataCollector
 import dao.entity.Decision
+import dao.entity.FieldType
 import dao.entity.RuleField
 
 import java.util.concurrent.ConcurrentHashMap
@@ -81,12 +83,11 @@ class MntCtrl extends ServerTpl {
 
 
     @Path(path = 'decisionPage')
-    ApiResp decisionPage(Integer page, String kw, String decisionId) {
+    ApiResp decisionPage(Integer page, String kw) {
         ApiResp.ok(
             repo.findPage(Decision, page, 10) {root, query, cb ->
                 query.orderBy(cb.desc(root.get('updateTime')))
                 if (kw) cb.like(root.get('dsl'), '%' + kw + '%')
-                else if (decisionId) cb.equal(root.get('decisionId'), decisionId)
             }
         )
     }
@@ -109,6 +110,76 @@ class MntCtrl extends ServerTpl {
     }
 
 
+    @Path(path = 'dataCollectorPage')
+    ApiResp dataCollectorPage(Integer page, Integer pageSize, String kw) {
+        if (pageSize && pageSize > 20) return ApiResp.fail("pageSize max 20")
+        ApiResp.ok(
+            repo.findPage(DataCollector, page, pageSize?:10) { root, query, cb ->
+                query.orderBy(cb.desc(root.get('updateTime')))
+                if (kw) {
+                    cb.or(
+                        cb.like(root.get('enName'), '%' + kw + '%'),
+                        cb.like(root.get('cnName'), '%' + kw + '%'),
+                        cb.like(root.get('comment'), '%' + kw + '%')
+                    )
+                }
+            }
+        )
+    }
+
+
+    @Path(path = 'addField', method = 'post')
+    ApiResp addField(String enName, String cnName, FieldType type, String comment, String dataCollector) {
+        if (!enName) return ApiResp.fail("enName must not be empty")
+        if (!cnName) return ApiResp.fail("cnName must not be empty")
+        if (!type) return ApiResp.fail("type must not be empty")
+        if (repo.count(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}) return ApiResp.fail("$enName aleady exist")
+        if (repo.count(RuleField) {root, query, cb -> cb.equal(root.get('cnName'), cnName)}) return ApiResp.fail("$cnName aleady exist")
+        def field = new RuleField(enName: enName, cnName: cnName, type: type, comment: comment, dataCollector: dataCollector)
+        repo.saveOrUpdate(field)
+        ApiResp.ok(field)
+    }
+
+
+    @Path(path = 'addDataCollector', method = 'post')
+    ApiResp addDataCollector(HttpContext ctx) {
+        def map = ctx.params()
+        DataCollector dc = new DataCollector()
+        map.each {entry -> if (dc.hasProperty(entry.key)) dc.setProperty(entry.key, entry.value)}
+        if (!dc.enName) return ApiResp.fail('enName must not be empty')
+        if (!dc.cnName) return ApiResp.fail('cnName must not be empty')
+        if (!dc.type) return ApiResp.fail('type must not be empty')
+        if ('interface' == dc.type) {
+            if (!dc.url) return ApiResp.fail('url must not be empty')
+            if (!dc.method) return ApiResp.fail('method must not be empty')
+            if (!dc.contentType) return ApiResp.fail('contentType must not be empty')
+        } else if ('script' == dc.type) {
+            if (!dc.computeScript) return ApiResp.fail('computeScript must not be empty')
+        }
+        if (repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), dc.enName)}) {
+            return ApiResp.fail("$dc.enName 已存在")
+        }
+        if (repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('cnName'), dc.cnName)}) {
+            return ApiResp.fail("$dc.cnName 已存在")
+        }
+        repo.saveOrUpdate(dc)
+        ApiResp.ok(dc)
+    }
+
+
+    @Path(path = 'updateField', method = 'post')
+    ApiResp updateField(String enName, String cnName, FieldType type, String comment, String dataCollector) {
+        if (!enName) return ApiResp.fail("enName must not be empty")
+        if (!cnName) return ApiResp.fail("cnName must not be empty")
+        if (!type) return ApiResp.fail("type must not be empty")
+        if (repo.count(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}) return ApiResp.fail("$enName aleady exist")
+        if (repo.count(RuleField) {root, query, cb -> cb.equal(root.get('cnName'), cnName)}) return ApiResp.fail("$cnName aleady exist")
+        def field = new RuleField(enName: enName, cnName: cnName, type: type, comment: comment, dataCollector: dataCollector)
+        repo.saveOrUpdate(field)
+        ApiResp.ok(field)
+    }
+
+
     @Path(path = 'delDecision/:decisionId')
     ApiResp delDecision(String decisionId) {
         repo.delete(repo.find(Decision) {root, query, cb -> cb.equal(root.get('decisionId'), decisionId)})
@@ -123,25 +194,9 @@ class MntCtrl extends ServerTpl {
     }
 
 
-//    @Path(path = 'decisionDetail/:decisionId')
-//    ApiResp decisionDetail(String decisionId) {
-//        if (!decisionId) return ApiResp.fail("decisionId must not be empty")
-//        def decision = repo.find(Decision) {root, query, cb ->
-//            cb.equal(root.get('decisionId'), decisionId)
-//        }
-//        // def attr = Utils.toMapper(decision).ignore('policies').build()
-//        // attr.put('dsl', DecisionManager.toDsl(decision))
-//        ApiResp.ok(decision)
-//    }
-
-
-//    @Path(path = 'selectDecision')
-//    ApiResp selectDecision(String nameLike) {
-//        ApiResp.ok(
-//            repo.findList(Decision) {root, query, cb ->
-//                if (nameLike) cb.like(root.get('name'), '%' + nameLike + '%')
-//                else query.orderBy(cb.desc(root.get('createTime')))
-//            }.collectEntries {[it.decisionId, it.name]}
-//        )
-//    }
+    @Path(path = 'delDataCollector/:enName')
+    ApiResp delDataCollector(String enName) {
+        repo.delete(repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), enName)})
+        ApiResp.ok()
+    }
 }

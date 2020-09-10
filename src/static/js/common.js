@@ -82,6 +82,8 @@ new Map([
     ['DecisionDetail', 'config/DecisionDetail.vue'],
     ['PolicyDetail', 'config/PolicyDetail.vue'],
     ['RuleDetail', 'config/RuleDetail.vue'],
+    ['FieldConfig', 'config/FieldConfig.vue'],
+    ['DataCollectorConfig', 'config/DataCollectorConfig.vue'],
 ]).forEach((value, key) => {
     Vue.component(key, (resolve, reject) => {
         httpVueLoader('components/'+ value)().then((r) => resolve(r))

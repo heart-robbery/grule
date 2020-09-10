@@ -23,7 +23,7 @@ import java.util.function.Function
  */
 class AttrManager extends ServerTpl {
 
-    @Lazy def                                                      repo             = bean(BaseRepo, 'jpa_rule')
+    @Lazy def                                                      repo             = bean(BaseRepo, 'jpa_rule_repo')
     /**
      * RuleField(enName, cnName), RuleField
      */
@@ -223,7 +223,7 @@ class AttrManager extends ServerTpl {
                 def icz = new ImportCustomizer()
                 config.addCompilationCustomizers(icz)
                 icz.addImports(JSON.class.name, JSONObject.class.name)
-                parseFn = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate(record.parseScript)
+                parseFn = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("{String resultStr -> $record.parseScript}")
             }
             dataFn(record.enName) {ctx ->
                 String result
@@ -250,7 +250,7 @@ class AttrManager extends ServerTpl {
                 def icz = new ImportCustomizer()
                 config.addCompilationCustomizers(icz)
                 icz.addImports(JSON.class.name, JSONObject.class.name)
-                Closure script = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate(record.computeScript)
+                Closure script = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("{ -> $record.computeScript}")
                 dataFn(record.enName) { ctx ->
                     def fn = script.rehydrate(ctx.data, script, this)
                     fn.resolveStrategy = Closure.DELEGATE_FIRST

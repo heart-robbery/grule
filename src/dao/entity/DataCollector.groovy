@@ -38,6 +38,7 @@ class DataCollector extends LongIdEntity {
     /**
      * 请求body 字符串 模板
      */
+    @Column(length = 1000)
     String bodyStr
     /**
      * application/json,multipart/form-data,application/x-www-form-urlencoded
@@ -50,9 +51,11 @@ class DataCollector extends LongIdEntity {
      *
      *  }
      */
+    @Column(length = 5000)
     String parseScript
     /**
      * 值计算函数
      */
+    @Column(length = 5000)
     String computeScript
 }

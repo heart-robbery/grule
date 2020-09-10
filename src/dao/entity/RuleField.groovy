@@ -19,6 +19,7 @@ class RuleField extends LongIdEntity {
     /**
      * 中文名 唯一
      */
+    @Column(unique = true)
     String    cnName
     /**
      * 备注说明
