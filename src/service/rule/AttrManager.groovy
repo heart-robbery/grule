@@ -32,9 +32,6 @@ class AttrManager extends ServerTpl {
      * 数据获取函数. 函数名 -> 函数
      */
     protected final Map<String, Function<DecisionContext, Object>> dataCollectorMap = new ConcurrentHashMap()
-    @Lazy Set<String>                                              ignoreGetAttr    = new HashSet<>(
-        (getStr('ignoreGetAttr', '')).split(",").collect {it.trim()}.findAll{it}
-    )
 
 
     @EL(name = 'jpa_rule.started', async = true)
@@ -47,36 +44,55 @@ class AttrManager extends ServerTpl {
 
 
     /**
-     * 获取属性值
+     * 执行数据收集, 获取属性值
      * @param aName 属性名
      * @param ctx
-     * @return
+     * @return 当前属性的值
      */
-    def getAttr(String aName, DecisionContext ctx) {
-        if (ignoreGetAttr.contains(aName) || ignoreGetAttr.contains(alias(aName))) return null
-        def fnName = attrMap.get(aName)?.dataCollector
-        if (fnName == null) {
-            log.warn(ctx.logPrefix() + "属性'" + aName + "'没有对应的取值函数")
+    def dataCollect(String aName, DecisionContext ctx) {
+        def field = attrMap.get(aName)
+        if (field == null) {
+            log.warn("未找到属性'$aName'对应的配置")
+            return
+        }
+        String collectorName = field.dataCollector // 属性对应的 值 收集器名
+        if (!collectorName) {
+            log.warn(ctx.logPrefix() + "属性'" + aName + "'没有对应的取值配置")
             return null
+        }
+        if (ctx.dataCollectResult.containsKey(collectorName)) { // 已查询过
+            return ctx.dataCollectResult.get(collectorName).get(aName)
         }
 
         // 函数执行
         def doApply = {Function<DecisionContext, Object> fn ->
-            log.debug(ctx.logPrefix() + "Get attr '{}' value apply function: '{}'", aName, fnName)
-            fn.apply(ctx)
+            log.debug(ctx.logPrefix() + "Get attr '{}' value apply function: '{}'", aName, collectorName)
+            def v = fn.apply(ctx)
+            if (v instanceof Map) { // 收集器,收集结果为多个属性的值, 则暂先保存
+                Map<String, Object> result = new HashMap<>()
+                ctx.dataCollectResult.put(collectorName, result)
+                v.each {entry ->
+                    String k = (String) entry.key
+                    result.put(k, entry.value)
+                    k = alias(k)
+                    if (k) result.put(k, entry.value)
+                }
+                return result.get(aName)
+            }
+            else return v
         }
 
-        def fn = dataCollectorMap.get(fnName)
+        def fn = dataCollectorMap.get(collectorName)
         if (fn) {
             return doApply(fn)
         } else {
-            dataCollect( // 重新去数据库中查找
-                repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), fnName)}
+            initDataCollect( // 重新去数据库中查找
+                repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), collectorName)}
             )
-            fn = dataCollectorMap.get(fnName)
+            fn = dataCollectorMap.get(collectorName)
             if (fn) return doApply(fn)
             else {
-                log.debug(ctx.logPrefix() + "Not fund attr '{}' mapped getter function '{}'", aName, fnName)
+                log.warn(ctx.logPrefix() + "Not fund attr '{}' mapped getter function '{}'", aName, collectorName)
                 return null
             }
         }
@@ -86,24 +102,25 @@ class AttrManager extends ServerTpl {
     /**
      * 决策产生的数据接口调用
      * @param ctx 当前决策 DecisionContext
-     * @param dataCfg 数据配置
-     * @param jsonBody 入参json
+     * @param collector 数据配置
+     * @param spend 接口调用花费时间
+     * @param url url地址
+     * @param bodyStr 请求body
      * @param resultStr 接口返回结果
      * @param resolveResult 解析结果
-     * @param spend 接口调用花费时间
      */
     @EL(name = 'decision.dataCollect')
-    void dataCollected(DecisionContext ctx, Map dataCfg, String jsonBody, String resultStr, Map resolveResult, Long spend) {
-        log.info(ctx.logPrefix() + "接口调用: " + dataCfg['name'] + ", spend: " + spend + "ms, params: " + jsonBody + ", returnStr: " + resultStr + ", resolveResult: " + resolveResult)
+    void dataCollected(DecisionContext ctx, DataCollector collector, Long spend, String url, String bodyStr, String resultStr, Map resolveResult) {
+
     }
 
 
     /**
-     * 数据获取函数
-     * @param fnName 函数名
-     * @param fn 函数
+     * 数据收集器 设置
+     * @param collectorName 收集器名
+     * @param collector 收集器函数
      */
-    Function<DecisionContext, Object> dataFn(String fnName, Function<DecisionContext, Object> fn) { dataCollectorMap.put(fnName, fn) }
+    Function<DecisionContext, Object> setCollector(String collectorName, Function<DecisionContext, Object> collector) { dataCollectorMap.put(collectorName, collector) }
 
 
     /**
@@ -166,7 +183,7 @@ class AttrManager extends ServerTpl {
     void loadDataCollector() {
         initDataCollector()
         log.info("加载数据集成配置")
-        repo.findList(DataCollector).each {dataCollect(it)}
+        repo.findList(DataCollector).each {initDataCollect(it)}
     }
 
 
@@ -212,9 +229,9 @@ class AttrManager extends ServerTpl {
      * 初始全数据收集器
      * @param record
      */
-    void dataCollect(DataCollector record) {
+    void initDataCollect(DataCollector record) {
         if (!record) return
-        if ('interface' == record.type) {
+        if ('http' == record.type) { // http 接口
             def http = bean(OkHttpSrv)
             Closure parseFn
             if (record.parseScript) {
@@ -225,7 +242,7 @@ class AttrManager extends ServerTpl {
                 icz.addImports(JSON.class.name, JSONObject.class.name)
                 parseFn = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("{String resultStr -> $record.parseScript}")
             }
-            dataFn(record.enName) {ctx ->
+            setCollector(record.enName) { ctx ->
                 String result
                 def urlFn = { record.url }
                 urlFn.delegate = ctx.data; urlFn.resolveStrategy = Closure.DELEGATE_ONLY
@@ -241,6 +258,7 @@ class AttrManager extends ServerTpl {
                     fn.resolveStrategy = Closure.DELEGATE_FIRST
                     return fn(result)
                 }
+                // log.info(ctx.logPrefix() + "接口调用: " + collector.enName + ", spend: " + spend + "ms, url: " + url + ", params: " + bodyStr + ", returnStr: " + resultStr + ", resolveResult: " + resolveResult)
                 return result
             }
         } else if ('script' == record.type) {
@@ -251,7 +269,7 @@ class AttrManager extends ServerTpl {
                 config.addCompilationCustomizers(icz)
                 icz.addImports(JSON.class.name, JSONObject.class.name)
                 Closure script = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("{ -> $record.computeScript}")
-                dataFn(record.enName) { ctx ->
+                setCollector(record.enName) { ctx ->
                     def fn = script.rehydrate(ctx.data, script, this)
                     fn.resolveStrategy = Closure.DELEGATE_FIRST
                     return fn()

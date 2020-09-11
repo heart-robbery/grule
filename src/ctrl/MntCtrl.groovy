@@ -168,13 +168,26 @@ class MntCtrl extends ServerTpl {
 
 
     @Path(path = 'updateField', method = 'post')
-    ApiResp updateField(String enName, String cnName, FieldType type, String comment, String dataCollector) {
+    ApiResp updateField(Long id, String enName, String cnName, FieldType type, String comment, String dataCollector) {
+        if (!id) return ApiResp.fail("id not legal")
         if (!enName) return ApiResp.fail("enName must not be empty")
         if (!cnName) return ApiResp.fail("cnName must not be empty")
         if (!type) return ApiResp.fail("type must not be empty")
-        if (repo.count(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}) return ApiResp.fail("$enName aleady exist")
-        if (repo.count(RuleField) {root, query, cb -> cb.equal(root.get('cnName'), cnName)}) return ApiResp.fail("$cnName aleady exist")
-        def field = new RuleField(enName: enName, cnName: cnName, type: type, comment: comment, dataCollector: dataCollector)
+        def field = repo.findById(RuleField, id)
+        if (field == null) return ApiResp.fail("id: $id not found")
+        if (enName != field.enName && repo.count(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}) {
+            return ApiResp.fail("$enName aleady exist")
+        }
+        if (cnName != field.cnName && repo.count(RuleField) {root, query, cb -> cb.equal(root.get('cnName'), cnName)}) {
+            return ApiResp.fail("$cnName aleady exist")
+        }
+
+        field.enName = enName
+        field.cnName = cnName
+        field.type = type
+        field.comment = comment
+        field.dataCollector = dataCollector
+
         repo.saveOrUpdate(field)
         ApiResp.ok(field)
     }

@@ -6,6 +6,9 @@ import org.hibernate.annotations.DynamicUpdate
 import javax.persistence.Column
 import javax.persistence.Entity
 
+/**
+ * 数据收集器
+ */
 @Entity
 @DynamicUpdate
 class DataCollector extends LongIdEntity {
@@ -19,7 +22,7 @@ class DataCollector extends LongIdEntity {
      */
     String cnName
     /**
-     * interface, script
+     * http, script
      */
     String type
     /**
