@@ -17,7 +17,7 @@
                     type: 'DecisionConfig',
                     showId: null
                 },
-                types: {DecisionConfig: '决策列表', PolicyConfig: '策略列表', RuleConfig: '规则列表'},
+                types: {DecisionConfig: '决策列表', FieldConfig:'字段列表', DataCollectorConfig: '数据集成', PolicyConfig: '策略列表', RuleConfig: '规则列表'},
 
             }
         },

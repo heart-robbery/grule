@@ -7,21 +7,23 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.function.BiConsumer
 
 class Devourer {
-    protected static final Logger          log         = LoggerFactory.getLogger(Devourer)
-    protected final        Executor        exec
-    protected final        AtomicBoolean   running     = new AtomicBoolean(false)
+    protected static final Logger                log         = LoggerFactory.getLogger(Devourer)
+    protected final        Executor                        exec
+    protected final        AtomicBoolean                   running     = new AtomicBoolean(false)
     // 任务执行对列
-    protected final        Queue<Runnable> waiting     = new ConcurrentLinkedQueue<>()
+    protected final        Queue<Runnable>                 waiting     = new ConcurrentLinkedQueue<>()
     /**
      * 对列中失败的最大保留个数,
      * 如果 大于0 执行失败, 暂时保留, 直至 排对的个数大于此值
      * 否则 失败丢弃
      * 默认: 执行失败,丢弃
      */
-    Integer                                failMaxKeep = 0
-    final Object                           key
+                           Integer                         failMaxKeep = 0
+    final                  Object                          key
+                           BiConsumer<Exception, Devourer> errorHandler
 
 
     Devourer(Object key, Executor exec) {
@@ -63,9 +65,12 @@ class Devourer {
                     task.run()
                     waiting.poll() // 避免 peek 出来null, 但poll 出来不为null(有可能在peek和poll 之前插入了新的Task)
                 }
-            } catch (Throwable t) {
+            } catch (ex) {
                 if (task && failMaxKeep && (waitingCount > failMaxKeep)) waiting.poll()
-                log.error(Devourer.simpleName + ": " + key, t)
+                log.error(Devourer.simpleName + ": " + key, ex)
+                try {
+                    errorHandler?.accept(ex, this)
+                } catch (exx) {log.error(Devourer.simpleName + ": " + key, exx)}
             } finally {
                 running.set(false)
                 if (!waiting.isEmpty()) trigger() // 持续不断执行对列中的任务
@@ -79,6 +84,17 @@ class Devourer {
      * @return
      */
     int getWaitingCount() { waiting.size() }
+
+
+    /**
+     * 错误处理
+     * @param handler
+     * @return
+     */
+    Devourer errorHandle(BiConsumer<Exception, Devourer> handler) {
+        this.errorHandler = handler
+        this
+    }
 
 
     /**

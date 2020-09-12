@@ -21,7 +21,12 @@
         <div class="h-panel-body">
             <div>
                 <h-collapse v-model="collapse" accordion @change="showEditor">
-                    <h-collapseitem v-for="item in decision.list" :key="item.decisionId" :name="item.decisionId" :title="item.name + '(' + item.decisionId + ')' + (item.comment ? ': ' + item.comment : '')">
+                    <h-collapseitem v-for="item in decision.list" :key="item.decisionId" :name="item.decisionId">
+                        <template slot='title'>
+                            {{item.name + '(' + item.decisionId + ')' + (item.comment ? ': ' + item.comment : '')}}
+                            &nbsp; &nbsp;
+                            <i class="h-icon-trash" @click.stop="del(item)"></i>
+                        </template>
                         <div style="height: 650px; width: 100vh">
                             <div v-if="collapse && collapse.length > 0 && collapse[0] == item.decisionId " ref="dslEditor" style="height: 650px; width: 800px"></div>
                         </div>
@@ -94,15 +99,15 @@
         },
         methods: {
             initEditor() {
-                let languageTools = ace.require("ace/ext/language_tools");
                 // if (this.editor) {this.editor.destroy()}
                 this.editor = ace.edit(this.$refs.dslEditor[0]);
                 console.log('editor: ', this.editor);
                 this.editor.session.setValue(this.curDecision.dsl);
+                console.log('$options', this.editor.$options);
                 this.editor.setOptions({
-                    enableBasicAutoCompletion: true,
+                    enableBasicAutocompletion: true,
                     enableSnippets: true,
-                    enableLiveAutoCompletion: true
+                    enableLiveAutocompletion: true
                 });
                 this.editor.on('change', (e) => {
                     //console.log('change: ', e);
@@ -118,22 +123,51 @@
                     // readOnly: false // 如果不需要使用只读模式，这里设置false
                 });
 
-//                 let languageTools = ace.require("ace/ext/language_tools");
-                console.log('languageTools', languageTools);
-                // languageTools.addCompleter({
-                //     getCompletions: function(editor, session, pos, prefix, callback) {
-                //         callback(null,  [
-                //             {
-                //                 name : "第一行", //名称
-                //                 value : "Select",//值，这就是匹配我们输入的内容，比如输入s或者select,这一行就会出现在提示框里，可根据自己需求修改，就是你想输入什么显示出北京呢，就改成什么
-                //                 caption: "北京",//字幕，下拉提示左侧内容,这也就是我们输入前缀匹配出来的内容，所以这里必须包含我们的前缀
-                //                 meta: "", //类型，下拉提示右侧内容
-                //                 type: "local",//可写为keyword
-                //                 score : 1000 // 让它排在最上面，类似权值的概念
-                //             }
-                //         ]);
-                //     }
-                // });
+                let languageTools = ace.require("ace/ext/language_tools");
+                // console.log('languageTools', ace.require("ace/ext/language_tools"));
+                languageTools.addCompleter({
+                    getCompletions: (editor, session, pos, prefix, callback) => {
+                        callback(null,  [
+                            {
+                                name : "第一行", //名称
+                                value : "身份证号码",//值，这就是匹配我们输入的内容，比如输入s或者select,这一行就会出现在提示框里，可根据自己需求修改，就是你想输入什么显示出北京呢，就改成什么
+                                caption: "身",//字幕，下拉提示左侧内容,这也就是我们输入前缀匹配出来的内容，所以这里必须包含我们的前缀
+                                meta: "字段-身份证号码", //类型，下拉提示右侧内容
+                                type: "local",//可写为keyword
+                                score : 1000 // 让它排在最上面，类似权值的概念
+                            },
+                            {
+                                name : "年龄", //名称
+                                value : "年龄",//值，这就是匹配我们输入的内容，比如输入s或者select,这一行就会出现在提示框里，可根据自己需求修改，就是你想输入什么显示出北京呢，就改成什么
+                                caption: "年",//字幕，下拉提示左侧内容,这也就是我们输入前缀匹配出来的内容，所以这里必须包含我们的前缀
+                                meta: "字段-年龄", //类型，下拉提示右侧内容
+                                type: "local",//可写为keyword
+                                score : 1000 // 让它排在最上面，类似权值的概念
+                            }
+                        ]);
+                    }
+                });
+            },
+            del(item) {
+                if (item.id) {
+                    this.$Confirm('确定删除?', `删除决策: ${item.decisionId}`).then(() => {
+                        this.$Message(`删除决策: ${item.decisionId}`);
+                        $.ajax({
+                            url: 'mnt/delDecision/' + item.decisionId,
+                            success: (res) => {
+                                if (res.code == '00') {
+                                    this.$Message.success(`删除决策: ${item.decisionId}成功`);
+                                    this.load();
+                                } else this.$Notice.error(res.desc)
+                            }
+                        });
+                    }).catch(() => {
+                        this.$Message.error('取消');
+                    });
+                } else {
+                    let index = this.decision.list.indexOf(item);
+                    this.decision.list.splice(index, 1);
+                }
             },
             save() {
                 this.$Message('保存中...');
@@ -197,10 +231,10 @@
                         }
                     });
                     if (window.ace == undefined) {
-                        loadJs('ace', this.initEditor);
-                        // loadJs('ace', () => {
-                        //     loadJs('ace-mode-groovy', this.initEditor)
-                        // });
+                        // loadJs('ace', this.initEditor);
+                        loadJs('ace', () => {
+                            loadJs('ace-ext', this.initEditor)
+                        });
                     } else {
                         // 必须用$nextTick 保证dom节点渲染完成
                         this.$nextTick(this.initEditor)
@@ -222,21 +256,6 @@
             //     console.log(data);
             //     this.$emit('tab-switch', 'PolicyConfig', data.decisionId)
             // },
-            removeDecision(data) {
-                this.$Confirm('确定删除？', `删除决策: ${data.decisionId}`).then(() => {
-                    $.ajax({
-                        url: 'mnt/deleteDecision/' + data.decisionId,
-                        success: (res) => {
-                            if (res.code == '00') {
-                                this.$Message.success('删除成功');
-                                this.load();
-                            } else this.$Notice({type: 'error', content: res.desc, timeout: 5})
-                        }
-                    });
-                }).catch(() => {
-                    this.$Message.error('取消');
-                });
-            },
             load(page) {
                 if (page == undefined || page == null) page = {page: 1};
                 this.decisionLoading = true;

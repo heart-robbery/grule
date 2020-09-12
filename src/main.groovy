@@ -7,9 +7,9 @@ import ctrl.MainCtrl
 import ctrl.MntCtrl
 import ctrl.RuleCtrl
 import ctrl.TestCtrl
+import dao.entity.DataCollector
 import dao.entity.Decision
-import dao.entity.Policy
-import dao.entity.Rule
+import dao.entity.RuleField
 import groovy.transform.Field
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -18,8 +18,6 @@ import service.TestService
 import service.rule.AttrManager
 import service.rule.DecisionEngine
 import service.rule.DecisionManager
-import service.rule.PolicyManger
-
 
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Field final AppContext app = new AppContext()
@@ -33,7 +31,7 @@ app.addSource(new SchedSrv())
 app.addSource(new Remoter())
 //app.addSource(new HibernateSrv('jpa_kratos'))
 app.addSource(new HibernateSrv('jpa_rule').entities(
-     Decision
+     Decision, RuleField, DataCollector
 ))
 app.addSource(new HttpServer().ctrls(
     TestCtrl, MainCtrl, RuleCtrl, MntCtrl
@@ -43,7 +41,7 @@ app.addSource(new TestService())
 app.addSource(new AttrManager())
 app.addSource(new DecisionEngine())
 app.addSource(new DecisionManager())
-app.addSource(new PolicyManger())
+// app.addSource(new PolicyManger())
 app.addSource(this)
 app.start() // 启动系统
 

@@ -54,7 +54,7 @@
                 siderCollapsed: false,
                 menuDatas: [ // key 为 组件名
                     { title: '配置中心', key: 'config', icon: 'h-icon-setting', children: [
-                            { title: '策略中心', key: 'DecisionConfig' },
+                            { title: '策略中心', key: 'PolicyCenter' },
                         ] },
                     { title: 'Dashboard', key: 'Dashboard', icon: 'h-icon-home' },
                     { title: '查询', key: 'search', icon: 'h-icon-search' },

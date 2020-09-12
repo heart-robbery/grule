@@ -24,7 +24,7 @@ class RuleCtrl extends ServerTpl {
      */
     @Path(path = 'decision')
     void decision(HttpContext ctx) {
-        Map params = ctx.params()
+        Map<String, Object> params = ctx.params()
         String decisionId = params['decisionId']
         if (!decisionId) {
             ctx.render ApiResp.fail('decisionId must not be empty')

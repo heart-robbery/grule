@@ -82,6 +82,8 @@ new Map([
     ['DecisionDetail', 'config/DecisionDetail.vue'],
     ['PolicyDetail', 'config/PolicyDetail.vue'],
     ['RuleDetail', 'config/RuleDetail.vue'],
+    ['FieldConfig', 'config/FieldConfig.vue'],
+    ['DataCollectorConfig', 'config/DataCollectorConfig.vue'],
 ]).forEach((value, key) => {
     Vue.component(key, (resolve, reject) => {
         httpVueLoader('components/'+ value)().then((r) => resolve(r))
@@ -91,10 +93,17 @@ new Map([
 
 // 异步加载js
 let jsMap = new Map([
-    ['ace', 'js/lib/ace.min.js'],
-    ['ace-mode-groovy', 'js/lib/mode-groovy.js'],
+    ['ace', 'js/lib/ace-1.4.12.js'],
+    ['ace-ext', ['js/lib/ext-language_tools.min.js', 'js/lib/mode-groovy.min.js']],
     ['moment', 'js/lib/moment.min.js'],
 ]);
 function loadJs(name, cb) {
-    $.getScript(jsMap.get(name), cb);
+    let arr = jsMap.get(name);
+    if (arr.forEach) {
+        let length = arr.length;
+        arr.forEach((v, i) => {$.getScript(v, () => {
+            length--;
+            if (length == 0) cb();
+        })})
+    } else $.getScript(arr, cb)
 }
