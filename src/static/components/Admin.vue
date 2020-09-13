@@ -53,10 +53,15 @@
                 siderFixed: false,
                 siderCollapsed: false,
                 menuDatas: [ // key 为 组件名
-                    { title: '配置中心', key: 'config', icon: 'h-icon-setting', children: [
-                            { title: '策略中心', key: 'PolicyCenter' },
-                        ] },
                     { title: 'Dashboard', key: 'Dashboard', icon: 'h-icon-home' },
+                    { title: '配置中心', key: 'configCenter', icon: 'h-icon-setting', children: [
+                            { title: '策略中心', key: 'PolicyCenter' },
+                            { title: '用户中心', key: 'UserCenter' },
+                        ] },
+                    { title: '数据中心', key: 'dataCenter', icon: 'h-icon-setting', children: [
+                            { title: '策略中心', key: 'PolicyCenter' },
+                            { title: '用户中心', key: 'UserCenter' },
+                        ] },
                     { title: '查询', key: 'search', icon: 'h-icon-search' },
                     { title: '收藏', key: 'favor', icon: 'h-icon-star', count: 100, children: [{ title: '收藏-1', key: 'favor2-1' }] },
                     { title: '任务', icon: 'h-icon-task', key: 'task' }
@@ -70,11 +75,12 @@
             };
         },
         mounted: function () {
-            this.select(this.firstKey())
+            this.select(localStorage.getItem("rule.admin.menu") || this.firstKey())
         },
         methods: {
             changeContent(key) {
                 this.contentComponent = key
+                localStorage.setItem("rule.admin.menu", key);
             },
             changeMenu: function(e){
                 this.changeContent(e.key)

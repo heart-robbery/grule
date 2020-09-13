@@ -194,32 +194,32 @@ class AttrManager extends ServerTpl {
         if (repo.count(DataCollector) == 0) {
             log.info("初始化默认数据集")
             repo.saveOrUpdate(new DataCollector(type: 'script', enName: 'week', cnName: '星期几', comment: '值: 1,2,3,4,5,6,7', computeScript: """
-                Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1
+Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1
             """))
             repo.saveOrUpdate(new DataCollector(type: 'script', enName: 'gender', cnName: '性别', comment: '根据身份证计算. 值: F,M', computeScript: """
-                if (idNumber && idNumber.length() >= 17) {
-                    Integer.parseInt(idNumber.substring(16, 17)) % 2 == 0 ? 'F' : 'M'
-                }
-                null
+if (idNumber && idNumber.length() >= 17) {
+    Integer.parseInt(idNumber.substring(16, 17)) % 2 == 0 ? 'F' : 'M'
+}
+null
             """))
             repo.saveOrUpdate(new DataCollector(type: 'script', enName: 'age', cnName: '年龄', comment: '根据身份证计算', computeScript: """
-                if (idNumber && idNumber.length() >= 17) {
-                    Calendar cal = Calendar.getInstance()
-                    int yearNow = cal.get(Calendar.YEAR)
-                    int monthNow = cal.get(Calendar.MONTH)+1
-                    int dayNow = cal.get(Calendar.DATE)
-            
-                    int birthday = Integer.valueOf(idNumber.substring(6, 14))
-                    int year = Integer.valueOf(idNumber.substring(10, 12))
-                    int day = Integer.valueOf(idNumber.substring(12, 14))
-                    
-                    if ((month < monthNow) || (month == monthNow && day <= dayNow)){
-                        yearNow - year
-                    } else {
-                        yearNow - year - 1
-                    }
-                }
-                null
+if (idNumber && idNumber.length() >= 17) {
+    Calendar cal = Calendar.getInstance()
+    int yearNow = cal.get(Calendar.YEAR)
+    int monthNow = cal.get(Calendar.MONTH)+1
+    int dayNow = cal.get(Calendar.DATE)
+
+    int birthday = Integer.valueOf(idNumber.substring(6, 14))
+    int year = Integer.valueOf(idNumber.substring(10, 12))
+    int day = Integer.valueOf(idNumber.substring(12, 14))
+    
+    if ((month < monthNow) || (month == monthNow && day <= dayNow)){
+        yearNow - year
+    } else {
+        yearNow - year - 1
+    }
+}
+null
             """))
         }
     }

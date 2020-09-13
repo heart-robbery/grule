@@ -149,7 +149,7 @@ class MntCtrl extends ServerTpl {
         if (!dc.enName) return ApiResp.fail('enName must not be empty')
         if (!dc.cnName) return ApiResp.fail('cnName must not be empty')
         if (!dc.type) return ApiResp.fail('type must not be empty')
-        if ('interface' == dc.type) {
+        if ('http' == dc.type) {
             if (!dc.url) return ApiResp.fail('url must not be empty')
             if (!dc.method) return ApiResp.fail('method must not be empty')
             if (!dc.contentType) return ApiResp.fail('contentType must not be empty')
@@ -189,7 +189,49 @@ class MntCtrl extends ServerTpl {
         field.dataCollector = dataCollector
 
         repo.saveOrUpdate(field)
+        ep.fire('updateField', field)
         ApiResp.ok(field)
+    }
+
+
+    @Path(path = 'updateDataCollector', method = 'post')
+    ApiResp updateDataCollector(Long id, String enName, String cnName, String url, String bodyStr, String method, String parseScript, String contentType, String comment, String computeScript) {
+        if (!id) return ApiResp.fail("id not legal")
+        if (!enName) return ApiResp.fail("enName must not be empty")
+        if (!cnName) return ApiResp.fail("cnName must not be empty")
+        def collector = repo.findById(DataCollector, id)
+        if (collector == null) return ApiResp.fail("id: $id not found")
+        if ('http' == collector.type) {
+            if (!url) return ApiResp.fail('url must not be empty')
+            if (!method) return ApiResp.fail('method must not be empty')
+            if (!contentType) return ApiResp.fail('contentType must not be empty')
+            collector.url = url
+            collector.method = method
+            collector.contentType = contentType
+            collector.bodyStr = bodyStr
+            collector.parseScript = parseScript
+        } else if ('script' == collector.type) {
+            if (!computeScript) return ApiResp.fail('computeScript must not be empty')
+            collector.computeScript = computeScript
+        }
+        if (enName != collector.enName ) {
+            if (repo.count(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), enName)}) {
+                return ApiResp.fail("$enName aleady exist")
+            }
+            collector.enName = enName
+        }
+        if (cnName != collector.cnName) {
+            if (repo.count(DataCollector) {root, query, cb -> cb.equal(root.get('cnName'), cnName)}) {
+                return ApiResp.fail("$cnName aleady exist")
+            }
+            collector.cnName = cnName
+        }
+
+        collector.comment = comment
+
+        repo.saveOrUpdate(collector)
+        ep.fire('updateDataCollector', collector)
+        ApiResp.ok(collector)
     }
 
 

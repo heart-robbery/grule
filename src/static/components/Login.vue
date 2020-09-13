@@ -2,7 +2,7 @@
 
 </style>
 <template>
-    <h-modal v-model="opened" :close-on-mask="false" :title="登录">
+    <h-modal v-model="opened" :close-on-mask="false" :title="'登录'">
         <div v-width="400" style="padding-top: 10px">
             <h-form ref="form"
                     :valid-on-change="validOnChange"

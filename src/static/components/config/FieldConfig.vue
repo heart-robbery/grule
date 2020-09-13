@@ -1,7 +1,7 @@
 <template>
     <div class="h-panel">
         <div class="h-panel-bar">
-            <span class="h-panel-title">属性集</span>
+<!--            <span class="h-panel-title">属性集</span>-->
             <!--            <span v-color:gray v-font="13">说明~~</span>-->
             &nbsp;&nbsp;
             <h-button @click="showAddPop"><i class="h-icon-plus"></i></h-button>
@@ -16,13 +16,15 @@
                 <!--                <h-tableitem title="ID" prop="id" align="center"></h-tableitem>-->
                 <h-tableitem title="英文名" prop="enName" align="center"></h-tableitem>
                 <h-tableitem title="中文名" prop="cnName" align="center"></h-tableitem>
-                <h-tableitem title="类型" prop="type" align="center"></h-tableitem>
+                <h-tableitem title="类型" prop="type" align="center" :format="formatType"></h-tableitem>
+                <h-tableitem title="更新时间" prop="updateTime" align="center" :format="formatDate"></h-tableitem>
                 <!--                    <h-tableitem title="创建时间" prop="createTime" align="center"></h-tableitem>-->
                 <h-tableitem title="描述" prop="comment" align="center"></h-tableitem>
                 <h-tableitem title="值函数名" prop="dataCollector" align="center"></h-tableitem>
                 <h-tableitem title="操作" align="center" :width="100">
                     <template slot-scope="{data}">
                         <span class="text-hover" @click="showUpdatePop(data)">编辑</span>
+                        &nbsp;
                         <span class="text-hover" @click="del(data)">删除</span>
                     </template>
                 </h-tableitem>
@@ -36,6 +38,13 @@
     </div>
 </template>
 <script>
+    const types = [
+        { title: '字符串', key: 'Str'},
+        { title: '整型', key: 'Int' },
+        { title: '小数', key: 'Decimal' },
+        { title: '布尔', key: 'Bool'},
+    ];
+    loadJs('moment');
     const addEditPop = { //添加,编辑窗口组件
         template: `
                 <div v-width="400" style="padding-top: 10px">
@@ -79,12 +88,7 @@
                     validationRules: {
                         required: ['enName', 'cnName']
                     },
-                    types: [
-                        { title: '字符串', key: 'Str'},
-                        { title: '整型', key: 'Int' },
-                        { title: '小数', key: 'Decimal' },
-                        { title: '布尔', key: 'Bool'},
-                    ],
+                    types: types,
                     param: {
                         keyName: 'enName',
                         titleName: 'cnName',
@@ -159,6 +163,15 @@
             'add-pop': addEditPop
         },
         methods: {
+            formatType(v) {
+                for (let type of types) {
+                    if (type.key == v) return type.title
+                }
+                return ''
+            },
+            formatDate(v) {
+                return moment(v).format('YYYYMMDD HH:mm:ss')
+            },
             showAddPop() {
                 this.$Modal({
                     title: '添加新字段', middle: true, draggable: true,
@@ -215,7 +228,7 @@
                             this.pageSize = res.data.pageSize;
                             this.totalRow = res.data.totalRow;
                             this.list = res.data.list;
-                        } else this.$Notice.error({content: res.desc, timeout: 5})
+                        } else this.$Notice.error(res.desc)
                     },
                     error: () => this.loading = false
                 })

@@ -39,7 +39,7 @@ class DecisionEngine extends ServerTpl {
      * @param params 参数
      * @return
      */
-    Map run(String decisionId, boolean async = true, String id = null, Map<String, Object> params = []) {
+    Map<String, Object> run(String decisionId, boolean async = true, String id = null, Map<String, Object> params = []) {
         def decision = dm.findDecision(decisionId)
         if (decision == null) throw new IllegalArgumentException("未找到决策: " + decisionId)
         DecisionContext ctx = new DecisionContext()

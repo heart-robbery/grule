@@ -7,10 +7,25 @@ import org.codehaus.groovy.control.customizers.ImportCustomizer
  * 策略定义 spec
  */
 class PolicySpec {
-    String                         策略id
     String                         策略名
-    String                         策略描述
     protected final List<RuleSpec> rules = new LinkedList<>()
+    @Lazy Map<String, Object> attrs = new HashMap<>()
+
+
+    PolicySpec 属性定义(String 属性名, Object 值) {
+        if (!属性名) throw new IllegalArgumentException("属性名 不能为空")
+        attrs.put(属性名, 值)
+        this
+    }
+
+
+    PolicySpec 规则定义(@DelegatesTo(RuleSpec) Closure cl) {
+        RuleSpec rule = new RuleSpec(); rules.add(rule)
+        def code = cl.rehydrate(rule, cl, this)
+        code.resolveStrategy = Closure.DELEGATE_FIRST
+        code()
+        this
+    }
 
 
     static PolicySpec of(@DelegatesTo(PolicySpec) Closure cl) {
@@ -36,14 +51,5 @@ class PolicySpec {
         icz.addStarImports(RuleSpec.class.name)
         def shell = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config)
         shell.evaluate("service.rule.spec.PolicySpec.of{$dsl}")
-    }
-
-
-    PolicySpec 规则定义(@DelegatesTo(RuleSpec) Closure cl) {
-        RuleSpec rule = new RuleSpec(); rules.add(rule)
-        def code = cl.rehydrate(rule, cl, this)
-        code.resolveStrategy = Closure.DELEGATE_FIRST
-        code()
-        this
     }
 }

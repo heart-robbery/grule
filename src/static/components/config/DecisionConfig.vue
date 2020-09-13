@@ -8,7 +8,7 @@
 <template>
     <div class="h-panel">
         <div class="h-panel-bar">
-            <span class="h-panel-title">决策集</span>
+<!--            <span class="h-panel-title">决策集</span>-->
 <!--            <span v-color:gray v-font="13">说明~~</span>-->
             &nbsp;&nbsp;
             <h-button @click="add"><i class="h-icon-plus"></i></h-button>
@@ -24,8 +24,10 @@
                     <h-collapseitem v-for="item in decision.list" :key="item.decisionId" :name="item.decisionId">
                         <template slot='title'>
                             {{item.name + '(' + item.decisionId + ')' + (item.comment ? ': ' + item.comment : '')}}
-                            &nbsp; &nbsp;
-                            <i class="h-icon-trash" @click.stop="del(item)"></i>
+                            <span class="float-right">
+                                <h-button text-color="yellow" :circle="true" @click.stop="showTestPop(item)">测试</h-button>
+                                <h-button text-color="red" :circle="true" icon="h-icon-trash" @click.stop="del(item)">删除</h-button>
+                            </span>
                         </template>
                         <div style="height: 650px; width: 100vh">
                             <div v-if="collapse && collapse.length > 0 && collapse[0] == item.decisionId " ref="dslEditor" style="height: 650px; width: 800px"></div>
@@ -33,35 +35,6 @@
                     </h-collapseitem>
                 </h-collapse>
             </div>
-<!--            <h-table ref="table" :datas="decision.list" stripe select-when-click-tr :loading="decisionLoading">-->
-<!--                <h-tableitem title="ID" prop="decisionId" align="center"></h-tableitem>-->
-<!--                <h-tableitem title="决策名" prop="name" align="center"></h-tableitem>-->
-<!--                <h-tableitem title="描述说明" prop="comment" align="center"></h-tableitem>-->
-<!--                <h-tableitem title="操作" align="center" :width="100">-->
-<!--                    <template slot-scope="{data}">-->
-<!--                        &lt;!&ndash;                        <span class="text-hover" @click="openDecision(data)">{{data._expand?'收起':'展开'}}</span>&ndash;&gt;-->
-<!--                        <span class="text-hover" @click="showDsl(data)">DSL</span>-->
-<!--                        <span class="text-hover" @click="tabs.type = 'PolicyConfig'; tabs.showId = data.decisionId">策略集</span>-->
-<!--                        <span class="text-hover">测试</span>-->
-<!--                        &nbsp;-->
-<!--                        <span class="text-hover" @click="removeDecision(data)">删除</span>-->
-<!--                    </template>-->
-<!--                </h-tableitem>-->
-
-<!--                &lt;!&ndash; 下拉展示 &ndash;&gt;-->
-<!--                <template slot="expand" slot-scope="{index, data}">-->
-<!--                    {{data.decisionId}}-->
-<!--                    &lt;!&ndash;                    <Form readonly mode="twocolumn">&ndash;&gt;-->
-<!--                    &lt;!&ndash;                        <FormItem label="序号">{{index}}</FormItem>&ndash;&gt;-->
-<!--                    &lt;!&ndash;                        <FormItem label="姓名">{{data.name}}</FormItem>&ndash;&gt;-->
-<!--                    &lt;!&ndash;                        <FormItem label="年龄">{{data.age}}</FormItem>&ndash;&gt;-->
-<!--                    &lt;!&ndash;                        <FormItem label="地址">{{data.address}}</FormItem>&ndash;&gt;-->
-<!--                    &lt;!&ndash;                    </Form>&ndash;&gt;-->
-<!--                    &lt;!&ndash;                    <Loading :loading="data.loading"></Loading>&ndash;&gt;-->
-<!--                </template>-->
-
-<!--                <div slot="empty">暂时无数据</div>-->
-<!--            </h-table>-->
         </div>
         <div v-if="decision.totalRow" class="h-panel-bar">
             <h-pagination ref="pagination" :cur="decision.page" :total="decision.totalRow" :size="decision.pageSize"
@@ -83,10 +56,7 @@
             return {
                 decisionLoading: false,
                 decision: {
-                    page: 1,
-                    pageSize: 2,
-                    totalRow: list.length,
-                    list: list
+                    page: 1, pageSize: 2, totalRow: 0, list: []
                 },
                 collapse: null, curDecision: null,
                 kw: '',
@@ -95,9 +65,23 @@
         mounted: function () {
             this.load()
         },
-        watch: {
-        },
         methods: {
+            showTestPop(item) {
+                this.$Modal({
+                    title: `测试决策: ${item.name}`, middle: true, draggable: true,
+                    component: {
+                        vue: testPop,
+                        datas: {}
+                    },
+                    width: 700,
+                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false,
+                    // events: {
+                    //     reload: () => {
+                    //         this.load()
+                    //     }
+                    // }
+                })
+            },
             initEditor() {
                 // if (this.editor) {this.editor.destroy()}
                 this.editor = ace.edit(this.$refs.dslEditor[0]);
@@ -205,17 +189,22 @@
 返回属性 '身份证号码'
 
 策略定义 {
-    策略id = ''
-    策略名 = ''
-    策略描述 = ''
+    策略名 = 'P_预处理'
 
     规则定义 {
-        规则名 = ''
-        规则id = ''
-        规则描述 = ''
+        规则名 = 'R_参数验证'
+        属性定义 '处置代码', 'DC_INPUT_01'
 
         拒绝 {
-            身份证号码 == null
+            !身份证号码 || !手机号码 || !姓名
+        }
+    }
+
+    规则定义 {
+        规则名 = 'R_属性设值'
+
+        拒绝 {
+            贷前 = true
         }
     }
 }

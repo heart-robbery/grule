@@ -44,10 +44,8 @@ class DecisionContext {
     @Lazy protected Map<String, Map<String, Object>> dataCollectResult = new ConcurrentHashMap<>()
     // 规则执行迭代器
     @Lazy protected def                              ruleIterator      = new RuleIterator(this)
-    /**
-     * 结果代码
-     */
-    protected String code = '0000'
+    // 执行结果 异常
+    protected Exception exception
 
 
     /**
@@ -91,7 +89,7 @@ class DecisionContext {
         } catch (ex) {
             end.set(true); finalDecision = Decision.Reject
             running.set(false); curPolicySpec = null; curPassedRule = null; curRuleSpec = null
-            code = 'EEEE'
+            this.exception = ex
             log.error(logPrefix() + "结束错误. 共执行: " + (System.currentTimeMillis() - startup.getTime()) + "ms " + result(), ex)
             ep?.fire("decision.end", this)
         }
@@ -106,7 +104,7 @@ class DecisionContext {
     protected Decision decide(RuleSpec r) {
         if (!r.enabled) return null
         curRuleSpec = r
-        curPassedRule = new PassedRule(name: r.规则名, customId: r.规则id); rules.add(curPassedRule)
+        curPassedRule = new PassedRule(attrs: [*:r.attrs, 规则名: r.规则名]); rules.add(curPassedRule)
         log.trace(logPrefix() + "开始执行规则")
 
         Decision decision
@@ -128,10 +126,10 @@ class DecisionContext {
                     log.trace(logPrefix() + e.v1 + "函数执行完成. " + d)
                 }
             })
-            log.debug(logPrefix() + "结束执行规则. decision: " + decision  + ", attrs: " + curPassedRule.attrs)
+            log.debug(logPrefix() + "结束执行规则. decision: " + decision  + ", attrs: " + curPassedRule.data)
         } catch (ex) {
             decision = Decision.Reject
-            log.error(logPrefix() + "规则执行错误. " + decision + ", attrs: " + curPassedRule.attrs)
+            log.error(logPrefix() + "规则执行错误. " + decision + ", attrs: " + curPassedRule.data)
             throw ex
         } finally {
             curPassedRule.setDecision(decision); curRuleSpec = null; curPassedRule = null
@@ -146,9 +144,9 @@ class DecisionContext {
      * @return 属性值
      */
     Object getAttr(String aName) {
-        boolean f = curPassedRule?.attrs?.containsKey(aName)
+        boolean f = curPassedRule?.data?.containsKey(aName)
         data.get(aName)
-        if (!f) curPassedRule?.attrs?.remove(aName)
+        if (!f) curPassedRule?.data?.remove(aName)
     }
 
 
@@ -166,7 +164,7 @@ class DecisionContext {
      * @param value
      */
     protected void ruleAttr(String key, Object value) {
-        if (curPassedRule && !end.get()) curPassedRule.attrs.put(key, value)
+        if (curPassedRule && !end.get()) curPassedRule.data.put(key, value)
     }
 
 
@@ -260,14 +258,16 @@ class DecisionContext {
      * 执行过的规则
      */
     protected class PassedRule {
-        String    name
-        String    customId
+        // 规则 最终决策
         Decision  decision
-        @Lazy Map<String, Object> attrs = new LinkedHashMap()
+        // 规则属性
+        Map<String, Object> attrs
+        // 执行规则过程中产生的或用到的数据集
+        final Map<String, Object> data = new LinkedHashMap()
 
         @Override
         String toString() {
-            return [name: name, customId: customId, decision: decision, attrs: attrs].toMapString()
+            return [attrs: attrs, decision: decision, data: data].toMapString()
         }
     }
 
@@ -288,6 +288,7 @@ class DecisionContext {
         this.summary = [
             id         : id, occurTime: startup.time,
             decision   : finalDecision, decisionId: decisionSpec.决策id, input: input,
+            exception  : this.exception,
             attrs      : data.collect {e ->
                  if (!e.key.matches("[a-zA-Z0-9]+") && attrManager.alias(e.key)) {
                      return null
@@ -298,7 +299,7 @@ class DecisionContext {
                  return e
             }.findAll {it} .collectEntries(),
             rules: rules.collect { r ->
-                [name: r.name, customId: r.customId, decision: r.decision, attrs: r.attrs.collectEntries {e ->
+                [name: r.name, customId: r.customId, decision: r.decision, attrs: r.data.collectEntries { e ->
                     String k = e.key
                     def v = e.value
                     if (v instanceof Optional) {v = v.orElseGet({null})}
@@ -306,7 +307,8 @@ class DecisionContext {
                         k = getAttrManager().alias(k)?:k
                     }
                     return [k, v]
-            }]}
+            }]},
+            dataCollectResult: dataCollectResult
         ]
         this.summary
     }
@@ -316,12 +318,11 @@ class DecisionContext {
      * 用于接口返回
      * @return
      */
-    protected DecisionResult result = new DecisionResult()
     Map<String, Object> result() {
         [
             id: id, decision: finalDecision, decisionId: decisionSpec.决策id,
-            code: code, // 错误码
-            desc: '',
+            code: exception ? 'EEEE' : '0000', // 错误码
+            desc: exception?.toString(),
             attrs: decisionSpec.returnAttrs.collectEntries { n ->
                 def v = data.get(n)
                 if (v instanceof Optional) {v = v.orElseGet({null})}
@@ -333,17 +334,6 @@ class DecisionContext {
          ]
     }
 
-    /**
-     * 决策结果 返回结构
-     */
-    class DecisionResult {
-        String id
-        Decision decision
-        String decisionId
-        String code
-        String desc
-        Map<String, Object> attrs
-    }
 
 
     @Override

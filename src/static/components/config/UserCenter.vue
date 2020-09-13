@@ -14,18 +14,16 @@
         data() {
             return {
                 tabs: {
-                    type: localStorage.getItem('rule.policyConfig.tab') || 'DecisionConfig',
+                    type: localStorage.getItem('rule.userConfig.tab') || 'UserConfig',
                     showId: null
                 },
-                types: {DecisionConfig: '决策列表', FieldConfig:'字段列表', DataCollectorConfig: '数据集成',
-                    // PolicyConfig: '策略列表', RuleConfig: '规则列表'
-                },
+                types: {UserConfig: '用户列表', AuthConfig:'权限管理'},
 
             }
         },
         watch: {
             'tabs.type': function (v) {
-                localStorage.setItem("rule.policyConfig.tab", v);
+                localStorage.setItem("rule.userConfig.tab", v);
             }
         }
     }

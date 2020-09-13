@@ -7,19 +7,25 @@ import service.rule.Decision
  */
 class RuleSpec {
     private boolean enabled = true
-            String                        规则名
-            String                        规则id
-            String                        规则描述
+    String 规则名
     @Lazy private List<Tuple2<String, Closure>> decisionFn = new LinkedList<>()
+    // 自定义规则属性. 例: 自定义id, 描述
+    @Lazy Map<String, Object> attrs = new HashMap<>()
 
 
-    def 启用() {enabled = true}
+    void 启用() {enabled = true}
 
 
-    def 关闭() {enabled = false}
+    void 关闭() {enabled = false}
 
 
-    def 拒绝(Closure<Boolean> 条件) {
+    void 属性定义(String 属性名, Object 值) {
+        if (!属性名) throw new IllegalArgumentException("属性名 不能为空")
+        attrs.put(属性名, 值)
+    }
+
+
+    void 拒绝(Closure<Boolean> 条件) {
         decisionFn << Tuple.tuple('Reject', { Map ctx ->
             def cl = 条件.rehydrate(ctx, 条件, this)
             if (cl()) return Decision.Reject
@@ -28,7 +34,7 @@ class RuleSpec {
     }
 
 
-    def 通过(Closure<Boolean> 条件) {
+    void 通过(Closure<Boolean> 条件) {
         decisionFn << Tuple.tuple('Accept', { Map ctx ->
             def cl = 条件.rehydrate(ctx, 条件, this)
             if (cl()) return Decision.Accept
@@ -37,7 +43,7 @@ class RuleSpec {
     }
 
 
-    def 人工审核(Closure<Boolean> 条件) {
+    void 人工审核(Closure<Boolean> 条件) {
         decisionFn << Tuple.tuple('Review', { Map ctx ->
             def cl = 条件.rehydrate(ctx, 条件, this)
             if (cl()) return Decision.Review
@@ -46,7 +52,7 @@ class RuleSpec {
     }
 
 
-    def 操作(Closure 操作) {
+    void 操作(Closure 操作) {
         decisionFn << Tuple.tuple('Operate', { Map ctx ->
             def cl = 操作.rehydrate(ctx, 操作, this)
             cl.resolveStrategy = Closure.DELEGATE_FIRST

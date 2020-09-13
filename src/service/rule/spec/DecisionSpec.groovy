@@ -14,6 +14,14 @@ class DecisionSpec {
     // 策略集: 顺序执行
     @Lazy List<PolicySpec> policies    = new LinkedList<>()
     @Lazy Set<String>      returnAttrs = new LinkedHashSet<>()
+    @Lazy Map<String, Object> attrs = new HashMap<>()
+
+
+    DecisionSpec 属性定义(String 属性名, Object 值) {
+        if (!属性名) throw new IllegalArgumentException("属性名 不能为空")
+        attrs.put(属性名, 值)
+        this
+    }
 
 
     DecisionSpec 策略定义(@DelegatesTo(PolicySpec) Closure cl) {
