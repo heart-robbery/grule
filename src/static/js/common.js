@@ -77,17 +77,34 @@ new Map([
 });
 
 
-// 异步加载js
+// 异步加载全局js库
 let jsMap = new Map([
+    ['ace', 'js/lib/ace-1.4.12.js'],
+    ['ace-lang-tools', 'js/lib/ext-language_tools.min.js'],
+    ['ace-lang-groovy', 'js/lib/mode-groovy.min.js'],
+    ['ace-snip-groovy', 'js/lib/groovy-snippets.min.js'],
     ['moment', 'js/lib/moment.min.js'],
 ]);
-function loadJs(name, cb) {
-    let arr = jsMap.get(name);
-    if (arr.forEach) {
-        let length = arr.length;
-        arr.forEach((v, i) => {$.getScript(v, () => {
-            length--;
-            if (length == 0) cb();
-        })})
-    } else $.getScript(arr, cb)
+function loadJs() {
+    if (arguments.length < 1) return;
+    let names = [...arguments];
+    let cb = arguments[arguments.length - 1]; // 最后一个参数可为 回调函数
+    if (typeof cb == "string") {
+        cb = null
+    } else {
+        names.pop()
+    }
+    let length = names.length;
+    names.forEach(((value, index) => {
+        $.ajax({
+            url: jsMap.get(value),
+            success: (res) => {
+                let script = document.createElement( "script" );
+                script.text = res;
+                document.head.appendChild(script).parentNode.removeChild(script);
+                length--;
+                if (length == 0 && cb) cb();
+            }
+        })
+    }));
 }
