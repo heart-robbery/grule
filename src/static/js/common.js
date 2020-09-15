@@ -79,10 +79,6 @@ new Map([
 
 // 异步加载全局js库
 let jsMap = new Map([
-    ['ace', 'js/lib/ace-1.4.12.js'],
-    ['ace-lang-tools', 'js/lib/ext-language_tools.min.js'],
-    ['ace-lang-groovy', 'js/lib/mode-groovy.min.js'],
-    ['ace-snip-groovy', 'js/lib/groovy-snippets.min.js'],
     ['moment', 'js/lib/moment.min.js'],
 ]);
 function loadJs() {
@@ -96,13 +92,15 @@ function loadJs() {
     }
     let length = names.length;
     names.forEach(((value, index) => {
+        let path = jsMap.get(value);
+        if (!path) return;
         $.ajax({
-            url: jsMap.get(value),
+            url: path,
             success: (res) => {
                 let script = document.createElement( "script" );
                 script.text = res;
                 document.head.appendChild(script).parentNode.removeChild(script);
-                length--;
+                length--; jsMap.delete(value); //只加载一次
                 if (length == 0 && cb) cb();
             }
         })

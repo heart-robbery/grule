@@ -114,8 +114,8 @@ class Remoter extends ServerTpl {
      */
     void fireAsync(String appName, String eName, Consumer callback, List remoteMethodArgs) {
         ep.fire("remote", EC.of(this).args(appName, eName, remoteMethodArgs).completeFn({ ec ->
-            if (ec.success) callback.accept(ec.result)
-            else callback.accept(new Exception(ec.failDesc()))
+            if (ec.success) callback?.accept(ec.result)
+            else callback?.accept(new Exception(ec.failDesc()))
         }))
     }
 
@@ -139,7 +139,6 @@ class Remoter extends ServerTpl {
         }
 
         if ('any' == target) {
-            ls = ls.findAll {it['id'] != app.id}
             doSend(ls.get(new Random().nextInt(ls.size())))
         } else if ('all' == target) {
             ls.each {doSend(it)}
