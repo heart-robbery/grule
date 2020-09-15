@@ -299,7 +299,7 @@ class DecisionContext {
                  return e
             }.findAll {it} .collectEntries(),
             rules: rules.collect { r ->
-                [name: r.name, customId: r.customId, decision: r.decision, attrs: r.data.collectEntries { e ->
+                [attrs: r.attrs, decision: r.decision, data: r.data.collectEntries { e ->
                     String k = e.key
                     def v = e.value
                     if (v instanceof Optional) {v = v.orElseGet({null})}

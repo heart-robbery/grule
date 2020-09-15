@@ -130,7 +130,8 @@ class AttrManager extends ServerTpl {
      */
     String alias(String aName) {
         def record = attrMap.get(aName)
-        if (record.cnName == aName) return record.enName
+        if (record == null) return null
+        else if (record.cnName == aName) return record.enName
         else if (record.enName == aName) return record.cnName
         null
     }
@@ -144,7 +145,9 @@ class AttrManager extends ServerTpl {
      */
     Object convert(String aName, Object aValue) {
         if (aValue == null) return aValue
-        Utils.to(aValue, attrMap.get(aName).type.clzType)
+        def field = attrMap.get(aName)
+        if (field == null) return aValue
+        Utils.to(aValue, field.type.clzType)
     }
 
 
@@ -161,13 +164,48 @@ class AttrManager extends ServerTpl {
     }
 
 
+    // ======================= 监听变化 ==========================
+    @EL(name = ['updateField', 'addField'], async = true)
+    void listenFieldChange(String enName) {
+        def field = repo.find(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}
+        attrMap.put(field.enName, field)
+        attrMap.put(field.cnName, field)
+        ep.fire('remote', app.name, 'updateField', [enName])
+    }
+    @EL(name = 'delField')
+    void listenDelField(String enName) {
+        def field = attrMap.remove(enName)
+        attrMap.remove(field.cnName)
+        ep.fire('remote', app.name, 'delField', [enName])
+    }
+    @EL(name = 'addDataCollector', async = true)
+    void listenAddDataCollector(String enName) {
+        def collector = repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), enName)}
+        initDataCollect(collector)
+        ep.fire('remote', app.name, 'addDataCollector', [enName])
+    }
+    @EL(name = 'updateDataCollector')
+    void listenUpdateDataCollector(String enName) {
+        def collector = repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), enName)}
+        initDataCollect(collector)
+        loadAttrs()
+        ep.fire('remote', app.name, 'updateDataCollector', [enName])
+    }
+    @EL(name = 'delDataCollector')
+    void listenDelCollector(String enName) {
+        dataCollectorMap.remove(enName)
+        ep.fire('remote', app.name, 'delDataCollector', [enName])
+    }
+
+
+
     /**
      * 初始化默认属性集
      */
     protected void initAttr() {
         if (repo.count(RuleField) == 0) {
             log.info("初始化默认属性集")
-            repo.saveOrUpdate(new RuleField(enName: 'idNumber', cnName: '身份证', type: FieldType.Str))
+            repo.saveOrUpdate(new RuleField(enName: 'idNumber', cnName: '身份证号码', type: FieldType.Str))
             repo.saveOrUpdate(new RuleField(enName: 'name', cnName: '姓名', type: FieldType.Str))
             repo.saveOrUpdate(new RuleField(enName: 'mobileNo', cnName: '手机号码', type: FieldType.Str))
             repo.saveOrUpdate(new RuleField(enName: 'age', cnName: '年龄', type: FieldType.Int, dataCollector: 'age'))
@@ -195,13 +233,13 @@ class AttrManager extends ServerTpl {
             log.info("初始化默认数据集")
             repo.saveOrUpdate(new DataCollector(type: 'script', enName: 'week', cnName: '星期几', comment: '值: 1,2,3,4,5,6,7', computeScript: """
 Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1
-            """))
+            """.trim()))
             repo.saveOrUpdate(new DataCollector(type: 'script', enName: 'gender', cnName: '性别', comment: '根据身份证计算. 值: F,M', computeScript: """
 if (idNumber && idNumber.length() >= 17) {
     Integer.parseInt(idNumber.substring(16, 17)) % 2 == 0 ? 'F' : 'M'
 }
 null
-            """))
+            """.trim()))
             repo.saveOrUpdate(new DataCollector(type: 'script', enName: 'age', cnName: '年龄', comment: '根据身份证计算', computeScript: """
 if (idNumber && idNumber.length() >= 17) {
     Calendar cal = Calendar.getInstance()
@@ -220,7 +258,7 @@ if (idNumber && idNumber.length() >= 17) {
     }
 }
 null
-            """))
+            """.trim()))
         }
     }
 
@@ -240,11 +278,11 @@ null
                 def icz = new ImportCustomizer()
                 config.addCompilationCustomizers(icz)
                 icz.addImports(JSON.class.name, JSONObject.class.name)
-                parseFn = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("{String resultStr -> $record.parseScript}")
+                parseFn = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("$record.parseScript")
             }
             setCollector(record.enName) { ctx ->
                 String result
-                def urlFn = { record.url }
+                def urlFn = { "$record.url" }
                 urlFn.delegate = ctx.data; urlFn.resolveStrategy = Closure.DELEGATE_ONLY
                 if ('get'.equalsIgnoreCase(record.method)) {
                     result = http.get(urlFn()).execute()

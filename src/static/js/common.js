@@ -92,19 +92,36 @@ new Map([
 });
 
 
-// 异步加载js
+// 异步加载全局js库
 let jsMap = new Map([
     ['ace', 'js/lib/ace-1.4.12.js'],
-    ['ace-ext', ['js/lib/ext-language_tools.min.js', 'js/lib/mode-groovy.min.js', 'js/lib/groovy-snippets.min.js']],
+    ['ace-tools', 'js/lib/ext-language_tools.min.js'],
+    ['ace-lang-groovy', 'js/lib/mode-groovy.js'],
+    ['ace-snip-groovy', 'js/lib/groovy-snippets.min.js'],
     ['moment', 'js/lib/moment.min.js'],
 ]);
-function loadJs(name, cb) {
-    let arr = jsMap.get(name);
-    if (arr.forEach) {
-        let length = arr.length;
-        arr.forEach((v, i) => {$.getScript(v, () => {
-            length--;
-            if (length == 0 && cb) cb();
-        })})
-    } else $.getScript(arr, cb)
+function loadJs() {
+    if (arguments.length < 1) return;
+    let names = [...arguments];
+    let cb = arguments[arguments.length - 1]; // 最后一个参数可为 回调函数
+    if (typeof cb == "string") {
+        cb = null
+    } else {
+        names.pop()
+    }
+    let length = names.length;
+    names.forEach(((value, index) => {
+        let path = jsMap.get(value);
+        if (!path) return;
+        $.ajax({
+            url: path,
+            success: (res) => {
+                let script = document.createElement( "script" );
+                script.text = res;
+                document.head.appendChild(script).parentNode.removeChild(script);
+                length--; jsMap.delete(value); //只加载一次
+                if (length == 0 && cb) cb();
+            }
+        })
+    }));
 }

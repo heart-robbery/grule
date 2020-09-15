@@ -61,7 +61,7 @@
                         </h-formitem>
                         <h-formitem label="类型" icon="h-icon-complete" prop="type">
                             <h-select v-if="model.id" v-model="model.type" :datas="types" disabled></h-select>
-                            <h-select v-else v-model="model.type" :datas="types"></h-select>
+                            <h-select v-else v-model="model.type" :datas="types" :deletable="false"></h-select>
                         </h-formitem>
                         <h-formitem v-if="model.type == 'http'" label="接口地址" prop="url" icon="h-icon-user">
                             <input type="text" v-model="model.url">
@@ -122,27 +122,19 @@
         },
         methods: {
             showEditor() {
-                if (window.ace == undefined) {
-                    // loadJs('ace', this.initEditor);
-                    loadJs('ace', () => {
-                        loadJs('ace-ext', this.initEditor)
-                    });
-                } else {
-                    // 必须用$nextTick 保证dom节点渲染完成
-                    this.$nextTick(this.initEditor)
-                }
+                // 必须用$nextTick 保证dom节点渲染完成
+                this.$nextTick(this.initEditor);
             },
             initEditor() {
-                // if (this.editor) {this.editor.destroy()}
-
+                if (this.editor) {this.editor.destroy()}
+                console.log('this.$refs.dslEditor', this.$refs.dslEditor);
                 this.editor = ace.edit(this.$refs.dslEditor);
                 // console.log('editor: ', this.editor);
                 if (this.model.type == 'http') {
-                    this.editor.session.setValue(this.model.parseScript);
+                    if (this.model.parseScript) this.editor.session.setValue(this.model.parseScript);
                 } else if (this.model.type = 'script') {
-                    this.editor.session.setValue(this.model.computeScript);
+                    if (this.model.computeScript) this.editor.session.setValue(this.model.computeScript);
                 }
-                // console.log('$options', this.editor.$options);
                 this.editor.setOptions({
                     enableBasicAutocompletion: true,
                     enableSnippets: true,
@@ -150,15 +142,14 @@
                     //fontSize: "50pt",
                 });
                 this.editor.getSession().setUseSoftTabs(true);
-                this.editor.session.setMode('ace/mode/groovy');
                 this.editor.on('change', (e) => {
-                    //console.log('change: ', e);
                     if (this.model.type == 'http') {
                         this.model.parseScript = this.editor.session.getValue();
                     } else if (this.model.type = 'script') {
                         this.model.computeScript = this.editor.session.getValue();
                     }
                 });
+                this.editor.session.setMode('ace/mode/groovy');
                 this.editor.commands.addCommand({
                     name: 'save',
                     bindKey: {win: 'Ctrl-S', mac: 'Command-S'},

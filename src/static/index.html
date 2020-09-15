@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="css/lib/heyui.css" />
     <script src="js/lib/vue.js"></script>
     <script src="js/lib/heyui.js"></script>
-    <script src="js/lib/jquery-3.4.1.js"></script>
+    <script src="js/lib/jquery.min.js"></script>
     <script src="js/lib/httpVueLoader.js"></script>
     <script src="js/common.js"></script>
 </head>
@@ -25,7 +25,7 @@
             user: null
         },
         mounted: function () {
-            this.getCurrentUser()
+            this.getCurrentUser();
             ws({path: '/mnt/ws'})
         },
         methods: {

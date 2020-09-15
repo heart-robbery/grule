@@ -139,7 +139,6 @@ class Remoter extends ServerTpl {
         }
 
         if ('any' == target) {
-            ls = ls.findAll {it['id'] != app.id}
             doSend(ls.get(new Random().nextInt(ls.size())))
         } else if ('all' == target) {
             ls.each {doSend(it)}

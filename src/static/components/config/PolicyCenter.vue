@@ -10,6 +10,13 @@
     </div>
 </template>
 <script>
+    loadJs('ace', () => {
+        ace.config.set("basePath", "js/lib");
+        loadJs('ace-tools');
+        loadJs('ace-lang-groovy');
+        loadJs('ace-snip-groovy');
+    });
+    loadJs('moment');
     module.exports = {
         data() {
             return {
@@ -20,7 +27,6 @@
                 types: {DecisionConfig: '决策列表', FieldConfig:'字段列表', DataCollectorConfig: '数据集成',
                     // PolicyConfig: '策略列表', RuleConfig: '规则列表'
                 },
-
             }
         },
         watch: {

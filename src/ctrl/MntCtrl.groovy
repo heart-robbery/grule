@@ -137,6 +137,7 @@ class MntCtrl extends ServerTpl {
         if (repo.count(RuleField) {root, query, cb -> cb.equal(root.get('cnName'), cnName)}) return ApiResp.fail("$cnName aleady exist")
         def field = new RuleField(enName: enName, cnName: cnName, type: type, comment: comment, dataCollector: dataCollector)
         repo.saveOrUpdate(field)
+        ep.fire('addField', field.enName)
         ApiResp.ok(field)
     }
 
@@ -163,6 +164,7 @@ class MntCtrl extends ServerTpl {
             return ApiResp.fail("$dc.cnName 已存在")
         }
         repo.saveOrUpdate(dc)
+        ep.fire('addDataCollector', dc.enName)
         ApiResp.ok(dc)
     }
 
@@ -189,7 +191,7 @@ class MntCtrl extends ServerTpl {
         field.dataCollector = dataCollector
 
         repo.saveOrUpdate(field)
-        ep.fire('updateField', field)
+        ep.fire('updateField', field.enName)
         ApiResp.ok(field)
     }
 
@@ -209,16 +211,29 @@ class MntCtrl extends ServerTpl {
             collector.method = method
             collector.contentType = contentType
             collector.bodyStr = bodyStr
-            collector.parseScript = parseScript
+            collector.parseScript = parseScript?.trim()
+            if (collector.parseScript && (!collector.parseScript.startsWith('{') || !collector.parseScript.endsWith('}'))) {
+                return ApiResp.fail('parseScript is not a function')
+            }
         } else if ('script' == collector.type) {
             if (!computeScript) return ApiResp.fail('computeScript must not be empty')
-            collector.computeScript = computeScript
+            collector.computeScript = computeScript?.trim()
+            if (collector.computeScript && (collector.computeScript.startsWith('{') || collector.computeScript.endsWith('}'))) {
+                return ApiResp.fail('computeScript is pure script. cannot startWith { or endWith }')
+            }
         }
+        def updateRelateField
         if (enName != collector.enName ) {
             if (repo.count(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), enName)}) {
                 return ApiResp.fail("$enName aleady exist")
             }
             collector.enName = enName
+            updateRelateField = { // 修改RuleField相关联
+                repo.find(RuleField) {root, query, cb -> cb.equal(root.get('dataCollector'), collector.cnName)}.each {field ->
+                    field.dataCollector = enName
+                    repo.saveOrUpdate(field)
+                }
+            }
         }
         if (cnName != collector.cnName) {
             if (repo.count(DataCollector) {root, query, cb -> cb.equal(root.get('cnName'), cnName)}) {
@@ -226,11 +241,17 @@ class MntCtrl extends ServerTpl {
             }
             collector.cnName = cnName
         }
-
         collector.comment = comment
 
-        repo.saveOrUpdate(collector)
-        ep.fire('updateDataCollector', collector)
+        if (updateRelateField) {
+            repo.trans {
+                repo.saveOrUpdate(collector)
+                updateRelateField()
+            }
+        } else {
+            repo.saveOrUpdate(collector)
+        }
+        ep.fire('updateDataCollector', collector.enName)
         ApiResp.ok(collector)
     }
 
@@ -238,6 +259,7 @@ class MntCtrl extends ServerTpl {
     @Path(path = 'delDecision/:decisionId')
     ApiResp delDecision(String decisionId) {
         repo.delete(repo.find(Decision) {root, query, cb -> cb.equal(root.get('decisionId'), decisionId)})
+        ep.fire('delDecision', decisionId)
         ApiResp.ok()
     }
 
@@ -245,6 +267,7 @@ class MntCtrl extends ServerTpl {
     @Path(path = 'delField/:enName')
     ApiResp delField(String enName) {
         repo.delete(repo.find(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)})
+        ep.fire('delField', enName)
         ApiResp.ok()
     }
 
@@ -252,6 +275,7 @@ class MntCtrl extends ServerTpl {
     @Path(path = 'delDataCollector/:enName')
     ApiResp delDataCollector(String enName) {
         repo.delete(repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), enName)})
+        ep.fire('delDataCollector', enName)
         ApiResp.ok()
     }
 }

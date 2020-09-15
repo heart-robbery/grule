@@ -24,6 +24,8 @@
                     <h-collapseitem v-for="item in decision.list" :key="item.decisionId" :name="item.decisionId">
                         <template slot='title'>
                             {{item.name + '(' + item.decisionId + ')' + (item.comment ? ': ' + item.comment : '')}}
+                            &nbsp;&nbsp;&nbsp;
+                            <date-item :time="item.updateTime"></date-item>
                             <span class="float-right">
                                 <h-button text-color="yellow" :circle="true" @click.stop="showTestPop(item)">测试</h-button>
                                 <h-button text-color="red" :circle="true" icon="h-icon-trash" @click.stop="del(item)">删除</h-button>
@@ -43,13 +45,69 @@
     </div>
 </template>
 <script>
-    // let detail
-    // httpVueLoader('components/config/DecisionDetail.vue')().then((r) => detail = r);
-    let list = [
-        {id:'', decisionId: 'decision_1', name:'决策1', comment:'', dsl: 'xxxxxxx'},
-        {id:'', decisionId: 'decision_2', name:'决策2', comment:'decisionId2', dsl: 'xxxxxxxxxxx'},
-        {id:'', decisionId: 'decision_3', name:'决策3', comment:'decisionId3'},
-    ];
+    const testPop = {
+        props: ['decision'],
+        template: `
+            <div>
+                <h-row :space="10">
+                    <h-cell>
+                        <input type="text" :value="items.url" placeholder="请求地址" style="width: 100%"/>
+                    </h-cell>
+                </h-row>
+                <h-row :space="10" v-for="(param,index) in items.params" :key="param.name">
+                    <h-cell width="4"><input type="text" v-model="param.name" placeholder="参数名" style="float: left; width: 100%"/></h-cell>
+                    <h-cell width="16"><input type="text" v-model="param.value" placeholder="参数值" style="float: left; width: 100%"/></h-cell>
+                    <h-cell width="2">
+                        <i v-if="items.params.length == (index + 1)" class="h-icon-plus" @click="add"></i>
+                        <i class="h-icon-minus" @click="del(param)"></i>
+                    </h-cell>
+                </h-row>
+                <h-row>
+                    <h-cell width="24">
+                        <h-button @click="test">测试</h-button>
+                    </h-cell>
+
+                </h-row>
+                <h-row>
+                    {{result}}
+                </h-row>
+            </div>
+        `,
+        data() {
+            let items = {
+                url: location.protocol + '//' + location.host + '/decision?decisionId=' + this.decision.decisionId,
+                params: [{name: '参数1', value: null}]
+            };
+            let itemsStr = localStorage.getItem('rule.test.items');
+            if (itemsStr) items = JSON.parse(itemsStr);
+            return {
+                items: items,
+                result: ''
+            }
+        },
+        methods: {
+            test() {
+                $.ajax({
+                    url: this.items.url,
+                    data: this.items.params.map((param) => {let o={}; o[param.name] = param.value; return o}).reduce((o1, o2) => {let o = {...o1, ...o2}; return o}),
+                    success: (res) => {
+                        if (res.code == '00') {
+                            this.result = res.data;
+                            this.$Message.success(`测试调用: ${this.decision.decisionId}成功`);
+                            localStorage.setItem("rule.test.items", JSON.stringify(this.items))
+                        } else this.$Notice.error(res.desc);
+                    }
+                })
+            },
+            add() {
+                this.items.params.push({name: `参数${this.items.params.length + 1}`, value: null})
+            },
+            del(param) {
+                let index = this.items.params.indexOf(param);
+                this.items.params.splice(index, 1)
+            }
+        }
+    };
     module.exports = {
         props: ['tabs'],
         data() {
@@ -71,9 +129,9 @@
                     title: `测试决策: ${item.name}`, middle: true, draggable: true,
                     component: {
                         vue: testPop,
-                        datas: {}
+                        datas: {decision: item}
                     },
-                    width: 700,
+                    width: 700, closeOnMask: false,
                     hasCloseIcon: true, fullScreen: false, middle: false, transparent: false,
                     // events: {
                     //     reload: () => {
@@ -85,9 +143,9 @@
             initEditor() {
                 // if (this.editor) {this.editor.destroy()}
                 this.editor = ace.edit(this.$refs.dslEditor[0]);
-                console.log('editor: ', this.editor);
+                // console.log('editor: ', this.editor);
                 this.editor.session.setValue(this.curDecision.dsl);
-                console.log('$options', this.editor.$options);
+                // console.log('$options', this.editor.$options);
                 this.editor.setOptions({
                     enableBasicAutocompletion: true,
                     enableSnippets: true,
@@ -179,8 +237,7 @@
                     decisionId: decisionId,
                     name: '决策名',
                     dsl:
-`// 决策编辑: Ctrl+s 保存
-// 决策id: 必须唯一
+`// 决策id: 必须唯一
 决策id = '${decisionId}'
 决策名 = '${decisionId}'
 决策描述 = ''
@@ -203,7 +260,7 @@
     规则定义 {
         规则名 = 'R_属性设值'
 
-        拒绝 {
+        操作 {
             贷前 = true
         }
     }
@@ -221,9 +278,7 @@
                     });
                     if (window.ace == undefined) {
                         // loadJs('ace', this.initEditor);
-                        loadJs('ace', () => {
-                            loadJs('ace-ext', this.initEditor)
-                        });
+                        loadJs('ace', 'ace-lang-tools', this.initEditor);
                     } else {
                         // 必须用$nextTick 保证dom节点渲染完成
                         this.$nextTick(this.initEditor)
@@ -257,9 +312,7 @@
                             this.decision = res.data;
                         } else this.$Notice.error({content: res.desc, timeout: 5})
                     },
-                    error: () => {
-                        this.decisionLoading = false;
-                    }
+                    error: () => this.decisionLoading = false
                 })
             }
         }

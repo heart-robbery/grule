@@ -38,13 +38,13 @@
     </div>
 </template>
 <script>
+    loadJs('moment');
     const types = [
         { title: '字符串', key: 'Str'},
         { title: '整型', key: 'Int' },
         { title: '小数', key: 'Decimal' },
         { title: '布尔', key: 'Bool'},
     ];
-    loadJs('moment');
     const addEditPop = { //添加,编辑窗口组件
         template: `
                 <div v-width="400" style="padding-top: 10px">
@@ -170,7 +170,7 @@
                 return ''
             },
             formatDate(v) {
-                return moment(v).format('YYYYMMDD HH:mm:ss')
+                return moment(v).format('YYYY-MM-DD HH:mm:ss')
             },
             showAddPop() {
                 this.$Modal({

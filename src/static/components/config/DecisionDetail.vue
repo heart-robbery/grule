@@ -16,9 +16,7 @@
 
 <script>
     let data = {name: null, dsl: '', ace: null, editor: null};
-    if (window.ace == undefined) {
-        loadJs('ace',() =>{data.ace = window.ace;});
-    }
+    loadJs('ace',() => {data.ace = window.ace;});
     module.exports = {
         props: ['decisionId'],
         data() {

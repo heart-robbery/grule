@@ -33,7 +33,7 @@
                 opened: true,
                 isLoading: false,
                 labelPosition: 'left',
-                model: {username: null, password: null},
+                model: {username: localStorage.getItem('rule.login.username'), password: localStorage.getItem('rule.login.password')},
                 validationRules: {
                     required: ['username', 'password']
                 },
@@ -53,9 +53,11 @@
                         success: (res) => {
                             this.isLoading = true;
                             if (res.code == '00') {
-                                app.$Message('登录成功');
-                                app.$data.user = res.data
-                            } else app.$Notice({type: 'error', content: res.desc, timeout: 5})
+                                this.$Message.success('登录成功');
+                                app.$data.user = res.data;
+                                localStorage.setItem('rule.login.username', this.model.username);
+                                localStorage.setItem('rule.login.password', this.model.password);
+                            } else this.$Notice.error(res.desc)
                         }
                     })
                 } else {

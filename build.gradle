@@ -36,6 +36,7 @@ targetCompatibility = 1.8
 dependencies {
     compile fileTree(dir: 'sysLib', include: ['*.jar'])
     compile 'org.codehaus.groovy:groovy:3.0.5'
+    compile 'org.codehaus.groovy:groovy-templates:3.0.5'
 
     compile 'com.alibaba:fastjson:1.2.73'
     compile 'ch.qos.logback:logback-classic:1.2.3'
@@ -46,7 +47,7 @@ dependencies {
     compile 'com.alibaba:druid:1.1.23'
     // compile 'com.zaxxer:HikariCP:3.4.1'
     // compile 'org.apache.commons:commons-dbcp2:2.7.0'
-    compile 'com.h2database:h2:1.4.200'
+    compile 'com.h2database:h2:1.4.199'
     // compile 'mysql:mysql-connector-java:5.1.34'
 
     // compile 'javax.mail:javax.mail-api:1.6.2'
