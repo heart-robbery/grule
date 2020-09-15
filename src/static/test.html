@@ -125,7 +125,7 @@
             pieceUpload: function(file) { // 分片上传文件
                 let uploading = {
                     file: file, name: file.name, pause: false, // 是否暂停
-                    perPieceSize: 1024 * 1024,
+                    perPieceSize: 1024 * 800,
                     totalPiece: 0, currentPiece: 0,
                     progress: 0,
                     url: null,
@@ -196,63 +196,6 @@
             }
         },
     });
-
-
-    // web socket
-    function ws(cfg) {
-        // web socket
-        let ws = null;
-        if (ws && (ws.readyState == 1 || ws.readyState == 2)) {
-            console.log('Websocket连接可用不用重创建. state: ' + ws.readyState);
-            return;
-        }
-        function doCreate() {
-            console.log('create websocket ...');
-            try {
-                let protocol = "ws://";
-                if (window.location.protocol.startsWith("https")) protocol = "wss://";
-                ws = new WebSocket(protocol + window.location.host + (cfg.path || "/test/msg"));
-            } catch (e) {
-                console.log('创建websocket错误', e);
-                setTimeout(function () {
-                    ws(cfg)
-                }, cfg.reconnection || (1000 * 60 * 2)); // 每两分钟重试
-                return
-            }
-            ws.onclose = cfg.onClose || function () {
-                setTimeout(function () {
-                    ws(cfg)
-                }, cfg.reconnection || (1000 * 60 * 2)); // 每两分钟重试
-            };
-            ws.onmessage = cfg.onMsg || function (e) { //接收websocket 消息
-                let jo = toJSON(e.data);
-                if (jo) {
-                    // {type: 'xxx': data: null}
-                    // if (jo.type == 'xxx') {}
-                    if (jo.data.msg) {
-                        app.$Notice.info({title: '后台提示', desc: jo.data.msg, duration: 5})
-                    }
-                } else {
-                    app.$Notice.info({title: '后台提示', desc: e.data, duration: 7})
-                }
-            };
-            ws.onopen = cfg.onOpen || function() {
-                console.log('websocket onopen');
-                ws.send('成功连接...')
-            };
-        }
-        doCreate()
-    }
-
-    function toJSON(str) {
-        if (typeof str == 'string') {
-            try {
-                let obj = JSON.parse(str);
-                return obj
-            } catch(e) {}
-        }
-        return null
-    }
 </script>
 </body>
 </html>

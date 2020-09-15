@@ -24,7 +24,7 @@ class HttpAioSession {
     protected              Long                      lastUsed
     protected final        AtomicBoolean             closed      = new AtomicBoolean(false)
     // 每次接收消息的内存空间(文件上传大小限制)
-    @Lazy protected               def                buf         = ByteBuffer.allocate(server.getInteger('maxMsgSize', 1024 * 1024 * 2))
+    @Lazy protected               def                buf         = ByteBuffer.allocate(server.getInteger('maxMsgSize', 1024 * 1024 * 1))
     // 不为空代表是WebSocket
     WebSocket ws
     @Lazy protected List<File> tmpFiles = new LinkedList<>()

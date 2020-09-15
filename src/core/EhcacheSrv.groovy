@@ -23,7 +23,7 @@ class EhcacheSrv extends ServerTpl {
     EhcacheSrv() { super(F_NAME) }
 
     @EL(name = 'sys.starting', async = true)
-    def start() {
+    void start() {
         if (cm) throw new RuntimeException("$name is already running")
         if (ep == null) {ep = new EP(); ep.addListenerSource(this)}
         cm = CacheManagerBuilder.newCacheManagerBuilder().build(true)
@@ -34,7 +34,7 @@ class EhcacheSrv extends ServerTpl {
 
 
     @EL(name = 'sys.stopping')
-    def stop() {
+    void stop() {
         log.debug("Close '{}'", name)
         cm?.close(); cm == null
     }
