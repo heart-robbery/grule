@@ -25,7 +25,7 @@ class HttpContext {
     final HttpResponse response
     final Map<String, Object> pathToken = new HashMap<>(7)
     // 路径块
-    protected String[] pieces
+    String[] pieces
     protected final AtomicBoolean closed = new AtomicBoolean(false)
     @Lazy protected Map<String, Object> attrs = new ConcurrentHashMap<>()
     @Lazy protected def ehcache = server.bean(EhcacheSrv)
@@ -455,12 +455,13 @@ class HttpContext {
      * @return
      */
     def <T> T param(String pName, Class<T> type = null) {
+        if (type && HttpContext.isAssignableFrom(type)) return this
         def v = pathToken.get(pName)
         if (v == null) v = request.queryParams.get(pName)
         if (v == null) v = request.formParams.get(pName)
         if (v == null) v = request.jsonParams.get(pName)
         if (type == null) return v
-        if (v == null) return type.cast(v)
+        else if (v == null) return type.cast(v)
         else if (type == String) return v instanceof List ? (v?[0]) : String.valueOf(v)
         else if (type == Integer || type == int) return Integer.valueOf(v)
         else if (type == Long || type == long) return Long.valueOf(v)

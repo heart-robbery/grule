@@ -9,6 +9,7 @@ import ctrl.RuleCtrl
 import ctrl.TestCtrl
 import dao.entity.DataCollector
 import dao.entity.Decision
+import dao.entity.OpHistory
 import dao.entity.RuleField
 import groovy.transform.Field
 import org.slf4j.Logger
@@ -18,6 +19,7 @@ import service.TestService
 import service.rule.AttrManager
 import service.rule.DecisionEngine
 import service.rule.DecisionManager
+
 
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Field final AppContext app = new AppContext()
@@ -31,7 +33,7 @@ app.addSource(new SchedSrv())
 app.addSource(new Remoter())
 //app.addSource(new HibernateSrv('jpa_kratos'))
 app.addSource(new HibernateSrv('jpa_rule').entities(
-     Decision, RuleField, DataCollector
+     Decision, RuleField, DataCollector, OpHistory
 ))
 app.addSource(new HttpServer().ctrls(
     TestCtrl, MainCtrl, RuleCtrl, MntCtrl

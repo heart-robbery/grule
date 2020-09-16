@@ -10,6 +10,7 @@ import core.jpa.BaseRepo
 import dao.entity.DataCollector
 import dao.entity.FieldType
 import dao.entity.RuleField
+import groovy.text.GStringTemplateEngine
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.ImportCustomizer
 
@@ -37,7 +38,7 @@ class AttrManager extends ServerTpl {
     @EL(name = 'jpa_rule.started', async = true)
     void init() {
         // 有顺序
-        loadAttrs()
+        loadField()
         loadDataCollector()
         ep.fire("${name}.started")
     }
@@ -67,7 +68,12 @@ class AttrManager extends ServerTpl {
         // 函数执行
         def doApply = {Function<DecisionContext, Object> fn ->
             log.debug(ctx.logPrefix() + "Get attr '{}' value apply function: '{}'", aName, collectorName)
-            def v = fn.apply(ctx)
+            def v = null
+            try {
+                v = fn.apply(ctx)
+            } catch (ex) { // 接口执行报错, 默认继续往下执行规则
+                log.error(ctx.logPrefix() + "数据收集器'$collectorName' 执行错误".toString(), ex)
+            }
             if (v instanceof Map) { // 收集器,收集结果为多个属性的值, 则暂先保存
                 Map<String, Object> result = new HashMap<>()
                 ctx.dataCollectResult.put(collectorName, result)
@@ -154,13 +160,19 @@ class AttrManager extends ServerTpl {
     /**
      * 加载属性
      */
-    void loadAttrs() {
+    void loadField() {
         initAttr()
         log.info("加载属性配置")
-        repo.findList(RuleField).each {field ->
-            attrMap.put(field.enName, field)
-            attrMap.put(field.cnName, field)
-        }
+        int page = 1
+        do {
+            def p = repo.findPage(RuleField, (page++), 100)
+            if (!p.list) break
+            p.list.each {field ->
+                attrMap.put(field.enName, field)
+                attrMap.put(field.cnName, field)
+            }
+
+        } while (true)
     }
 
 
@@ -188,7 +200,7 @@ class AttrManager extends ServerTpl {
     void listenUpdateDataCollector(String enName) {
         def collector = repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), enName)}
         initDataCollect(collector)
-        loadAttrs()
+        loadField()
         ep.fire('remote', app.name, 'updateDataCollector', [enName])
     }
     @EL(name = 'delDataCollector')
@@ -235,29 +247,28 @@ class AttrManager extends ServerTpl {
 Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1
             """.trim()))
             repo.saveOrUpdate(new DataCollector(type: 'script', enName: 'gender', cnName: '性别', comment: '根据身份证计算. 值: F,M', computeScript: """
-if (idNumber && idNumber.length() >= 17) {
+if (idNumber && idNumber.length() > 17) {
     Integer.parseInt(idNumber.substring(16, 17)) % 2 == 0 ? 'F' : 'M'
-}
-null
+} else null
             """.trim()))
             repo.saveOrUpdate(new DataCollector(type: 'script', enName: 'age', cnName: '年龄', comment: '根据身份证计算', computeScript: """
-if (idNumber && idNumber.length() >= 17) {
+if (idNumber && idNumber.length() > 17) {
     Calendar cal = Calendar.getInstance()
     int yearNow = cal.get(Calendar.YEAR)
     int monthNow = cal.get(Calendar.MONTH)+1
     int dayNow = cal.get(Calendar.DATE)
 
     int birthday = Integer.valueOf(idNumber.substring(6, 14))
-    int year = Integer.valueOf(idNumber.substring(10, 12))
-    int day = Integer.valueOf(idNumber.substring(12, 14))
+    int year = Integer.valueOf(idNumber.substring(6, 10))
+    int month = Integer.valueOf(idNumber.substring(10,12))
+    int day = Integer.valueOf(idNumber.substring(12,14))
     
     if ((month < monthNow) || (month == monthNow && day <= dayNow)){
         yearNow - year
     } else {
         yearNow - year - 1
     }
-}
-null
+} else null
             """.trim()))
         }
     }
@@ -280,23 +291,42 @@ null
                 icz.addImports(JSON.class.name, JSONObject.class.name)
                 parseFn = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("$record.parseScript")
             }
-            setCollector(record.enName) { ctx ->
+            // 变量替换
+            def tplEngine = new GStringTemplateEngine(Thread.currentThread().contextClassLoader)
+            setCollector(record.enName) { ctx -> // 数据集成中3方接口访问过程
                 String result
-                def urlFn = { "$record.url" }
-                urlFn.delegate = ctx.data; urlFn.resolveStrategy = Closure.DELEGATE_ONLY
+                String url = tplEngine.createTemplate(record.url).make(new HashMap(1) {
+                    @Override
+                    Object get(Object key) {
+                        def v = ctx.data.get(key)
+                        return v == null ? '' : URLEncoder.encode(v.toString(), 'utf-8')
+                    }
+                }).toString()
+                String bodyStr = record.bodyStr ? tplEngine.createTemplate(record.bodyStr).make(new HashMap(1) {
+                    @Override
+                    Object get(Object key) {
+                        def v = ctx.data.get(key)
+                        return v == null ? '' : URLEncoder.encode(v.toString(), 'utf-8')
+                    }
+                }).toString() : ''
+                Object resolveResult
                 if ('get'.equalsIgnoreCase(record.method)) {
-                    result = http.get(urlFn()).execute()
+                    result = http.get(url).execute()
                 } else if ('post'.equalsIgnoreCase(record.method)) {
-                    def bodyFn = { record.bodyStr }
-                    bodyFn.delegate = ctx.data; bodyFn.resolveStrategy = Closure.DELEGATE_ONLY
-                    result = http.post(urlFn()).textBody(bodyFn()).contentType(record.contentType).execute()
+                    result = http.post(url).textBody(bodyStr).contentType(record.contentType).execute()
                 } else throw new Exception("Not support http method $record.method")
+                String logMsg = ctx.logPrefix() + "接口调用: name: $record.enName, url: $url, bodyStr: $bodyStr, result: $result"
                 if (parseFn) {
-                    def fn = parseFn.rehydrate(ctx.data, parseFn, this)
-                    fn.resolveStrategy = Closure.DELEGATE_FIRST
-                    return fn(result)
+                    try {
+                        resolveResult = parseFn.rehydrate(ctx.data, parseFn, this)(result)
+                    } catch (ex) {
+                        throw new RuntimeException("解析函数'$record.enName'执行失败", ex)
+                    } finally {
+                        log.info(logMsg + ", parseResult: " + resolveResult)
+                    }
+                    return resolveResult
                 }
-                // log.info(ctx.logPrefix() + "接口调用: " + collector.enName + ", spend: " + spend + "ms, url: " + url + ", params: " + bodyStr + ", returnStr: " + resultStr + ", resolveResult: " + resolveResult)
+                log.info(logMsg)
                 return result
             }
         } else if ('script' == record.type) {
@@ -308,9 +338,15 @@ null
                 icz.addImports(JSON.class.name, JSONObject.class.name)
                 Closure script = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("{ -> $record.computeScript}")
                 setCollector(record.enName) { ctx ->
-                    def fn = script.rehydrate(ctx.data, script, this)
-                    fn.resolveStrategy = Closure.DELEGATE_FIRST
-                    return fn()
+                    Object result
+                    try {
+                        result = script.rehydrate(ctx.data, script, this)()
+                    } catch (ex) {
+                        throw new RuntimeException("脚本函数'$record.enName'执行失败", ex)
+                    } finally {
+                        log.debug(ctx.logPrefix() + "脚本函数'$record.enName'执行结果: $result".toString())
+                    }
+                    return result
                 }
             }
         } else throw new Exception("Not support type: $record.type")

@@ -17,7 +17,7 @@
                 <h-tableitem title="英文名" prop="enName" align="center"></h-tableitem>
                 <h-tableitem title="中文名" prop="cnName" align="center"></h-tableitem>
                 <h-tableitem title="类型" prop="type" align="center" :format="formatType"></h-tableitem>
-                <!--                    <h-tableitem title="创建时间" prop="createTime" align="center"></h-tableitem>-->
+                <h-tableitem title="更新时间" prop="updateTime" align="center" :format="formatDate"></h-tableitem>
                 <h-tableitem title="描述" prop="comment" align="center"></h-tableitem>
                 <h-tableitem title="操作" align="center" :width="100">
                     <template slot-scope="{data}">
@@ -127,7 +127,7 @@
             },
             initEditor() {
                 if (this.editor) {this.editor.destroy()}
-                console.log('this.$refs.dslEditor', this.$refs.dslEditor);
+                // console.log('this.$refs.dslEditor', this.$refs.dslEditor);
                 this.editor = ace.edit(this.$refs.dslEditor);
                 // console.log('editor: ', this.editor);
                 if (this.model.type == 'http') {
@@ -215,6 +215,9 @@
             // 'add-pop': addEditPop
         },
         methods: {
+            formatDate(v) {
+                return moment(v).format('YYYY-MM-DD HH:mm:ss')
+            },
             formatType(v) {
                 for (let type of types) {
                     if (type.key == v) return type.title

@@ -201,7 +201,7 @@ class DecisionContext {
     /**
      * 数据存放. 用于规则闭包执行上下文
      */
-    protected class Data extends ConcurrentHashMap<String, Object> {
+    protected class Data extends LinkedHashMap<String, Object> {
         final DecisionContext ctx
 
         Data(DecisionContext ctx) {this.ctx = ctx}
@@ -210,8 +210,8 @@ class DecisionContext {
         Object get(Object aName) {
             if (aName == null) return null
             def value = super.get(aName)
-            if (value == null && !ctx.end.get()) {// 属性值未找到,则从属性管理器获取
-                put(aName.toString(), Optional.empty()) // 代表属性已从外部获取过,后面就不再去获取了(防止重复获取)
+            if (value == null && !super.containsKey(aName) && !ctx.end.get()) {// 属性值未找到,则从属性管理器获取
+                safeSet(aName.toString(), null) // 代表属性已从外部获取过,后面就不再去获取了(防止重复获取)
                 safeSet((String) aName, ctx.getAttrManager().dataCollect(aName.toString(), ctx))
                 value = super.get(aName)
             }
@@ -230,13 +230,10 @@ class DecisionContext {
          * @param value
          */
         protected Object safeSet(String key, Object value) {
-            if (value == null) value = Optional.empty()
-            else {
-                if (value instanceof Optional) {
-                    value = value.present ? Optional.ofNullable(ctx.getAttrManager().convert(key, value.get())) : value
-                } else {
-                    value = ctx.getAttrManager().convert(key, value) // 属性值类型转换
-                }
+            if (value instanceof Optional) {
+                value = value.present ? Optional.ofNullable(ctx.getAttrManager().convert(key, value.get())) : value
+            } else {
+                value = ctx.getAttrManager().convert(key, value) // 属性值类型转换
             }
             super.put(key, value)
 
@@ -288,7 +285,7 @@ class DecisionContext {
         this.summary = [
             id         : id, occurTime: startup.time,
             decision   : finalDecision, decisionId: decisionSpec.决策id, input: input,
-            exception  : this.exception,
+            exception  : this.exception.toString(),
             attrs      : data.collect {e ->
                  if (!e.key.matches("[a-zA-Z0-9]+") && attrManager.alias(e.key)) {
                      return null

@@ -41,7 +41,7 @@ class HttpServer extends ServerTpl {
     protected final Chain                                                    chain   = new Chain(this)
     protected final List                                                     ctrls   = new LinkedList<>()
     // 是否可用
-                    boolean                                                  enabled = false
+    boolean                                                  enabled = false
     @Lazy def                                                                sched   = bean(SchedSrv)
     // 当前连接数
     protected      final def                                                 connected = new AtomicInteger(0)
@@ -185,12 +185,7 @@ class HttpServer extends ServerTpl {
                 log.info("Request filter: /" + (aCtrl.prefix()) + ". {}#{}", ctrl.class.simpleName, method.name)
                 def ps = method.getParameters(); method.setAccessible(true)
                 chain.filter({HttpContext ctx -> // 实际@Filter 方法 调用
-                    method.invoke(ctrl,
-                        ps.collect {p ->
-                            if (p instanceof HttpContext) return ctx
-                            ctx.param(p.name, p.type)
-                        }.toArray()
-                    )
+                    method.invoke(ctrl, ps.collect {p -> ctx.param(p.name, p.type)}.toArray())
                 }, aFilter.order())
                 return
             }

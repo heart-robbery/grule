@@ -36,7 +36,7 @@
                     success: (res) => {
                         if (res.code == '00') {
                             this.user = res.data
-                        } else this.$Notice.error({content: res.desc, timeout: 5})
+                        } else this.$Notice.error(res.desc)
                     }
                 })
             }
@@ -47,8 +47,8 @@
     // app.$Notice.config({timeout: 5000});
 
     $.ajaxSetup({
-        complete: function(xhr,status) {
-            if (status == 401) { // 登录实效 or 未登录
+        complete: (xhr) => {
+            if (xhr.status == 401) { // 登录实效 or 未登录
                 app.$data.user = null
             }
         }

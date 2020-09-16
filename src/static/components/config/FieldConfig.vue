@@ -20,7 +20,8 @@
                 <h-tableitem title="更新时间" prop="updateTime" align="center" :format="formatDate"></h-tableitem>
                 <!--                    <h-tableitem title="创建时间" prop="createTime" align="center"></h-tableitem>-->
                 <h-tableitem title="描述" prop="comment" align="center"></h-tableitem>
-                <h-tableitem title="值函数名" prop="dataCollector" align="center"></h-tableitem>
+                <h-tableitem title="值函数名" prop="dataCollector" align="center" :render="dataCollectorRender">
+                </h-tableitem>
                 <h-tableitem title="操作" align="center" :width="100">
                     <template slot-scope="{data}">
                         <span class="text-hover" @click="showUpdatePop(data)">编辑</span>
@@ -38,7 +39,6 @@
     </div>
 </template>
 <script>
-    loadJs('moment');
     const types = [
         { title: '字符串', key: 'Str'},
         { title: '整型', key: 'Int' },
@@ -68,7 +68,7 @@
                             <textarea v-model="model.comment" />
                         </h-formitem>
                         <h-formitem label="值函数" icon="h-icon-complete" prop="dataCollector">
-                            <h-autocomplete v-model="model.dataCollector" :option="param"></h-autocomplete>
+                            <h-autocomplete ref="ac" v-model="model.dataCollector" :show="model.dataCollectorName" :option="param"></h-autocomplete>
                         </h-formitem>
                         <h-formitem>
                                 <h-button v-if="model.id" color="primary" :loading="isLoading" @click="update">提交</h-button>
@@ -163,6 +163,16 @@
             'add-pop': addEditPop
         },
         methods: {
+            dataCollectorRender(item) {
+                if (item.dataCollectorName) {
+                    return item.dataCollectorName
+                    // return `<a href="#" @click="jumpToDataCollector(item)">{{item.dataCollectorName}}</a>`
+                }
+                return item.dataCollector
+            },
+            jumpToDataCollector(item) {
+                console.log('==================', item)
+            },
             formatType(v) {
                 for (let type of types) {
                     if (type.key == v) return type.title

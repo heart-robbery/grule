@@ -37,7 +37,7 @@
                     <component v-bind:is="contentComponent"></component>
                 </h-content>
                 <h-footer class="text-center">Copyright © {{year}}
-                    <a href="https://gitee.com/xnat/gy" target="_blank">xxb</a>
+                    <a href="https://gitee.com/xnat/gy/tree/rule/" target="_blank">xxb</a>
                 </h-footer>
             </h-layout>
         </h-layout>

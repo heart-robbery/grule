@@ -78,15 +78,18 @@
                 url: location.protocol + '//' + location.host + '/decision?decisionId=' + this.decision.decisionId,
                 params: [{name: '参数1', value: null}]
             };
-            let itemsStr = localStorage.getItem('rule.test.items');
+            let cacheKey = 'rule.test.' + this.decision.decisionId;
+            let itemsStr = localStorage.getItem(cacheKey);
             if (itemsStr) items = JSON.parse(itemsStr);
             return {
+                cacheKey: cacheKey,
                 items: items,
                 result: ''
             }
         },
         methods: {
             test() {
+                this.result = '';
                 $.ajax({
                     url: this.items.url,
                     data: this.items.params.map((param) => {let o={}; o[param.name] = param.value; return o}).reduce((o1, o2) => {let o = {...o1, ...o2}; return o}),
@@ -94,7 +97,7 @@
                         if (res.code == '00') {
                             this.result = res.data;
                             this.$Message.success(`测试调用: ${this.decision.decisionId}成功`);
-                            localStorage.setItem("rule.test.items", JSON.stringify(this.items))
+                            localStorage.setItem(this.cacheKey, JSON.stringify(this.items))
                         } else this.$Notice.error(res.desc);
                     }
                 })
@@ -200,6 +203,7 @@
                                 if (res.code == '00') {
                                     this.$Message.success(`删除决策: ${item.decisionId}成功`);
                                     this.load();
+                                    localStorage.removeItem('rule.test.' + this.item.decisionId)
                                 } else this.$Notice.error(res.desc)
                             }
                         });

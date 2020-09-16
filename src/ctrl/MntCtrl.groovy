@@ -1,10 +1,13 @@
 package ctrl
 
 import cn.xnatural.enet.event.EL
+import core.Page
 import core.ServerTpl
+import core.Utils
 import core.http.HttpContext
 import core.http.mvc.ApiResp
 import core.http.mvc.Ctrl
+import core.http.mvc.Filter
 import core.http.mvc.Path
 import core.http.ws.Listener
 import core.http.ws.WS
@@ -23,6 +26,17 @@ class MntCtrl extends ServerTpl {
     @Lazy def repo = bean(BaseRepo, 'jpa_rule_repo')
 
     protected final Set<WebSocket> wss = ConcurrentHashMap.newKeySet()
+
+
+    @Filter
+    void filter(HttpContext ctx) {
+        if (ctx.pieces[0] !in ['login']) { // login 不拦截
+            def res = getCurrentUser(ctx)
+            if (res.code != '00') { // 判断当前session 是否过期
+                ctx.render(res)
+            }
+        }
+    }
 
 
     @EL(name = 'wsMsg')
@@ -95,18 +109,23 @@ class MntCtrl extends ServerTpl {
 
     @Path(path = 'fieldPage')
     ApiResp fieldPage(Integer page, String kw) {
-        ApiResp.ok(
-            repo.findPage(RuleField, page, 10) { root, query, cb ->
-                query.orderBy(cb.desc(root.get('updateTime')))
-                if (kw) {
-                    cb.or(
-                        cb.like(root.get('enName'), '%' + kw + '%'),
-                        cb.like(root.get('cnName'), '%' + kw + '%'),
-                        cb.like(root.get('comment'), '%' + kw + '%')
-                    )
-                }
+        def fieldPage = Page.of(repo.findPage(RuleField, page, 10) { root, query, cb ->
+            query.orderBy(cb.desc(root.get('updateTime')))
+            if (kw) {
+                cb.or(
+                    cb.like(root.get('enName'), '%' + kw + '%'),
+                    cb.like(root.get('cnName'), '%' + kw + '%'),
+                    cb.like(root.get('comment'), '%' + kw + '%')
+                )
             }
-        )
+        }, { Utils.toMapper(it).build()})
+        def collectorNames = fieldPage.list.collect {it.dataCollector}.findAll{it}
+        if (collectorNames) {
+            repo.findList(DataCollector) {root, query, cb -> root.get('enName').in(collectorNames)}.each {dc ->
+                fieldPage.list.find {it.dataCollector == dc.enName}?.dataCollectorName = dc.cnName
+            }
+        }
+        ApiResp.ok(fieldPage)
     }
 
 
