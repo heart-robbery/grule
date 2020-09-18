@@ -13,11 +13,11 @@ import core.http.ws.Listener
 import core.http.ws.WS
 import core.http.ws.WebSocket
 import core.jpa.BaseRepo
-import dao.entity.DataCollector
-import dao.entity.Decision
-import dao.entity.FieldType
-import dao.entity.RuleField
+import dao.entity.*
+import service.rule.DecisionManager
+import service.rule.spec.DecisionSpec
 
+import javax.persistence.criteria.Predicate
 import java.util.concurrent.ConcurrentHashMap
 
 @Ctrl(prefix = 'mnt')
@@ -30,7 +30,7 @@ class MntCtrl extends ServerTpl {
 
     @Filter
     void filter(HttpContext ctx) {
-        if (ctx.pieces[0] !in ['login']) { // login 不拦截
+        if (ctx.pieces?[0] !in ['login']) { // session 判断, login 不拦截
             def res = getCurrentUser(ctx)
             if (res.code != '00') { // 判断当前session 是否过期
                 ctx.render(res)
@@ -147,8 +147,66 @@ class MntCtrl extends ServerTpl {
     }
 
 
+    @Path(path = 'opHistoryPage')
+    ApiResp opHistoryPage(Integer page, Integer pageSize, String kw, String type) {
+        if (pageSize && pageSize > 20) return ApiResp.fail("pageSize max 20")
+        ApiResp.ok(
+            repo.findPage(OpHistory, page, pageSize?:10) { root, query, cb ->
+                query.orderBy(cb.desc(root.get('createTime')))
+                def ps = []
+                if (kw) {
+                    ps << cb.like(root.get('content'), '%' + kw + '%')
+                }
+                if (type) {
+                    ps << cb.equal(root.get('tbName'), repo.tbName(Decision.package.name + "." + type))
+                }
+                cb.and(ps.toArray(new Predicate[ps.size()]))
+            }
+        )
+    }
+
+
+    /**
+     * 设置一条决策
+     * @param id 决策数据库中的Id 如果为空, 则为新建
+     * @param dsl 决策DSL
+     * @return
+     */
+    @Path(path = 'setDecision', method = 'post')
+    ApiResp setDecision(String id, String dsl, HttpContext ctx) {
+        DecisionSpec spec
+        try {
+            spec = bean(DecisionManager).create(dsl)
+        } catch (ex) {
+            log.error("语法错误", ex)
+            return ApiResp.fail('语法错误: ' + ex.message)
+        }
+        Decision decision
+        if (id) { // 更新
+            ctx.auth('decision-update')
+            decision = repo.findById(Decision, id)
+            if (decision.decisionId != spec.决策id) {
+                if (repo.find(Decision) {root, query, cb -> cb.equal(root.get('decisionId'), spec.决策id)}) { // 决策id 不能重
+                    return ApiResp.fail("决策id($spec.决策id)已存在")
+                }
+            }
+        } else { // 创建
+            ctx.auth('decision-create')
+            decision = new Decision()
+        }
+        decision.decisionId = spec.决策id
+        decision.name = spec.决策名
+        decision.comment = spec.决策描述
+        decision.dsl = dsl
+        repo.saveOrUpdate(decision)
+        ep.fire('enHistory', decision, ctx.getSessionAttr('name'))
+        ApiResp.ok(decision)
+    }
+
+
     @Path(path = 'addField', method = 'post')
-    ApiResp addField(String enName, String cnName, FieldType type, String comment, String dataCollector) {
+    ApiResp addField(HttpContext ctx, String enName, String cnName, FieldType type, String comment, String dataCollector) {
+        ctx.auth('field-add')
         if (!enName) return ApiResp.fail("enName must not be empty")
         if (!cnName) return ApiResp.fail("cnName must not be empty")
         if (!type) return ApiResp.fail("type must not be empty")
@@ -157,12 +215,14 @@ class MntCtrl extends ServerTpl {
         def field = new RuleField(enName: enName, cnName: cnName, type: type, comment: comment, dataCollector: dataCollector)
         repo.saveOrUpdate(field)
         ep.fire('addField', field.enName)
+        ep.fire('enHistory', field, ctx.getSessionAttr('name'))
         ApiResp.ok(field)
     }
 
 
     @Path(path = 'addDataCollector', method = 'post')
     ApiResp addDataCollector(HttpContext ctx) {
+        ctx.auth('dataCollector-add')
         def map = ctx.params()
         DataCollector dc = new DataCollector()
         map.each {entry -> if (dc.hasProperty(entry.key)) dc.setProperty(entry.key, entry.value)}
@@ -184,12 +244,14 @@ class MntCtrl extends ServerTpl {
         }
         repo.saveOrUpdate(dc)
         ep.fire('addDataCollector', dc.enName)
+        ep.fire('enHistory', dc, ctx.getSessionAttr('name'))
         ApiResp.ok(dc)
     }
 
 
     @Path(path = 'updateField', method = 'post')
-    ApiResp updateField(Long id, String enName, String cnName, FieldType type, String comment, String dataCollector) {
+    ApiResp updateField(HttpContext ctx, Long id, String enName, String cnName, FieldType type, String comment, String dataCollector) {
+        ctx.auth('field-update')
         if (!id) return ApiResp.fail("id not legal")
         if (!enName) return ApiResp.fail("enName must not be empty")
         if (!cnName) return ApiResp.fail("cnName must not be empty")
@@ -211,12 +273,14 @@ class MntCtrl extends ServerTpl {
 
         repo.saveOrUpdate(field)
         ep.fire('updateField', field.enName)
+        ep.fire('enHistory', field, ctx.getSessionAttr('name'))
         ApiResp.ok(field)
     }
 
 
     @Path(path = 'updateDataCollector', method = 'post')
-    ApiResp updateDataCollector(Long id, String enName, String cnName, String url, String bodyStr, String method, String parseScript, String contentType, String comment, String computeScript) {
+    ApiResp updateDataCollector(HttpContext ctx, Long id, String enName, String cnName, String url, String bodyStr, String method, String parseScript, String contentType, String comment, String computeScript) {
+        ctx.auth('dataCollector-update')
         if (!id) return ApiResp.fail("id not legal")
         if (!enName) return ApiResp.fail("enName must not be empty")
         if (!cnName) return ApiResp.fail("cnName must not be empty")
@@ -271,20 +335,23 @@ class MntCtrl extends ServerTpl {
             repo.saveOrUpdate(collector)
         }
         ep.fire('updateDataCollector', collector.enName)
+        ep.fire('enHistory', collector, ctx.getSessionAttr('name'))
         ApiResp.ok(collector)
     }
 
 
     @Path(path = 'delDecision/:decisionId')
-    ApiResp delDecision(String decisionId) {
+    ApiResp delDecision(HttpContext ctx, String decisionId) {
         repo.delete(repo.find(Decision) {root, query, cb -> cb.equal(root.get('decisionId'), decisionId)})
+        ctx.auth('decision-del')
         ep.fire('delDecision', decisionId)
         ApiResp.ok()
     }
 
 
     @Path(path = 'delField/:enName')
-    ApiResp delField(String enName) {
+    ApiResp delField(HttpContext ctx, String enName) {
+        ctx.auth('field-del')
         repo.delete(repo.find(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)})
         ep.fire('delField', enName)
         ApiResp.ok()
@@ -292,7 +359,8 @@ class MntCtrl extends ServerTpl {
 
 
     @Path(path = 'delDataCollector/:enName')
-    ApiResp delDataCollector(String enName) {
+    ApiResp delDataCollector(HttpContext ctx, String enName) {
+        ctx.auth('dataCollector-del')
         repo.delete(repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), enName)})
         ep.fire('delDataCollector', enName)
         ApiResp.ok()

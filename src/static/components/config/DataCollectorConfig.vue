@@ -222,7 +222,7 @@
                 for (let type of types) {
                     if (type.key == v) return type.title
                 }
-                return ''
+                return v
             },
             showAddPop() {
                 this.$Modal({
@@ -270,6 +270,10 @@
             load(page) {
                 if (page == undefined || page == null) page = {page: 1};
                 this.loading = true;
+                this.page = 1;
+                this.pageSize = 10;
+                this.totalRow = 0;
+                this.list = [];
                 $.ajax({
                     url: 'mnt/dataCollectorPage',
                     data: {page: page.page || 1, kw: this.kw},

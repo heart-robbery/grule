@@ -57,7 +57,8 @@ class DecisionContext {
         input?.forEach {k, v -> setAttr(k, v) }
         if (!ruleIterator.hasNext()) {
             finalDecision = Decision.Reject
-            log.warn(logPrefix() + "没有可执行的策略")
+            exception = "没有可执行的策略"
+            log.warn(logPrefix() + exception)
         }
         trigger()
     }

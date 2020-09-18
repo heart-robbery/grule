@@ -77,6 +77,14 @@ class BaseRepo {
     String tbName(Class<IEntity> eType) {
         ((AbstractEntityPersister) ((MetamodelImplementor) sf.getMetamodel()).locateEntityPersister(eType)).getRootTableName()
     }
+    /**
+     * 根据实体名,查表名
+     * @param eName 实体名
+     * @return 表名
+     */
+    String tbName(String eName) {
+        ((AbstractEntityPersister) ((MetamodelImplementor) sf.getMetamodel()).locateEntityPersister(eName)).getRootTableName()
+    }
 
 
     /**

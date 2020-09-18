@@ -19,6 +19,7 @@ import service.TestService
 import service.rule.AttrManager
 import service.rule.DecisionEngine
 import service.rule.DecisionManager
+import service.rule.OpHistorySrv
 
 
 @Field final Logger log = LoggerFactory.getLogger(getClass())
@@ -43,6 +44,7 @@ app.addSource(new TestService())
 app.addSource(new AttrManager())
 app.addSource(new DecisionEngine())
 app.addSource(new DecisionManager())
+app.addSource(new OpHistorySrv())
 // app.addSource(new PolicyManger())
 app.addSource(this)
 app.start() // 启动系统

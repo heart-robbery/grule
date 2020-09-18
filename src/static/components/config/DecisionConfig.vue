@@ -219,7 +219,7 @@
                 this.$Message('保存中...');
                 let decision = this.curDecision;
                 $.ajax({
-                    url: 'setDecision',
+                    url: 'mnt/setDecision',
                     type: 'post',
                     data: {id: decision.id, dsl: decision.dsl},
                     success: (res) => {
@@ -289,17 +289,6 @@
                     }
                 }
             },
-            // showDsl(data) {
-            //     this.$Modal({
-            //         component: {
-            //             vue: Vue.component('DecisionDetail'),
-            //             datas: {decisionId: data.decisionId}
-            //         },
-            //         width: 600,
-            //         // className: 'dsl-model',
-            //         hasCloseIcon: true, fullScreen: false, middle: false, transparent: true
-            //     })
-            // },
             // tabSwitch(data) {
             //     console.log(data);
             //     this.$emit('tab-switch', 'PolicyConfig', data.decisionId)
@@ -307,6 +296,7 @@
             load(page) {
                 if (page == undefined || page == null) page = {page: 1};
                 this.decisionLoading = true;
+                this.decision = {};
                 $.ajax({
                     url: 'mnt/decisionPage',
                     data: {page: page.page || 1, kw: this.kw},

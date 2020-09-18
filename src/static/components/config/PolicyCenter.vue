@@ -24,7 +24,7 @@
                     type: localStorage.getItem('rule.policyConfig.tab') || 'DecisionConfig',
                     showId: null
                 },
-                types: {DecisionConfig: '决策列表', FieldConfig:'字段列表', DataCollectorConfig: '数据集成',
+                types: {DecisionConfig: '决策列表', FieldConfig:'字段列表', DataCollectorConfig: '数据集成', OpHistory: '操作历史'
                     // PolicyConfig: '策略列表', RuleConfig: '规则列表'
                 },
             }

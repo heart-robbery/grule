@@ -13,10 +13,13 @@ import javax.persistence.Lob
 @Entity
 class OpHistory extends LongIdEntity {
     /**
-     * 实体名
+     * 表名
      */
-    String entityName
-
+    String tbName
+    /**
+     * 操作员
+     */
+    String operator
     /**
      * 保存各个字段的 json 字符串
      */

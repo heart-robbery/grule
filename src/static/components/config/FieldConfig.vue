@@ -228,6 +228,10 @@
             load(page) {
                 if (page == undefined || page == null) page = {page: 1};
                 this.loading = true;
+                this.page = 1;
+                this.pageSize = 10;
+                this.totalRow = 0;
+                this.list = [];
                 $.ajax({
                     url: 'mnt/fieldPage',
                     data: {page: page.page || 1, kw: this.kw},

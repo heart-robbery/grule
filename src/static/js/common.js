@@ -84,6 +84,7 @@ new Map([
     ['RuleDetail', 'config/RuleDetail.vue'],
     ['FieldConfig', 'config/FieldConfig.vue'],
     ['DataCollectorConfig', 'config/DataCollectorConfig.vue'],
+    ['OpHistory', 'config/OpHistory.vue'],
     ['UserCenter', 'config/UserCenter.vue'],
 ]).forEach((value, key) => {
     Vue.component(key, (resolve, reject) => {
