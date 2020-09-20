@@ -113,10 +113,10 @@ class Remoter extends ServerTpl {
      * @param remoteMethodArgs 远程事件监听方法的参数
      */
     void fireAsync(String appName, String eName, Consumer callback, List remoteMethodArgs) {
-        ep.fire("remote", EC.of(this).args(appName, eName, remoteMethodArgs).completeFn({ ec ->
-            if (ec.success) callback?.accept(ec.result)
-            else callback?.accept(new Exception(ec.failDesc()))
-        }))
+        ep.fire("remote", EC.of(this).args(appName, eName, remoteMethodArgs).completeFn(callback ? { ec ->
+            if (ec.success) callback.accept(ec.result)
+            else callback.accept(new Exception(ec.failDesc()))
+        }: null))
     }
 
 

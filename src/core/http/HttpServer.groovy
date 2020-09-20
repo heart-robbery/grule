@@ -185,12 +185,7 @@ class HttpServer extends ServerTpl {
                 log.info("Request filter: /" + (aCtrl.prefix()) + ". {}#{}", ctrl.class.simpleName, method.name)
                 def ps = method.getParameters(); method.setAccessible(true)
                 chain.filter({HttpContext ctx -> // 实际@Filter 方法 调用
-                    method.invoke(ctrl,
-                        ps.collect {p ->
-                            if (p instanceof HttpContext) return ctx
-                            ctx.param(p.name, p.type)
-                        }.toArray()
-                    )
+                    method.invoke(ctrl, ps.collect {p -> ctx.param(p.name, p.type)}.toArray())
                 }, aFilter.order())
                 return
             }
