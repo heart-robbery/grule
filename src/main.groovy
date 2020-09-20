@@ -7,10 +7,7 @@ import ctrl.MainCtrl
 import ctrl.MntCtrl
 import ctrl.RuleCtrl
 import ctrl.TestCtrl
-import dao.entity.DataCollector
-import dao.entity.Decision
-import dao.entity.OpHistory
-import dao.entity.RuleField
+import dao.entity.*
 import groovy.transform.Field
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -20,7 +17,6 @@ import service.rule.AttrManager
 import service.rule.DecisionEngine
 import service.rule.DecisionManager
 import service.rule.OpHistorySrv
-
 
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Field final AppContext app = new AppContext()
@@ -32,9 +28,8 @@ app.addSource(new EhcacheSrv())
 app.addSource(new SchedSrv())
 //app.addSource(new RedisClient())
 app.addSource(new Remoter())
-//app.addSource(new HibernateSrv('jpa_kratos'))
 app.addSource(new HibernateSrv('jpa_rule').entities(
-     Decision, RuleField, DataCollector, OpHistory
+     Decision, RuleField, DataCollector, OpHistory, DecisionResult
 ))
 app.addSource(new HttpServer().ctrls(
     TestCtrl, MainCtrl, RuleCtrl, MntCtrl
@@ -51,8 +46,7 @@ app.start() // 启动系统
 
 
 @EL(name = 'sys.started', async = true)
-def sysStarted() {
-    TestService ts = app.bean(TestService)
+void sysStarted() {
     try {
     } finally {
         // System.exit(0)

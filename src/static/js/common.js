@@ -86,6 +86,8 @@ new Map([
     ['DataCollectorConfig', 'config/DataCollectorConfig.vue'],
     ['OpHistory', 'config/OpHistory.vue'],
     ['UserCenter', 'config/UserCenter.vue'],
+    ['DataCenter', 'data/DataCenter.vue'],
+    ['DecisionResult', 'data/DecisionResult.vue'],
 ]).forEach((value, key) => {
     Vue.component(key, (resolve, reject) => {
         httpVueLoader('components/'+ value)().then((r) => resolve(r))
@@ -97,6 +99,8 @@ new Map([
 let jsMap = new Map([
     ['ace', 'js/lib/ace-1.4.12.js'],
     ['ace-tools', 'js/lib/ext-language_tools.min.js'],
+    ['ace-lang-rule', 'js/lib/mode-rule.js'],
+    ['ace-snip-rule', 'js/lib/rule-snippets.js'],
     ['ace-lang-groovy', 'js/lib/mode-groovy.js'],
     ['ace-snip-groovy', 'js/lib/groovy-snippets.min.js'],
     ['moment', 'js/lib/moment.min.js'],

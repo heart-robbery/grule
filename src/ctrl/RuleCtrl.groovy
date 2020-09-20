@@ -5,14 +5,12 @@ import core.http.HttpContext
 import core.http.mvc.ApiResp
 import core.http.mvc.Ctrl
 import core.http.mvc.Path
-import core.jpa.BaseRepo
 import service.rule.AttrManager
 import service.rule.DecisionEngine
 
 @Ctrl
 class RuleCtrl extends ServerTpl {
 
-    @Lazy def repo = bean(BaseRepo, 'jpa_rule_repo')
     @Lazy def engine = bean(DecisionEngine)
 
 

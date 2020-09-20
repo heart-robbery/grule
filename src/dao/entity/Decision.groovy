@@ -3,9 +3,12 @@ package dao.entity
 
 import core.jpa.UUIDEntity
 import org.hibernate.annotations.DynamicUpdate
+import org.hibernate.annotations.Type
 
+import javax.persistence.Basic
 import javax.persistence.Column
 import javax.persistence.Entity
+import javax.persistence.Lob
 
 /**
  * 决策
@@ -29,6 +32,8 @@ class Decision extends UUIDEntity {
     /**
      * 完整 DSL
      */
-    @Column(length = 10000)
+    @Lob
+    @Basic
+    @Type(type = "text")
     String dsl
 }

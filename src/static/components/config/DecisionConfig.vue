@@ -158,6 +158,7 @@
                     //console.log('change: ', e);
                     this.curDecision.dsl = this.editor.session.getValue()
                 });
+                this.editor.session.setMode('ace/mode/rule');
                 this.editor.commands.addCommand({
                     name: 'save',
                     bindKey: {win: 'Ctrl-S', mac: 'Command-S'},

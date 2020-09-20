@@ -1,5 +1,6 @@
 package ctrl
 
+import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import core.Page
 import core.ServerTpl
@@ -19,6 +20,7 @@ import service.rule.spec.DecisionSpec
 
 import javax.persistence.criteria.Predicate
 import java.util.concurrent.ConcurrentHashMap
+
 
 @Ctrl(prefix = 'mnt')
 class MntCtrl extends ServerTpl {
@@ -97,9 +99,10 @@ class MntCtrl extends ServerTpl {
 
 
     @Path(path = 'decisionPage')
-    ApiResp decisionPage(Integer page, String kw) {
+    ApiResp decisionPage(Integer page, Integer pageSize, String kw) {
+        if (pageSize && pageSize > 20) return ApiResp.fail("pageSize max 20")
         ApiResp.ok(
-            repo.findPage(Decision, page, 10) {root, query, cb ->
+            repo.findPage(Decision, page, pageSize?:10) {root, query, cb ->
                 query.orderBy(cb.desc(root.get('updateTime')))
                 if (kw) cb.like(root.get('dsl'), '%' + kw + '%')
             }
@@ -166,6 +169,33 @@ class MntCtrl extends ServerTpl {
     }
 
 
+    @Path(path = 'decisionResultPage')
+    ApiResp decisionResultPage(Integer page, Integer pageSize, String id, String decisionId, service.rule.Decision decision, String idNum, Long spend, String exception, String input, String attrs, String rules) {
+        if (pageSize && pageSize > 20) return ApiResp.fail("pageSize max 20")
+        ApiResp.ok(
+            Page.of(
+                repo.findPage(DecisionResult, page, pageSize?:10) { root, query, cb ->
+                    query.orderBy(cb.desc(root.get('occurTime')))
+                    def ps = []
+                    if (id) ps << cb.equal(root.get('id'), id)
+                    if (decisionId) ps << cb.equal(root.get('decisionId'), decisionId)
+                    if (idNum) ps << cb.equal(root.get('idNum'), idNum)
+                    if (spend) ps << cb.ge(root.get('spend'), spend)
+                    if (decision) ps << cb.equal(root.get('decision'), decision)
+                    if (exception) ps << cb.like(root.get('exception'), '%' + exception + '%')
+                    if (input) ps << cb.like(root.get('input'), '%' + input + '%')
+                    if (attrs) ps << cb.like(root.get('attrs'), '%' + attrs + '%')
+                    if (rules) ps << cb.like(root.get('rules'), '%' + rules + '%')
+                    if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
+                },
+                {Utils.toMapper(it).addConverter('decisionId', 'decisionName', {String dId ->
+                    bean(DecisionManager).findDecision(dId).决策名
+                }).build()}
+            )
+        )
+    }
+
+
     /**
      * 设置一条决策
      * @param id 决策数据库中的Id 如果为空, 则为新建
@@ -182,12 +212,27 @@ class MntCtrl extends ServerTpl {
             return ApiResp.fail('语法错误: ' + ex.message)
         }
         Decision decision
+        def removeFn
         if (id) { // 更新
             ctx.auth('decision-update')
             decision = repo.findById(Decision, id)
             if (decision.decisionId != spec.决策id) {
                 if (repo.find(Decision) {root, query, cb -> cb.equal(root.get('decisionId'), spec.决策id)}) { // 决策id 不能重
                     return ApiResp.fail("决策id($spec.决策id)已存在")
+                }
+                removeFn = {
+                    bean(DecisionManager).remove(decision.decisionId)
+                    ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'decision.remove', [decision.decisionId]).completeFn{ ec ->
+                        if (ec.success) {
+                            String msg = "删除决策'$decision.decisionId'集群同步完成成功"
+                            log.info(msg)
+                            ep.fire('wsMsg', msg)
+                        } else {
+                            String msg = "删除决策'$decision.decisionId'集群同步完成失败: " + ec.failDesc()
+                            log.error(msg)
+                            ep.fire('wsMsg', msg)
+                        }
+                    })
                 }
             }
         } else { // 创建
@@ -199,6 +244,7 @@ class MntCtrl extends ServerTpl {
         decision.comment = spec.决策描述
         decision.dsl = dsl
         repo.saveOrUpdate(decision)
+        if (removeFn) removeFn()
         ep.fire('enHistory', decision, ctx.getSessionAttr('name'))
         ApiResp.ok(decision)
     }

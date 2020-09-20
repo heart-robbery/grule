@@ -1,5 +1,6 @@
 package service.rule
 
+import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
@@ -182,31 +183,31 @@ class AttrManager extends ServerTpl {
         def field = repo.find(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}
         attrMap.put(field.enName, field)
         attrMap.put(field.cnName, field)
-        ep.fire('remote', app.name, 'updateField', [enName])
+        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'updateField', [enName]))
     }
     @EL(name = 'delField')
     void listenDelField(String enName) {
         def field = attrMap.remove(enName)
         attrMap.remove(field.cnName)
-        ep.fire('remote', app.name, 'delField', [enName])
+        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'delField', [enName]))
     }
     @EL(name = 'addDataCollector', async = true)
     void listenAddDataCollector(String enName) {
         def collector = repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), enName)}
         initDataCollect(collector)
-        ep.fire('remote', app.name, 'addDataCollector', [enName])
+        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'addDataCollector', [enName]))
     }
     @EL(name = 'updateDataCollector')
     void listenUpdateDataCollector(String enName) {
         def collector = repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), enName)}
         initDataCollect(collector)
         loadField()
-        ep.fire('remote', app.name, 'updateDataCollector', [enName])
+        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'updateDataCollector', [enName]))
     }
     @EL(name = 'delDataCollector')
     void listenDelCollector(String enName) {
         dataCollectorMap.remove(enName)
-        ep.fire('remote', app.name, 'delDataCollector', [enName])
+        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'delDataCollector', [enName]))
     }
 
 

@@ -284,9 +284,9 @@ class DecisionContext {
     Map<String, Object> summary() {
         if (this.summary && end.get()) return this.summary
         this.summary = [
-            id         : id, occurTime: startup.time,
+            id         : id, occurTime: startup.time, spend: System.currentTimeMillis() - startup.time,
             decision   : finalDecision, decisionId: decisionSpec.决策id, input: input,
-            exception  : this.exception.toString(),
+            exception  : this.exception?.toString(),
             attrs      : data.collect {e ->
                  if (!e.key.matches("[a-zA-Z0-9]+") && attrManager.alias(e.key)) {
                      return null

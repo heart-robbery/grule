@@ -1,8 +1,9 @@
 package service.rule
 
+import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
-import core.Utils
 import core.ServerTpl
+import core.Utils
 import core.jpa.BaseRepo
 import service.rule.spec.DecisionSpec
 
@@ -24,6 +25,12 @@ class DecisionManager extends ServerTpl {
 
 
     DecisionSpec findDecision(String decisionId) { decisionMap.get(decisionId) }
+
+
+    @EL(name = 'decision.remove')
+    void remove(String decisionId) {
+        decisionMap.remove(decisionId)
+    }
 
 
 //    /**
@@ -74,7 +81,8 @@ class DecisionManager extends ServerTpl {
 
     protected void load() {
         log.info("加载决策")
-        create(Utils.baseDir("/src/service/rule/policy/test1.decision").getText('utf-8'))
+        decisionMap.clear()
+        // create(Utils.baseDir("/src/service/rule/policy/test1.decision").getText('utf-8'))
         repo.findList(dao.entity.Decision).each { create(it.dsl) }
     }
 }

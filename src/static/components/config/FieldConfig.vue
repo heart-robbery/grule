@@ -177,7 +177,7 @@
                 for (let type of types) {
                     if (type.key == v) return type.title
                 }
-                return ''
+                return v
             },
             formatDate(v) {
                 return moment(v).format('YYYY-MM-DD HH:mm:ss')

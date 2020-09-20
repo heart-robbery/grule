@@ -13,6 +13,8 @@
     loadJs('ace', () => {
         ace.config.set("basePath", "js/lib");
         loadJs('ace-tools');
+        loadJs('ace-lang-rule');
+        // loadJs('ace-snip-rule');
         loadJs('ace-lang-groovy');
         loadJs('ace-snip-groovy');
     });
