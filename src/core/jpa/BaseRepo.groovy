@@ -86,6 +86,15 @@ class BaseRepo {
         ((AbstractEntityPersister) ((MetamodelImplementor) sf.getMetamodel()).locateEntityPersister(eName)).getRootTableName()
     }
 
+    /**
+     * 根据实体名,查表名
+     * @param eName 实体名
+     * @return 表名
+     */
+    String tbName(String eName) {
+        ((AbstractEntityPersister) ((MetamodelImplementor) sf.getMetamodel()).locateEntityPersister(eName)).getRootTableName()
+    }
+
 
     /**
      * 连接mysql当前数据库的库名
