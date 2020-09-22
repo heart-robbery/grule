@@ -9,12 +9,14 @@ import com.alibaba.fastjson.JSONException
 import com.alibaba.fastjson.JSONObject
 import com.alibaba.fastjson.parser.Feature
 import com.alibaba.fastjson.serializer.SerializerFeature
+import core.aio.AioMsg
 
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Consumer
 
 import static core.Utils.ipv4
@@ -126,9 +128,12 @@ class Remoter extends ServerTpl {
      * @param msg 消息内容
      * @param target 可用值: 'any', 'all'
      */
-    Remoter sendMsg(String appName, String msg, String target = 'any') {
+    Remoter sendMsg(String appName, AioMsg msg, String target = 'any') {
         def ls = appInfos.get(appName)
-        assert ls : "Not found app '$appName' system online"
+        if (!ls) {
+            log.warn("Not found app '$appName' system online")
+            return this
+        }
 
         final def doSend = {Map<String, Object> appInfo ->
             if (appInfo['id'] == app.id) return false
@@ -141,7 +146,7 @@ class Remoter extends ServerTpl {
         if ('any' == target) {
             doSend(ls.get(new Random().nextInt(ls.size())))
         } else if ('all' == target) {
-            ls.each {doSend(it)}
+            ls.each {app -> async { doSend(app) }}
         } else {
             throw new IllegalArgumentException("Not support target '$target'")
         }
@@ -209,7 +214,7 @@ class Remoter extends ServerTpl {
                 ecMap.put(ec.id(), ec)
                 // 数据发送成功. 如果需要响应, 则添加等待响应超时处理
                 sched.after(Duration.ofSeconds(
-                    ec.getAttr("timeout", Integer, getInteger("timeout_$eName", getInteger("eventTimeout", 20)))
+                    (long) ec.getAttr("timeout", Integer, getInteger("timeout_$eName", getInteger("eventTimeout", 20)))
                 ), {
                     ecMap.remove(ec.id())?.errMsg("'${appName}_$eName' Timeout")?.resume()?.tryFinish()
                 })
@@ -231,10 +236,12 @@ class Remoter extends ServerTpl {
                 .fluentPut("data", params)
             if (ec.getAttr('toAll', Boolean.class, false)) {
                 if (trace) {log.info("Fire Remote Event(toAll). app:"+ appName +", params: " + params)}
-                sendMsg(appName, data.toString(), 'all')
+                AtomicInteger count = new AtomicInteger(0); ec.attr('sendCount', count) // 发送了多少个
+                ec.attr('receiveCount', new AtomicInteger(0)) // 成功接收了多少个
+                sendMsg(appName, AioMsg.of(data.toString(), {msg, se -> count.incrementAndGet()}), 'all')
             } else {
                 if (trace) {log.info("Fire Remote Event(toAny). app:"+ appName +", params: " + params)}
-                sendMsg(appName, data.toString(), 'any')
+                sendMsg(appName, AioMsg.of(data.toString()), 'any')
             }
         } catch (Throwable ex) {
             log.error("Error fire remote event to '" +appName+ "'. params: " + params, ex)
@@ -330,8 +337,21 @@ class Remoter extends ServerTpl {
      */
     protected void receiveEventResp(JSONObject data) {
         log.debug("Receive event response: {}", data)
-        EC ec = ecMap.remove(data.getString("id"))
-        if (ec != null) ec.errMsg(data.getString("exMsg")).result(data["result"]).resume().tryFinish()
+        EC ec = ecMap.get(data.getString("id"))
+        if (ec == null) {
+            log.warn("ec null. toAll: " + ec.getAttr('toAll'))
+        }
+        if (ec.getAttr('toAll', Boolean)) {
+            def send = ec.getAttr('sendCount', AtomicInteger).get()
+            def receive = ec.getAttr('receiveCount', AtomicInteger).incrementAndGet()
+            if (send == receive) {
+                ecMap.remove(ec.id())
+                ec.errMsg(data.getString("exMsg")).result(data["result"]).resume().tryFinish()
+            }
+        } else {
+            ecMap.remove(ec.id())
+            ec.errMsg(data.getString("exMsg")).result(data["result"]).resume().tryFinish()
+        }
     }
 
 
@@ -600,7 +620,7 @@ class Remoter extends ServerTpl {
         info.put("id", app.id)
         info.put("name", app.name)
         // http
-        info.put("http", getStr('exposeHttp', ep.fire("http.hp")))
+        info.put("http", getStr('exposeHttp', (String) ep.fire("http.hp")))
         // tcp
         info.put('tcp', getStr('exposeTcp', aioServer.hp))
         info.put('master', master)
