@@ -29,7 +29,7 @@ app.addSource(new SchedSrv())
 //app.addSource(new RedisClient())
 app.addSource(new Remoter())
 app.addSource(new HibernateSrv('jpa_rule').entities(
-     Decision, RuleField, DataCollector, OpHistory, DecisionResult
+     Decision, RuleField, DataCollector, OpHistory, DecisionResult, CollectResult
 ))
 app.addSource(new HttpServer().ctrls(
     TestCtrl, MainCtrl, RuleCtrl, MntCtrl

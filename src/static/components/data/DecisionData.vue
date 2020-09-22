@@ -1,6 +1,3 @@
-<style scoped>
-
-</style>
 <template>
     <div>
         <h-tabs v-model="tabs.type" :datas="types"></h-tabs>
@@ -18,7 +15,7 @@
                     type: localStorage.getItem('rule.dataCenter.tab') || 'DecisionResult',
                     showId: null
                 },
-                types: {DecisionResult: '决策结果'},
+                types: {DecisionResult: '决策记录', CollectResult: '收集记录'},
             }
         },
         watch: {

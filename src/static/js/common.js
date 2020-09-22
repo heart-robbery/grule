@@ -86,8 +86,10 @@ new Map([
     ['DataCollectorConfig', 'config/DataCollectorConfig.vue'],
     ['OpHistory', 'config/OpHistory.vue'],
     ['UserCenter', 'config/UserCenter.vue'],
-    ['DataCenter', 'data/DataCenter.vue'],
+    ['DecisionData', 'data/DecisionData.vue'],
     ['DecisionResult', 'data/DecisionResult.vue'],
+    ['CollectResult', 'data/CollectResult.vue'],
+    ['DataAnalyse', 'data/DataAnalyse.vue'],
 ]).forEach((value, key) => {
     Vue.component(key, (resolve, reject) => {
         httpVueLoader('components/'+ value)().then((r) => resolve(r))

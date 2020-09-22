@@ -1,9 +1,8 @@
 package service.rule
 
-import cn.xnatural.enet.event.EC
+
 import cn.xnatural.enet.event.EL
 import core.ServerTpl
-import core.Utils
 import core.jpa.BaseRepo
 import service.rule.spec.DecisionSpec
 
@@ -24,46 +23,26 @@ class DecisionManager extends ServerTpl {
     }
 
 
-    DecisionSpec findDecision(String decisionId) { decisionMap.get(decisionId) }
-
-
-    @EL(name = 'decision.remove')
-    void remove(String decisionId) {
-        decisionMap.remove(decisionId)
+    DecisionSpec findDecision(String decisionId) {
+        def spec = decisionMap.get(decisionId)
+        if (spec == null) {
+            loadDecision(decisionId)
+            spec = decisionMap.get(decisionId)
+        }
+        return spec
     }
 
 
-//    /**
-//     * Decision 转换成 DSL
-//     * @param decision
-//     * @return
-//     */
-//    static String toDsl(dao.entity.Decision decision) {
-//        StringBuilder sb = new StringBuilder()
-//        sb.append("决策id = ").append(decision.decisionId).append('\n')
-//        sb.append("决策名 = ").append(decision.name).append('\n')
-//        if (decision.comment) sb.append("决策描述 = ").append(decision.comment).append('\n')
-//        sb.append('\n')
-//        decision.returnAttrs.split(';').each {attr ->
-//            if (attr) sb.append("返回属性 = ").append(attr).append('\n')
-//        }
-//        sb.append('\n')
-//        decision.policies.each {policy ->
-//            sb.append("策略定义 {\n")
-//            if (policy.name) sb.append("策略名 = ").append(policy.name).append('\n')
-//            if (policy.comment) sb.append("策略描述 = ").append(policy.comment).append('\n')
-//            sb.append('\n')
-//
-//            policy.rules.each {rule ->
-//                sb.append("规则定义 {\n")
-//
-//                sb.append("}\n")
-//            }
-//
-//            sb.append("}\n")
-//        }
-//        sb.toString()
-//    }
+    @EL(name = 'delDecision')
+    void remove(String decisionId) {
+        decisionMap.remove(decisionId)
+        log.info("delDecision: " + decisionId)
+    }
+    @EL(name = 'loadDecision')
+    void loadDecision(String decisionId) {
+        create(repo.find(dao.entity.Decision) {root, query, cb -> cb.equal(root.get('decisionId'), decisionId)}?.dsl)
+        log.info("loadDecision: " + decisionId)
+    }
 
 
     /**
@@ -72,6 +51,7 @@ class DecisionManager extends ServerTpl {
      * @return
      */
     DecisionSpec create(String s) {
+        if (s == null) return null
         def p = DecisionSpec.of(s)
         decisionMap.put(p.决策id, p)
         log.debug("添加决策: " + p.决策id)
@@ -81,7 +61,7 @@ class DecisionManager extends ServerTpl {
 
     protected void load() {
         log.info("加载决策")
-        decisionMap.clear()
+        if (!decisionMap.isEmpty()) decisionMap.clear()
         // create(Utils.baseDir("/src/service/rule/policy/test1.decision").getText('utf-8'))
         repo.findList(dao.entity.Decision).each { create(it.dsl) }
     }

@@ -1,3 +1,8 @@
+<style>
+    .inlinetb {
+        float: left;
+    }
+</style>
 <template>
     <div class="h-panel">
         <div class="h-panel-bar">
@@ -39,20 +44,43 @@
     const detail = {
         props: ['item'],
         template:`
-            <h-table :datas="attrs" stripe select-when-click-tr>
-                <h-tableitem title="属性名" prop="key" align="center"></h-tableitem>
-                <h-tableitem title="属性名" prop="value" align="center"></h-tableitem>
-                <div slot="empty">无属性</div>
-            </h-table>
+            <div>
+                <h-table :datas="rules" stripe select-when-click-tr>
+                    <h-tableitem title="属性" prop="attrs" align="center"></h-tableitem>
+                    <h-tableitem title="决策" prop="decision" align="center" :width="100"></h-tableitem>
+                    <h-tableitem title="数据" prop="data" align="center"></h-tableitem>
+                    <div slot="empty">无属性</div>
+                </h-table>
+<!--                <h-table :datas="attrs" stripe select-when-click-tr className="inlinetb">-->
+<!--                    <h-tableitem title="属性名" prop="name" align="center"></h-tableitem>-->
+<!--                    <h-tableitem title="属性值" prop="value" align="center"></h-tableitem>-->
+<!--                    <div slot="empty">无属性</div>-->
+<!--                </h-table>-->
+            </div>
         `,
         data() {
             let jo = JSON.parse(this.item.attrs);
-            let arr = [];
+            let attrs = [];
             for (let k in jo) {
-                arr.push({name: k, value: jo[k]})
+                attrs.push({name: k, value: jo[k]})
             }
+
+            // let rules = [];
+            // let keys = new Set();
+            // JSON.parse(this.item.rules).forEach((v, i) => {
+            //     let o = {decision: null};
+            //     o = v.decision;
+            //     $.extend(o, v.attrs);
+            //     //o['data'] = JSON.stringify(v.data);
+            //     rules.push(o);
+            //     for (let k in o) keys.add(k)
+            // });
+            // console.log(rules);
+            // console.log(keys);
             return {
-                attrs: arr
+                attrs: attrs,
+                rules: JSON.parse(this.item.rules),
+                // keys: keys
             }
         }
     };
@@ -95,8 +123,8 @@
                         vue: detail,
                         datas: {item: item}
                     },
-                    width: 1000,
-                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: true, closeOnMask: true,
+                    width: 800,
+                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false, closeOnMask: true,
                     events: {
                         // reload: () => {
                         //     this.load()

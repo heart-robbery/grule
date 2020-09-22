@@ -40,7 +40,6 @@ class AioSession {
         assert server != null: "server must not be null"
         this.sc = sc
         this.server = server
-        sendQueue = new Devourer(AioSession.simpleName + ":" + sc.toString(), server.exec)
     }
 
 

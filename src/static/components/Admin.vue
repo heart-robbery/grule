@@ -22,13 +22,13 @@
             <h-sider theme="dark">
 
                 <div class="layout-logo">
-                    <h-avatar src="https://i1.go2yd.com/image.php?url=0Kvq81cKR1">
-                        <!--                    <div style="font-size: 18px;">默认尺寸的显示</div>-->
-                        <!--                    <p class="dark2-color">描述</p>-->
-                    </h-avatar>
+<!--                    <h-avatar src="https://i1.go2yd.com/image.php?url=0Kvq81cKR1">-->
+<!--                        &lt;!&ndash;                    <div style="font-size: 18px;">默认尺寸的显示</div>&ndash;&gt;-->
+<!--                        &lt;!&ndash;                    <p class="dark2-color">描述</p>&ndash;&gt;-->
+<!--                    </h-avatar>-->
                 </div>
                 <h-menu style="margin-top: 20px;" class="h-menu-dark" :datas="menuDatas"
-                        :inline-collapsed="siderCollapsed"
+                        :inline-collapsed="siderCollapsed" accordion
                         ref="menu"
                         @select="changeMenu"
                 ></h-menu>
@@ -65,8 +65,8 @@
                             { title: '用户中心', key: 'UserCenter' },
                         ] },
                     { title: '数据中心', key: 'dataCenter', icon: 'h-icon-setting', children: [
-                            { title: '决策结果', key: 'DecisionResult' },
-                            // { title: '用户中心', key: 'UserCenter' },
+                            { title: '决策数据', key: 'DecisionData' },
+                            { title: '数据分析', key: 'DataAnalyse' },
                         ] },
                     { title: '查询', key: 'search', icon: 'h-icon-search' },
                     { title: '收藏', key: 'favor', icon: 'h-icon-star', count: 100, children: [{ title: '收藏-1', key: 'favor2-1' }] },

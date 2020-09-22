@@ -221,18 +221,11 @@ class MntCtrl extends ServerTpl {
                     return ApiResp.fail("决策id($spec.决策id)已存在")
                 }
                 removeFn = {
-                    bean(DecisionManager).remove(decision.decisionId)
-                    ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'decision.remove', [decision.decisionId]).completeFn{ ec ->
-                        if (ec.success) {
-                            String msg = "删除决策'$decision.decisionId'集群同步完成成功"
-                            log.info(msg)
-                            ep.fire('wsMsg', msg)
-                        } else {
-                            String msg = "删除决策'$decision.decisionId'集群同步完成失败: " + ec.failDesc()
-                            log.error(msg)
-                            ep.fire('wsMsg', msg)
-                        }
-                    })
+                    def dId = decision.decisionId
+                    bean(DecisionManager).remove(dId)
+                    bean(DecisionManager).loadDecision(spec.决策id)
+                    ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'delDecision', [dId]))
+                    ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'loadDecision', [spec.决策id]))
                 }
             }
         } else { // 创建
@@ -245,6 +238,10 @@ class MntCtrl extends ServerTpl {
         decision.dsl = dsl
         repo.saveOrUpdate(decision)
         if (removeFn) removeFn()
+        if (!id) {
+            bean(DecisionManager).loadDecision(decision.decisionId)
+            ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'loadDecision', [decision.decisionId]))
+        }
         ep.fire('enHistory', decision, ctx.getSessionAttr('name'))
         ApiResp.ok(decision)
     }
@@ -261,6 +258,7 @@ class MntCtrl extends ServerTpl {
         def field = new RuleField(enName: enName, cnName: cnName, type: type, comment: comment, dataCollector: dataCollector)
         repo.saveOrUpdate(field)
         ep.fire('addField', field.enName)
+        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'addField', [enName]))
         ep.fire('enHistory', field, ctx.getSessionAttr('name'))
         ApiResp.ok(field)
     }
@@ -279,6 +277,7 @@ class MntCtrl extends ServerTpl {
             if (!dc.url) return ApiResp.fail('url must not be empty')
             if (!dc.method) return ApiResp.fail('method must not be empty')
             if (!dc.contentType) return ApiResp.fail('contentType must not be empty')
+            if (!dc.url.startsWith("http")) return ApiResp.fail('url incorrect')
         } else if ('script' == dc.type) {
             if (!dc.computeScript) return ApiResp.fail('computeScript must not be empty')
         }
@@ -290,6 +289,7 @@ class MntCtrl extends ServerTpl {
         }
         repo.saveOrUpdate(dc)
         ep.fire('addDataCollector', dc.enName)
+        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'addDataCollector', [dc.enName]))
         ep.fire('enHistory', dc, ctx.getSessionAttr('name'))
         ApiResp.ok(dc)
     }
@@ -319,6 +319,7 @@ class MntCtrl extends ServerTpl {
 
         repo.saveOrUpdate(field)
         ep.fire('updateField', field.enName)
+        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'updateField', [field.enName]))
         ep.fire('enHistory', field, ctx.getSessionAttr('name'))
         ApiResp.ok(field)
     }
@@ -336,6 +337,7 @@ class MntCtrl extends ServerTpl {
             if (!url) return ApiResp.fail('url must not be empty')
             if (!method) return ApiResp.fail('method must not be empty')
             if (!contentType) return ApiResp.fail('contentType must not be empty')
+            if (!url.startsWith("http")) return ApiResp.fail('url incorrect')
             collector.url = url
             collector.method = method
             collector.contentType = contentType
@@ -381,6 +383,7 @@ class MntCtrl extends ServerTpl {
             repo.saveOrUpdate(collector)
         }
         ep.fire('updateDataCollector', collector.enName)
+        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'updateDataCollector', [collector.enName]))
         ep.fire('enHistory', collector, ctx.getSessionAttr('name'))
         ApiResp.ok(collector)
     }
@@ -391,6 +394,7 @@ class MntCtrl extends ServerTpl {
         repo.delete(repo.find(Decision) {root, query, cb -> cb.equal(root.get('decisionId'), decisionId)})
         ctx.auth('decision-del')
         ep.fire('delDecision', decisionId)
+        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'delDecision', [decisionId]))
         ApiResp.ok()
     }
 
@@ -400,6 +404,7 @@ class MntCtrl extends ServerTpl {
         ctx.auth('field-del')
         repo.delete(repo.find(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)})
         ep.fire('delField', enName)
+        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'delField', [enName]))
         ApiResp.ok()
     }
 
@@ -409,6 +414,7 @@ class MntCtrl extends ServerTpl {
         ctx.auth('dataCollector-del')
         repo.delete(repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), enName)})
         ep.fire('delDataCollector', enName)
+        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'delDataCollector', [enName]))
         ApiResp.ok()
     }
 }

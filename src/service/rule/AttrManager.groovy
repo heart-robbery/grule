@@ -8,6 +8,7 @@ import core.OkHttpSrv
 import core.ServerTpl
 import core.Utils
 import core.jpa.BaseRepo
+import dao.entity.CollectResult
 import dao.entity.DataCollector
 import dao.entity.FieldType
 import dao.entity.RuleField
@@ -110,15 +111,20 @@ class AttrManager extends ServerTpl {
      * 决策产生的数据接口调用
      * @param ctx 当前决策 DecisionContext
      * @param collector 数据配置
+     * @param collectDate 调用时间
      * @param spend 接口调用花费时间
      * @param url url地址
      * @param bodyStr 请求body
      * @param resultStr 接口返回结果
      * @param resolveResult 解析结果
      */
-    @EL(name = 'decision.dataCollect')
-    void dataCollected(DecisionContext ctx, DataCollector collector, Long spend, String url, String bodyStr, String resultStr, Map resolveResult) {
-
+    // @EL(name = 'decision.dataCollected', async = true)
+    void dataCollected(DecisionContext ctx, DataCollector collector, Date collectDate, Long spend, String url, String bodyStr, String resultStr, Object resolveResult) {
+        repo.saveOrUpdate(new CollectResult(
+            decideId: ctx.id, decisionId: ctx.decisionSpec.决策id, collector: collector.enName, collectDate: collectDate,
+            spend: spend, url: url, body: bodyStr, result: resultStr,
+            resolveResult: resolveResult instanceof Map ? JSON.toJSONString(resolveResult) : resolveResult?.toString()
+        ))
     }
 
 
@@ -162,6 +168,7 @@ class AttrManager extends ServerTpl {
      * 加载属性
      */
     void loadField() {
+        if (!attrMap.isEmpty()) attrMap.clear()
         initAttr()
         log.info("加载属性配置")
         int page = 1
@@ -178,36 +185,44 @@ class AttrManager extends ServerTpl {
 
 
     // ======================= 监听变化 ==========================
-    @EL(name = ['updateField', 'addField'], async = true)
-    void listenFieldChange(String enName) {
+    @EL(name = 'addField', async = true)
+    void listenFieldAdd(String enName) {
         def field = repo.find(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}
         attrMap.put(field.enName, field)
         attrMap.put(field.cnName, field)
-        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'updateField', [enName]))
+        log.info("addField: " + enName)
+    }
+    @EL(name = 'updateField', async = true)
+    void listenFieldUpdate(String enName) {
+        def field = repo.find(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}
+        attrMap.put(field.enName, field)
+        attrMap.put(field.cnName, field)
+        log.info("updateField: " + enName)
     }
     @EL(name = 'delField')
     void listenDelField(String enName) {
         def field = attrMap.remove(enName)
         attrMap.remove(field.cnName)
         ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'delField', [enName]))
+        log.info("delField: " + enName)
     }
     @EL(name = 'addDataCollector', async = true)
     void listenAddDataCollector(String enName) {
         def collector = repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), enName)}
         initDataCollect(collector)
-        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'addDataCollector', [enName]))
+        log.info("addDataCollector: " + enName)
     }
-    @EL(name = 'updateDataCollector')
+    @EL(name = 'updateDataCollector', async = true)
     void listenUpdateDataCollector(String enName) {
         def collector = repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), enName)}
         initDataCollect(collector)
         loadField()
-        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'updateDataCollector', [enName]))
+        log.info("addDataCollector: " + enName)
     }
-    @EL(name = 'delDataCollector')
+    @EL(name = 'delDataCollector', async = true)
     void listenDelCollector(String enName) {
         dataCollectorMap.remove(enName)
-        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'delDataCollector', [enName]))
+        log.info("delDataCollector: " + enName)
     }
 
 
@@ -232,6 +247,7 @@ class AttrManager extends ServerTpl {
      * 加载数据集成
      */
     void loadDataCollector() {
+        if (!dataCollectorMap.isEmpty()) dataCollectorMap.clear()
         initDataCollector()
         log.info("加载数据集成配置")
         repo.findList(DataCollector).each {initDataCollect(it)}
@@ -277,79 +293,104 @@ if (idNumber && idNumber.length() > 17) {
 
     /**
      * 初始全数据收集器
-     * @param record
+     * @param collector
      */
-    void initDataCollect(DataCollector record) {
-        if (!record) return
-        if ('http' == record.type) { // http 接口
+    void initDataCollect(DataCollector collector) {
+        if (!collector) return
+        if ('http' == collector.type) { // http 接口
             def http = bean(OkHttpSrv)
             Closure parseFn
-            if (record.parseScript) {
+            if (collector.parseScript) {
                 Binding binding = new Binding()
                 def config = new CompilerConfiguration()
                 def icz = new ImportCustomizer()
                 config.addCompilationCustomizers(icz)
                 icz.addImports(JSON.class.name, JSONObject.class.name)
-                parseFn = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("$record.parseScript")
+                parseFn = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("$collector.parseScript")
             }
-            // 变量替换
+            // GString 模板替换
             def tplEngine = new GStringTemplateEngine(Thread.currentThread().contextClassLoader)
-            setCollector(record.enName) { ctx -> // 数据集成中3方接口访问过程
-                String result
-                String url = tplEngine.createTemplate(record.url).make(new HashMap(1) {
+            setCollector(collector.enName) { ctx -> // 数据集成中3方接口访问过程
+                // http请求 url
+                String url = tplEngine.createTemplate(collector.url).make(new HashMap(1) {
                     @Override
                     Object get(Object key) {
                         def v = ctx.data.get(key)
                         return v == null ? '' : URLEncoder.encode(v.toString(), 'utf-8')
                     }
                 }).toString()
-                String bodyStr = record.bodyStr ? tplEngine.createTemplate(record.bodyStr).make(new HashMap(1) {
+                // http 请求 body字符串
+                String bodyStr = collector.bodyStr ? tplEngine.createTemplate(collector.bodyStr).make(new HashMap(1) {
                     @Override
                     Object get(Object key) {
                         def v = ctx.data.get(key)
                         return v == null ? '' : URLEncoder.encode(v.toString(), 'utf-8')
                     }
                 }).toString() : ''
-                Object resolveResult
-                if ('get'.equalsIgnoreCase(record.method)) {
-                    result = http.get(url).execute()
-                } else if ('post'.equalsIgnoreCase(record.method)) {
-                    result = http.post(url).textBody(bodyStr).contentType(record.contentType).execute()
-                } else throw new Exception("Not support http method $record.method")
-                String logMsg = ctx.logPrefix() + "接口调用: name: $record.enName, url: $url, bodyStr: $bodyStr, result: $result"
-                if (parseFn) {
+                String result // 接口返回结果字符串
+                Object resolveResult // 解析接口返回结果
+
+                final Date start = new Date() // 调用时间
+                long spend = 0
+                def logMsg = "${ctx.logPrefix()}接口调用: name: $collector.enName, url: $url, bodyStr: $bodyStr${ -> ', ' + result}${ -> ', ' + resolveResult}"
+                try {
+                    for (int i = 0, times = getInteger('http.retry', 3); i < times; i++) { // 接口一般遇网络错重试3次
+                        try {
+                            if ('get'.equalsIgnoreCase(collector.method)) {
+                                result = http.get(url).execute()
+                            } else if ('post'.equalsIgnoreCase(collector.method)) {
+                                result = http.post(url).textBody(bodyStr).contentType(collector.contentType).execute()
+                            } else throw new Exception("Not support http method $collector.method")
+                        } catch (ex) {
+                            if ((ex instanceof SocketTimeoutException || ex instanceof ConnectException) && (i + 1) < times) {
+                                log.error(logMsg.toString() + ". " + (ex.class.simpleName + ': ' + ex.message))
+                                continue
+                            } else throw ex
+                        } finally {
+                            spend = System.currentTimeMillis() - start.time
+                        }
+                    }
+                } catch (ex) {
+                    log.error(logMsg.toString())
+                    dataCollected(ctx, collector, start, spend, url, bodyStr, result, resolveResult)
+                    throw ex
+                }
+
+                if (parseFn) { // 如果有配置解构函数,则对接口返回结果解析
                     try {
                         resolveResult = parseFn.rehydrate(ctx.data, parseFn, this)(result)
                     } catch (ex) {
-                        throw new RuntimeException("解析函数'$record.enName'执行失败", ex)
+                        throw new RuntimeException("解析函数'$collector.enName'执行失败", ex)
                     } finally {
-                        log.info(logMsg + ", parseResult: " + resolveResult)
+                        log.info(logMsg.toString())
+                        dataCollected(ctx, collector, start, spend, url, bodyStr, result, resolveResult)
                     }
                     return resolveResult
                 }
-                log.info(logMsg)
+                log.info(logMsg.toString())
+                dataCollected(ctx, collector, start, spend, url, bodyStr, result, resolveResult)
                 return result
             }
-        } else if ('script' == record.type) {
-            if (record.computeScript) {
+        } else if ('script' == collector.type) {
+            if (collector.computeScript) {
                 Binding binding = new Binding()
                 def config = new CompilerConfiguration()
                 def icz = new ImportCustomizer()
                 config.addCompilationCustomizers(icz)
                 icz.addImports(JSON.class.name, JSONObject.class.name)
-                Closure script = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("{ -> $record.computeScript}")
-                setCollector(record.enName) { ctx ->
+                Closure script = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("{ -> $collector.computeScript}")
+                setCollector(collector.enName) { ctx ->
                     Object result
                     try {
                         result = script.rehydrate(ctx.data, script, this)()
                     } catch (ex) {
-                        throw new RuntimeException("脚本函数'$record.enName'执行失败", ex)
+                        throw new RuntimeException("脚本函数'$collector.enName'执行失败", ex)
                     } finally {
-                        log.debug(ctx.logPrefix() + "脚本函数'$record.enName'执行结果: $result".toString())
+                        log.debug(ctx.logPrefix() + "脚本函数'$collector.enName'执行结果: $result".toString())
                     }
                     return result
                 }
             }
-        } else throw new Exception("Not support type: $record.type")
+        } else throw new Exception("Not support type: $collector.type")
     }
 }
