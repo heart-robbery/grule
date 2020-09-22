@@ -9,6 +9,8 @@ import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.ClosedChannelException
 import java.nio.channels.CompletionHandler
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.function.BiConsumer
 
@@ -19,7 +21,9 @@ class AioSession {
     protected final ServerTpl                            server
     protected final List<BiConsumer<String, AioSession>> msgFns      = new LinkedList<>()
     // 消息发送队列
-    protected final Devourer                             sendQueue
+    protected final Queue<AioMsg>                             sendQueue = new ConcurrentLinkedQueue<>()
+    // 是否正在有消息发送
+    final        AtomicBoolean                   sending     = new AtomicBoolean(false)
     // close 回调函数
     protected Runnable                                   closeFn
     protected Long                                       lastUsed
@@ -67,23 +71,57 @@ class AioSession {
     }
 
 
+
+    void send(String msg) { send(AioMsg.of(msg)) }
     /**
      * 发送消息到客户端
      * @param msg
      */
-    void send(String msg) {
-        if (closed.get() || msg == null) return
-        lastUsed = System.currentTimeMillis()
-        sendQueue.offer { // 排对发送消息. 避免 WritePendingException
-            try {
-                sc.write(ByteBuffer.wrap((msg + (delimiter?:'')).getBytes('utf-8'))).get()
-            } catch (ex) {
-                if (ex !instanceof ClosedChannelException) {
-                    log.error(ex.class.simpleName + " " + sc.localAddress.toString() + " ->" + sc.remoteAddress.toString())
-                }
-                close()
-            }
+    void send(AioMsg msg) {
+        if (msg == null || msg.content == null) return
+        if (closed.get()) {
+            msg.failCallback?.accept(null, this)
+            return
         }
+        lastUsed = System.currentTimeMillis()
+        sendQueue.offer(msg)
+        server.async { trigger() }
+    }
+
+
+    /**
+     * 自动遍历消息发送
+     */
+    protected final void trigger() {
+        if (closed.get() || sendQueue.isEmpty()) return
+        if (!sending.compareAndSet(false, true)) return
+        def msg = sendQueue.poll()
+        if (msg == null) return
+        sc.write( // 写入tcp通道
+            ByteBuffer.wrap((msg.content + (delimiter?:'')).getBytes('utf-8')),
+            msg.timeout.toMillis(), TimeUnit.MICROSECONDS, this,
+            new CompletionHandler<Integer, AioSession>() {
+                @Override
+                void completed(Integer result, AioSession se) {
+                    if (result > 0) {
+                        if (msg.okCallback) se.server.async { msg.okCallback.accept(msg, se) }
+                        se.trigger()
+                    }
+                    else {
+                        if (msg.failCallback) se.server.async { msg.failCallback.accept(null, se) }
+                    }
+                }
+                @Override
+                void failed(Throwable ex, AioSession se) {
+                    if (msg.failCallback) se.server.async { msg.failCallback.accept(ex, se) }
+                    else {
+                        if (ex !instanceof ClosedChannelException) {
+                            log.error(ex.class.simpleName + " " + sc.localAddress.toString() + " ->" + sc.remoteAddress.toString())
+                        }
+                        se.close()
+                    }
+                }
+            })
     }
 
 
@@ -91,7 +129,7 @@ class AioSession {
      * 当前会话渠道是否忙
      * @return
      */
-    boolean busy() { sendQueue.waitingCount > 0 }
+    boolean busy() { sendQueue.size() > 1 }
 
 
     /**

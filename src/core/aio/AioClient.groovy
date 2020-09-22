@@ -5,6 +5,8 @@ import core.ServerTpl
 
 import java.nio.channels.AsynchronousChannelGroup
 import java.nio.channels.AsynchronousSocketChannel
+import java.nio.channels.ClosedChannelException
+import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReadWriteLock
@@ -38,6 +40,31 @@ class AioClient extends ServerTpl {
      * @param msg 消息内容
      */
     AioClient send(String host, Integer port, String msg) {
+        getSession(host, port).send(
+            AioMsg.of(msg, Duration.ofMillis(getInteger('sendTimeout', 3000)))
+        )
+        this
+    }
+
+
+    AioClient send(String host, Integer port, AioMsg msg) {
+        if (msg.timeout == null) msg.timeout = Duration.ofMillis(getInteger('sendTimeout', 3000))
+        def failCallback = msg.failCallback
+        msg.failCallback = {ex, se ->
+            if (ex instanceof ClosedChannelException) { // 默认关闭的通道 重试两次
+                se.close()
+                if (msg.retryCount < getInteger('perRetryMax', 2)) {
+                    msg.retryCount += 1
+                    getSession(host, port).send(msg)
+                } else {
+                    failCallback?.accept(ex, se)
+                    log.error("msg send fail cause by ClosedChannelException. " + msg)
+                }
+            } else {
+                failCallback?.accept(ex, se)
+                log.error(ex.class.simpleName + " " + se.sc.localAddress.toString() + " ->" + se.sc.remoteAddress.toString())
+            }
+        }
         getSession(host, port).send(msg)
         this
     }
@@ -64,6 +91,7 @@ class AioClient extends ServerTpl {
             }
         }
 
+        ls.findAll {!it.sc.isOpen()}.each {it.close()}
         se = ls.find {!it.busy()}
 
         if (se == null) {
@@ -78,11 +106,11 @@ class AioClient extends ServerTpl {
      * 安全列表
      * @return
      */
-    protected List safeList() {
+    protected List<AioSession> safeList() {
         final ReadWriteLock lock = new ReentrantReadWriteLock()
-        new LinkedList() {
+        new LinkedList<AioSession>() {
             @Override
-            Object get(int index) {
+            AioSession get(int index) {
                 try {
                     lock.readLock().lock()
                     return super.get(index)
@@ -112,7 +140,7 @@ class AioClient extends ServerTpl {
             }
 
             @Override
-            boolean add(Object e) {
+            boolean add(AioSession e) {
                 try {
                     lock.writeLock().lock()
                     return super.add(e)

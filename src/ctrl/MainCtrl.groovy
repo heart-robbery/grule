@@ -70,7 +70,9 @@ class MainCtrl extends ServerTpl {
 
     @Path(path = 'components/:fName')
     File components(String fName, HttpContext ctx) {
-        // ctx.response.cacheControl(1800)
+        if (app.profile == 'pro') {
+            ctx.response.cacheControl(1800)
+        }
         Utils.baseDir("src/static/components/$fName")
     }
 
