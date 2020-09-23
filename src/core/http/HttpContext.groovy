@@ -463,6 +463,7 @@ class HttpContext {
         if (type == null) return v
         else if (v == null) return type.cast(v)
         else if (type == String) return v instanceof List ? (v?[0]) : String.valueOf(v)
+        else if (type == Boolean) return Boolean.valueOf(v)
         else if (type == Integer || type == int) return Integer.valueOf(v)
         else if (type == Long || type == long) return Long.valueOf(v)
         else if (type == Double || type == double) return Double.valueOf(v)

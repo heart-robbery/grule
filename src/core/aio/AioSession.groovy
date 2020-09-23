@@ -1,6 +1,6 @@
 package core.aio
 
-import core.Devourer
+
 import core.ServerTpl
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -40,7 +40,6 @@ class AioSession {
         assert server != null: "server must not be null"
         this.sc = sc
         this.server = server
-        sendQueue = new Devourer(AioSession.simpleName + ":" + sc.toString(), server.exec)
     }
 
 
