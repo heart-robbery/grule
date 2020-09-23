@@ -5,6 +5,8 @@ import core.http.HttpContext
 import core.http.mvc.ApiResp
 import core.http.mvc.Ctrl
 import core.http.mvc.Path
+import core.jpa.BaseRepo
+import dao.entity.DecisionResult
 import service.rule.AttrManager
 import service.rule.DecisionEngine
 
@@ -12,6 +14,7 @@ import service.rule.DecisionEngine
 class RuleCtrl extends ServerTpl {
 
     @Lazy def engine = bean(DecisionEngine)
+    @Lazy def repo = bean(BaseRepo, 'jpa_rule_repo')
 
 
     /**
@@ -30,6 +33,20 @@ class RuleCtrl extends ServerTpl {
             ApiResp.ok(
                 engine.run(decisionId, async, ctx.request.id, params)
             )
+        )
+    }
+
+
+    /**
+     * 查询决策结果
+     */
+    @Path(path = 'findDecisionResult')
+    ApiResp findDecisionResult(String id) {
+        if (!id) return ApiResp.fail("id must not be empty")
+        def dr = repo.findById(DecisionResult, id)
+        if (!dr) return ApiResp.fail("未找到记录: " + id)
+        ApiResp.ok(
+
         )
     }
 

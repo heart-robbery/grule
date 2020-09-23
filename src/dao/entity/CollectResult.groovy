@@ -3,15 +3,13 @@ package dao.entity
 import core.jpa.LongIdEntity
 import org.hibernate.annotations.Type
 
-import javax.persistence.Basic
-import javax.persistence.Column
-import javax.persistence.Entity
-import javax.persistence.Lob
+import javax.persistence.*
 
 /**
  * 决策结果保存地
  */
 @Entity
+@Table(indexes = [@Index(name = "index_collectDate", columnList = "collectDate"), @Index(name = "index_decideId", columnList = "decideId")])
 class CollectResult extends LongIdEntity {
     /**
      * 执行决策id
@@ -25,6 +23,10 @@ class CollectResult extends LongIdEntity {
      * 收集器
      */
     String collector
+    /**
+     * 收集器:类型
+     */
+    String collectorType
     /**
      * 收集时间
      */
@@ -57,4 +59,19 @@ class CollectResult extends LongIdEntity {
     @Basic
     @Type(type = "text")
     String resolveResult
+    /**
+     * http 请求异常
+     */
+    @Column(length = 1000)
+    String httpException
+    /**
+     * 解析http返回异常
+     */
+    @Column(length = 1000)
+    String parseException
+    /**
+     * 脚本执行异常
+     */
+    @Column(length = 1000)
+    String scriptException
 }

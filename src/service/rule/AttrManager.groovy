@@ -4,6 +4,7 @@ import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
+import com.alibaba.fastjson.serializer.SerializerFeature
 import core.OkHttpSrv
 import core.ServerTpl
 import core.Utils
@@ -109,22 +110,11 @@ class AttrManager extends ServerTpl {
 
     /**
      * 决策产生的数据接口调用
-     * @param ctx 当前决策 DecisionContext
-     * @param collector 数据配置
-     * @param collectDate 调用时间
-     * @param spend 接口调用花费时间
-     * @param url url地址
-     * @param bodyStr 请求body
-     * @param resultStr 接口返回结果
-     * @param resolveResult 解析结果
+     * @param collectResult CollectResult
      */
     // @EL(name = 'decision.dataCollected', async = true)
-    void dataCollected(DecisionContext ctx, DataCollector collector, Date collectDate, Long spend, String url, String bodyStr, String resultStr, Object resolveResult) {
-        repo.saveOrUpdate(new CollectResult(
-            decideId: ctx.id, decisionId: ctx.decisionSpec.决策id, collector: collector.enName, collectDate: collectDate,
-            spend: spend, url: url, body: bodyStr, result: resultStr,
-            resolveResult: resolveResult instanceof Map ? JSON.toJSONString(resolveResult) : resolveResult?.toString()
-        ))
+    void dataCollected(CollectResult collectResult) {
+        repo.saveOrUpdate(collectResult)
     }
 
 
@@ -298,99 +288,151 @@ if (idNumber && idNumber.length() > 17) {
     void initDataCollect(DataCollector collector) {
         if (!collector) return
         if ('http' == collector.type) { // http 接口
-            def http = bean(OkHttpSrv)
-            Closure parseFn
-            if (collector.parseScript) {
-                Binding binding = new Binding()
-                def config = new CompilerConfiguration()
-                def icz = new ImportCustomizer()
-                config.addCompilationCustomizers(icz)
-                icz.addImports(JSON.class.name, JSONObject.class.name)
-                parseFn = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("$collector.parseScript")
+            initHttpCollector(collector)
+        } else if ('script' == collector.type) {
+            initScriptCollector(collector)
+        } else throw new Exception("Not support type: $collector.type")
+    }
+
+
+    /**
+     * 初始化 script 收集器
+     * @param collector
+     */
+    protected void initScriptCollector(DataCollector collector) {
+        if (!collector.computeScript) {
+            log.warn("Script collector'$collector.enName' script must not be empty".toString())
+            return
+        }
+        Binding binding = new Binding()
+        def config = new CompilerConfiguration()
+        def icz = new ImportCustomizer()
+        config.addCompilationCustomizers(icz)
+        icz.addImports(JSON.class.name, JSONObject.class.name)
+        Closure script = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("{ -> $collector.computeScript}")
+        setCollector(collector.enName) { ctx ->
+            Object result
+            final def start = new Date()
+            Exception exx
+            try {
+                result = script.rehydrate(ctx.data, script, this)()
+            } catch (ex) {
+                exx = ex
+                log.error(ctx.logPrefix() + "脚本函数'$collector.enName'执行失败".toString(), ex)
+            } finally {
+                log.info(ctx.logPrefix() + "脚本函数'$collector.enName'执行结果: $result".toString())
+                // TODO 保存吗
+                dataCollected(new CollectResult(
+                    decideId: ctx.id, decisionId: ctx.decisionSpec.决策id, collector: collector.enName,
+                    collectDate: start, collectorType: collector.type,
+                    spend: System.currentTimeMillis() - start.time,
+                    result: result instanceof Map ? JSON.toJSONString(result, SerializerFeature.WriteMapNullValue) : result?.toString(),
+                    scriptException: exx == null ? null : exx.message?:exx.class.simpleName
+                ))
             }
-            // GString 模板替换
-            def tplEngine = new GStringTemplateEngine(Thread.currentThread().contextClassLoader)
-            setCollector(collector.enName) { ctx -> // 数据集成中3方接口访问过程
-                // http请求 url
-                String url = tplEngine.createTemplate(collector.url).make(new HashMap(1) {
-                    @Override
-                    Object get(Object key) {
-                        def v = ctx.data.get(key)
-                        return v == null ? '' : URLEncoder.encode(v.toString(), 'utf-8')
-                    }
-                }).toString()
-                // http 请求 body字符串
-                String bodyStr = collector.bodyStr ? tplEngine.createTemplate(collector.bodyStr).make(new HashMap(1) {
-                    @Override
-                    Object get(Object key) {
-                        def v = ctx.data.get(key)
-                        return v == null ? '' : URLEncoder.encode(v.toString(), 'utf-8')
-                    }
-                }).toString() : ''
-                String result // 接口返回结果字符串
-                Object resolveResult // 解析接口返回结果
+            return result
+        }
+    }
 
-                final Date start = new Date() // 调用时间
-                long spend = 0
-                def logMsg = "${ctx.logPrefix()}接口调用: name: $collector.enName, url: $url, bodyStr: $bodyStr${ -> ', ' + result}${ -> ', ' + resolveResult}"
-                try {
-                    for (int i = 0, times = getInteger('http.retry', 3); i < times; i++) { // 接口一般遇网络错重试3次
-                        try {
-                            if ('get'.equalsIgnoreCase(collector.method)) {
-                                result = http.get(url).execute()
-                            } else if ('post'.equalsIgnoreCase(collector.method)) {
-                                result = http.post(url).textBody(bodyStr).contentType(collector.contentType).execute()
-                            } else throw new Exception("Not support http method $collector.method")
-                        } catch (ex) {
-                            if ((ex instanceof SocketTimeoutException || ex instanceof ConnectException) && (i + 1) < times) {
-                                log.error(logMsg.toString() + ". " + (ex.class.simpleName + ': ' + ex.message))
-                                continue
-                            } else throw ex
-                        } finally {
-                            spend = System.currentTimeMillis() - start.time
-                        }
-                    }
-                } catch (ex) {
-                    log.error(logMsg.toString())
-                    dataCollected(ctx, collector, start, spend, url, bodyStr, result, resolveResult)
-                    throw ex
+
+    /**
+     * 初始化 http 收集器
+     * @param collector
+     */
+    protected void initHttpCollector(DataCollector collector) {
+        def http = bean(OkHttpSrv)
+        Closure parseFn
+        if (collector.parseScript) {
+            Binding binding = new Binding()
+            def config = new CompilerConfiguration()
+            def icz = new ImportCustomizer()
+            config.addCompilationCustomizers(icz)
+            icz.addImports(JSON.class.name, JSONObject.class.name)
+            parseFn = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("$collector.parseScript")
+        }
+        // GString 模板替换
+        def tplEngine = new GStringTemplateEngine(Thread.currentThread().contextClassLoader)
+        setCollector(collector.enName) { ctx -> // 数据集成中3方接口访问过程
+            // http请求 url
+            String url = tplEngine.createTemplate(collector.url).make(new HashMap(1) {
+                @Override
+                Object get(Object key) {
+                    def v = ctx.data.get(key)
+                    return v == null ? '' : URLEncoder.encode(v.toString(), 'utf-8')
                 }
+            }).toString()
+            // http 请求 body字符串
+            String bodyStr = collector.bodyStr ? tplEngine.createTemplate(collector.bodyStr).make(new HashMap(1) {
+                @Override
+                Object get(Object key) {
+                    def v = ctx.data.get(key)
+                    return v == null ? '' : URLEncoder.encode(v.toString(), 'utf-8')
+                }
+            }).toString() : ''
+            String result // 接口返回结果字符串
+            Object resolveResult // 解析接口返回结果
 
-                if (parseFn) { // 如果有配置解构函数,则对接口返回结果解析
+            final Date start = new Date() // 调用时间
+            long spend = 0 // 耗时时长
+            String retryMsg = ''
+            def logMsg = "${ctx.logPrefix()}接口调用${ -> retryMsg}: name: $collector.enName, url: $url, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}"
+            try {
+                for (int i = 0, times = getInteger('http.retry', 2) + 1; i < times; i++) { // 接口一般遇网络错重试3次
                     try {
-                        resolveResult = parseFn.rehydrate(ctx.data, parseFn, this)(result)
+                        if ('get'.equalsIgnoreCase(collector.method)) {
+                            result = http.get(url).execute()
+                        } else if ('post'.equalsIgnoreCase(collector.method)) {
+                            result = http.post(url).textBody(bodyStr).contentType(collector.contentType).execute()
+                        } else throw new Exception("Not support http method $collector.method")
                     } catch (ex) {
-                        throw new RuntimeException("解析函数'$collector.enName'执行失败", ex)
+                        if ((ex instanceof SocketTimeoutException || ex instanceof ConnectException) && (i + 1) < times) {
+                            retryMsg = "(重试第'$times'次)"
+                            log.error(logMsg.toString() + ". " + (ex.class.simpleName + ': ' + ex.message))
+                            retryMsg = ''
+                            continue
+                        } else throw ex
                     } finally {
-                        log.info(logMsg.toString())
-                        dataCollected(ctx, collector, start, spend, url, bodyStr, result, resolveResult)
+                        spend = System.currentTimeMillis() - start.time
                     }
-                    return resolveResult
                 }
-                log.info(logMsg.toString())
-                dataCollected(ctx, collector, start, spend, url, bodyStr, result, resolveResult)
+            } catch (ex) {
+                log.error(logMsg.toString(), ex)
+                dataCollected(new CollectResult(
+                    decideId: ctx.id, decisionId: ctx.decisionSpec.决策id, collector: collector.enName,
+                    collectDate: start, collectorType: collector.type,
+                    spend: spend, url: url, body: bodyStr, result: result, httpException: ex.message?:ex.class.simpleName
+                ))
                 return result
             }
-        } else if ('script' == collector.type) {
-            if (collector.computeScript) {
-                Binding binding = new Binding()
-                def config = new CompilerConfiguration()
-                def icz = new ImportCustomizer()
-                config.addCompilationCustomizers(icz)
-                icz.addImports(JSON.class.name, JSONObject.class.name)
-                Closure script = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("{ -> $collector.computeScript}")
-                setCollector(collector.enName) { ctx ->
-                    Object result
-                    try {
-                        result = script.rehydrate(ctx.data, script, this)()
-                    } catch (ex) {
-                        throw new RuntimeException("脚本函数'$collector.enName'执行失败", ex)
-                    } finally {
-                        log.debug(ctx.logPrefix() + "脚本函数'$collector.enName'执行结果: $result".toString())
+
+            if (parseFn) { // 如果有配置解析函数,则对接口返回结果解析
+                Exception exx
+                try {
+                    resolveResult = parseFn.rehydrate(ctx.data, parseFn, this)(result)
+                } catch (ex) {
+                    exx = ex
+                } finally {
+                    if (exx) {
+                        log.error(logMsg.toString() + ", 解析函数执行失败", exx)
+                    } else {
+                        log.info(logMsg.toString())
                     }
-                    return result
+                    dataCollected(new CollectResult(
+                        decideId: ctx.id, decisionId: ctx.decisionSpec.决策id, collector: collector.enName,
+                        collectDate: start, collectorType: collector.type,
+                        spend: spend, url: url, body: bodyStr, result: result, parseException: exx == null ? null : exx.message?:exx.class.simpleName,
+                        resolveResult: resolveResult instanceof Map ? JSON.toJSONString(resolveResult, SerializerFeature.WriteMapNullValue) : resolveResult?.toString()
+                    ))
                 }
+                return resolveResult
             }
-        } else throw new Exception("Not support type: $collector.type")
+            log.info(logMsg.toString())
+            dataCollected(new CollectResult(
+                decideId: ctx.id, decisionId: ctx.decisionSpec.决策id, collector: collector.enName,
+                collectDate: start, collectorType: collector.type,
+                spend: spend, url: url, body: bodyStr, result: result
+            ))
+            return result
+        }
     }
 }

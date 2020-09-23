@@ -26,7 +26,7 @@
     const types = [
         { title: '决策', key: 'Decision'},
         { title: '字段', key: 'RuleField'},
-        { title: '数据集成', key: 'DataCollector'},
+        { title: '收集器', key: 'DataCollector'},
     ];
     module.exports = {
         data() {

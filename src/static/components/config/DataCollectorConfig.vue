@@ -48,23 +48,18 @@
                             :show-error-tip="true"
                             :label-position="'left'"
                             :label-width="110"
+                            mode="twocolumn"
                             :rules="validationRules"
                             :model="model">
                         <h-formitem label="英语名" icon="h-icon-complete" prop="enName">
-                            <input type="text" v-model="model.enName" />
+                            <input type="text" v-model="model.enName" readonly/>
                         </h-formitem>
                         <h-formitem label="中文名" icon="h-icon-complete" prop="cnName">
                             <input type="text" v-model="model.cnName" />
                         </h-formitem>
-                        <h-formitem label="描述" icon="h-icon-complete" prop="comment">
-                            <input type="text" v-model="model.comment" />
-                        </h-formitem>
                         <h-formitem label="类型" icon="h-icon-complete" prop="type">
                             <h-select v-if="model.id" v-model="model.type" :datas="types" disabled></h-select>
                             <h-select v-else v-model="model.type" :datas="types" :deletable="false"></h-select>
-                        </h-formitem>
-                        <h-formitem v-if="model.type == 'http'" label="接口地址" prop="url" icon="h-icon-user">
-                            <input type="text" v-model="model.url">
                         </h-formitem>
                         <h-formitem v-if="model.type == 'http'" label="方法" icon="h-icon-user" prop="method">
                             <h-select v-model="model.method" :datas="methods"></h-select>
@@ -72,16 +67,22 @@
                         <h-formitem v-if="model.type == 'http'" label="ContentType" icon="h-icon-user" prop="contentType">
                             <h-select v-model="model.contentType" :datas="contentTypes"></h-select>
                         </h-formitem>
-                        <h-formitem v-if="model.type == 'http'" label="请求体" icon="h-icon-complete" prop="bodyStr">
+                        <h-formitem label="描述" icon="h-icon-complete" prop="comment" single>
+                            <textarea type="text" v-model="model.comment" />
+                        </h-formitem>
+                        <h-formitem v-if="model.type == 'http'" label="接口地址" prop="url" icon="h-icon-user" single>
+                            <input type="text" v-model="model.url">
+                        </h-formitem>
+                        <h-formitem v-if="model.type == 'http'" label="请求体" icon="h-icon-complete" prop="bodyStr" single>
                             <textarea v-model="model.bodyStr" rows="7"/>
                         </h-formitem>
-                        <h-formitem v-if="model.type == 'http'" label="解析脚本" icon="h-icon-complete" prop="parseScript">
-                            <div ref="dslEditor" style="height: 320px; width: 670px"></div>
+                        <h-formitem v-if="model.type == 'http'" label="解析脚本" icon="h-icon-complete" prop="parseScript" single>
+                            <div ref="dslEditor" style="height: 300px; width: 670px"></div>
                         </h-formitem>
-                        <h-formitem v-if="model.type == 'script'" label="值计算函数" icon="h-icon-complete" prop="computeScript">
-                            <div ref="dslEditor" style="height: 460px; width: 670px"></div>
+                        <h-formitem v-if="model.type == 'script'" label="值计算函数" icon="h-icon-complete" prop="computeScript" single>
+                            <div ref="dslEditor" style="height: 430px; width: 670px"></div>
                         </h-formitem>
-                        <h-formitem>
+                        <h-formitem single>
                                 <h-button v-if="model.id" color="primary" :loading="isLoading" @click="update">提交</h-button>
                                 <h-button v-else color="primary" :loading="isLoading" @click="add">提交</h-button>
                                 &nbsp;&nbsp;&nbsp;

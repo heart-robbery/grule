@@ -21,7 +21,6 @@
                     <template slot-scope="{data}">
                         <span class="text-hover" @click="openRule(data)">{{data._expand?'收起':'展开'}}</span>
                         <span class="text-hover" >测试</span>
-                        &nbsp;
                         <span class="text-hover" @click="removeRule(data)">删除</span>
                     </template>
                 </h-tableitem>

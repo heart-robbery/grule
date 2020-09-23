@@ -54,7 +54,7 @@
                         <input type="text" :value="items.url" placeholder="请求地址" style="width: 100%"/>
                     </h-cell>
                 </h-row>
-                <h-row :space="10" v-for="(param,index) in items.params" :key="param.name">
+                <h-row :space="10" v-for="(param,index) in items.params">
                     <h-cell width="4"><input type="text" v-model="param.name" placeholder="参数名" style="float: left; width: 100%"/></h-cell>
                     <h-cell width="16"><input type="text" v-model="param.value" placeholder="参数值" style="float: left; width: 100%"/></h-cell>
                     <h-cell width="2">

@@ -84,7 +84,7 @@ class DecisionEngine extends ServerTpl {
         ctx.setInput(params)
 
         log.info("Run decision. decisionId: " + decisionId + ", id: " + ctx.getId() + ", async: " + async  + ", params: " + params)
-        repo.saveOrUpdate(new DecisionResult(id: ctx.id, decisionId: decisionId, occurTime: ctx.startup.time))
+        repo.saveOrUpdate(new DecisionResult(id: ctx.id, decisionId: decisionId, occurTime: ctx.startup))
         if (async) {
             super.async { ctx.start() }
         } else {

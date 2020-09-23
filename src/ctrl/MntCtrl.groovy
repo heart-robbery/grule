@@ -19,8 +19,8 @@ import service.rule.DecisionManager
 import service.rule.spec.DecisionSpec
 
 import javax.persistence.criteria.Predicate
+import java.text.SimpleDateFormat
 import java.util.concurrent.ConcurrentHashMap
-
 
 @Ctrl(prefix = 'mnt')
 class MntCtrl extends ServerTpl {
@@ -99,12 +99,13 @@ class MntCtrl extends ServerTpl {
 
 
     @Path(path = 'decisionPage')
-    ApiResp decisionPage(Integer page, Integer pageSize, String kw) {
+    ApiResp decisionPage(Integer page, Integer pageSize, String kw, String nameLike) {
         if (pageSize && pageSize > 20) return ApiResp.fail("pageSize max 20")
         ApiResp.ok(
             repo.findPage(Decision, page, pageSize?:10) {root, query, cb ->
                 query.orderBy(cb.desc(root.get('updateTime')))
                 if (kw) cb.like(root.get('dsl'), '%' + kw + '%')
+                if (nameLike) cb.like(root.get('name'), '%' + nameLike + '%')
             }
         )
     }
@@ -170,14 +171,14 @@ class MntCtrl extends ServerTpl {
 
 
     @Path(path = 'decisionResultPage')
-    ApiResp decisionResultPage(Integer page, Integer pageSize, String id, String decisionId, service.rule.Decision decision, String idNum, Long spend, String exception, String input, String attrs, String rules) {
+    ApiResp decisionResultPage(Integer page, Integer pageSize, String decideId, String decisionId, service.rule.Decision decision, String idNum, Long spend, String exception, String input, String attrs, String rules) {
         if (pageSize && pageSize > 20) return ApiResp.fail("pageSize max 20")
         ApiResp.ok(
             Page.of(
                 repo.findPage(DecisionResult, page, pageSize?:10) { root, query, cb ->
                     query.orderBy(cb.desc(root.get('occurTime')))
                     def ps = []
-                    if (id) ps << cb.equal(root.get('id'), id)
+                    if (decideId) ps << cb.equal(root.get('decideId'), decideId)
                     if (decisionId) ps << cb.equal(root.get('decisionId'), decisionId)
                     if (idNum) ps << cb.equal(root.get('idNum'), idNum)
                     if (spend) ps << cb.ge(root.get('spend'), spend)
@@ -191,6 +192,46 @@ class MntCtrl extends ServerTpl {
                 {Utils.toMapper(it).addConverter('decisionId', 'decisionName', {String dId ->
                     bean(DecisionManager).findDecision(dId).决策名
                 }).build()}
+            )
+        )
+    }
+
+
+    @Path(path = 'collectResultPage')
+    ApiResp collectResultPage(
+        Integer page, Integer pageSize, String decideId, String collectorType, String decisionId,
+        Long spend, Boolean success, String startTime, String endTime
+    ) {
+        Date start = startTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(startTime) : null
+        Date end = endTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(endTime) : null
+        if (pageSize && pageSize > 20) return ApiResp.fail("pageSize max 20")
+        ApiResp.ok(
+            Page.of(
+                repo.findPage(CollectResult, page, pageSize?:10) { root, query, cb ->
+                    query.orderBy(cb.desc(root.get('collectDate')))
+                    def ps = []
+                    if (decideId) ps << cb.equal(root.get('decideId'), decideId)
+                    if (decisionId) ps << cb.equal(root.get('decisionId'), decisionId)
+                    if (collectorType) ps << cb.equal(root.get('collectorType'), collectorType)
+                    if (spend) ps << cb.ge(root.get('spend'), spend)
+                    if (start) ps << cb.greaterThanOrEqualTo(root.get('collectDate'), start)
+                    if (end) ps << cb.lessThanOrEqualTo(root.get('collectDate'), end)
+                    if (success != null) {
+                        if (success) {
+                            ps << cb.and(root.get('httpException').isNotNull(), root.get('parseException').isNotNull(), root.get('scriptException').isNotNull())
+                        } else {
+                            ps << cb.or(root.get('httpException').isNull(), root.get('parseException').isNull(), root.get('scriptException').isNull())
+                        }
+                    }
+                    if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
+                },
+                {record ->
+                    def m = Utils.toMapper(record).addConverter('decisionId', 'decisionName', {String dId ->
+                        bean(DecisionManager).findDecision(dId).决策名
+                    }).build()
+                    m.put('success', record.httpException == null && record.parseException == null && record.scriptException == null)
+                    m
+                }
             )
         )
     }

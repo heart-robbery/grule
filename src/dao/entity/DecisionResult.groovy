@@ -24,7 +24,7 @@ class DecisionResult extends BaseEntity {
     /**
      * 决策时间
      */
-    Long occurTime
+    Date occurTime
     /**
      * 执行花费时间
      */

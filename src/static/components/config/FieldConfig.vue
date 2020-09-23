@@ -56,7 +56,7 @@
                             :rules="validationRules"
                             :model="model">
                         <h-formitem label="英文名" prop="enName" icon="h-icon-user">
-                            <input type="text" v-model="model.enName">
+                            <input type="text" v-model="model.enName" readonly>
                         </h-formitem>
                         <h-formitem label="中文名" icon="h-icon-user" prop="cnName">
                             <input type="text" v-model="model.cnName">
@@ -166,7 +166,7 @@
             dataCollectorRender(item) {
                 if (item.dataCollectorName) {
                     return item.dataCollectorName
-                    // return `<a href="#" @click="jumpToDataCollector(item)">{{item.dataCollectorName}}</a>`
+                    // return '<a href="#" @click="jumpToDataCollector(item)">{{item.dataCollectorName}}</a>'
                 }
                 return item.dataCollector
             },

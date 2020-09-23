@@ -35,7 +35,6 @@
     </div>
 </template>
 <script>
-    loadJs('moment');
     const types = [
         { title: '拒绝', key: 'Reject'},
         { title: '通过', key: 'Accept'},
@@ -95,7 +94,7 @@
                     loadData: (filter, cb) => {
                         $.ajax({
                             url: 'mnt/decisionPage',
-                            data: {page: 1, pageSize: 5, kw: filter},
+                            data: {page: 1, pageSize: 5, nameLike: filter},
                             success: (res) => {
                                 this.isLoading = false;
                                 if (res.code == '00') {
