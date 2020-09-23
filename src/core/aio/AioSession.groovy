@@ -1,6 +1,6 @@
 package core.aio
 
-import core.Devourer
+
 import core.ServerTpl
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory

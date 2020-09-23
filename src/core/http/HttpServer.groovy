@@ -103,8 +103,10 @@ class HttpServer extends ServerTpl {
                     return
                 }
                 chain.handle(hCtx)
+            } else {
+                hCtx.response.status(503)
+                hCtx.render(ApiResp.fail('请稍候...'))
             }
-            else hCtx.render(ApiResp.fail('请稍候...'))
         } catch (ex) {
             log.error("请求处理错误", ex)
             hCtx?.close()
