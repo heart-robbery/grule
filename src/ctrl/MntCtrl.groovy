@@ -41,7 +41,7 @@ class MntCtrl extends ServerTpl {
     }
 
 
-    @EL(name = 'wsMsg')
+    @EL(name = 'wsMsg_rule')
     void wsMsgBroadcast(String msg) { wss.each {ws -> ws.send(msg)} }
 
     @WS(path = 'ws')
@@ -99,13 +99,14 @@ class MntCtrl extends ServerTpl {
 
 
     @Path(path = 'decisionPage')
-    ApiResp decisionPage(Integer page, Integer pageSize, String kw, String nameLike) {
+    ApiResp decisionPage(Integer page, Integer pageSize, String kw, String nameLike, String decisionId) {
         if (pageSize && pageSize > 20) return ApiResp.fail("pageSize max 20")
         ApiResp.ok(
             repo.findPage(Decision, page, pageSize?:10) {root, query, cb ->
                 query.orderBy(cb.desc(root.get('updateTime')))
-                if (kw) cb.like(root.get('dsl'), '%' + kw + '%')
-                if (nameLike) cb.like(root.get('name'), '%' + nameLike + '%')
+                if (decisionId) return cb.equal(root.get('decisionId'), decisionId)
+                if (nameLike) return cb.like(root.get('name'), '%' + nameLike + '%')
+                if (kw) return cb.like(root.get('dsl'), '%' + kw + '%')
             }
         )
     }
@@ -134,18 +135,23 @@ class MntCtrl extends ServerTpl {
 
 
     @Path(path = 'dataCollectorPage')
-    ApiResp dataCollectorPage(Integer page, Integer pageSize, String kw) {
+    ApiResp dataCollectorPage(Integer page, Integer pageSize, String kw, String enName) {
         if (pageSize && pageSize > 20) return ApiResp.fail("pageSize max 20")
         ApiResp.ok(
             repo.findPage(DataCollector, page, pageSize?:10) { root, query, cb ->
                 query.orderBy(cb.desc(root.get('updateTime')))
+                def ps = []
                 if (kw) {
-                    cb.or(
+                    ps << cb.or(
                         cb.like(root.get('enName'), '%' + kw + '%'),
                         cb.like(root.get('cnName'), '%' + kw + '%'),
                         cb.like(root.get('comment'), '%' + kw + '%')
                     )
                 }
+                if (enName) {
+                    ps << cb.equal(root.get('enName'), enName)
+                }
+                cb.and(ps.toArray(new Predicate[ps.size()]))
             }
         )
     }

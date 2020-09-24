@@ -17,14 +17,23 @@
         <div class="h-panel-body">
             <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading"R>
                 <!--                <h-tableitem title="ID" prop="id" align="center"></h-tableitem>-->
-                <h-tableitem title="决策" prop="decisionName" align="center"></h-tableitem>
-                <h-tableitem title="收集器" prop="collectorName" align="center"></h-tableitem>
+                <h-tableitem title="决策" align="center">
+                    <template slot-scope="{data}">
+                        <a v-if="data.decisionName" href="javascript:void" @click="jumpToDecision(data)">{{data.decisionName}}</a>
+                        <span v-else>{{data.decisionId}}</span>
+                    </template>
+                </h-tableitem>
+                <h-tableitem title="收集器" prop="collectorName" align="center">
+                    <template slot-scope="{data}">
+                        <a v-if="data.collectorName" href="javascript:void" @click="jumpToDataCollector(data)">{{data.collectorName}}</a>
+                        <span v-else>{{data.collector}}</span>
+                    </template>
+                </h-tableitem>
                 <h-tableitem title="类型" prop="collectorType" align="center" :format="formatType"></h-tableitem>
                 <h-tableitem title="决策流水" prop="decideId" align="center" :width="250"></h-tableitem>
                 <h-tableitem title="收集时间" prop="collectDate" align="center" :format="formatDate"></h-tableitem>
                 <h-tableitem title="耗时(ms)" prop="spend" align="center"></h-tableitem>
                 <h-tableitem title="成功" prop="success" align="center" :format="formatSuccessType"></h-tableitem>
-<!--                <h-tableitem title="描述" prop="comment" align="center"></h-tableitem>-->
                 <h-tableitem title="操作" align="center" :width="80">
                     <template slot-scope="{data}">
                         <span class="text-hover" @click="open(data)">{{data._expand?'收起':'展开'}}</span>
@@ -60,6 +69,7 @@
         { title: '失败', key: 'false'},
     ];
     module.exports = {
+        props: ['tabs'],
         data() {
             return {
                 types: types,
@@ -114,6 +124,14 @@
             // 'add-pop': addEditPop
         },
         methods: {
+            jumpToDataCollector(item) {
+                this.tabs.showId = item.collector;
+                this.tabs.type = 'DataCollectorConfig';
+            },
+            jumpToDecision(item) {
+                this.tabs.showId = item.decisionId;
+                this.tabs.type = 'DecisionConfig';
+            },
             formatDate(v) {
                 return moment(v).format('YYYY-MM-DD HH:mm:ss')
             },

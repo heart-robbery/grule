@@ -202,6 +202,7 @@
         }
     };
     module.exports = {
+        props: ['tabs'],
         data() {
             return {
                 kw: '',
@@ -211,6 +212,9 @@
         },
         mounted() {
             this.load()
+        },
+        activated() {
+            if (this.tabs.showId) this.load()
         },
         components: {
             // 'add-pop': addEditPop
@@ -277,8 +281,9 @@
                 this.list = [];
                 $.ajax({
                     url: 'mnt/dataCollectorPage',
-                    data: {page: page.page || 1, kw: this.kw},
+                    data: {page: page.page || 1, kw: this.kw, enName: this.tabs.showId},
                     success: (res) => {
+                        this.tabs.showId = null;
                         this.loading = false;
                         if (res.code == '00') {
                             this.page = res.data.page;

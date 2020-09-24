@@ -20,12 +20,15 @@
                 <h-tableitem title="更新时间" prop="updateTime" align="center" :format="formatDate"></h-tableitem>
                 <!--                    <h-tableitem title="创建时间" prop="createTime" align="center"></h-tableitem>-->
                 <h-tableitem title="描述" prop="comment" align="center"></h-tableitem>
-                <h-tableitem title="值函数名" prop="dataCollector" align="center" :render="dataCollectorRender">
+                <h-tableitem title="值函数名" align="center">
+                    <template slot-scope="{data}">
+                        <a v-if="data.dataCollectorName" href="javascript:void" @click="jumpToDataCollector(data)">{{data.dataCollectorName}}</a>
+                        <span v-else>{{data.dataCollector}}</span>
+                    </template>
                 </h-tableitem>
                 <h-tableitem title="操作" align="center" :width="100">
                     <template slot-scope="{data}">
                         <span class="text-hover" @click="showUpdatePop(data)">编辑</span>
-                        &nbsp;
                         <span class="text-hover" @click="del(data)">删除</span>
                     </template>
                 </h-tableitem>
@@ -149,6 +152,7 @@
     };
 
     module.exports = {
+        props: ['tabs'],
         data() {
             return {
                 kw: '',
@@ -163,15 +167,9 @@
             'add-pop': addEditPop
         },
         methods: {
-            dataCollectorRender(item) {
-                if (item.dataCollectorName) {
-                    return item.dataCollectorName
-                    // return '<a href="#" @click="jumpToDataCollector(item)">{{item.dataCollectorName}}</a>'
-                }
-                return item.dataCollector
-            },
             jumpToDataCollector(item) {
-                console.log('==================', item)
+                this.tabs.showId = item.dataCollector;
+                this.tabs.type = 'DataCollectorConfig';
             },
             formatType(v) {
                 for (let type of types) {

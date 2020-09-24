@@ -18,13 +18,28 @@ class DecisionEngine extends ServerTpl {
     @Lazy def http = bean(OkHttpSrv)
     @Lazy def repo = bean(BaseRepo, 'jpa_rule_repo')
 
+
+
+    /**
+     * 系统全局消息
+     * @param msg
+     */
+    @EL(name = 'globalMsg', async = true)
+    void globalMsg(String msg) {
+        String url = getStr('msgNotifyUrl')
+        if (url) {
+            //bean(OkHttpSrv)?.
+        }
+    }
+
+
     // 决策执行结果监听
     @EL(name = 'decision.end', async = true)
     void endDecision(DecisionContext ctx) {
         log.info("end decision: " + JSON.toJSONString(ctx.summary(), SerializerFeature.WriteMapNullValue))
 
         super.async { // 异步查询的, 异步回调通知
-            if (ctx.input['async'] == 'true' ? true : false) {
+            if (ctx.input['async'] == 'true') {
                 String cbUrl = ctx.input['callback'] // 回调Url
                 if (cbUrl && cbUrl.startsWith('http')) {
                     (1..2).each {
@@ -45,7 +60,7 @@ class DecisionEngine extends ServerTpl {
         }
         q.failMaxKeep(10000)
         q.offer {
-            repo.saveOrUpdate(
+            repo.saveOrUpdate( // 保存到数据成
                 repo.findById(DecisionResult, ctx.id).tap {
                     idNum = ctx.summary().get('attrs')['idNumber']?:ctx.input['idNumber']
                     exception = ctx.summary().get('exception')
@@ -73,7 +88,7 @@ class DecisionEngine extends ServerTpl {
      * @param params 参数
      * @return
      */
-    Map<String, Object> run(String decisionId, boolean async = true, String id = null, Map<String, Object> params = []) {
+    Map<String, Object> run(String decisionId, boolean async = true, String id = null, Map<String, Object> params = Collections.emptyMap()) {
         def decision = dm.findDecision(decisionId)
         if (decision == null) throw new IllegalArgumentException("未找到决策: " + decisionId)
         DecisionContext ctx = new DecisionContext()

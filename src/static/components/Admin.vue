@@ -85,7 +85,7 @@
         },
         methods: {
             changeContent(key) {
-                this.contentComponent = key
+                this.contentComponent = key;
                 localStorage.setItem("rule.admin.menu", key);
             },
             changeMenu: function(e){

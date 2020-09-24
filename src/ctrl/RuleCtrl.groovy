@@ -28,7 +28,7 @@ class RuleCtrl extends ServerTpl {
             ctx.render ApiResp.fail('decisionId must not be empty')
             return
         }
-        boolean async = params['async'] == 'true' ? true : false
+        boolean async = params['async'] == 'true'
         ctx.render(
             ApiResp.ok(
                 engine.run(decisionId, async, ctx.request.id, params)
@@ -56,7 +56,10 @@ class RuleCtrl extends ServerTpl {
      */
     @Path(path = 'loadAttrCfg')
     ApiResp loadAttrCfg() {
-        async {bean(AttrManager).init()}
+        async {
+            bean(AttrManager).init()
+            ep.fire("wsMsg_rule", '加载完成')
+        }
         ApiResp.ok('加载中...')
     }
 }

@@ -30,10 +30,10 @@ function ws(cfg) {
                 // {type: 'xxx': data: null}
                 // if (jo.type == 'xxx') {}
                 if (jo.data.msg) {
-                    app.$Notice.info({title: '后台提示', desc: jo.data.msg, duration: 5})
+                    app.$Notice.info({title: '后台提示', content: jo.data.msg, duration: 5})
                 }
             } else {
-                app.$Notice.info({title: '后台提示', desc: e.data, duration: 7})
+                app.$Notice.info({title: '后台提示', content: e.data, duration: 7})
             }
         };
         ws.onopen = cfg.onOpen || function() {

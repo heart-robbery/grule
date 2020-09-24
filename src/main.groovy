@@ -26,7 +26,6 @@ import service.rule.OpHistorySrv
 app.addSource(new OkHttpSrv())
 app.addSource(new EhcacheSrv())
 app.addSource(new SchedSrv())
-//app.addSource(new RedisClient())
 app.addSource(new Remoter())
 app.addSource(new HibernateSrv('jpa_rule').entities(
      Decision, RuleField, DataCollector, OpHistory, DecisionResult, CollectResult
@@ -43,6 +42,14 @@ app.addSource(new OpHistorySrv())
 // app.addSource(new PolicyManger())
 app.addSource(this)
 app.start() // 启动系统
+
+
+@EL(name = 'sys.inited')
+void sysInited() {
+    if (app.env['redis']) {
+        app.addSource(new RedisClient())
+    }
+}
 
 
 @EL(name = 'sys.started', async = true)

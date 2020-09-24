@@ -8,14 +8,12 @@
 <template>
     <div class="h-panel">
         <div class="h-panel-bar">
-<!--            <span class="h-panel-title">决策集</span>-->
-<!--            <span v-color:gray v-font="13">说明~~</span>-->
             &nbsp;&nbsp;
             <h-button @click="add"><i class="h-icon-plus"></i></h-button>
+            <input type="text" v-model="model.nameLike" placeholder="决策名" style="width: 250px" @keyup.enter="load"/>
             <div class="h-panel-right">
-                <h-search placeholder="查询" v-width="200" v-model="kw" show-search-button search-text="搜索" @search="load"></h-search>
-<!--                <i class="h-split"></i>-->
-<!--                <button class="h-btn h-btn-green h-btn-m" @click="load">查询</button>-->
+<!--                <h-search placeholder="查询" v-width="200" v-model="kw" show-search-button search-text="搜索" @search="load"></h-search>-->
+                <button class="h-btn h-btn-primary float-right" @click="load"><i class="h-icon-search"></i><span>查询</span></button>
             </div>
         </div>
         <div class="h-panel-body">
@@ -115,16 +113,19 @@
         props: ['tabs'],
         data() {
             return {
+                model: {},
                 decisionLoading: false,
                 decision: {
                     page: 1, pageSize: 2, totalRow: 0, list: []
                 },
                 collapse: null, curDecision: null,
-                kw: '',
             };
         },
         mounted: function () {
             this.load()
+        },
+        activated() {
+            if (this.tabs.showId) this.load()
         },
         methods: {
             showTestPop(item) {
@@ -300,12 +301,13 @@
                 this.decision = {};
                 $.ajax({
                     url: 'mnt/decisionPage',
-                    data: {page: page.page || 1, kw: this.kw},
+                    data: $.extend({page: page.page || 1, decisionId: this.tabs.showId}, this.model),
                     success: (res) => {
+                        this.tabs.showId = null;
                         this.decisionLoading = false;
                         if (res.code == '00') {
                             this.decision = res.data;
-                        } else this.$Notice.error({content: res.desc, timeout: 5})
+                        } else this.$Notice.error(res.desc)
                     },
                     error: () => this.decisionLoading = false
                 })
