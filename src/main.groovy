@@ -25,7 +25,6 @@ import java.time.Duration
 app.addSource(new OkHttpSrv())
 app.addSource(new EhcacheSrv())
 app.addSource(new SchedSrv())
-app.addSource(new RedisClient())
 app.addSource(new Remoter())
 app.addSource(new HibernateSrv().entities(
     Test, VersionFile
@@ -37,6 +36,14 @@ app.addSource(new FileUploader())
 app.addSource(new TestService())
 app.addSource(this)
 app.start() // 启动系统
+
+
+@EL(name = 'sys.inited')
+void sysInited() {
+    if (app.env['redis']) {
+        app.addSource(new RedisClient())
+    }
+}
 
 
 @EL(name = 'sys.started', async = true)
