@@ -23,7 +23,7 @@ import java.util.function.Function
 
 class Utils {
     protected static final Logger log = LoggerFactory.getLogger(Utils)
-    static final GroovyClassLoader gcl = new GroovyClassLoader()
+    // static final GroovyClassLoader gcl = new GroovyClassLoader()
 
 
     /**
@@ -121,6 +121,7 @@ class Utils {
         if (type == null) return v
         if (v == null) return type.cast(v)
         else if (type == String) return v.toString()
+        else if (type == Boolean || type == boolean) return v as Boolean
         else if (type == Integer || type == int) return Integer.valueOf(v)
         else if (type == Boolean || type == boolean) return v as Boolean
         else if (type == Long || type == long) return Long.valueOf(v)
@@ -129,7 +130,7 @@ class Utils {
         else if (type == BigDecimal) return new BigDecimal(v.toString())
         else if (type == URI) return URI.create(v.toString())
         else if (type == URL) return URI.create(v.toString()).toURL()
-        else throw new IllegalArgumentException("不支持转换类型: $type.simpleName")
+        else return v
     }
 
 

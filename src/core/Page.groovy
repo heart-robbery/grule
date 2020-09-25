@@ -24,7 +24,7 @@ class Page<E> {
 
 
     static Page empty() {
-        new Page(page: 1, pageSize: 0, totalRow: 0, list: Collections.emptyList())
+        new Page(page: 1, pageSize: 10, totalRow: 0, list: Collections.emptyList())
     }
 
 

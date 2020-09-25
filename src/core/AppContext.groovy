@@ -115,10 +115,9 @@ class AppContext {
         if (exec) throw new RuntimeException('App is running')
         log.info('Starting Application on {} with PID {}, active profile: ' + (env['profile']?:''), InetAddress.getLocalHost().getHostName(), pid())
         // 1. 初始化
-        initExecutor()
-        initEp()
-        ep.addListenerSource(this)
+        initExecutor(); initEp(); ep.addListenerSource(this)
         sourceMap.each{ k, v -> inject(v); ep.addListenerSource(v) }
+        ep.fire('sys.inited', EC.of(this))
         // 2. 通知所有服务启动
         ep.fire('sys.starting', EC.of(this).completeFn({ ec ->
             if (shutdownHook) Runtime.getRuntime().addShutdownHook(shutdownHook)
