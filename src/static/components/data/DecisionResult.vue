@@ -19,7 +19,12 @@
         </div>
         <div class="h-panel-body">
             <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading" @trdblclick="trdblclick">
-                <h-tableitem title="决策名" prop="decisionName" align="center" :width="150"></h-tableitem>
+                <h-tableitem title="决策" align="center" :width="150">
+                    <template slot-scope="{data}">
+                        <a v-if="data.decisionName" href="javascript:void(0)" @click="jumpToDecision(data)">{{data.decisionName}}</a>
+                        <span v-else>{{data.decisionId}}</span>
+                    </template>
+                </h-tableitem>
                 <h-tableitem title="流水id" prop="id" align="center"></h-tableitem>
                 <h-tableitem title="身份证" prop="idNum" align="center" :width="140"></h-tableitem>
                 <h-tableitem title="决策" prop="decision" align="center" :format="formatType" :width="70"></h-tableitem>
@@ -44,17 +49,39 @@
         props: ['item'],
         template:`
             <div>
-                <h-table :datas="rules" stripe select-when-click-tr>
-                    <h-tableitem title="属性" prop="attrs" align="center"></h-tableitem>
-                    <h-tableitem title="决策" prop="decision" align="center" :width="100"></h-tableitem>
-                    <h-tableitem title="数据" prop="data" align="center"></h-tableitem>
-                    <div slot="empty">无属性</div>
-                </h-table>
-<!--                <h-table :datas="attrs" stripe select-when-click-tr className="inlinetb">-->
-<!--                    <h-tableitem title="属性名" prop="name" align="center"></h-tableitem>-->
-<!--                    <h-tableitem title="属性值" prop="value" align="center"></h-tableitem>-->
-<!--                    <div slot="empty">无属性</div>-->
-<!--                </h-table>-->
+                <div class="h-panel">
+                    <div class="h-panel-bar">执行规则集</div>
+                    <div class="h-panel-body">
+                        <h-table :datas="rules" stripe select-when-click-tr border>
+                            <h-tableitem title="规则属性" :width="220">
+                                <template slot-scope="{data}">
+                                    <h-form readonly>
+                                        <h-formitem v-for="(v,k) in data.attrs" :key="k" :label="k">{{v}}</h-formitem>
+                                    </h-form>
+                                </template>
+                            </h-tableitem>
+                            <h-tableitem title="决策" prop="decision" align="center" :width="100" :format="formatType"></h-tableitem>
+                            <h-tableitem title="数据">
+                                <template slot-scope="{data}">
+                                    <h-form readonly>
+                                        <h-formitem v-for="(v,k) in data.data" :key="k" :label="k">{{v}}</h-formitem>
+                                    </h-form>
+                                </template>
+                            </h-tableitem>
+                            <div slot="empty">无规则</div>
+                        </h-table>
+                    </div>
+                </div>
+                <div class="h-panel">
+                    <div class="h-panel-bar">属性结果集</div>
+                    <div class="h-panel-body">
+                        <h-table :datas="attrs" stripe select-when-click-tr border>
+                            <h-tableitem title="属性名" prop="name" :width="120"></h-tableitem>
+                            <h-tableitem title="属性值" prop="value" align="center" :width="100"></h-tableitem>
+                            <div slot="empty">无属性</div>
+                        </h-table>
+                    </div>
+                </div>
             </div>
         `,
         data() {
@@ -63,27 +90,22 @@
             for (let k in jo) {
                 attrs.push({name: k, value: jo[k]})
             }
-
-            // let rules = [];
-            // let keys = new Set();
-            // JSON.parse(this.item.rules).forEach((v, i) => {
-            //     let o = {decision: null};
-            //     o = v.decision;
-            //     $.extend(o, v.attrs);
-            //     //o['data'] = JSON.stringify(v.data);
-            //     rules.push(o);
-            //     for (let k in o) keys.add(k)
-            // });
-            // console.log(rules);
-            // console.log(keys);
             return {
                 attrs: attrs,
                 rules: JSON.parse(this.item.rules),
-                // keys: keys
             }
+        },
+        methods: {
+            formatType(v) {
+                for (let type of types) {
+                    if (type.key == v) return type.title
+                }
+                return v
+            },
         }
     };
     module.exports = {
+        props: ['tabs', 'menu'],
         data() {
             return {
                 types: types,
@@ -114,6 +136,10 @@
             this.load()
         },
         methods: {
+            jumpToDecision(item) {
+                this.tabs.showId = item.decisionId;
+                this.tabs.type = 'DecisionConfig';
+            },
             trdblclick(item) {
                 this.$Modal({
                     middle: true, draggable: false,
@@ -122,7 +148,7 @@
                         vue: detail,
                         datas: {item: item}
                     },
-                    width: 800,
+                    width: 700,
                     hasCloseIcon: true, fullScreen: false, middle: false, transparent: false, closeOnMask: true,
                     events: {
                         // reload: () => {

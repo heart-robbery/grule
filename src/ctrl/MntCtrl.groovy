@@ -136,7 +136,7 @@ class MntCtrl extends ServerTpl {
 
     @Path(path = 'dataCollectorPage')
     ApiResp dataCollectorPage(Integer page, Integer pageSize, String kw, String enName) {
-        if (pageSize && pageSize > 20) return ApiResp.fail("pageSize max 20")
+        if (pageSize && pageSize > 50) return ApiResp.fail("pageSize max 50")
         ApiResp.ok(
             repo.findPage(DataCollector, page, pageSize?:10) { root, query, cb ->
                 query.orderBy(cb.desc(root.get('updateTime')))
@@ -177,14 +177,14 @@ class MntCtrl extends ServerTpl {
 
 
     @Path(path = 'decisionResultPage')
-    ApiResp decisionResultPage(Integer page, Integer pageSize, String decideId, String decisionId, service.rule.Decision decision, String idNum, Long spend, String exception, String input, String attrs, String rules) {
+    ApiResp decisionResultPage(Integer page, Integer pageSize, String id, String decisionId, service.rule.Decision decision, String idNum, Long spend, String exception, String input, String attrs, String rules) {
         if (pageSize && pageSize > 20) return ApiResp.fail("pageSize max 20")
         ApiResp.ok(
             Page.of(
                 repo.findPage(DecisionResult, page, pageSize?:10) { root, query, cb ->
                     query.orderBy(cb.desc(root.get('occurTime')))
                     def ps = []
-                    if (decideId) ps << cb.equal(root.get('decideId'), decideId)
+                    if (id) ps << cb.equal(root.get('id'), id)
                     if (decisionId) ps << cb.equal(root.get('decisionId'), decisionId)
                     if (idNum) ps << cb.equal(root.get('idNum'), idNum)
                     if (spend) ps << cb.ge(root.get('spend'), spend)
@@ -205,41 +205,48 @@ class MntCtrl extends ServerTpl {
 
     @Path(path = 'collectResultPage')
     ApiResp collectResultPage(
-        Integer page, Integer pageSize, String decideId, String collectorType, String decisionId,
+        Integer page, Integer pageSize, String decideId, String collectorType, String collector, String decisionId,
         Long spend, Boolean success, String startTime, String endTime
     ) {
         Date start = startTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(startTime) : null
         Date end = endTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(endTime) : null
-        if (pageSize && pageSize > 20) return ApiResp.fail("pageSize max 20")
-        ApiResp.ok(
-            Page.of(
-                repo.findPage(CollectResult, page, pageSize?:10) { root, query, cb ->
-                    query.orderBy(cb.desc(root.get('collectDate')))
-                    def ps = []
-                    if (decideId) ps << cb.equal(root.get('decideId'), decideId)
-                    if (decisionId) ps << cb.equal(root.get('decisionId'), decisionId)
-                    if (collectorType) ps << cb.equal(root.get('collectorType'), collectorType)
-                    if (spend) ps << cb.ge(root.get('spend'), spend)
-                    if (start) ps << cb.greaterThanOrEqualTo(root.get('collectDate'), start)
-                    if (end) ps << cb.lessThanOrEqualTo(root.get('collectDate'), end)
-                    if (success != null) {
-                        if (success) {
-                            ps << cb.and(root.get('httpException').isNotNull(), root.get('parseException').isNotNull(), root.get('scriptException').isNotNull())
-                        } else {
-                            ps << cb.or(root.get('httpException').isNull(), root.get('parseException').isNull(), root.get('scriptException').isNull())
-                        }
+        if (pageSize && pageSize > 50) return ApiResp.fail("pageSize max 50")
+        def result = Page.of(
+            repo.findPage(CollectResult, page, pageSize?:10) { root, query, cb ->
+                query.orderBy(cb.desc(root.get('collectDate')))
+                def ps = []
+                if (decideId) ps << cb.equal(root.get('decideId'), decideId)
+                if (decisionId) ps << cb.equal(root.get('decisionId'), decisionId)
+                if (collectorType) ps << cb.equal(root.get('collectorType'), collectorType)
+                if (collector) ps << cb.equal(root.get('collector'), collector)
+                if (spend) ps << cb.ge(root.get('spend'), spend)
+                if (start) ps << cb.greaterThanOrEqualTo(root.get('collectDate'), start)
+                if (end) ps << cb.lessThanOrEqualTo(root.get('collectDate'), end)
+                if (success != null) {
+                    if (success) {
+                        ps << cb.and(root.get('httpException').isNull(), root.get('parseException').isNull(), root.get('scriptException').isNull())
+                    } else {
+                        ps << cb.or(root.get('httpException').isNotNull(), root.get('parseException').isNotNull(), root.get('scriptException').isNotNull())
                     }
-                    if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
-                },
-                {record ->
-                    def m = Utils.toMapper(record).addConverter('decisionId', 'decisionName', {String dId ->
-                        bean(DecisionManager).findDecision(dId).决策名
-                    }).build()
-                    m.put('success', record.httpException == null && record.parseException == null && record.scriptException == null)
-                    m
                 }
-            )
+                if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
+            },
+            {record ->
+                def m = Utils.toMapper(record).addConverter('decisionId', 'decisionName', {String dId ->
+                    bean(DecisionManager).findDecision(dId).决策名
+                }).build()
+                m.put('success', record.httpException == null && record.parseException == null && record.scriptException == null)
+                m
+            }
         )
+        repo.findList(DataCollector) {root, query, cb -> root.get('enName').in(result.list.collect {it['collector']})}.each {dc ->
+            for (def m : result.list) {
+                if (m['collector'] == dc.enName) {
+                    m['collectorName'] = dc.cnName
+                }
+            }
+        }
+        ApiResp.ok(result)
     }
 
 
@@ -327,7 +334,11 @@ class MntCtrl extends ServerTpl {
             if (!dc.url.startsWith("http")) return ApiResp.fail('url incorrect')
         } else if ('script' == dc.type) {
             if (!dc.computeScript) return ApiResp.fail('computeScript must not be empty')
-        }
+        } else if ('sql' == dc.type) {
+            if (!dc.sqlScript) return ApiResp.fail('sql must not be empty')
+            if (dc.minIdle < 0 || dc.minIdle > 50) return ApiResp.fail('0 <= minIdle <= 50')
+            if (dc.maxActive < 1 || dc.maxActive > 100) return ApiResp.fail('1 <= minIdle <= 100')
+        } else return ApiResp.fail('Not support type: ' + dc.type)
         if (repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), dc.enName)}) {
             return ApiResp.fail("$dc.enName 已存在")
         }
@@ -373,7 +384,11 @@ class MntCtrl extends ServerTpl {
 
 
     @Path(path = 'updateDataCollector', method = 'post')
-    ApiResp updateDataCollector(HttpContext ctx, Long id, String enName, String cnName, String url, String bodyStr, String method, String parseScript, String contentType, String comment, String computeScript) {
+    ApiResp updateDataCollector(
+        HttpContext ctx, Long id, String enName, String cnName, String url, String bodyStr,
+        String method, String parseScript, String contentType, String comment, String computeScript,
+        String sqlScript, Integer minIdle, Integer maxActive
+    ) {
         ctx.auth('dataCollector-update')
         if (!id) return ApiResp.fail("id not legal")
         if (!enName) return ApiResp.fail("enName must not be empty")
@@ -399,6 +414,10 @@ class MntCtrl extends ServerTpl {
             if (collector.computeScript && (collector.computeScript.startsWith('{') || collector.computeScript.endsWith('}'))) {
                 return ApiResp.fail('computeScript is pure script. cannot startWith { or endWith }')
             }
+        } else if ('sql' == collector.type) {
+            if (!sqlScript) return ApiResp.fail('sqlScript must not be empty')
+            if (minIdle < 0 || minIdle > 50) return ApiResp.fail('0 <= minIdle <= 50')
+            if (maxActive < 1 || maxActive > 100) return ApiResp.fail('1 <= minIdle <= 100')
         }
         def updateRelateField
         if (enName != collector.enName ) {

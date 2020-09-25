@@ -86,6 +86,7 @@ new Map([
     ['DataCollectorConfig', 'config/DataCollectorConfig.vue'],
     ['OpHistory', 'config/OpHistory.vue'],
     ['UserCenter', 'config/UserCenter.vue'],
+    ['UserConfig', 'config/UserConfig.vue'],
     ['DecisionData', 'data/DecisionData.vue'],
     ['DecisionResult', 'data/DecisionResult.vue'],
     ['CollectResult', 'data/CollectResult.vue'],

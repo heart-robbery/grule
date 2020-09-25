@@ -5,7 +5,7 @@
     <div>
         <h-tabs v-model="tabs.type" :datas="types"></h-tabs>
         <keep-alive>
-            <component v-bind:is="tabs.type" :tabs="tabs"></component>
+            <component v-bind:is="tabs.type" :tabs="tabs" :menu="menu"></component>
         </keep-alive>
     </div>
 </template>
@@ -13,13 +13,14 @@
     loadJs('ace', () => {
         ace.config.set("basePath", "js/lib");
         loadJs('ace-tools');
-        loadJs('ace-lang-rule');
+        // loadJs('ace-lang-rule');
         // loadJs('ace-snip-rule');
         loadJs('ace-lang-groovy');
         loadJs('ace-snip-groovy');
     });
     loadJs('moment');
     module.exports = {
+        props: ['menu'],
         data() {
             return {
                 tabs: {
@@ -30,6 +31,9 @@
                     // PolicyConfig: '策略列表', RuleConfig: '规则列表'
                 },
             }
+        },
+        activated() {
+            this.tabs.type = localStorage.getItem('rule.policyConfig.tab') || 'DecisionConfig'
         },
         watch: {
             'tabs.type': function (v) {

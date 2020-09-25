@@ -2,8 +2,8 @@ package core.jpa
 
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
-import core.Utils
 import core.ServerTpl
+import core.Utils
 import org.hibernate.SessionFactory
 import org.hibernate.boot.MetadataSources
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder
@@ -86,7 +86,19 @@ class HibernateSrv extends ServerTpl {
         if (datasource) throw new RuntimeException('DataSource already exist')
         Map<String, Object> dsAttr = attrs('datasource')
         log.debug('Create dataSource properties: {}', dsAttr)
+        datasource = createDs(dsAttr)
+        if (!datasource) throw new RuntimeException('Not found DataSource implement class')
+        log.debug('Created datasource for {} Server. {}', name, datasource)
+    }
 
+
+    /**
+     * 创建一个DataSource
+     * @param dsAttr
+     * @return
+     */
+    static DataSource createDs(Map<String, Object> dsAttr) {
+        DataSource db
         // druid 数据源
         try {
             Map props = new HashMap()
@@ -99,12 +111,12 @@ class HibernateSrv extends ServerTpl {
                 // com.alibaba.druid.filter.stat.StatFilter
                 props.put('connectionProperties', 'druid.stat.logSlowSql=true;druid.stat.slowSqlMillis=5000')
             }
-            datasource = (DataSource) Utils.findMethod(Class.forName('com.alibaba.druid.pool.DruidDataSourceFactory'), 'createDataSource', Map.class).invoke(null, props)
+            db = (DataSource) Utils.findMethod(Class.forName('com.alibaba.druid.pool.DruidDataSourceFactory'), 'createDataSource', Map.class).invoke(null, props)
         } catch(ClassNotFoundException ex) {}
 
-        if (!datasource) {// Hikari 数据源
+        if (!db) {// Hikari 数据源
             try {
-                datasource = (DataSource) Class.forName('com.zaxxer.hikari.HikariDataSource').newInstance()
+                db = (DataSource) Class.forName('com.zaxxer.hikari.HikariDataSource').newInstance()
                 dsAttr.each {k, v ->
                     if (datasource.hasProperty(k)) {
                         def t = datasource[(k)].getClass()
@@ -118,15 +130,14 @@ class HibernateSrv extends ServerTpl {
         }
 
         // dbcp2 数据源
-        if (!datasource) {
+        if (!db) {
             try {
                 Map props = new HashMap()
                 dsAttr.each {props.put(it.key, Objects.toString(it.value, ''))}
                 if (!props.containsKey('validationQuery')) props.put('validationQuery', 'select 1')
-                datasource = (DataSource) Utils.findMethod(Class.forName('org.apache.commons.dbcp2.BasicDataSourceFactory'), 'createDataSource', Properties.class).invoke(null, props)
+                db = (DataSource) Utils.findMethod(Class.forName('org.apache.commons.dbcp2.BasicDataSourceFactory'), 'createDataSource', Properties.class).invoke(null, props)
             } catch (ClassNotFoundException ex) {}
+            return db
         }
-        if (!datasource) throw new RuntimeException('Not found DataSource implement class')
-        log.debug('Created datasource for {} Server. {}', name, datasource)
     }
 }

@@ -40,7 +40,9 @@
                     </div>
                 </h-header>
                 <h-content style="padding: 0px 30px;">
-                    <component v-bind:is="contentComponent"></component>
+                    <keep-alive>
+                        <component v-bind:is="menu.key" :menu="menu"></component>
+                    </keep-alive>
                 </h-content>
                 <h-footer class="text-center">Copyright © {{year}}
                     <a href="https://gitee.com/xnat/gy/tree/rule/" target="_blank">xxb</a>
@@ -77,15 +79,25 @@
                     { title: 'Component', icon: 'h-icon-complete', route: { name: 'Component' } },
                     { title: 'Breadcrumb', icon: 'h-icon-star' }
                 ],
-                contentComponent: null
+                menu: {key: null}
             };
         },
         mounted: function () {
             this.select(localStorage.getItem("rule.admin.menu") || this.firstKey())
         },
+        watch: {
+            siderFixed: function (){
+                if (!this.siderFixed) {
+                    this.headerFixed = false;
+                }
+            },
+            'menu.key': function (v) {
+                this.select(v)
+            }
+        },
         methods: {
             changeContent(key) {
-                this.contentComponent = key;
+                this.menu.key = key;
                 localStorage.setItem("rule.admin.menu", key);
             },
             changeMenu: function(e){
@@ -103,12 +115,5 @@
                 }
             }
         },
-        watch: {
-            siderFixed: function (){
-                if (!this.siderFixed) {
-                    this.headerFixed = false;
-                }
-            }
-        }
     };
 </script>

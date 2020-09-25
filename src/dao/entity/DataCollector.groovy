@@ -2,9 +2,12 @@ package dao.entity
 
 import core.jpa.LongIdEntity
 import org.hibernate.annotations.DynamicUpdate
+import org.hibernate.annotations.Type
 
+import javax.persistence.Basic
 import javax.persistence.Column
 import javax.persistence.Entity
+import javax.persistence.Lob
 
 /**
  * 数据收集器
@@ -22,7 +25,7 @@ class DataCollector extends LongIdEntity {
      */
     String cnName
     /**
-     * http, script
+     * http, script, sql
      */
     String type
     /**
@@ -30,10 +33,14 @@ class DataCollector extends LongIdEntity {
      */
     String comment
 
+
     /**
-     * 接口url
+     * 接口url, jdbc url
      */
     String url
+
+    // ======================== http =======================
+
     /**
      * http method
      */
@@ -50,15 +57,34 @@ class DataCollector extends LongIdEntity {
     /**
      * 值解析脚本
      * 格式为:
-     *  {resultStr -> // 接口返回的字符串
+     *  {String resultStr -> // 接口返回的字符串
      *
      *  }
      */
     @Column(length = 5000)
     String parseScript
+
+
+    // ======================= script ======================
     /**
      * 值计算函数
      */
     @Column(length = 5000)
     String computeScript
+
+
+    // ========================= sql ========================
+    /**
+     * groovy Sql 执行脚本
+     */
+    @Column(length = 5000)
+    String  sqlScript
+    /**
+     * sql 连接池的最小连接
+     */
+    Integer minIdle
+    /**
+     * sql 连接池的最大连接
+     */
+    Integer maxActive
 }

@@ -15,22 +15,26 @@
 <!--            </div>-->
         </div>
         <div class="h-panel-body">
-            <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading"R>
+            <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading">
                 <!--                <h-tableitem title="ID" prop="id" align="center"></h-tableitem>-->
                 <h-tableitem title="决策" align="center">
                     <template slot-scope="{data}">
-                        <a v-if="data.decisionName" href="javascript:void" @click="jumpToDecision(data)">{{data.decisionName}}</a>
+                        <a v-if="data.decisionName" href="javascript:void(0)" @click="jumpToDecision(data)">{{data.decisionName}}</a>
                         <span v-else>{{data.decisionId}}</span>
                     </template>
                 </h-tableitem>
-                <h-tableitem title="收集器" prop="collectorName" align="center">
+                <h-tableitem title="收集器" align="center">
                     <template slot-scope="{data}">
-                        <a v-if="data.collectorName" href="javascript:void" @click="jumpToDataCollector(data)">{{data.collectorName}}</a>
+                        <a v-if="data.collectorName" href="javascript:void(0)" @click="jumpToDataCollector(data)">{{data.collectorName}}</a>
                         <span v-else>{{data.collector}}</span>
                     </template>
                 </h-tableitem>
                 <h-tableitem title="类型" prop="collectorType" align="center" :format="formatType"></h-tableitem>
-                <h-tableitem title="决策流水" prop="decideId" align="center" :width="250"></h-tableitem>
+                <h-tableitem title="决策流水" align="center" :width="250">
+                    <template slot-scope="{data}">
+                        <a href="javascript:void(0)" @click="model.decideId = data.decideId; load()">{{data.decideId}}</a>
+                    </template>
+                </h-tableitem>
                 <h-tableitem title="收集时间" prop="collectDate" align="center" :format="formatDate"></h-tableitem>
                 <h-tableitem title="耗时(ms)" prop="spend" align="center"></h-tableitem>
                 <h-tableitem title="成功" prop="success" align="center" :format="formatSuccessType"></h-tableitem>
@@ -63,13 +67,14 @@
     const types = [
         { title: '接口', key: 'http'},
         { title: '脚本', key: 'script'},
+        { title: 'sql', key: 'sql'},
     ];
     const successTypes = [
         { title: '成功', key: 'true'},
         { title: '失败', key: 'false'},
     ];
     module.exports = {
-        props: ['tabs'],
+        props: ['tabs', 'menu'],
         data() {
             return {
                 types: types,
@@ -119,9 +124,6 @@
         },
         mounted() {
             this.load()
-        },
-        components: {
-            // 'add-pop': addEditPop
         },
         methods: {
             jumpToDataCollector(item) {

@@ -10,6 +10,22 @@ class PolicySpec {
     String                         策略名
     protected final List<RuleSpec> rules = new LinkedList<>()
     @Lazy Map<String, Object> attrs = new HashMap<>()
+    protected Closure condition
+
+
+    /**
+     * 条件为 false 则不执行此条策略
+     * @param cl
+     * @return
+     */
+    PolicySpec 条件(Closure cl) {
+        condition = {Map ctx ->
+            def fn = cl.rehydrate(ctx, cl, this)
+            if (fn()) return true
+            return false
+        }
+        this
+    }
 
 
     PolicySpec 属性定义(String 属性名, Object 值) {

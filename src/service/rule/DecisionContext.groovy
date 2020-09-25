@@ -189,11 +189,17 @@ class DecisionContext {
         RuleSpec next() {
             if ((ctx.curPolicySpec == null || (itt == null || !itt.hasNext())) && policyItt.hasNext()) {
                 ctx.curPolicySpec = policyItt.next()
+                if (ctx.curPolicySpec.condition) {
+                    if (!ctx.curPolicySpec.condition(ctx.data)) {
+                        ctx.curPolicySpec = null
+                        return next()
+                    }
+                }
                 log.debug(logPrefix() + "开始执行策略")
             }
 
-            if (itt == null || !itt.hasNext()) itt = ctx.curPolicySpec.rules.iterator()
-            if (itt.hasNext()) return itt.next()
+            if (itt == null || !itt.hasNext()) itt = ctx.curPolicySpec?.rules?.iterator()
+            if (itt && itt.hasNext()) return itt.next()
             return null
         }
     }

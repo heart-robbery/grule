@@ -39,6 +39,7 @@
     const types = [
         { title: '接口', key: 'http'},
         { title: '脚本', key: 'script' },
+        { title: 'sql', key: 'sql' },
     ];
     const addEditPop = { //添加,编辑窗口组件
         template: `
@@ -80,6 +81,9 @@
                             <div ref="dslEditor" style="height: 300px; width: 670px"></div>
                         </h-formitem>
                         <h-formitem v-if="model.type == 'script'" label="值计算函数" icon="h-icon-complete" prop="computeScript" single>
+                            <div ref="dslEditor" style="height: 430px; width: 670px"></div>
+                        </h-formitem>
+                        <h-formitem v-if="model.type == 'sql'" label="sql执行脚本" icon="h-icon-complete" prop="sqlScript" single>
                             <div ref="dslEditor" style="height: 430px; width: 670px"></div>
                         </h-formitem>
                         <h-formitem single>
@@ -135,6 +139,8 @@
                     if (this.model.parseScript) this.editor.session.setValue(this.model.parseScript);
                 } else if (this.model.type = 'script') {
                     if (this.model.computeScript) this.editor.session.setValue(this.model.computeScript);
+                } else if (this.model.type = 'sql') {
+                    if (this.model.sqlScript) this.editor.session.setValue(this.model.sqlScript);
                 }
                 this.editor.setOptions({
                     enableBasicAutocompletion: true,
@@ -148,6 +154,8 @@
                         this.model.parseScript = this.editor.session.getValue();
                     } else if (this.model.type = 'script') {
                         this.model.computeScript = this.editor.session.getValue();
+                    } else if (this.model.type = 'sql') {
+                        this.model.sqlScript = this.editor.session.getValue();
                     }
                 });
                 this.editor.session.setMode('ace/mode/groovy');

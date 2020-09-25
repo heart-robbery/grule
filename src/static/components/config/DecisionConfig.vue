@@ -64,7 +64,6 @@
                     <h-cell width="24">
                         <h-button @click="test">测试</h-button>
                     </h-cell>
-
                 </h-row>
                 <h-row>
                     {{result}}
@@ -159,7 +158,7 @@
                     //console.log('change: ', e);
                     this.curDecision.dsl = this.editor.session.getValue()
                 });
-                this.editor.session.setMode('ace/mode/rule');
+                this.editor.session.setMode('ace/mode/groovy');
                 this.editor.commands.addCommand({
                     name: 'save',
                     bindKey: {win: 'Ctrl-S', mac: 'Command-S'},
@@ -253,6 +252,10 @@
 
 策略定义 {
     策略名 = 'P_预处理'
+
+    条件 { // 执行此策略的条件, false: 不执行, true/不配置默认 执行此策略
+        true
+    }
 
     规则定义 {
         规则名 = 'R_参数验证'

@@ -9,10 +9,12 @@ import core.OkHttpSrv
 import core.ServerTpl
 import core.Utils
 import core.jpa.BaseRepo
+import core.jpa.HibernateSrv
 import dao.entity.CollectResult
 import dao.entity.DataCollector
 import dao.entity.FieldType
 import dao.entity.RuleField
+import groovy.sql.Sql
 import groovy.text.GStringTemplateEngine
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.ImportCustomizer
@@ -291,7 +293,45 @@ if (idNumber && idNumber.length() > 17) {
             initHttpCollector(collector)
         } else if ('script' == collector.type) {
             initScriptCollector(collector)
+        } else if ('sql' == collector.type) {
+            initSqlCollector(collector)
         } else throw new Exception("Not support type: $collector.type")
+    }
+
+
+    /**
+     * 初始化 sql 收集器
+     * @param collector
+     */
+    protected void initSqlCollector(DataCollector collector) {
+        if (!collector.sqlScript) {
+            log.warn('sqlScript must not be empty')
+            return
+        }
+        if (collector.minIdle < 0 || collector.minIdle > 50) {
+            log.warn('0 <= minIdle <= 50')
+            return
+        }
+        if (collector.maxActive < 1 || collector.maxActive > 100) {
+            log.warn('1 <= minIdle <= 100')
+            return
+        }
+
+        def db = new Sql(HibernateSrv.createDs([
+            minIdle: collector.minIdle, maxActive: collector.maxActive
+        ]))
+
+        Binding binding = new Binding()
+        def config = new CompilerConfiguration()
+        binding.setProperty('DB', db)
+        def icz = new ImportCustomizer()
+        config.addCompilationCustomizers(icz)
+        icz.addImports(JSON.class.name, JSONObject.class.name)
+        Closure sqlScript = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("{ -> $collector.sqlScript }")
+
+        setCollector(collector.enName) {ctx ->
+            sqlScript.rehydrate(ctx.data, sqlScript, this)()
+        }
     }
 
 
@@ -379,16 +419,16 @@ if (idNumber && idNumber.length() > 17) {
             try {
                 for (int i = 0, times = getInteger('http.retry', 2) + 1; i < times; i++) { // 接口一般遇网络错重试3次
                     try {
+                        retryMsg = i > 0 ? "(重试第${i}次)" : ''
                         if ('get'.equalsIgnoreCase(collector.method)) {
                             result = http.get(url).execute()
                         } else if ('post'.equalsIgnoreCase(collector.method)) {
                             result = http.post(url).textBody(bodyStr).contentType(collector.contentType).execute()
                         } else throw new Exception("Not support http method $collector.method")
+                        break
                     } catch (ex) {
                         if ((ex instanceof SocketTimeoutException || ex instanceof ConnectException) && (i + 1) < times) {
-                            retryMsg = "(重试第'$times'次)"
                             log.error(logMsg.toString() + ". " + (ex.class.simpleName + ': ' + ex.message))
-                            retryMsg = ''
                             continue
                         } else throw ex
                     } finally {
@@ -403,6 +443,8 @@ if (idNumber && idNumber.length() > 17) {
                     spend: spend, url: url, body: bodyStr, result: result, httpException: ex.message?:ex.class.simpleName
                 ))
                 return result
+            } finally {
+                retryMsg = ''
             }
 
             if (parseFn) { // 如果有配置解析函数,则对接口返回结果解析
