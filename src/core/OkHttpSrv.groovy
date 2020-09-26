@@ -25,6 +25,7 @@ class OkHttpSrv extends ServerTpl {
     final Map<String, Set<String>> shareCookie = new ConcurrentHashMap<>()
 
     OkHttpSrv() {super('okHttp')}
+    OkHttpSrv(String name) {super(name)}
 
 
     @EL(name = 'sys.starting', async = true)
@@ -39,7 +40,7 @@ class OkHttpSrv extends ServerTpl {
      */
     @Lazy OkHttpClient client = {
         new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(getLong('connectTimeout', 8)))
+            .connectTimeout(Duration.ofSeconds(getLong('connectTimeout', 5)))
             .readTimeout(Duration.ofSeconds(getLong('readTimeout', 20)))
             .writeTimeout(Duration.ofSeconds(getLong('writeTimeout', 32)))
             .dispatcher(new Dispatcher(exec))

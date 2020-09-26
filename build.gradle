@@ -53,7 +53,7 @@ dependencies {
 
     // compile 'javax.mail:javax.mail-api:1.6.2'
     // compile 'io.netty:netty-all:4.1.49.Final'
-    compile 'com.squareup.okhttp3:okhttp:3.14.8'
+    compile 'com.squareup.okhttp3:okhttp:3.14.9'
     // compile('org.apache.httpcomponents:httpclient:4.5.12')
     compile ('org.ehcache:ehcache:3.8.1') {exclude group:'org.slf4j'}
     compile ('org.quartz-scheduler:quartz:2.3.2') {

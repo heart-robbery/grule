@@ -137,7 +137,7 @@ class HibernateSrv extends ServerTpl {
                 if (!props.containsKey('validationQuery')) props.put('validationQuery', 'select 1')
                 db = (DataSource) Utils.findMethod(Class.forName('org.apache.commons.dbcp2.BasicDataSourceFactory'), 'createDataSource', Properties.class).invoke(null, props)
             } catch (ClassNotFoundException ex) {}
-            return db
         }
+        return db
     }
 }
