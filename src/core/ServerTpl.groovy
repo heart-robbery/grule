@@ -27,6 +27,7 @@ class ServerTpl {
     @Resource protected EP ep
     @Lazy protected def    app  = bean(AppContext)
     @Lazy protected def    exec = bean(ExecutorService)
+    @Lazy protected def  config = new ConfigObject()
 
 
     ServerTpl(String name) {
@@ -133,7 +134,7 @@ class ServerTpl {
      * @return
      */
     ConfigObject attrs(String key = null) {
-        def r = app.env[(name)]
+        def r = app ? app.env[(name)] : config
         if (key) {
             if (key.contains(".")) {
                 key.split("\\.").each {s -> r = r[(s)] }
@@ -149,7 +150,7 @@ class ServerTpl {
      * @return
      */
     def attr(String key) {
-        def r = app.env[(name)]
+        def r = app ? app.env[(name)] : config
         String k = key
         if (key && key.contains("."))  {
             def arr = key.split("\\.")
