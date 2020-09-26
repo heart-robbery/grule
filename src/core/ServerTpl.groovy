@@ -84,7 +84,7 @@ class ServerTpl {
      * @param name 对象名字
      * @return
      */
-    protected <T> T bean(Class<T> type, String name = null) { (T) ep.fire("bean.get", type, name) }
+    protected <T> T bean(Class<T> type, String name = null) { (T) ep?.fire("bean.get", type, name) }
 
 
     /**
