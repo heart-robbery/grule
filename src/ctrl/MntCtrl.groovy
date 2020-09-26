@@ -2,6 +2,8 @@ package ctrl
 
 import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
+import com.alibaba.fastjson.JSON
+import com.alibaba.fastjson.JSONObject
 import core.Page
 import core.ServerTpl
 import core.Utils
@@ -15,11 +17,13 @@ import core.http.ws.WS
 import core.http.ws.WebSocket
 import core.jpa.BaseRepo
 import dao.entity.*
+import service.rule.AttrManager
 import service.rule.DecisionManager
 import service.rule.spec.DecisionSpec
 
 import javax.persistence.criteria.Predicate
 import java.text.SimpleDateFormat
+import java.util.Map.Entry
 import java.util.concurrent.ConcurrentHashMap
 
 @Ctrl(prefix = 'mnt')
@@ -177,8 +181,11 @@ class MntCtrl extends ServerTpl {
 
 
     @Path(path = 'decisionResultPage')
-    ApiResp decisionResultPage(Integer page, Integer pageSize, String id, String decisionId, service.rule.Decision decision, String idNum, Long spend, String exception, String input, String attrs, String rules) {
-        if (pageSize && pageSize > 20) return ApiResp.fail("pageSize max 20")
+    ApiResp decisionResultPage(
+        Integer page, Integer pageSize, String id, String decisionId, service.rule.Decision decision, String idNum,
+        Long spend, String exception, String input, String attrs, String rules
+    ) {
+        if (pageSize && pageSize > 10) return ApiResp.fail("pageSize max 10")
         ApiResp.ok(
             Page.of(
                 repo.findPage(DecisionResult, page, pageSize?:10) { root, query, cb ->
@@ -195,9 +202,29 @@ class MntCtrl extends ServerTpl {
                     if (rules) ps << cb.like(root.get('rules'), '%' + rules + '%')
                     if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
                 },
-                {Utils.toMapper(it).addConverter('decisionId', 'decisionName', {String dId ->
-                    bean(DecisionManager).findDecision(dId).决策名
-                }).build()}
+                {
+                    Utils.toMapper(it).addConverter('decisionId', 'decisionName', {String dId ->
+                        bean(DecisionManager).findDecision(dId).决策名
+                    }).addConverter('attrs', {
+                        def am = bean(AttrManager)
+                        JSON.parseObject(it).collect { e ->
+                            [enName: e.key, cnName: am.attrMap.get(e.key)?.cnName, value: e.value]
+                        }
+                    }).addConverter('input', {
+                        JSON.parseObject(it)
+                    }).addConverter('dataCollectResult', {
+                        it == null ? null : JSON.parseObject(it)
+                    }).addConverter('rules', {
+                        def am = bean(AttrManager)
+                        def arr = JSON.parseArray(it)
+                        arr.each { JSONObject jo ->
+                            jo.put('data', jo.getJSONObject('data').collect { Entry<String, Object> e ->
+                                [enName: e.key, cnName: am.attrMap.get(e.key)?.cnName, value: e.value]
+                            })
+                        }
+                        arr
+                    }).build()
+                }
             )
         )
     }
@@ -265,6 +292,13 @@ class MntCtrl extends ServerTpl {
             log.error("语法错误", ex)
             return ApiResp.fail('语法错误: ' + ex.message)
         }
+
+        for (def policy : spec.policies) {
+            for (def rule : policy.rules) {
+                if (!rule.规则名) return ApiResp.fail('规则名字不能为空')
+            }
+        }
+
         Decision decision
         def removeFn
         if (id) { // 更新
@@ -319,37 +353,56 @@ class MntCtrl extends ServerTpl {
 
 
     @Path(path = 'addDataCollector', method = 'post')
-    ApiResp addDataCollector(HttpContext ctx) {
+    ApiResp addDataCollector(
+        HttpContext ctx, String enName, String cnName, String type, String url, String bodyStr,
+        String method, String parseScript, String contentType, String comment, String computeScript,
+        String sqlScript, Integer minIdle, Integer maxActive, Integer timeout
+    ) {
         ctx.auth('dataCollector-add')
-        def map = ctx.params()
-        DataCollector dc = new DataCollector()
-        map.each {entry -> if (dc.hasProperty(entry.key)) dc.setProperty(entry.key, entry.value)}
-        if (!dc.enName) return ApiResp.fail('enName must not be empty')
-        if (!dc.cnName) return ApiResp.fail('cnName must not be empty')
-        if (!dc.type) return ApiResp.fail('type must not be empty')
-        if ('http' == dc.type) {
-            if (!dc.url) return ApiResp.fail('url must not be empty')
-            if (!dc.method) return ApiResp.fail('method must not be empty')
-            if (!dc.contentType) return ApiResp.fail('contentType must not be empty')
-            if (!dc.url.startsWith("http")) return ApiResp.fail('url incorrect')
-        } else if ('script' == dc.type) {
-            if (!dc.computeScript) return ApiResp.fail('computeScript must not be empty')
-        } else if ('sql' == dc.type) {
-            if (!dc.sqlScript) return ApiResp.fail('sql must not be empty')
-            if (dc.minIdle < 0 || dc.minIdle > 50) return ApiResp.fail('0 <= minIdle <= 50')
-            if (dc.maxActive < 1 || dc.maxActive > 100) return ApiResp.fail('1 <= minIdle <= 100')
-        } else return ApiResp.fail('Not support type: ' + dc.type)
-        if (repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), dc.enName)}) {
-            return ApiResp.fail("$dc.enName 已存在")
+        DataCollector collector = new DataCollector()
+        collector.enName = enName
+        collector.cnName = cnName
+        collector.type = type
+        collector.comment = comment
+        if (!collector.enName) return ApiResp.fail('enName must not be empty')
+        if (!collector.cnName) return ApiResp.fail('cnName must not be empty')
+        if (!collector.type) return ApiResp.fail('type must not be empty')
+        if ('http' == collector.type) {
+            if (!url) return ApiResp.fail('url must not be empty')
+            if (!method) return ApiResp.fail('method must not be empty')
+            if (!contentType) return ApiResp.fail('contentType must not be empty')
+            if (!url.startsWith("http")) return ApiResp.fail('url incorrect')
+            collector.parseScript = parseScript?.trim()
+            if (collector.parseScript && !collector.parseScript.startsWith("{") && !collector.parseScript.endsWith("}")) {
+                return ApiResp.fail('parseScript is not a function, must startWith {, endWith }')
+            }
+            collector.url = url
+            collector.method = method
+            collector.bodyStr = bodyStr
+            collector.contentType = contentType
+            collector.timeout = timeout
+        } else if ('script' == collector.type) {
+            if (!computeScript) return ApiResp.fail('computeScript must not be empty')
+            collector.computeScript = computeScript
+        } else if ('sql' == collector.type) {
+            if (!sqlScript) return ApiResp.fail('sqlScript must not be empty')
+            if (minIdle < 0 || collector.minIdle > 50) return ApiResp.fail('0 <= minIdle <= 50')
+            if (maxActive < 1 || collector.maxActive > 100) return ApiResp.fail('1 <= minIdle <= 100')
+            collector.sqlScript = sqlScript
+            collector.minIdle = minIdle
+            collector.maxActive = maxActive
+        } else return ApiResp.fail('Not support type: ' + collector.type)
+        if (repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), collector.enName)}) {
+            return ApiResp.fail("$collector.enName 已存在")
         }
-        if (repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('cnName'), dc.cnName)}) {
-            return ApiResp.fail("$dc.cnName 已存在")
+        if (repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('cnName'), collector.cnName)}) {
+            return ApiResp.fail("$collector.cnName 已存在")
         }
-        repo.saveOrUpdate(dc)
-        ep.fire('addDataCollector', dc.enName)
-        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'addDataCollector', [dc.enName]))
-        ep.fire('enHistory', dc, ctx.getSessionAttr('name'))
-        ApiResp.ok(dc)
+        repo.saveOrUpdate(collector)
+        ep.fire('addDataCollector', collector.enName)
+        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'addDataCollector', [collector.enName]))
+        ep.fire('enHistory', collector, ctx.getSessionAttr('name'))
+        ApiResp.ok(collector)
     }
 
 
@@ -362,6 +415,7 @@ class MntCtrl extends ServerTpl {
         if (!type) return ApiResp.fail("type must not be empty")
         def field = repo.findById(RuleField, id)
         if (field == null) return ApiResp.fail("id: $id not found")
+        if (enName != field.enName) return ApiResp.fail('enName can not change')
         if (enName != field.enName && repo.count(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}) {
             return ApiResp.fail("$enName aleady exist")
         }
@@ -387,7 +441,7 @@ class MntCtrl extends ServerTpl {
     ApiResp updateDataCollector(
         HttpContext ctx, Long id, String enName, String cnName, String url, String bodyStr,
         String method, String parseScript, String contentType, String comment, String computeScript,
-        String sqlScript, Integer minIdle, Integer maxActive
+        String sqlScript, Integer minIdle, Integer maxActive, Integer timeout
     ) {
         ctx.auth('dataCollector-update')
         if (!id) return ApiResp.fail("id not legal")
@@ -400,14 +454,15 @@ class MntCtrl extends ServerTpl {
             if (!method) return ApiResp.fail('method must not be empty')
             if (!contentType) return ApiResp.fail('contentType must not be empty')
             if (!url.startsWith("http")) return ApiResp.fail('url incorrect')
+            collector.parseScript = parseScript?.trim()
+            if (collector.parseScript && (!collector.parseScript.startsWith('{') || !collector.parseScript.endsWith('}'))) {
+                return ApiResp.fail('parseScript is not a function, must startWith {, endWith }')
+            }
             collector.url = url
             collector.method = method
             collector.contentType = contentType
             collector.bodyStr = bodyStr
-            collector.parseScript = parseScript?.trim()
-            if (collector.parseScript && (!collector.parseScript.startsWith('{') || !collector.parseScript.endsWith('}'))) {
-                return ApiResp.fail('parseScript is not a function')
-            }
+            collector.timeout = timeout
         } else if ('script' == collector.type) {
             if (!computeScript) return ApiResp.fail('computeScript must not be empty')
             collector.computeScript = computeScript?.trim()
@@ -418,9 +473,13 @@ class MntCtrl extends ServerTpl {
             if (!sqlScript) return ApiResp.fail('sqlScript must not be empty')
             if (minIdle < 0 || minIdle > 50) return ApiResp.fail('0 <= minIdle <= 50')
             if (maxActive < 1 || maxActive > 100) return ApiResp.fail('1 <= minIdle <= 100')
+            collector.minIdle = minIdle
+            collector.maxActive = maxActive
+            collector.sqlScript = sqlScript
         }
         def updateRelateField
-        if (enName != collector.enName ) {
+        if (enName != collector.enName ) {// 不让修改名字
+            return ApiResp.fail('enName can not change')
             if (repo.count(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), enName)}) {
                 return ApiResp.fail("$enName aleady exist")
             }
@@ -482,5 +541,11 @@ class MntCtrl extends ServerTpl {
         ep.fire('delDataCollector', enName)
         ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'delDataCollector', [enName]))
         ApiResp.ok()
+    }
+
+
+    @Path(path = 'countDecide')
+    ApiResp countDecide(String startTime, String endTime, String type) {
+
     }
 }

@@ -36,10 +36,18 @@
     </div>
 </template>
 <script>
+    loadJs('ace', () => {
+        ace.config.set("basePath", "js/lib");
+        loadJs('ace-tools');
+        // loadJs('ace-lang-rule');
+        // loadJs('ace-snip-rule');
+        loadJs('ace-lang-groovy');
+        loadJs('ace-snip-groovy');
+    });
     const types = [
         { title: '接口', key: 'http'},
         { title: '脚本', key: 'script' },
-        { title: 'sql', key: 'sql' },
+        { title: 'SQL', key: 'sql' },
     ];
     const addEditPop = { //添加,编辑窗口组件
         template: `
@@ -52,8 +60,8 @@
                             mode="twocolumn"
                             :rules="validationRules"
                             :model="model">
-                        <h-formitem label="英语名" icon="h-icon-complete" prop="enName">
-                            <input type="text" v-model="model.enName" readonly/>
+                        <h-formitem label="英文名" icon="h-icon-complete" prop="enName">
+                            <input type="text" v-model="model.enName" :readonly="collector"/>
                         </h-formitem>
                         <h-formitem label="中文名" icon="h-icon-complete" prop="cnName">
                             <input type="text" v-model="model.cnName" />
@@ -65,7 +73,10 @@
                         <h-formitem v-if="model.type == 'http'" label="方法" icon="h-icon-user" prop="method">
                             <h-select v-model="model.method" :datas="methods"></h-select>
                         </h-formitem>
-                        <h-formitem v-if="model.type == 'http'" label="ContentType" icon="h-icon-user" prop="contentType">
+                        <h-formitem v-if="model.type == 'http'" label="超时(ms)" icon="h-icon-user" prop="timeout">
+                            <h-numberinput v-model="model.timeout" :min="1000" :max="600000"></h-numberinput>
+                        </h-formitem>
+                        <h-formitem v-if="model.type == 'http' && model.method == 'POST'" label="ContentType" icon="h-icon-user" prop="contentType">
                             <h-select v-model="model.contentType" :datas="contentTypes"></h-select>
                         </h-formitem>
                         <h-formitem label="描述" icon="h-icon-complete" prop="comment" single>
@@ -74,24 +85,35 @@
                         <h-formitem v-if="model.type == 'http'" label="接口地址" prop="url" icon="h-icon-user" single>
                             <input type="text" v-model="model.url">
                         </h-formitem>
-                        <h-formitem v-if="model.type == 'http'" label="请求体" icon="h-icon-complete" prop="bodyStr" single>
-                            <textarea v-model="model.bodyStr" rows="7"/>
+                        <h-formitem v-if="model.type == 'http' && model.method == 'POST'" label="请求体" icon="h-icon-complete" prop="bodyStr" single>
+                            <textarea v-model="model.bodyStr" rows="6"/>
                         </h-formitem>
+
+                        <h-formitem v-if="model.type == 'sql'" label="数据库连接url" prop="url" icon="h-icon-user" single>
+                            <input type="text" v-model="model.url">
+                        </h-formitem>
+                        <h-formitem v-if="model.type == 'sql'" label="最少闲连接数" prop="minIdle" icon="h-icon-user" >
+                            <h-numberinput v-model="model.minIdle" :min="0" :max="50" useInt></h-numberinput>
+                        </h-formitem>
+                        <h-formitem v-if="model.type == 'sql'" label="最大连接数" prop="maxActive" icon="h-icon-user" >
+                            <h-numberinput v-model="model.maxActive" :min="1" :max="100" useInt></h-numberinput>
+                        </h-formitem>
+
                         <h-formitem v-if="model.type == 'http'" label="解析脚本" icon="h-icon-complete" prop="parseScript" single>
-                            <div ref="dslEditor" style="height: 300px; width: 670px"></div>
+                            <div ref="dslEditor" style="height: 280px; width: 670px"></div>
                         </h-formitem>
                         <h-formitem v-if="model.type == 'script'" label="值计算函数" icon="h-icon-complete" prop="computeScript" single>
                             <div ref="dslEditor" style="height: 430px; width: 670px"></div>
                         </h-formitem>
                         <h-formitem v-if="model.type == 'sql'" label="sql执行脚本" icon="h-icon-complete" prop="sqlScript" single>
-                            <div ref="dslEditor" style="height: 430px; width: 670px"></div>
+                            <div ref="dslEditor" style="height: 380px; width: 670px"></div>
                         </h-formitem>
                         <h-formitem single>
                                 <h-button v-if="model.id" color="primary" :loading="isLoading" @click="update">提交</h-button>
                                 <h-button v-else color="primary" :loading="isLoading" @click="add">提交</h-button>
                                 &nbsp;&nbsp;&nbsp;
                                 <h-button v-if="model.id" @click="model = {type: 'http', method: 'GET', contentType: 'application/x-www-form-urlencoded'}">清除</h-button>
-                                <h-button v-else @click="model = {type: 'http', method: 'GET', contentType: 'application/x-www-form-urlencoded'}">重置</h-button>
+                                <h-button v-else @click="model = {type: 'http', method: 'GET', contentType: 'application/x-www-form-urlencoded', minIdle: 1, maxActive: 8}">重置</h-button>
                             </h-formitem>
                     </h-form>
                 </div>
@@ -100,7 +122,7 @@
         data() {
             return {
                 isLoading: false,
-                model: this.collector ? $.extend({}, this.collector) : {type: 'http', method: 'GET', contentType: 'application/x-www-form-urlencoded'},
+                model: this.collector ? $.extend({}, this.collector) : {type: 'http', method: 'GET', timeout: 10000, contentType: 'application/x-www-form-urlencoded', minIdle: 1, maxActive: 8},
                 validationRules: {
                     required: ['enName', 'cnName']
                 },
@@ -116,12 +138,10 @@
             }
         },
         mounted() {
-            // setTimeout(this.showEditor, 700)
             this.showEditor()
         },
         watch: {
             'model.type': function () {
-                console.log(this.model);
                 this.showEditor()
             }
         },
@@ -131,15 +151,15 @@
                 this.$nextTick(this.initEditor);
             },
             initEditor() {
-                if (this.editor) {this.editor.destroy()}
+                // if (this.editor) {this.editor.destroy()}
                 // console.log('this.$refs.dslEditor', this.$refs.dslEditor);
                 this.editor = ace.edit(this.$refs.dslEditor);
                 // console.log('editor: ', this.editor);
                 if (this.model.type == 'http') {
                     if (this.model.parseScript) this.editor.session.setValue(this.model.parseScript);
-                } else if (this.model.type = 'script') {
+                } else if (this.model.type == 'script') {
                     if (this.model.computeScript) this.editor.session.setValue(this.model.computeScript);
-                } else if (this.model.type = 'sql') {
+                } else if (this.model.type == 'sql') {
                     if (this.model.sqlScript) this.editor.session.setValue(this.model.sqlScript);
                 }
                 this.editor.setOptions({
@@ -152,9 +172,9 @@
                 this.editor.on('change', (e) => {
                     if (this.model.type == 'http') {
                         this.model.parseScript = this.editor.session.getValue();
-                    } else if (this.model.type = 'script') {
+                    } else if (this.model.type == 'script') {
                         this.model.computeScript = this.editor.session.getValue();
-                    } else if (this.model.type = 'sql') {
+                    } else if (this.model.type == 'sql') {
                         this.model.sqlScript = this.editor.session.getValue();
                     }
                 });
@@ -165,8 +185,10 @@
                     exec: (editor) => {
                         if (this.model.type == 'http') {
                             this.model.parseScript = this.editor.session.getValue();
-                        } else if (this.model.type = 'script') {
+                        } else if (this.model.type == 'script') {
                             this.model.computeScript = this.editor.session.getValue();
+                        } else if (this.model.type == 'sql') {
+                            this.model.sqlScript = this.editor.session.getValue();
                         }
                         // this.save()
                     },
@@ -260,7 +282,7 @@
                         vue: addEditPop,
                         datas: {collector: collector}
                     },
-                    width:850,
+                    width: 850,
                     hasCloseIcon: true, fullScreen: false, middle: false, transparent: false
                 })
             },

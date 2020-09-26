@@ -67,6 +67,7 @@ class DecisionEngine extends ServerTpl {
                     decisionId = ctx.summary().get('decisionId')
                     decision = ctx.summary().get('decision')
                     spend = ctx.summary().get('spend')
+                    input = JSON.toJSONString(ctx.input, SerializerFeature.WriteMapNullValue)
                     attrs = JSON.toJSONString(ctx.summary().get('attrs'), SerializerFeature.WriteMapNullValue)
 
                     def rs = ctx.summary().get('rules')

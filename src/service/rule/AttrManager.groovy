@@ -38,6 +38,7 @@ class AttrManager extends ServerTpl {
      * 数据获取函数. 函数名 -> 函数
      */
     protected final Map<String, Function<DecisionContext, Object>> dataCollectorMap = new ConcurrentHashMap()
+    protected final Map<String, Sql> sqlMap = new ConcurrentHashMap<>()
 
 
     @EL(name = 'jpa_rule.started', async = true)
@@ -46,6 +47,12 @@ class AttrManager extends ServerTpl {
         loadField()
         loadDataCollector()
         ep.fire("${name}.started")
+    }
+
+
+    @EL(name = 'sys.stop')
+    void stop() {
+        sqlMap.each {}
     }
 
 
@@ -318,6 +325,7 @@ if (idNumber && idNumber.length() > 17) {
         }
 
         def db = new Sql(HibernateSrv.createDs([
+            url: collector.url, jdbcUrl: collector.url,
             minIdle: collector.minIdle, maxActive: collector.maxActive
         ]))
 
@@ -330,7 +338,24 @@ if (idNumber && idNumber.length() > 17) {
         Closure sqlScript = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("{ -> $collector.sqlScript }")
 
         setCollector(collector.enName) {ctx ->
-            sqlScript.rehydrate(ctx.data, sqlScript, this)()
+            def start = new Date()
+            Object result
+            Exception exx
+            try {
+                result = sqlScript.rehydrate(ctx.data, sqlScript, this)()
+                log.info(ctx.logPrefix() + "Sql脚本函数'$collector.enName'执行结果: $result".toString())
+            } catch (ex) {
+                exx = ex
+                log.error(ctx.logPrefix() + "Sql脚本函数'$collector.enName'执行失败".toString(), ex)
+            }
+            dataCollected(new CollectResult(
+                decideId: ctx.id, decisionId: ctx.decisionSpec.决策id, collector: collector.enName,
+                collectDate: start, collectorType: collector.type,
+                spend: System.currentTimeMillis() - start.time,
+                result: result instanceof Map ? JSON.toJSONString(result, SerializerFeature.WriteMapNullValue) : result?.toString(),
+                scriptException: exx == null ? null : exx.message?:exx.class.simpleName
+            ))
+            return result
         }
     }
 
@@ -356,20 +381,19 @@ if (idNumber && idNumber.length() > 17) {
             Exception exx
             try {
                 result = script.rehydrate(ctx.data, script, this)()
+                log.info(ctx.logPrefix() + "脚本函数'$collector.enName'执行结果: $result".toString())
             } catch (ex) {
                 exx = ex
                 log.error(ctx.logPrefix() + "脚本函数'$collector.enName'执行失败".toString(), ex)
-            } finally {
-                log.info(ctx.logPrefix() + "脚本函数'$collector.enName'执行结果: $result".toString())
-                // TODO 保存吗
-                dataCollected(new CollectResult(
-                    decideId: ctx.id, decisionId: ctx.decisionSpec.决策id, collector: collector.enName,
-                    collectDate: start, collectorType: collector.type,
-                    spend: System.currentTimeMillis() - start.time,
-                    result: result instanceof Map ? JSON.toJSONString(result, SerializerFeature.WriteMapNullValue) : result?.toString(),
-                    scriptException: exx == null ? null : exx.message?:exx.class.simpleName
-                ))
             }
+            // TODO 保存吗
+            dataCollected(new CollectResult(
+                decideId: ctx.id, decisionId: ctx.decisionSpec.决策id, collector: collector.enName,
+                collectDate: start, collectorType: collector.type,
+                spend: System.currentTimeMillis() - start.time,
+                result: result instanceof Map ? JSON.toJSONString(result, SerializerFeature.WriteMapNullValue) : result?.toString(),
+                scriptException: exx == null ? null : exx.message?:exx.class.simpleName
+            ))
             return result
         }
     }
@@ -380,7 +404,11 @@ if (idNumber && idNumber.length() > 17) {
      * @param collector
      */
     protected void initHttpCollector(DataCollector collector) {
-        def http = bean(OkHttpSrv)
+        def http = new OkHttpSrv('okHttp_' + collector.enName)
+        http.attr('connectTimeout', getInteger('http.connectTimeout', 3))
+        http.attr('readTimeout', getInteger('http.readTimeout', collector.timeout?:20))
+        http.init()
+
         Closure parseFn
         if (collector.parseScript) {
             Binding binding = new Binding()
@@ -400,6 +428,12 @@ if (idNumber && idNumber.length() > 17) {
                     def v = ctx.data.get(key)
                     return v == null ? '' : URLEncoder.encode(v.toString(), 'utf-8')
                 }
+
+                @Override
+                Object put(Object key, Object value) {
+                    log.error("$collector.enName url config error, not allow set property '$key'".toString())
+                    null
+                }
             }).toString()
             // http 请求 body字符串
             String bodyStr = collector.bodyStr ? tplEngine.createTemplate(collector.bodyStr).make(new HashMap(1) {
@@ -407,6 +441,11 @@ if (idNumber && idNumber.length() > 17) {
                 Object get(Object key) {
                     def v = ctx.data.get(key)
                     return v == null ? '' : URLEncoder.encode(v.toString(), 'utf-8')
+                }
+                @Override
+                Object put(Object key, Object value) {
+                    log.error("$collector.enName bodyStr config error, not allow set property '$key'".toString())
+                    null
                 }
             }).toString() : ''
             String result // 接口返回结果字符串
@@ -417,7 +456,7 @@ if (idNumber && idNumber.length() > 17) {
             String retryMsg = ''
             def logMsg = "${ctx.logPrefix()}接口调用${ -> retryMsg}: name: $collector.enName, url: $url, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}"
             try {
-                for (int i = 0, times = getInteger('http.retry', 2) + 1; i < times; i++) { // 接口一般遇网络错重试3次
+                for (int i = 0, times = getInteger('http.retry', 2) + 1; i < times; i++) { // 接口一般遇网络错重试2次
                     try {
                         retryMsg = i > 0 ? "(重试第${i}次)" : ''
                         if ('get'.equalsIgnoreCase(collector.method)) {

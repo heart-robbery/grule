@@ -49,50 +49,73 @@
         props: ['item'],
         template:`
             <div>
-                <div class="h-panel">
-                    <div class="h-panel-bar">执行规则集</div>
-                    <div class="h-panel-body">
-                        <h-table :datas="rules" stripe select-when-click-tr border>
-                            <h-tableitem title="规则属性" :width="220">
-                                <template slot-scope="{data}">
-                                    <h-form readonly>
-                                        <h-formitem v-for="(v,k) in data.attrs" :key="k" :label="k">{{v}}</h-formitem>
-                                    </h-form>
-                                </template>
-                            </h-tableitem>
-                            <h-tableitem title="决策" prop="decision" align="center" :width="100" :format="formatType"></h-tableitem>
-                            <h-tableitem title="数据">
-                                <template slot-scope="{data}">
-                                    <h-form readonly>
-                                        <h-formitem v-for="(v,k) in data.data" :key="k" :label="k">{{v}}</h-formitem>
-                                    </h-form>
-                                </template>
-                            </h-tableitem>
-                            <div slot="empty">无规则</div>
-                        </h-table>
-                    </div>
-                </div>
-                <div class="h-panel">
-                    <div class="h-panel-bar">属性结果集</div>
-                    <div class="h-panel-body">
-                        <h-table :datas="attrs" stripe select-when-click-tr border>
-                            <h-tableitem title="属性名" prop="name" :width="120"></h-tableitem>
-                            <h-tableitem title="属性值" prop="value" align="center" :width="100"></h-tableitem>
-                            <div slot="empty">无属性</div>
-                        </h-table>
-                    </div>
-                </div>
+                <header class="h-modal-header text-center">{{item.decisionName + '&nbsp;' + item.id + '&nbsp;' + item.decision}}</header>
+                <h-layout>
+                    <h-header>
+                        <h-form readonly>
+                            <h-formitem label="入参">{{item.input}}</h-formitem>
+                        </h-form>
+                    </h-header>
+                    <h-layout>
+                        <h-sider style="flex: none; max-width: 60%; width: auto">
+                            <div class="h-panel">
+                                <div class="h-panel-bar">执行规则集</div>
+                                <div class="h-panel-body">
+                                    <h-table :datas="rules" stripe select-when-click-tr border>
+                                        <h-tableitem title="规则属性" :width="220" align="left">
+                                            <template slot-scope="{data}">
+                                                <h-form readonly>
+                                                    <h-formitem v-for="(v,k) in data.attrs" :key="k" :label="k">{{v}}</h-formitem>
+                                                </h-form>
+                                            </template>
+                                        </h-tableitem>
+                                        <h-tableitem title="决策" prop="decision" align="center" :width="80" :format="formatType"></h-tableitem>
+                                        <h-tableitem title="数据" align="left">
+                                            <template slot-scope="{data}">
+                                                <h-form readonly :labelWidth="170">
+                                                    <h-formitem v-for="item in data.data" :key="item.enName" :label="item.cnName ? item.cnName : item.enName">{{item.value}}</h-formitem>
+                                                </h-form>
+                                            </template>
+                                        </h-tableitem>
+                                        <div slot="empty">无规则</div>
+                                    </h-table>
+                                </div>
+                            </div>
+                        </h-sider>
+                        <h-content>
+                            <div class="h-panel">
+                                <div class="h-panel-bar">属性结果集</div>
+                                <div class="h-panel-body">
+                                    <h-table :datas="attrs" stripe select-when-click-tr border>
+                                        <h-tableitem title="属性名" :width="120" align="right">
+                                            <template slot-scope="{data}">
+                                                <span>{{data.cnName ? data.cnName : data.enName}}</span>
+                                            </template>
+                                        </h-tableitem>
+                                        <h-tableitem title="属性值" prop="value" align="left" :width="100"></h-tableitem>
+                                        <div slot="empty">无属性</div>
+                                    </h-table>
+                                </div>
+                            </div>
+                        </h-content>
+                    </h-layout>
+                    <h-footer v-if="item.dataCollectResult">
+                        <h-form readonly>
+                            <h-formitem label="数据收集">{{item.dataCollectResult}}</h-formitem>
+                        </h-form>
+                    </h-footer>
+                </h-layout>
             </div>
         `,
         data() {
-            let jo = JSON.parse(this.item.attrs);
-            let attrs = [];
-            for (let k in jo) {
-                attrs.push({name: k, value: jo[k]})
-            }
+            // let jo = JSON.parse(this.item.attrs);
+            // let attrs = [];
+            // for (let k in jo) {
+            //     attrs.push({name: k, value: jo[k]})
+            // }
             return {
-                attrs: attrs,
-                rules: JSON.parse(this.item.rules),
+                attrs: this.item.attrs,
+                rules: this.item.rules,
             }
         },
         methods: {
@@ -148,7 +171,7 @@
                         vue: detail,
                         datas: {item: item}
                     },
-                    width: 700,
+                    width: 1200,
                     hasCloseIcon: true, fullScreen: false, middle: false, transparent: false, closeOnMask: true,
                     events: {
                         // reload: () => {

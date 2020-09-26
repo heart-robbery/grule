@@ -107,6 +107,7 @@ let jsMap = new Map([
     ['ace-lang-groovy', 'js/lib/mode-groovy.js'],
     ['ace-snip-groovy', 'js/lib/groovy-snippets.min.js'],
     ['moment', 'js/lib/moment.min.js'],
+    ['echarts', 'js/lib/echarts.min.js'],
 ]);
 function loadJs() {
     if (arguments.length < 1) return;

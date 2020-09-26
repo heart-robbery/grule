@@ -32,6 +32,10 @@ class DataCollector extends LongIdEntity {
      * 备注说明
      */
     String comment
+    /**
+     * 超时(ms)
+     */
+    Integer timeout
 
 
     /**

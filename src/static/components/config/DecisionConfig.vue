@@ -43,6 +43,14 @@
     </div>
 </template>
 <script>
+    loadJs('ace', () => {
+        ace.config.set("basePath", "js/lib");
+        loadJs('ace-tools');
+        // loadJs('ace-lang-rule');
+        // loadJs('ace-snip-rule');
+        loadJs('ace-lang-groovy');
+        loadJs('ace-snip-groovy');
+    });
     const testPop = {
         props: ['decision'],
         template: `
@@ -53,8 +61,8 @@
                     </h-cell>
                 </h-row>
                 <h-row :space="10" v-for="(param,index) in items.params">
-                    <h-cell width="4"><input type="text" v-model="param.name" placeholder="参数名" style="float: left; width: 100%"/></h-cell>
-                    <h-cell width="16"><input type="text" v-model="param.value" placeholder="参数值" style="float: left; width: 100%"/></h-cell>
+                    <h-cell width="8"><input type="text" v-model="param.name" placeholder="参数名" style="float: left; width: 100%"/></h-cell>
+                    <h-cell width="12"><input type="text" v-model="param.value" placeholder="参数值" style="float: left; width: 100%"/></h-cell>
                     <h-cell width="2">
                         <i v-if="items.params.length == (index + 1)" class="h-icon-plus" @click="add"></i>
                         <i class="h-icon-minus" @click="del(param)"></i>
