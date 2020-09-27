@@ -57,7 +57,10 @@
                                 app.$data.user = res.data;
                                 localStorage.setItem('rule.login.username', this.model.username);
                                 localStorage.setItem('rule.login.password', this.model.password);
-                            } else this.$Notice.error(res.desc)
+                            } else {
+                                this.isLoading = false;
+                                this.$Notice.error(res.desc)
+                            }
                         }
                     })
                 } else {

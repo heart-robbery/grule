@@ -5,6 +5,7 @@ import core.http.HttpServer
 import core.jpa.HibernateSrv
 import ctrl.MainCtrl
 import ctrl.MntCtrl
+import ctrl.MntUserCtrl
 import ctrl.RuleCtrl
 import ctrl.TestCtrl
 import dao.entity.*
@@ -17,6 +18,7 @@ import service.rule.AttrManager
 import service.rule.DecisionEngine
 import service.rule.DecisionManager
 import service.rule.OpHistorySrv
+import service.rule.UserSrv
 
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Field final AppContext app = new AppContext()
@@ -28,10 +30,10 @@ app.addSource(new EhcacheSrv())
 app.addSource(new SchedSrv())
 app.addSource(new Remoter())
 app.addSource(new HibernateSrv('jpa_rule').entities(
-     Decision, RuleField, DataCollector, OpHistory, DecisionResult, CollectResult
+     Decision, RuleField, DataCollector, OpHistory, DecisionResult, CollectResult, User, Permission
 ))
 app.addSource(new HttpServer().ctrls(
-    TestCtrl, MainCtrl, RuleCtrl, MntCtrl
+    TestCtrl, MainCtrl, RuleCtrl, MntCtrl, MntUserCtrl
 ))
 app.addSource(new FileUploader())
 app.addSource(new TestService())
@@ -39,7 +41,7 @@ app.addSource(new AttrManager())
 app.addSource(new DecisionEngine())
 app.addSource(new DecisionManager())
 app.addSource(new OpHistorySrv())
-// app.addSource(new PolicyManger())
+app.addSource(new UserSrv())
 app.addSource(this)
 app.start() // 启动系统
 

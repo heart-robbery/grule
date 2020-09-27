@@ -50,6 +50,8 @@
         complete: (xhr) => {
             if (xhr.status == 401) { // 登录实效 or 未登录
                 app.$data.user = null
+            } else if (xhr.status == 403) {
+                app.$Notice.error('没有权限');
             }
         }
     });

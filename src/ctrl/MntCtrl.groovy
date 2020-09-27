@@ -17,6 +17,8 @@ import core.http.ws.WS
 import core.http.ws.WebSocket
 import core.jpa.BaseRepo
 import dao.entity.*
+import org.hibernate.query.internal.NativeQueryImpl
+import org.hibernate.transform.Transformers
 import service.rule.AttrManager
 import service.rule.DecisionManager
 import service.rule.spec.DecisionSpec
@@ -30,7 +32,6 @@ import java.util.concurrent.ConcurrentHashMap
 class MntCtrl extends ServerTpl {
 
     @Lazy def repo = bean(BaseRepo, 'jpa_rule_repo')
-
     protected final Set<WebSocket> wss = ConcurrentHashMap.newKeySet()
 
 
@@ -78,10 +79,12 @@ class MntCtrl extends ServerTpl {
     ApiResp login(String username, String password, HttpContext ctx) {
         if (!username) return ApiResp.fail('username must not be empty')
         if (!password) return ApiResp.fail('password must not be empty')
+        def user = repo.find(User) {root, query, cb -> cb.equal(root.get('name'), username)}
+        if (!user) return ApiResp.fail("用户不存在")
+        if (password != user.password) return ApiResp.fail('密码错误')
         ctx.setSessionAttr('name', username)
-        ctx.setSessionAttr('id', username)
-        ctx.setSessionAttr('uRoles', ['admin'] as Set)
-        ApiResp.ok().attr('name', username)
+        ctx.setSessionAttr('permissions', user.permissions.split(",") as Set)
+        ApiResp.ok().attr('name', username).attr('permissions', user.permissions.split(","))
     }
 
 
@@ -94,7 +97,7 @@ class MntCtrl extends ServerTpl {
     ApiResp getCurrentUser(HttpContext ctx) {
         String name = ctx.getSessionAttr('name')
         if (name) {
-            ApiResp.ok().attr('name', name)
+            ApiResp.ok().attr('name', name).attr('permissions', ctx.getSessionAttr("permissions", Set))
         } else {
             ctx.response.status(401)
             ApiResp.fail('用户会话已失效, 请重新登录')
@@ -203,21 +206,20 @@ class MntCtrl extends ServerTpl {
                     if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
                 },
                 {
+                    def am = bean(AttrManager)
                     Utils.toMapper(it).addConverter('decisionId', 'decisionName', {String dId ->
                         bean(DecisionManager).findDecision(dId).决策名
                     }).addConverter('attrs', {
-                        def am = bean(AttrManager)
-                        JSON.parseObject(it).collect { e ->
+                        it == null ? null : JSON.parseObject(it).collect { e ->
                             [enName: e.key, cnName: am.attrMap.get(e.key)?.cnName, value: e.value]
                         }
                     }).addConverter('input', {
-                        JSON.parseObject(it)
+                        it == null ? null : JSON.parseObject(it)
                     }).addConverter('dataCollectResult', {
                         it == null ? null : JSON.parseObject(it)
                     }).addConverter('rules', {
-                        def am = bean(AttrManager)
-                        def arr = JSON.parseArray(it)
-                        arr.each { JSONObject jo ->
+                        def arr = it == null ? null : JSON.parseArray(it)
+                        arr?.each { JSONObject jo ->
                             jo.put('data', jo.getJSONObject('data').collect { Entry<String, Object> e ->
                                 [enName: e.key, cnName: am.attrMap.get(e.key)?.cnName, value: e.value]
                             })
@@ -422,13 +424,11 @@ class MntCtrl extends ServerTpl {
         if (cnName != field.cnName && repo.count(RuleField) {root, query, cb -> cb.equal(root.get('cnName'), cnName)}) {
             return ApiResp.fail("$cnName aleady exist")
         }
-
         field.enName = enName
         field.cnName = cnName
         field.type = type
         field.comment = comment
         field.dataCollector = dataCollector
-
         repo.saveOrUpdate(field)
         ep.fire('updateField', field.enName)
         ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'updateField', [field.enName]))
@@ -546,6 +546,35 @@ class MntCtrl extends ServerTpl {
 
     @Path(path = 'countDecide')
     ApiResp countDecide(String startTime, String endTime, String type) {
-
+        Date start = startTime ? new SimpleDateFormat('yyyy-MM-dd HH:mm:ss').parse(startTime) : null
+        Date end = endTime ? new SimpleDateFormat('yyyy-MM-dd HH:mm:ss').parse(endTime) : null
+        def cal = Calendar.getInstance()
+        if (type == 'today') {
+            cal.set(Calendar.HOUR_OF_DAY, 0)
+            cal.set(Calendar.MINUTE, 0)
+            cal.set(Calendar.SECOND, 0)
+            cal.set(Calendar.MILLISECOND, 0)
+        } else if (type == 'lastOneHour') {
+            cal.add(Calendar.HOUR_OF_DAY, -1)
+        } else if (type == 'lastTwoHour') {
+            cal.add(Calendar.HOUR_OF_DAY, -2)
+        } else if (type == 'lastFiveHour') {
+            cal.add(Calendar.HOUR_OF_DAY, -5)
+        } else return ApiResp.fail("type: '$type' not supprot")
+        ApiResp.ok(repo.trans{se ->
+            se.createNativeQuery(
+                "select decision_id, decision, count(*) total from decision_result where occur_time>=:occurTime group by decision_id, decision"
+            )
+                .setParameter("occurTime", cal.getTime())
+                .unwrap(NativeQueryImpl).setResultTransformer(Transformers.ALIAS_TO_ENTITY_MAP)
+                .list()
+        }.collect {Map<String, Object> record ->
+            def data = new HashMap<>(5)
+            record.each {e ->
+                data.put(e.key.toLowerCase(), e.value)
+            }
+            data['decisionName'] = bean(DecisionManager).findDecision(data['decision_id']).决策名
+            data
+        })
     }
 }

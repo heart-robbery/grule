@@ -91,6 +91,7 @@ new Map([
     ['DecisionResult', 'data/DecisionResult.vue'],
     ['CollectResult', 'data/CollectResult.vue'],
     ['DataAnalyse', 'data/DataAnalyse.vue'],
+    ['DecisionEChart', 'data/DecisionEChart.vue'],
 ]).forEach((value, key) => {
     Vue.component(key, (resolve, reject) => {
         httpVueLoader('components/'+ value)().then((r) => resolve(r))

@@ -181,7 +181,7 @@
                 // console.log('languageTools', ace.require("ace/ext/language_tools"));
                 languageTools.addCompleter({
                     getCompletions: (editor, session, pos, prefix, callback) => {
-                        callback(null,  [
+                        callback(null, [
                             {
                                 name : "第一行", //名称
                                 value : "身份证号码",//值，这就是匹配我们输入的内容，比如输入s或者select,这一行就会出现在提示框里，可根据自己需求修改，就是你想输入什么显示出北京呢，就改成什么
@@ -286,7 +286,7 @@
                 })
             },
             showEditor(e) {
-                console.log('showEditor', e);
+                // console.log('showEditor', e);
                 if (e && e.length > 0) {
                     this.decision.list.forEach((v, i) => {
                         if (v.decisionId == e[0]) {

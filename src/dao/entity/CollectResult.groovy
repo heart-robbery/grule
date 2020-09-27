@@ -9,7 +9,8 @@ import javax.persistence.*
  * 决策结果保存地
  */
 @Entity
-@Table(indexes = [@Index(name = "index_collectDate", columnList = "collectDate"), @Index(name = "index_decideId", columnList = "decideId")])
+@Table(indexes = [@Index(name = "index_collectDate", columnList = "collectDate"), @Index(name = "index_decideId", columnList = "decideId"),
+    @Index(name = "index_collector", columnList = "collector")])
 class CollectResult extends LongIdEntity {
     /**
      * 执行决策id

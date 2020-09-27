@@ -9,6 +9,8 @@ import javax.persistence.*
  * 决策结果保存地
  */
 @Entity
+@Table(indexes = [@Index(name = "index_occurTime", columnList = "occurTime"), @Index(name = "index_decisionId", columnList = "decisionId"),
+    @Index(name = "index_idNum", columnList = "idNum")])
 class DecisionResult extends BaseEntity {
     @Id
     String id
