@@ -115,7 +115,7 @@ class HttpContext {
             if (Set.isAssignableFrom(type) && v instanceof Set) {
                 return v
             } else if (Set.isAssignableFrom(type) && v instanceof String) {
-                return v == '' ? null : v.toString().split(',').toList().toSet()
+                return v == '' ? null : v.toString().split(',') as Set
             } else if (List.isAssignableFrom(List) && v instanceof String) {
                 return v == '' ? null : v.toString().split(',').toList()
             }
@@ -212,31 +212,36 @@ class HttpContext {
 
     /**
      * 权限验证
-     * @param authority 权限名 验证用户是否有此权限
+     * @param permission 权限名 验证用户是否有此权限
      * @return true: 验证通过
      */
-    boolean auth(String authority) {
-        if (!authority) throw new IllegalArgumentException('authority is empty')
-        def doAuth = {Set<String> uAuthorities -> // 权限验证函数
-            if (uAuthorities.contains(authority)) return true
-            else throw new AccessControlException('没有权限')
+    boolean auth(String permission) {
+        if (!permission) throw new IllegalArgumentException('permission is empty')
+        if (!getSessionAttr('permissions', Set)?.contains(permission)) {
+            response.status(403)
+            throw new AccessControlException('没有权限')
         }
+        true
+//        def doAuth = {Set<String> uAuthorities -> // 权限验证函数
+//            if (uAuthorities.contains(permission)) return true
+//            else throw new AccessControlException('没有权限')
+//        }
+//
+//        Set<String> uPermissions = getSessionAttr('permissions', Set) // 当前用户的所有权限. 例: auth1,auth2,auth3
+//        if (uPermissions != null) {
+//            def f = doAuth(uPermissions)
+//            if (f) return true
+//        }
+        // else uPermissions = ConcurrentHashMap.newKeySet()
 
-        Set<String> uAuthorities = getSessionAttr('uAuthorities', Set) // 当前用户的所有权限. 例: auth1,auth2,auth3
-        if (uAuthorities != null) {
-            def f = doAuth(uAuthorities)
-            if (f) return true
-        }
-        else uAuthorities = ConcurrentHashMap.newKeySet()
-
-        // 收集用户权限
-        Set<String> uRoles = getSessionAttr('uRoles', Set) // 当前用户的角色. 例: role1,role2,role3
-        if (uRoles == null) throw new AccessControlException('没有权限')
-        uRoles.each {role ->
-            server.attr('role')[(role)].each {String auth -> uAuthorities.add(auth)}
-        }
-        setSessionAttr('uAuthorities', uAuthorities)
-        doAuth(uAuthorities)
+//        // 收集用户权限
+//        Set<String> uRoles = getSessionAttr('roles', Set) // 当前用户的角色. 例: role1,role2,role3
+//        if (uRoles == null) throw new AccessControlException('没有权限')
+//        uRoles.each {role ->
+//            server.attr('role')[(role)].each {String auth -> uPermissions.add(auth)}
+//        }
+        // setSessionAttr('uPermissions', uPermissions)
+//        doAuth(uPermissions)
     }
 
 
