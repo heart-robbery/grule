@@ -46,12 +46,22 @@ class HttpRequest {
 
     @Lazy Map<String, String> queryParams = {
         if (queryStr) {
-            Map<String, String> ret = new HashMap<>()
-            queryStr.split("&").each {s ->
+            Map<String, String> data = new HashMap<>()
+            URLDecoder.decode(queryStr, 'utf-8').split("&").each {s ->
                 def arr = s.split("=")
-                ret.put(arr[0], arr.length > 1 ? URLDecoder.decode(arr[1], 'utf-8') : null)
+                String name = arr[0]
+                String value = arr.length > 1 ? arr[1] : null
+                if (data.containsKey(name)) { // 证明name 有多个值
+                    def v = data.get(name)
+                    if (v instanceof List) v.add(value)
+                    else {
+                        data.put(name, [v, value])
+                    }
+                } else {
+                    data.put(name, value)
+                }
             }
-            return Collections.unmodifiableMap(ret)
+            return Collections.unmodifiableMap(data)
         }
         Collections.emptyMap()
     }()
@@ -64,9 +74,19 @@ class HttpRequest {
     @Lazy Map<String, Object> formParams = {
         Map<String, Object> data = new HashMap<>()
         if (bodyStr && contentType?.contains('application/x-www-form-urlencoded')) {
-            bodyStr.split("&").each {s ->
+            URLDecoder.decode(bodyStr, 'utf-8').split("&").each {s ->
                 def arr = s.split("=")
-                data.put(arr[0], arr.length > 1 ? URLDecoder.decode(arr[1], 'utf-8') : null)
+                String name = arr[0]
+                String value = arr.length > 1 ? arr[1] : null
+                if (data.containsKey(name)) { // 证明name 有多个值
+                    def v = data.get(name)
+                    if (v instanceof List) v.add(value)
+                    else {
+                        data.put(name, [v, value])
+                    }
+                } else {
+                    data.put(name, value)
+                }
             }
         }
         data

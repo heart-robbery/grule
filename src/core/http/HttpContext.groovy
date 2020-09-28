@@ -9,6 +9,7 @@ import core.http.mvc.ApiResp
 import core.http.mvc.FileData
 import core.http.mvc.Handler
 
+import java.lang.reflect.Array
 import java.nio.ByteBuffer
 import java.security.AccessControlException
 import java.time.Duration
@@ -465,6 +466,13 @@ class HttpContext {
         if (v == null) v = request.queryParams.get(pName)
         if (v == null) v = request.formParams.get(pName)
         if (v == null) v = request.jsonParams.get(pName)
+        if (v == null && type && (type.isArray() || type instanceof Collection)) { // 数组参数名后边加个[]
+            pName = pName + '[]'
+            v = pathToken.get(pName)
+            if (v == null) v = request.queryParams.get(pName)
+            if (v == null) v = request.formParams.get(pName)
+            if (v == null) v = request.jsonParams.get(pName)
+        }
         if (type == null) return v
         else if (v == null) return type.cast(v)
         else if (type == String) return v instanceof List ? (v?[0]) : String.valueOf(v)
@@ -481,9 +489,9 @@ class HttpContext {
         else if (type.isEnum()) return type.enumConstants.find {it.name() == v}
         else if (type.isArray()) {
             if (v instanceof List) {
-                return v.collect { Utils.to(it, type.componentType)}.toArray()
+                return v.collect { Utils.to(it, type.componentType)}.toArray(Array.newInstance(type.componentType, v.size()))
             } else {
-                return [Utils.to(v, type.componentType)].toArray()
+                return [Utils.to(v, type.componentType)].toArray(Array.newInstance(type.componentType, 1))
             }
         }
         else throw new IllegalArgumentException("不支持的类型: " + type.name)
