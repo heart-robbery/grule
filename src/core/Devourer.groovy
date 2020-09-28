@@ -67,10 +67,13 @@ class Devourer {
                 }
             } catch (ex) {
                 if (task && failMaxKeep && (waitingCount > failMaxKeep)) waiting.poll()
-                log.error(Devourer.simpleName + ": " + key, ex)
-                try {
-                    errorHandler?.accept(ex, this)
-                } catch (exx) {log.error(Devourer.simpleName + ": " + key, exx)}
+                if (errorHandler) {
+                    try {
+                        errorHandler.accept(ex, this)
+                    } catch (exx) {log.error(Devourer.simpleName + ": " + key, exx)}
+                } else {
+                    log.error(Devourer.simpleName + ": " + key, ex)
+                }
             } finally {
                 running.set(false)
                 if (!waiting.isEmpty()) trigger() // 持续不断执行对列中的任务

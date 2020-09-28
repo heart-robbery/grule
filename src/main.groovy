@@ -5,6 +5,7 @@ import core.http.HttpServer
 import core.jpa.HibernateSrv
 import ctrl.MainCtrl
 import ctrl.TestCtrl
+import dao.entity.Permission
 import dao.entity.Test
 import dao.entity.VersionFile
 import groovy.transform.Field
@@ -27,7 +28,7 @@ app.addSource(new EhcacheSrv())
 app.addSource(new SchedSrv())
 app.addSource(new Remoter())
 app.addSource(new HibernateSrv().entities(
-    Test, VersionFile
+    Test, VersionFile, Permission
 ))
 app.addSource(new HttpServer().ctrls(
     TestCtrl, MainCtrl
