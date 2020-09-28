@@ -19,6 +19,10 @@ class DecisionResult extends BaseEntity {
      */
     String decisionId
     /**
+     * 执行结果状态
+     */
+    String status
+    /**
      * 决策结果
      */
     @Enumerated(EnumType.STRING)

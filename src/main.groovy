@@ -30,7 +30,8 @@ app.addSource(new EhcacheSrv())
 app.addSource(new SchedSrv())
 app.addSource(new Remoter())
 app.addSource(new HibernateSrv('jpa_rule').entities(
-     Decision, RuleField, DataCollector, OpHistory, DecisionResult, CollectResult, User, Permission
+    Decision, RuleField, DataCollector, OpHistory, DecisionResult, CollectResult,
+    User, Permission, GlobalConfig
 ))
 app.addSource(new HttpServer().ctrls(
     TestCtrl, MainCtrl, RuleCtrl, MntCtrl, MntUserCtrl

@@ -6,24 +6,27 @@ import org.hibernate.annotations.DynamicUpdate
 import javax.persistence.Column
 import javax.persistence.Entity
 
+/**
+ * 全局配置 key value形式
+ */
 @Entity
 @DynamicUpdate
-class User extends LongIdEntity  {
+class GlobalConfig extends LongIdEntity {
     /**
-     * 用户登录名
+     * 配置 key
      */
     @Column(unique = true)
-    String name
+    String key
     /**
-     * 登录的密码
+     * 值
      */
-    String password
+    String value
     /**
-     * 权限列表, 用豆号分割
+     * 额外属性1
      */
-    String permissions
+    String prop1
     /**
-     * 上次登录时间
+     * 额外属性2
      */
-    Date login
+    String prop2
 }

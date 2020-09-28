@@ -19,6 +19,7 @@ import groovy.text.GStringTemplateEngine
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.ImportCustomizer
 
+import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.function.Function
 
@@ -28,7 +29,7 @@ import java.util.function.Function
  * 属性值函数
  */
 class AttrManager extends ServerTpl {
-
+    static final String                                            DATA_COLLECTED   = "data_collected"
     @Lazy def                                                      repo             = bean(BaseRepo, 'jpa_rule_repo')
     /**
      * RuleField(enName, cnName), RuleField
@@ -38,14 +39,24 @@ class AttrManager extends ServerTpl {
      * 数据获取函数. 函数名 -> 函数
      */
     protected final Map<String, Function<DecisionContext, Object>> dataCollectorMap = new ConcurrentHashMap()
-    protected final Map<String, Sql> sqlMap = new ConcurrentHashMap<>()
+    protected final Map<String, Sql>                               sqlMap           = new ConcurrentHashMap<>()
 
 
     @EL(name = 'jpa_rule.started', async = true)
     void init() {
-        // 有顺序
         loadField()
         loadDataCollector()
+
+        Long lastWarn // 上次告警时间
+        queue(DATA_COLLECTED)
+            .failMaxKeep(getInteger(DATA_COLLECTED + ".failMaxKeep", 10000))
+            .errorHandle {ex, devourer ->
+                if (lastWarn == null || (System.currentTimeMillis() - lastWarn >= Duration.ofSeconds(getInteger(DATA_COLLECTED + ".warnInterval", 60 * 5)))) {
+                    log.error("保存数据收集结果到数据库错误", ex)
+                    ep.fire("globalMsg", "保存数据收集结果到数据库错误: " + (ex.message?:ex.class.simpleName))
+                }
+            }
+
         ep.fire("${name}.started")
     }
 
@@ -121,9 +132,10 @@ class AttrManager extends ServerTpl {
      * 决策产生的数据接口调用
      * @param collectResult CollectResult
      */
-    // @EL(name = 'decision.dataCollected', async = true)
-    void dataCollected(CollectResult collectResult) {
-        repo.saveOrUpdate(collectResult)
+    protected void dataCollected(CollectResult collectResult) {
+        queue(DATA_COLLECTED) {
+            repo.saveOrUpdate(collectResult)
+        }
     }
 
 
@@ -350,7 +362,7 @@ if (idNumber && idNumber.length() > 17) {
             }
             dataCollected(new CollectResult(
                 decideId: ctx.id, decisionId: ctx.decisionSpec.决策id, collector: collector.enName,
-                collectDate: start, collectorType: collector.type,
+                status: (exx ? 'EEEE' : '0000'), collectDate: start, collectorType: collector.type,
                 spend: System.currentTimeMillis() - start.time,
                 result: result instanceof Map ? JSON.toJSONString(result, SerializerFeature.WriteMapNullValue) : result?.toString(),
                 scriptException: exx == null ? null : exx.message?:exx.class.simpleName
@@ -386,10 +398,9 @@ if (idNumber && idNumber.length() > 17) {
                 exx = ex
                 log.error(ctx.logPrefix() + "脚本函数'$collector.enName'执行失败".toString(), ex)
             }
-            // TODO 保存吗
             dataCollected(new CollectResult(
                 decideId: ctx.id, decisionId: ctx.decisionSpec.决策id, collector: collector.enName,
-                collectDate: start, collectorType: collector.type,
+                status: (exx ? 'EEEE' : '0000'), collectDate: start, collectorType: collector.type,
                 spend: System.currentTimeMillis() - start.time,
                 result: result instanceof Map ? JSON.toJSONString(result, SerializerFeature.WriteMapNullValue) : result?.toString(),
                 scriptException: exx == null ? null : exx.message?:exx.class.simpleName
@@ -404,13 +415,14 @@ if (idNumber && idNumber.length() > 17) {
      * @param collector
      */
     protected void initHttpCollector(DataCollector collector) {
+        // 创建 http 客户端
         def http = new OkHttpSrv('okHttp_' + collector.enName)
         http.attr('connectTimeout', getInteger('http.connectTimeout', 3))
         http.attr('readTimeout', getInteger('http.readTimeout', collector.timeout?:20))
         http.init()
 
         Closure parseFn
-        if (collector.parseScript) {
+        if (collector.parseScript) { // 结果解析函数
             Binding binding = new Binding()
             def config = new CompilerConfiguration()
             def icz = new ImportCustomizer()
@@ -478,6 +490,7 @@ if (idNumber && idNumber.length() > 17) {
                 log.error(logMsg.toString(), ex)
                 dataCollected(new CollectResult(
                     decideId: ctx.id, decisionId: ctx.decisionSpec.决策id, collector: collector.enName,
+                    status: (ex instanceof SocketTimeoutException || ex instanceof ConnectException) ? 'E001': 'EEEE',
                     collectDate: start, collectorType: collector.type,
                     spend: spend, url: url, body: bodyStr, result: result, httpException: ex.message?:ex.class.simpleName
                 ))
@@ -486,7 +499,7 @@ if (idNumber && idNumber.length() > 17) {
                 retryMsg = ''
             }
 
-            if (parseFn) { // 如果有配置解析函数,则对接口返回结果解析
+            if (parseFn) { // 解析接口返回结果
                 Exception exx
                 try {
                     resolveResult = parseFn.rehydrate(ctx.data, parseFn, this)(result)
@@ -500,7 +513,7 @@ if (idNumber && idNumber.length() > 17) {
                     }
                     dataCollected(new CollectResult(
                         decideId: ctx.id, decisionId: ctx.decisionSpec.决策id, collector: collector.enName,
-                        collectDate: start, collectorType: collector.type,
+                        status: exx ? 'E002': '0000', collectDate: start, collectorType: collector.type,
                         spend: spend, url: url, body: bodyStr, result: result, parseException: exx == null ? null : exx.message?:exx.class.simpleName,
                         resolveResult: resolveResult instanceof Map ? JSON.toJSONString(resolveResult, SerializerFeature.WriteMapNullValue) : resolveResult?.toString()
                     ))
@@ -510,7 +523,7 @@ if (idNumber && idNumber.length() > 17) {
             log.info(logMsg.toString())
             dataCollected(new CollectResult(
                 decideId: ctx.id, decisionId: ctx.decisionSpec.决策id, collector: collector.enName,
-                collectDate: start, collectorType: collector.type,
+                status: '0000', collectDate: start, collectorType: collector.type,
                 spend: spend, url: url, body: bodyStr, result: result
             ))
             return result

@@ -83,8 +83,10 @@ class MntCtrl extends ServerTpl {
         if (!user) return ApiResp.fail("用户不存在")
         if (password != user.password) return ApiResp.fail('密码错误')
         ctx.setSessionAttr('name', username)
-        ctx.setSessionAttr('permissions', user.permissions.split(",") as Set)
-        ApiResp.ok().attr('name', username).attr('permissions', user.permissions.split(","))
+        ctx.setSessionAttr('permissions', user.permissions?.split(",") as Set)
+        user.login = new Date()
+        repo.saveOrUpdate(user)
+        ApiResp.ok().attr('name', username).attr('permissions', user.permissions?.split(","))
     }
 
 
@@ -185,8 +187,8 @@ class MntCtrl extends ServerTpl {
 
     @Path(path = 'decisionResultPage')
     ApiResp decisionResultPage(
-        Integer page, Integer pageSize, String id, String decisionId, service.rule.Decision decision, String idNum,
-        Long spend, String exception, String input, String attrs, String rules
+        Integer page, Integer pageSize, String id, String decisionId, service.rule.Decision decision,
+        String idNum, Long spend, String exception, String input, String attrs, String rules
     ) {
         if (pageSize && pageSize > 10) return ApiResp.fail("pageSize max 10")
         ApiResp.ok(
@@ -253,9 +255,9 @@ class MntCtrl extends ServerTpl {
                 if (end) ps << cb.lessThanOrEqualTo(root.get('collectDate'), end)
                 if (success != null) {
                     if (success) {
-                        ps << cb.and(root.get('httpException').isNull(), root.get('parseException').isNull(), root.get('scriptException').isNull())
+                        ps << cb.equal(root.get('status'), '0000')
                     } else {
-                        ps << cb.or(root.get('httpException').isNotNull(), root.get('parseException').isNotNull(), root.get('scriptException').isNotNull())
+                        ps << cb.notEqual(root.get('status'), '0000')
                     }
                 }
                 if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))

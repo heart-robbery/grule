@@ -29,6 +29,10 @@ class CollectResult extends LongIdEntity {
      */
     String collectorType
     /**
+     * 执行结果状态
+     */
+    String status
+    /**
      * 收集时间
      */
     Date collectDate

@@ -46,6 +46,8 @@ class DecisionContext {
     @Lazy protected def                              ruleIterator      = new RuleIterator(this)
     // 执行结果 异常
     protected Exception exception
+    // 执行状态
+    protected String status = '0000'
 
 
     /**
@@ -90,7 +92,7 @@ class DecisionContext {
         } catch (ex) {
             end.set(true); finalDecision = Decision.Reject
             running.set(false); curPolicySpec = null; curPassedRule = null; curRuleSpec = null
-            this.exception = ex
+            status = 'EEEE'; this.exception = ex
             log.error(logPrefix() + "结束错误. 共执行: " + (System.currentTimeMillis() - startup.getTime()) + "ms " + result(), ex)
             ep?.fire("decision.end", this)
         }
@@ -292,7 +294,7 @@ class DecisionContext {
         this.summary = [
             id         : id, occurTime: startup, spend: System.currentTimeMillis() - startup.time,
             decision   : finalDecision, decisionId: decisionSpec.决策id, input: input,
-            exception  : this.exception?.toString(),
+            status     : status, exception : this.exception?.toString(),
             attrs      : data.collect {e ->
                  if (!e.key.matches("[a-zA-Z0-9]+") && attrManager.alias(e.key)) {
                      return null
@@ -325,7 +327,7 @@ class DecisionContext {
     Map<String, Object> result() {
         [
             id: id, decision: finalDecision, decisionId: decisionSpec.决策id,
-            code: exception ? 'EEEE' : '0000', // 错误码
+            status: status,
             desc: exception?.toString(),
             attrs: decisionSpec.returnAttrs.collectEntries { n ->
                 def v = data.get(n)
@@ -337,7 +339,6 @@ class DecisionContext {
             }
          ]
     }
-
 
 
     @Override

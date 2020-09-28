@@ -42,6 +42,7 @@
     </div>
 </template>
 <script>
+    loadJs('md5');
     const types = [
         { title: '字符串', key: 'Str'},
         { title: '整型', key: 'Int' },
@@ -182,7 +183,7 @@
             },
             showAddPop() {
                 this.$Modal({
-                    title: '添加新字段', middle: true, draggable: true,
+                    title: '添加字段', middle: true, draggable: true,
                     component: {
                         vue: addEditPop,
                         datas: {}

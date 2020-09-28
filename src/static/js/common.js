@@ -101,6 +101,7 @@ new Map([
 
 // 异步加载全局js库
 let jsMap = new Map([
+    ['md5', 'js/lib/md5.min.js'],
     ['ace', 'js/lib/ace-1.4.12.js'],
     ['ace-tools', 'js/lib/ext-language_tools.min.js'],
     ['ace-lang-rule', 'js/lib/mode-rule.js'],

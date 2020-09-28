@@ -57,7 +57,8 @@ class RuleCtrl extends ServerTpl {
     @Path(path = 'loadAttrCfg')
     ApiResp loadAttrCfg() {
         async {
-            bean(AttrManager).init()
+            bean(AttrManager).loadField()
+            bean(AttrManager).loadDataCollector()
             ep.fire("wsMsg_rule", '加载完成')
         }
         ApiResp.ok('加载中...')

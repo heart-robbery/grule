@@ -8,16 +8,31 @@ import core.ServerTpl
 import core.jpa.BaseRepo
 import dao.entity.DecisionResult
 
+import java.time.Duration
+
 /**
  * 决策执行引擎
  */
 class DecisionEngine extends ServerTpl {
+    static final String SAVE_RESULT = 'save_result'
     @Lazy def dm = bean(DecisionManager)
-    @Lazy def pm = bean(PolicyManger)
     @Lazy def am = bean(AttrManager)
     @Lazy def http = bean(OkHttpSrv)
     @Lazy def repo = bean(BaseRepo, 'jpa_rule_repo')
 
+
+    @EL(name = 'sys.starting', async = true)
+    protected void init() {
+        Long lastWarn // 上次告警时间
+        queue(SAVE_RESULT)
+            .failMaxKeep(getInteger(SAVE_RESULT + ".failMaxKeep", 10000))
+            .errorHandle {ex, devourer ->
+                if (lastWarn == null || (System.currentTimeMillis() - lastWarn >= Duration.ofSeconds(getInteger(SAVE_RESULT + ".warnInterval", 60 * 5)))) {
+                    log.error("保存决策结果到数据库错误", ex)
+                    ep.fire("globalMsg", "保存决策结果到数据库错误: " + (ex.message?:ex.class.simpleName))
+                }
+            }
+    }
 
 
     /**
@@ -26,6 +41,8 @@ class DecisionEngine extends ServerTpl {
      */
     @EL(name = 'globalMsg', async = true)
     void globalMsg(String msg) {
+        log.info("系统消息: " + msg)
+        ep.fire("wsMsg_rule", msg)
         String url = getStr('msgNotifyUrl')
         if (url) {
             //bean(OkHttpSrv)?.
@@ -53,16 +70,11 @@ class DecisionEngine extends ServerTpl {
             }
         }
 
-        // 保存决策结果到数据库
-        def q = queue('save_result')
-        q.errorHandle {ex, devourer ->
-            // TODO 告警
-        }
-        q.failMaxKeep(10000)
-        q.offer {
-            repo.saveOrUpdate( // 保存到数据成
+        queue(SAVE_RESULT) { // 保存决策结果到数据库
+            repo.saveOrUpdate(
                 repo.findById(DecisionResult, ctx.id).tap {
                     idNum = ctx.summary().get('attrs')['idNumber']?:ctx.input['idNumber']
+                    status = ctx.status
                     exception = ctx.summary().get('exception')
                     decisionId = ctx.summary().get('decisionId')
                     decision = ctx.summary().get('decision')
