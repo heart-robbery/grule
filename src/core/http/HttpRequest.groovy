@@ -34,7 +34,7 @@ class HttpRequest {
 
     @Lazy String contentType = getHeader('content-type')
 
-    @Lazy Map<String, String> cookies = getHeader('Cookie').split(';').collectEntries {entry ->
+    @Lazy Map<String, String> cookies = getHeader('Cookie')?.split(';')?.collectEntries {entry ->
         entry?.trim()?.split('=')
     }
 
@@ -44,13 +44,13 @@ class HttpRequest {
         i == -1 ? null : rowUrl.substring(i + 1)
     }()
 
-    @Lazy Map<String, String> queryParams = {
+    @Lazy Map<String, Object> queryParams = {
         if (queryStr) {
-            Map<String, String> data = new HashMap<>()
-            URLDecoder.decode(queryStr, 'utf-8').split("&").each {s ->
+            Map<String, Object> data = new HashMap<>()
+            queryStr.split("&").each {s ->
                 def arr = s.split("=")
-                String name = arr[0]
-                String value = arr.length > 1 ? arr[1] : null
+                String name = URLDecoder.decode(arr[0], 'utf-8')
+                String value = arr.length > 1 ? URLDecoder.decode(arr[1], 'utf-8') : null
                 if (data.containsKey(name)) { // 证明name 有多个值
                     def v = data.get(name)
                     if (v instanceof List) v.add(value)
@@ -74,10 +74,10 @@ class HttpRequest {
     @Lazy Map<String, Object> formParams = {
         Map<String, Object> data = new HashMap<>()
         if (bodyStr && contentType?.contains('application/x-www-form-urlencoded')) {
-            URLDecoder.decode(bodyStr, 'utf-8').split("&").each {s ->
+            bodyStr.split("&").each {s ->
                 def arr = s.split("=")
-                String name = arr[0]
-                String value = arr.length > 1 ? arr[1] : null
+                String name = URLDecoder.decode(arr[0], 'utf-8')
+                String value = arr.length > 1 ? URLDecoder.decode(arr[1], 'utf-8') : null
                 if (data.containsKey(name)) { // 证明name 有多个值
                     def v = data.get(name)
                     if (v instanceof List) v.add(value)
@@ -117,7 +117,7 @@ class HttpRequest {
      * @param cName cookie 名
      * @return cookie 值
      */
-    String cookie(String cName) { cookies.get(cName) }
+    String cookie(String cName) { cookies?.get(cName) }
 
 
     // 请求属性集

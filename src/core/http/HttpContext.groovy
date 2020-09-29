@@ -120,7 +120,7 @@ class HttpContext {
             } else if (List.isAssignableFrom(List) && v instanceof String) {
                 return v == '' ? null : v.toString().split(',').toList()
             }
-            return type.cast(v)
+            return Utils.to(v, type)
         }
         v
     }
@@ -220,7 +220,7 @@ class HttpContext {
         if (!permission) throw new IllegalArgumentException('permission is empty')
         if (!getSessionAttr('permissions', Set)?.contains(permission)) {
             response.status(403)
-            throw new AccessControlException('没有权限')
+            throw new AccessControlException("没有权限")
         }
         true
 //        def doAuth = {Set<String> uAuthorities -> // 权限验证函数
