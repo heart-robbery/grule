@@ -35,7 +35,8 @@
                     async: false,
                     success: (res) => {
                         if (res.code == '00') {
-                            this.user = res.data
+                            this.user = res.data;
+                            if (this.user.permissions == undefined || this.user.permissions == null) this.user.permissions = []
                         } else this.$Notice.error(res.desc)
                     }
                 })

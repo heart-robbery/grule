@@ -82,11 +82,21 @@ class MntCtrl extends ServerTpl {
         def user = repo.find(User) {root, query, cb -> cb.equal(root.get('name'), username)}
         if (!user) return ApiResp.fail("用户不存在")
         if (password != user.password) return ApiResp.fail('密码错误')
+        ctx.setSessionAttr('id', user.id)
         ctx.setSessionAttr('name', username)
         ctx.setSessionAttr('permissions', user.permissions?.split(",") as Set)
         user.login = new Date()
         repo.saveOrUpdate(user)
-        ApiResp.ok().attr('name', username).attr('permissions', user.permissions?.split(","))
+        ApiResp.ok().attr('id', user.id).attr('name', username)
+            .attr('permissions', user.permissions?.split(","))
+    }
+
+
+    @Path(path = 'logout')
+    ApiResp logout(HttpContext ctx) {
+        ctx.setSessionAttr('id', null)
+        ctx.setSessionAttr('name', null)
+        ApiResp.ok()
     }
 
 
@@ -97,9 +107,10 @@ class MntCtrl extends ServerTpl {
      */
     @Path(path = 'getCurrentUser')
     ApiResp getCurrentUser(HttpContext ctx) {
-        String name = ctx.getSessionAttr('name')
+        String name = ctx.getSessionAttr('id')
         if (name) {
-            ApiResp.ok().attr('name', name).attr('permissions', ctx.getSessionAttr("permissions", Set))
+            ApiResp.ok().attr('id', ctx.getSessionAttr('id')).attr('name', name)
+                .attr('permissions', ctx.getSessionAttr("permissions", Set))
         } else {
             ctx.response.status(401)
             ApiResp.fail('用户会话已失效, 请重新登录')
@@ -321,7 +332,7 @@ class MntCtrl extends ServerTpl {
                 }
             }
         } else { // 创建
-            ctx.auth('decision-create')
+            ctx.auth('decision-add')
             decision = new Decision()
         }
         decision.decisionId = spec.决策id

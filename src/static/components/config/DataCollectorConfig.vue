@@ -4,7 +4,7 @@
 <!--            <span class="h-panel-title">数据集</span>-->
             <!--            <span v-color:gray v-font="13">说明~~</span>-->
             &nbsp;&nbsp;
-            <h-button @click="showAddPop"><i class="h-icon-plus"></i></h-button>
+            <h-button v-if="sUser.permissions.find((e) => e == 'dataCollector-add') == 'dataCollector-add'" @click="showAddPop"><i class="h-icon-plus"></i></h-button>
             <div class="h-panel-right">
                 <h-search placeholder="查询" v-width="200" v-model="kw" show-search-button search-text="搜索" @search="load"></h-search>
                 <!--                <i class="h-split"></i>-->
@@ -19,11 +19,11 @@
                 <h-tableitem title="类型" prop="type" align="center" :format="formatType"></h-tableitem>
                 <h-tableitem title="更新时间" prop="updateTime" align="center" :format="formatDate"></h-tableitem>
                 <h-tableitem title="描述" prop="comment" align="center"></h-tableitem>
-                <h-tableitem title="操作" align="center" :width="100">
+                <h-tableitem v-if="sUser.permissions.find((e) => e == 'dataCollector-update' || e == 'dataCollector-del')" title="操作" align="center" :width="100">
                     <template slot-scope="{data}">
-                        <span class="text-hover" @click="showUpdatePop(data)">编辑</span>
+                        <span v-if="sUser.permissions.find((e) => e == 'dataCollector-update') == 'dataCollector-update'" class="text-hover" @click="showUpdatePop(data)">编辑</span>
                         &nbsp;
-                        <span class="text-hover" @click="del(data)">删除</span>
+                        <span v-if="sUser.permissions.find((e) => e == 'dataCollector-del') == 'dataCollector-del'" class="text-hover" @click="del(data)">删除</span>
                     </template>
                 </h-tableitem>
                 <div slot="empty">暂时无数据</div>
@@ -235,6 +235,7 @@
         props: ['tabs'],
         data() {
             return {
+                sUser: app.$data.user,
                 kw: '',
                 loading: false,
                 page: 1, totalRow: 0, pageSize: 10, list: []

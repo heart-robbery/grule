@@ -9,7 +9,7 @@
     <div class="h-panel">
         <div class="h-panel-bar">
             &nbsp;&nbsp;
-            <h-button @click="add"><i class="h-icon-plus"></i></h-button>
+            <h-button v-if="sUser.permissions.find((e) => e == 'decision-add') == 'decision-add'" @click="add"><i class="h-icon-plus"></i></h-button>
             <input type="text" v-model="model.nameLike" placeholder="决策名" style="width: 250px" @keyup.enter="load"/>
             <div class="h-panel-right">
 <!--                <h-search placeholder="查询" v-width="200" v-model="kw" show-search-button search-text="搜索" @search="load"></h-search>-->
@@ -26,7 +26,7 @@
                             <date-item :time="item.updateTime"></date-item>
                             <span class="float-right">
                                 <h-button text-color="yellow" :circle="true" @click.stop="showTestPop(item)">测试</h-button>
-                                <h-button text-color="red" :circle="true" icon="h-icon-trash" @click.stop="del(item)">删除</h-button>
+                                <h-button v-if="sUser.permissions.find((e) => e == 'decision-del') == 'decision-del'" text-color="red" :circle="true" icon="h-icon-trash" @click.stop="del(item)">删除</h-button>
                             </span>
                         </template>
                         <div style="height: 650px; width: 100vh">
@@ -120,6 +120,7 @@
         props: ['tabs'],
         data() {
             return {
+                sUser: app.$data.user,
                 model: {},
                 decisionLoading: false,
                 decision: {
@@ -156,6 +157,9 @@
                 this.editor = ace.edit(this.$refs.dslEditor[0]);
                 // console.log('editor: ', this.editor);
                 this.editor.session.setValue(this.curDecision.dsl);
+                if (this.sUser.permissions.find((e) => e == 'decision-update') != 'decision-update') {
+                    this.editor.setReadOnly(true)
+                }
                 // console.log('$options', this.editor.$options);
                 this.editor.setOptions({
                     enableBasicAutocompletion: true,
@@ -240,7 +244,7 @@
                                 this.load();
                                 this.$Message.success('保存成功: ' + res.data.decisionId);
                             }
-                        } else this.$Notice({type: 'error', content: res.desc, timeout: 5})
+                        } else this.$Notice.error(res.desc)
                     }
                 })
             },

@@ -54,7 +54,9 @@
                             this.isLoading = true;
                             if (res.code == '00') {
                                 this.$Message.success('登录成功');
+                                // $.extend(app.$data.user, res.data);
                                 app.$data.user = res.data;
+                                if (app.$data.user.permissions == undefined || app.$data.user.permissions == null) app.$data.user.permissions = [];
                                 localStorage.setItem('rule.login.username', this.model.username);
                                 localStorage.setItem('rule.login.password', this.model.password);
                             } else {

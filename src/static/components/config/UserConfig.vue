@@ -6,18 +6,20 @@
 <template>
     <div class="h-panel">
         <div class="h-panel-bar">
-            <h-button @click="showAddPop"><i class="h-icon-plus"></i></h-button>
+            <h-button v-if="sUser.permissions.find((e) => e == 'user-add') == 'user-add'" @click="showAddPop"><i class="h-icon-plus"></i></h-button>
+            <input type="text" placeholder="关键词" v-model="kw" @keyup.enter="load"/>
             <div class="h-panel-right">
-                <!--                <i class="h-split"></i>-->
-                <!--                <button class="h-btn h-btn-green h-btn-m" @click="load">查询</button>-->
-                <h-search placeholder="查询" v-width="200" v-model="kw" show-search-button search-text="搜索" @search="load"></h-search>
+                                <i class="h-split"></i>
+                                <button class="h-btn h-btn-green h-btn-m" @click="load">查询</button>
+<!--                <h-search placeholder="查询" v-width="200" v-model="kw" show-search-button search-text="搜索" @search="load"></h-search>-->
             </div>
         </div>
         <div class="h-panel-body">
             <div style="padding: 5px 0; margin: 0 10px;" v-for="item in list" :key="item.id">
                 <p style="font-size: 15px; font-weight: bold;">{{item.name}}
                     &nbsp; <span v-if="item.login">上次登录时间: <date-item :time="item.login" /></span>
-                    &nbsp; <span class="h-icon-edit text-hover" @click="showUpdatePop(item)"></span>
+                    &nbsp; <span v-if="sUser.permissions.find((e) => e == 'grant') == 'grant'" class="h-icon-edit text-hover" @click="showUpdatePop(item)"></span>
+                    &nbsp; <span v-if="sUser.permissions.find((e) => e == 'user-del') == 'user-del'" class="h-icon-trash text-hover" @click="del(item)"></span>
                 </p>
 
                 <p class="tags"><h-taginput v-model="item.permissionNames" readonly></h-taginput></p>
@@ -48,7 +50,7 @@
                             <input type="password" v-model="model.password">
                         </h-formitem>
                         <h-formitem label="权限" icon="h-icon-complete">
-                            <h-transfer v-model="model.ps" :datas="permissions" filterable></h-transfer>
+                            <h-transfer v-model="model.ps" :datas="permissions" :option="option"></h-transfer>
                         </h-formitem>
                         <h-formitem>
                                 <h-button v-if="model.id" color="primary" :loading="isLoading" @click="update">提交</h-button>
@@ -64,6 +66,7 @@
         data() {
             return {
                 isLoading: false,
+                option: {filterable: true},
                 model: this.initModel(),
                 validationRules: {
                     required: ['name', 'password']
@@ -132,6 +135,7 @@
     module.exports = {
         data() {
             return {
+                sUser: app.$data.user,
                 kw: '',
                 loading: false,
                 page: 1, totalRow: 0, pageSize: 10, list: []
@@ -152,6 +156,22 @@
             }
         },
         methods: {
+            del(user) {
+                this.$Confirm('确定删除?', `删除用户: ${user.name}`).then(() => {
+                    this.$Message(`删除用户: ${user.name}`);
+                    $.ajax({
+                        url: 'mnt/user/del/' + user.id,
+                        success: (res) => {
+                            if (res.code == '00') {
+                                this.$Message.success(`删除用户: ${user.name} 成功`);
+                                this.load();
+                            } else this.$Notice.error(res.desc)
+                        }
+                    });
+                }).catch(() => {
+                    this.$Message.error('取消');
+                });
+            },
             showAddPop() {
                 this.$Modal({
                     title: '添加用户', middle: true, draggable: true,

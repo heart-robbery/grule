@@ -38,6 +38,11 @@
                     <div style="width:100px;float:left;">
                         <h-button icon="h-icon-menu" size="l" no-border style="font-size: 20px" @click="siderCollapsed=!siderCollapsed"></h-button>
                     </div>
+                    <div class="float-right">
+                        <h-dropdownmenu class-name="app-header-dropdown" trigger="hover" offset="0,5" :width="150" placement="bottom-end" :datas="infoMenu" @onclick="trigger">
+                            <h-avatar src="https://admin.heyui.top/static/images/src/images/avatar.8a80923.png" :width="30"><span>{{sUser.name}}</span></h-avatar>
+                        </h-dropdownmenu>
+                    </div>
                 </h-header>
                 <h-content style="padding: 0px 30px;">
                     <keep-alive>
@@ -56,6 +61,11 @@
     module.exports = {
         data: function() {
             return {
+                infoMenu: [
+                    { key: 'info', title: '个人信息', icon: 'h-icon-user' },
+                    { key: 'logout', title: '退出登录', icon: 'h-icon-outbox' }
+                ],
+                sUser: app.$data.user,
                 year: (new Date()).getFullYear(),
                 headerFixed: false,
                 siderFixed: false,
@@ -92,10 +102,24 @@
                 }
             },
             'menu.key': function (v) {
-                this.select(v)
+                // this.select(v)
             }
         },
         methods: {
+            trigger(data) {
+                if (data == 'logout') {
+                    $.ajax({
+                        url: 'mnt/logout',
+                        success: (res) => {
+                            if (res.code == '00') {
+                                location.reload();
+                            } else this.$Notice.error(res.desc)
+                        }
+                    })
+                } else {
+                    // this.$router.push({ name: 'AccountBasic' });
+                }
+            },
             changeContent(key) {
                 this.menu.key = key;
                 localStorage.setItem("rule.admin.menu", key);

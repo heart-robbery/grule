@@ -4,7 +4,7 @@
 <!--            <span class="h-panel-title">属性集</span>-->
             <!--            <span v-color:gray v-font="13">说明~~</span>-->
             &nbsp;&nbsp;
-            <h-button @click="showAddPop"><i class="h-icon-plus"></i></h-button>
+            <h-button v-if="sUser.permissions.find((e) => e == 'field-add') == 'field-add'" @click="showAddPop"><i class="h-icon-plus"></i></h-button>
             <div class="h-panel-right">
                 <h-search placeholder="查询" v-width="200" v-model="kw" show-search-button search-text="搜索" @search="load"></h-search>
                 <!--                <i class="h-split"></i>-->
@@ -26,10 +26,10 @@
                         <span v-else>{{data.dataCollector}}</span>
                     </template>
                 </h-tableitem>
-                <h-tableitem title="操作" align="center" :width="100">
+                <h-tableitem v-if="sUser.permissions.find((e) => e == 'field-update' || e == 'field-del')" title="操作" align="center" :width="100">
                     <template slot-scope="{data}">
-                        <span class="text-hover" @click="showUpdatePop(data)">编辑</span>
-                        <span class="text-hover" @click="del(data)">删除</span>
+                        <span v-if="sUser.permissions.find((e) => e == 'field-update') == 'field-update'" class="text-hover" @click="showUpdatePop(data)">编辑</span>
+                        <span v-if="sUser.permissions.find((e) => e == 'field-del') == 'field-del'" class="text-hover" @click="del(data)">删除</span>
                     </template>
                 </h-tableitem>
                 <div slot="empty">暂时无数据</div>
@@ -156,6 +156,7 @@
         props: ['tabs'],
         data() {
             return {
+                sUser: app.$data.user,
                 kw: '',
                 loading: false,
                 page: 1, totalRow: 0, pageSize: 10, list: []
