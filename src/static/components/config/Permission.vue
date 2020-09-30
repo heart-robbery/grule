@@ -4,7 +4,7 @@
             <!--            <span class="h-panel-title">属性集</span>-->
             <!--            <span v-color:gray v-font="13">说明~~</span>-->
             &nbsp;&nbsp;
-            <h-button @click="showAddPop"><i class="h-icon-plus"></i></h-button>
+            <h-button v-if="sUser.permissions.find((e) => e == 'grant' || e == 'grant')" @click="showAddPop"><i class="h-icon-plus"></i></h-button>
             <div class="h-panel-right">
                 <h-search placeholder="查询" v-width="200" v-model="kw" show-search-button search-text="搜索" @search="load"></h-search>
                 <!--                <i class="h-split"></i>-->
