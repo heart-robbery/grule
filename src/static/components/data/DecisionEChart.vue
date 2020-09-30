@@ -43,17 +43,17 @@
         },
         mounted() {
             this.load(() => loadJs('echarts', () => this.$nextTick(this.initEChart)));
-            setTimeout(() => {
-                this.taskId = setInterval(() => {
-                    this.load(() => this.chart.setOption(this.option));
-                }, 1000 * 60 * 3)
-            })
+            // setTimeout(() => {
+            //     this.taskId = setInterval(() => {
+            //         this.load(() => this.chart.setOption(this.option));
+            //     }, 1000 * 60 * 3)
+            // })
         },
         activated() {
             if (this.chart) this.load(() => this.chart.setOption(this.option));
-            this.taskId = setInterval(() => {
-                this.load(() => this.chart.setOption(this.option));
-            }, 1000 * 60 * 3)
+            // this.taskId = setInterval(() => {
+            //     this.load(() => this.chart.setOption(this.option));
+            // }, 1000 * 60 * 3)
         },
         deactivated() {
             if (this.taskId) clearInterval(this.taskId)

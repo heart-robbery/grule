@@ -107,7 +107,7 @@ class MntCtrl extends ServerTpl {
      */
     @Path(path = 'getCurrentUser')
     ApiResp getCurrentUser(HttpContext ctx) {
-        String name = ctx.getSessionAttr('id')
+        String name = ctx.getSessionAttr('name')
         if (name) {
             ApiResp.ok().attr('id', ctx.getSessionAttr('id')).attr('name', name)
                 .attr('permissions', ctx.getSessionAttr("permissions", Set))

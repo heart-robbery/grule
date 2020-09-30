@@ -18,7 +18,8 @@
             <div style="padding: 5px 0; margin: 0 10px;" v-for="item in list" :key="item.id">
                 <p style="font-size: 15px; font-weight: bold;">{{item.name}}
                     &nbsp; <span v-if="item.login">上次登录时间: <date-item :time="item.login" /></span>
-                    &nbsp; <span v-if="sUser.permissions.find((e) => e == 'grant') == 'grant'" class="h-icon-edit text-hover" @click="showUpdatePop(item)"></span>
+                    &nbsp; &nbsp; <span v-if="sUser.permissions.find((e) => e == 'grant') == 'grant'" class="h-icon-edit text-hover" @click="showUpdatePop(item)"></span>
+                    &nbsp; <span v-if="sUser.permissions.find((e) => e == 'grant') == 'grant'" class="h-icon-lock text-hover" @click="showResetPass(item)"></span>
                     &nbsp; <span v-if="sUser.permissions.find((e) => e == 'user-del') == 'user-del'" class="h-icon-trash text-hover" @click="del(item)"></span>
                 </p>
 
@@ -132,6 +133,45 @@
             },
         }
     };
+    const resetPass = { //密码重置窗口
+        template: `
+                <div v-width="400" style="padding-top: 10px">
+                    <h-form :model="model">
+                        <h-formitem label="新密码" icon="h-icon-user">
+                            <input type="password" v-model="model.newPassword">
+                        </h-formitem>
+                        <h-formitem>
+                             <h-button color="primary" :loading="isLoading" @click="restPassword">重置</h-button>
+                        </h-formitem>
+                    </h-form>
+                </div>
+                `,
+        props: ['user'],
+        data() {
+            return {
+                model: this.user ? $.extend({}, this.user) : {},
+                isLoading: false,
+            }
+        },
+        methods: {
+            restPassword() {
+                this.isLoading = true;
+                $.ajax({
+                    url: 'mnt/user/restPassword',
+                    type: 'post',
+                    data: this.model,
+                    success: (res) => {
+                        this.isLoading = false;
+                        if (res.code == '00') {
+                            this.$emit('close');
+                            this.$Message.success(`用户 ${this.model.name} 密码重置成功`);
+                        } else this.$Notice.error(res.desc)
+                    },
+                    error: () => this.isLoading = false
+                })
+            }
+        }
+    };
     module.exports = {
         data() {
             return {
@@ -202,6 +242,17 @@
                             this.load()
                         }
                     }
+                })
+            },
+            showResetPass(user) {
+                this.$Modal({
+                    title: `重置密码: ${user.name}`, middle: true, draggable: true,
+                    component: {
+                        vue: resetPass,
+                        datas: {user: user}
+                    },
+                    width: 400,
+                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false,
                 })
             },
             edit(item) {

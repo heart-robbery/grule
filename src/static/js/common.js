@@ -87,11 +87,13 @@ new Map([
     ['OpHistory', 'config/OpHistory.vue'],
     ['UserCenter', 'config/UserCenter.vue'],
     ['UserConfig', 'config/UserConfig.vue'],
+    ['Permission', 'config/Permission.vue'],
     ['DecisionData', 'data/DecisionData.vue'],
     ['DecisionResult', 'data/DecisionResult.vue'],
     ['CollectResult', 'data/CollectResult.vue'],
     ['DataAnalyse', 'data/DataAnalyse.vue'],
     ['DecisionEChart', 'data/DecisionEChart.vue'],
+    ['MyInfo', 'MyInfo.vue'],
 ]).forEach((value, key) => {
     Vue.component(key, (resolve, reject) => {
         httpVueLoader('components/'+ value)().then((r) => resolve(r))
@@ -123,7 +125,10 @@ function loadJs() {
     let length = names.length;
     names.forEach(((value, index) => {
         let path = jsMap.get(value);
-        if (!path) return;
+        if (!path) {
+            if (cb) cb();
+            return;
+        }
         $.ajax({
             url: path,
             success: (res) => {

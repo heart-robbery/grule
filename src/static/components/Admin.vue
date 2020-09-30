@@ -20,13 +20,16 @@
     <div>
         <h-layout :sider-fixed="siderFixed" :sider-collapsed="siderCollapsed">
             <h-sider theme="dark">
-
                 <div class="layout-logo">
+
+                </div>
+<!--                <span>DSL Rule Language</span>-->
+<!--                <div class="text-center">-->
 <!--                    <h-avatar src="https://i1.go2yd.com/image.php?url=0Kvq81cKR1">-->
 <!--                        &lt;!&ndash;                    <div style="font-size: 18px;">默认尺寸的显示</div>&ndash;&gt;-->
 <!--                        &lt;!&ndash;                    <p class="dark2-color">描述</p>&ndash;&gt;-->
 <!--                    </h-avatar>-->
-                </div>
+<!--                </div>-->
                 <h-menu style="margin-top: 20px;" class="h-menu-dark" :datas="menuDatas"
                         :inline-collapsed="siderCollapsed" accordion
                         ref="menu"
@@ -80,9 +83,9 @@
                             { title: '决策数据', key: 'DecisionData' },
                             { title: '数据分析', key: 'DataAnalyse' },
                         ] },
-                    { title: '查询', key: 'search', icon: 'h-icon-search' },
-                    { title: '收藏', key: 'favor', icon: 'h-icon-star', count: 100, children: [{ title: '收藏-1', key: 'favor2-1' }] },
-                    { title: '任务', icon: 'h-icon-task', key: 'task' }
+                    // { title: '查询', key: 'search', icon: 'h-icon-search' },
+                    // { title: '收藏', key: 'favor', icon: 'h-icon-star', count: 100, children: [{ title: '收藏-1', key: 'favor2-1' }] },
+                    // { title: '任务', icon: 'h-icon-task', key: 'task' }
                 ],
                 datas: [
                     { icon: 'h-icon-home' },
@@ -117,7 +120,7 @@
                         }
                     })
                 } else {
-                    // this.$router.push({ name: 'AccountBasic' });
+                    this.changeContent('MyInfo');
                 }
             },
             changeContent(key) {

@@ -28,6 +28,13 @@
             this.getCurrentUser();
             ws({path: '/mnt/ws'})
         },
+        watch: {
+            user: (v) => {
+                if (v == null) {
+                    location.reload()
+                }
+            }
+        },
         methods: {
             getCurrentUser() {
                 $.ajax({

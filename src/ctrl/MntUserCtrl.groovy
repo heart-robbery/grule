@@ -58,7 +58,8 @@ class MntUserCtrl extends ServerTpl {
 
     @Path(path = 'add')
     ApiResp add(String name, String password, String[] ps) {
-        ApiResp.ok(repo.saveOrUpdate(new User(name: name, password: password, permissions: ps?.findAll {it?.trim()}?.join(','))))
+        def u = repo.saveOrUpdate(new User(name: name, password: password, permissions: ps?.findAll {it?.trim()}?.join(',')))
+        ApiResp.ok(u.id)
     }
 
 
@@ -83,7 +84,23 @@ class MntUserCtrl extends ServerTpl {
         if (ctx.getSessionAttr('id') == id) { //如果是当前用户
             ctx.setSessionAttr('permissions', ps as Set)
         }
-        ApiResp.ok(repo.saveOrUpdate(user))
+        repo.saveOrUpdate(user)
+        ApiResp.ok().attr('id', user.id).attr('name', user.name)
+            .attr('permissions', user.permissions?.split(","))
+    }
+
+
+    @Path(path = 'changePwd')
+    ApiResp changePwd(HttpContext ctx, Long id, String newPassword, String oldPassword) {
+        if (ctx.getSessionAttr("id", Long) != id) {
+            return ApiResp.fail('只能改当前用户的密码')
+        }
+        def user = repo.findById(User, id)
+        if (!user) return ApiResp.fail("用户不存在")
+        if (oldPassword != user.password) return ApiResp.fail('密码错误')
+        user.password = newPassword
+        repo.saveOrUpdate(user)
+        ApiResp.ok()
     }
 
 
@@ -101,5 +118,59 @@ class MntUserCtrl extends ServerTpl {
     @Path(path = 'permissions')
     ApiResp permissions() {
         ApiResp.ok(repo.findList(Permission))
+    }
+
+
+    @Path(path = 'delPermission/:id', method = 'post')
+    ApiResp delPermission(HttpContext ctx, Long id) {
+        ctx.auth("grant")
+        ApiResp.ok(repo.delete(Permission, id))
+    }
+
+
+    @Path(path = 'updatePermission', method = 'post')
+    ApiResp updatePermission(HttpContext ctx, Long id, String enName, String cnName, String comment) {
+        ctx.auth("grant")
+        def p = repo.findById(Permission, id)
+        if (!p) return ApiResp.fail('未找到权限: ' + id)
+        if (p.enName != enName && repo.find(Permission) {root, query, cb -> cb.equal(root.get('enName'), enName)}) {
+            return ApiResp.fail("权限名'$enName'已存在")
+        }
+        if (p.cnName != cnName && repo.find(Permission) {root, query, cb -> cb.equal(root.get('cnName'), cnName)}) {
+            return ApiResp.fail("权限名'$cnName'已存在")
+        }
+        p.enName = enName
+        p.cnName = cnName
+        p.comment = comment
+        ApiResp.ok(repo.saveOrUpdate(p))
+    }
+
+
+    @Path(path = 'addPermission', method = 'post')
+    ApiResp addPermission(HttpContext ctx, String enName, String cnName, String comment) {
+        ctx.auth("grant")
+        def p = new Permission(enName: enName, cnName: cnName, comment: comment)
+        if (repo.find(Permission) {root, query, cb -> cb.equal(root.get('enName'), enName)}) {
+            return ApiResp.fail("权限名'$enName'已存在")
+        }
+        if (repo.find(Permission) {root, query, cb -> cb.equal(root.get('cnName'), cnName)}) {
+            return ApiResp.fail("权限名'$cnName'已存在")
+        }
+        repo.saveOrUpdate(p)
+        ApiResp.ok(p)
+    }
+
+
+    @Path(path = 'permissionPage')
+    ApiResp permissionPage(Integer page, Integer pageSize, String kw) {
+        if (pageSize && pageSize > 20) return ApiResp.fail("pageSize max 20")
+        ApiResp.ok(
+            repo.findPage(Permission, page, pageSize?:10) {root, query, cb ->
+                query.orderBy(cb.desc(root.get('updateTime')))
+                if (kw) {
+                    return cb.or(cb.like(root.get('enName'), '%' + kw + '%'), cb.like(root.get('cnName'), '%' + kw + '%'))
+                }
+            }
+        )
     }
 }

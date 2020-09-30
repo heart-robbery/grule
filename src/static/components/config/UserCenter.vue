@@ -10,6 +10,7 @@
     </div>
 </template>
 <script>
+    loadJs('moment');
     module.exports = {
         data() {
             return {
@@ -17,7 +18,7 @@
                     type: localStorage.getItem('rule.userConfig.tab') || 'UserConfig',
                     showId: null
                 },
-                types: {UserConfig: '用户列表', AuthConfig:'权限管理'},
+                types: {UserConfig: '用户列表', Permission:'权限管理'},
 
             }
         },
