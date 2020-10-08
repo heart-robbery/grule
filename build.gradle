@@ -38,6 +38,7 @@ dependencies {
     compile 'org.codehaus.groovy:groovy:3.0.5'
     compile 'org.codehaus.groovy:groovy-templates:3.0.5'
     compile 'org.codehaus.groovy:groovy-sql:3.0.5'
+    compile 'org.codehaus.groovy:groovy-json:3.0.5'
 
     compile 'com.alibaba:fastjson:1.2.73'
     compile 'ch.qos.logback:logback-classic:1.2.3'

@@ -1,20 +1,14 @@
-<style>
-    .inlinetb {
-        float: left;
-    }
-</style>
 <template>
     <div class="h-panel">
         <div class="h-panel-bar">
-            <h-select v-model="model.decision" :datas="types" placeholder="所有" style="width: 90px; float: left" @change="load"></h-select>
-<!--            <h-select v-model="model.decisionId" :datas="decisions" placeholder="所有" style="width: 150px; float: left" @change="load"></h-select>-->
+            <h-select v-model="model.decision" :datas="types" placeholder="所有" style="width: 70px; float: left" @change="load"></h-select>
             <h-autocomplete v-model="model.decisionId" :option="decisions" style="float:left; width: 150px" @change="load" placeholder="决策名"></h-autocomplete>
             <input type="text" v-model="model.id" placeholder="流水id(精确匹配)" style="width: 250px" @keyup.enter="load"/>
-            <input type="text" v-model="model.idNum" placeholder="身份证(精确匹配)" @keyup.enter="load"/>
+            <input type="text" v-model="model.idNum" placeholder="身份证(精确匹配)" style="width: 155px" @keyup.enter="load"/>
+            <input type="number" v-model="model.spend" placeholder=">=耗时(ms)" style="width: 100px" @keyup.enter="load"/>
             <input type="text" v-model="model.exception" placeholder="异常信息" @keyup.enter="load"/>
-            <input type="number" v-model="model.spend" placeholder="大于耗时(ms)" style="width: 110px" @keyup.enter="load"/>
-            <input type="text" v-model="model.attrs" placeholder="属性关键字" @keyup.enter="load"/>
-            <input type="text" v-model="model.rules" placeholder="规则关键字" @keyup.enter="load"/>
+<!--            <input type="text" v-model="model.attrs" placeholder="属性关键字" @keyup.enter="load"/>-->
+<!--            <input type="text" v-model="model.rules" placeholder="规则关键字" @keyup.enter="load"/>-->
             <button class="h-btn h-btn-primary float-right" @click="load"><i class="h-icon-search"></i><span>查询</span></button>
         </div>
         <div class="h-panel-body">

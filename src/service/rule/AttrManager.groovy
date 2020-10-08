@@ -76,7 +76,7 @@ class AttrManager extends ServerTpl {
     def dataCollect(String aName, DecisionContext ctx) {
         def field = attrMap.get(aName)
         if (field == null) {
-            log.warn("未找到属性'$aName'对应的配置")
+            log.warn("未找到属性'$aName'对应的配置".toString())
             return
         }
         String collectorName = field.dataCollector // 属性对应的 值 收集器名
@@ -85,7 +85,8 @@ class AttrManager extends ServerTpl {
             return null
         }
         if (ctx.dataCollectResult.containsKey(collectorName)) { // 已查询过
-            return ctx.dataCollectResult.get(collectorName).get(aName)
+            def value = ctx.dataCollectResult.get(collectorName)
+            return value instanceof Map ? value.get(aName) : value
         }
 
         // 函数执行
@@ -108,7 +109,10 @@ class AttrManager extends ServerTpl {
                 }
                 return result.get(aName)
             }
-            else return v
+            else {
+                ctx.dataCollectResult.put(collectorName, v)
+                return v
+            }
         }
 
         def fn = dataCollectorMap.get(collectorName)
@@ -338,7 +342,8 @@ if (idNumber && idNumber.length() > 17) {
 
         def db = new Sql(HibernateSrv.createDs([
             url: collector.url, jdbcUrl: collector.url,
-            minIdle: collector.minIdle, maxActive: collector.maxActive
+            minIdle: collector.minIdle, maxActive: collector.maxActive,
+            minimumIdle: collector.minIdle, maximumPoolSize: collector.maxActive
         ]))
 
         Binding binding = new Binding()

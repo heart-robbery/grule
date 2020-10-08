@@ -155,7 +155,7 @@ class MntCtrl extends ServerTpl {
 
 
     @Path(path = 'dataCollectorPage')
-    ApiResp dataCollectorPage(Integer page, Integer pageSize, String kw, String enName) {
+    ApiResp dataCollectorPage(Integer page, Integer pageSize, String kw, String enName, String type) {
         if (pageSize && pageSize > 50) return ApiResp.fail("pageSize max 50")
         ApiResp.ok(
             repo.findPage(DataCollector, page, pageSize?:10) { root, query, cb ->
@@ -168,9 +168,8 @@ class MntCtrl extends ServerTpl {
                         cb.like(root.get('comment'), '%' + kw + '%')
                     )
                 }
-                if (enName) {
-                    ps << cb.equal(root.get('enName'), enName)
-                }
+                if (enName) ps << cb.equal(root.get('enName'), enName)
+                if (type) ps << cb.equal(root.get('type'), type)
                 cb.and(ps.toArray(new Predicate[ps.size()]))
             }
         )

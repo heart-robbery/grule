@@ -16,6 +16,10 @@ import javax.persistence.Lob
 @DynamicUpdate
 class DataCollector extends LongIdEntity {
     /**
+     * 是否可用
+     */
+    Boolean enabled
+    /**
      * 英文名
      */
     @Column(unique = true)

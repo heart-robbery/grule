@@ -1,11 +1,11 @@
 <template>
     <div class="h-panel">
         <div class="h-panel-bar">
-            <h-select v-model="model.collectorType" :datas="types" placeholder="类型" style="width: 90px; float: left" @change="load"></h-select>
+            <h-select v-model="model.collectorType" :datas="types" placeholder="类型" style="width: 70px; float: left" @change="load"></h-select>
             <h-select v-model="model.success" :datas="successTypes" placeholder="是否成功" style="width: 90px; float: left" @change="load"></h-select>
             <h-autocomplete v-model="model.decisionId" :option="decisions" style="float:left; width: 150px" @change="load" placeholder="决策名"></h-autocomplete>
             <h-autocomplete v-model="model.collector" :option="collectors" style="float:left; width: 150px" @change="load" placeholder="收集器"></h-autocomplete>
-            <input type="number" v-model="model.spend" placeholder=">=耗时(ms)" style="width: 110px" @keyup.enter="load"/>
+            <input type="number" v-model="model.spend" placeholder=">=耗时(ms)" style="width: 100px" @keyup.enter="load"/>
             <input type="text" v-model="model.decideId" placeholder="流水id(精确匹配)" style="width: 250px" @keyup.enter="load"/>
             <h-datepicker v-model="model.startTime" type="datetime" :has-seconds="true" placeholder="开始时间"></h-datepicker>
             <h-datepicker v-model="model.endTime" type="datetime" :has-seconds="true" placeholder="结束时间"></h-datepicker>

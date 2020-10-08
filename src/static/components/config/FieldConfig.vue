@@ -42,6 +42,7 @@
     </div>
 </template>
 <script>
+    loadJs('moment');
     loadJs('md5');
     const types = [
         { title: '字符串', key: 'Str'},

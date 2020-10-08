@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class DecisionContext {
     protected static final Logger    log     = LoggerFactory.getLogger(DecisionContext)
-    // 执行上下文id
+    // 决策执行标识(id)
                     String           id
     // 开始时间
     final           Date             startup = new Date()
@@ -41,7 +41,7 @@ class DecisionContext {
     // 最终数据属性值
     @Lazy protected Map<String, Object>              data              = new Data(this)
     // 数据收集器名 -> 数据收集结果集
-    @Lazy protected Map<String, Map<String, Object>> dataCollectResult = new ConcurrentHashMap<>()
+    @Lazy protected Map<String, Object> dataCollectResult = new ConcurrentHashMap<>()
     // 规则执行迭代器
     @Lazy protected def                              ruleIterator      = new RuleIterator(this)
     // 执行结果 异常

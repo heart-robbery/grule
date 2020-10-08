@@ -3,12 +3,13 @@
         <div class="h-panel-bar">
 <!--            <span class="h-panel-title">数据集</span>-->
             <!--            <span v-color:gray v-font="13">说明~~</span>-->
-            &nbsp;&nbsp;
             <h-button v-if="sUser.permissions.find((e) => e == 'dataCollector-add') == 'dataCollector-add'" @click="showAddPop"><i class="h-icon-plus"></i></h-button>
+            <h-select v-model="model.type" :datas="types" placeholder="所有" style="width: 70px; float: left" @change="load"></h-select>
+            <input type="text" v-model="model.kw" placeholder="关键词" @keyup.enter="load"/>
             <div class="h-panel-right">
-                <h-search placeholder="查询" v-width="200" v-model="kw" show-search-button search-text="搜索" @search="load"></h-search>
+<!--                <h-search placeholder="查询" v-width="200" v-model="model.kw" show-search-button search-text="搜索" @search="load"></h-search>-->
                 <!--                <i class="h-split"></i>-->
-                <!--                <button class="h-btn h-btn-green h-btn-m" @click="load">查询</button>-->
+                <button class="h-btn h-btn-green h-btn-m" @click="load">查询</button>
             </div>
         </div>
         <div class="h-panel-body">
@@ -36,6 +37,7 @@
     </div>
 </template>
 <script>
+    loadJs('moment');
     loadJs('ace', () => {
         ace.config.set("basePath", "js/lib");
         loadJs('ace-tools');
@@ -100,13 +102,13 @@
                         </h-formitem>
 
                         <h-formitem v-if="model.type == 'http'" label="解析脚本" icon="h-icon-complete" prop="parseScript" single>
-                            <div ref="dslEditor" style="height: 280px; width: 670px"></div>
+                            <div ref="dslEditor" style="height: 260px; width: 670px"></div>
                         </h-formitem>
                         <h-formitem v-if="model.type == 'script'" label="值计算函数" icon="h-icon-complete" prop="computeScript" single>
-                            <div ref="dslEditor" style="height: 430px; width: 670px"></div>
+                            <div ref="dslEditor" style="height: 385px; width: 670px"></div>
                         </h-formitem>
                         <h-formitem v-if="model.type == 'sql'" label="sql执行脚本" icon="h-icon-complete" prop="sqlScript" single>
-                            <div ref="dslEditor" style="height: 380px; width: 670px"></div>
+                            <div ref="dslEditor" style="height: 260px; width: 670px"></div>
                         </h-formitem>
                         <h-formitem single>
                                 <h-button v-if="model.id" color="primary" :loading="isLoading" @click="update">提交</h-button>
@@ -235,6 +237,8 @@
         props: ['tabs'],
         data() {
             return {
+                types: types,
+                model: {},
                 sUser: app.$data.user,
                 kw: '',
                 loading: false,
@@ -312,7 +316,7 @@
                 this.list = [];
                 $.ajax({
                     url: 'mnt/dataCollectorPage',
-                    data: {page: page.page || 1, kw: this.kw, enName: this.tabs.showId},
+                    data: $.extend({page: page.page || 1, enName: this.tabs.showId}, this.model),
                     success: (res) => {
                         this.tabs.showId = null;
                         this.loading = false;

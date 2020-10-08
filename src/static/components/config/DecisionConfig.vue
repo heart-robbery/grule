@@ -1,10 +1,3 @@
-<style scoped>
-    .editor-size{
-        width: 80vw;
-        height: 80vh;
-        overflow-y: auto;
-    }
-</style>
 <template>
     <div class="h-panel">
         <div class="h-panel-bar">
@@ -37,8 +30,7 @@
             </div>
         </div>
         <div v-if="decision.totalRow" class="h-panel-bar">
-            <h-pagination ref="pagination" :cur="decision.page" :total="decision.totalRow" :size="decision.pageSize"
-                          align="right" @change="load" layout="pager,total"></h-pagination>
+            <h-pagination ref="pagination" :cur="decision.page" :total="decision.totalRow" :size="decision.pageSize" align="right" @change="load" layout="pager,total"></h-pagination>
         </div>
     </div>
 </template>
@@ -74,7 +66,9 @@
                     </h-cell>
                 </h-row>
                 <h-row>
-                    {{result}}
+                  <pre style="white-space: pre-wrap">
+                      {{result}}
+                    </pre>
                 </h-row>
             </div>
         `,
@@ -100,7 +94,7 @@
                     data: this.items.params.map((param) => {let o={}; o[param.name] = param.value; return o}).reduce((o1, o2) => {let o = {...o1, ...o2}; return o}),
                     success: (res) => {
                         if (res.code == '00') {
-                            this.result = res.data;
+                            this.result = JSON.stringify(res.data, null, 4).trim();
                             this.$Message.success(`测试调用: ${this.decision.decisionId}成功`);
                             localStorage.setItem(this.cacheKey, JSON.stringify(this.items))
                         } else this.$Notice.error(res.desc);
