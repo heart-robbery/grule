@@ -9,14 +9,15 @@ import com.alibaba.fastjson.JSONException
 import com.alibaba.fastjson.JSONObject
 import com.alibaba.fastjson.parser.Feature
 import com.alibaba.fastjson.serializer.SerializerFeature
-import core.aio.AioMsg
+import core.aio.AioClient
+import core.aio.AioServer
+import core.aio.AioSession
 
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Consumer
 
 import static core.Utils.ipv4
@@ -36,8 +37,8 @@ class Remoter extends ServerTpl {
      */
     protected final Map<String, EC>                        ecMap      = new ConcurrentHashMap<>()
 
-    protected core.aio.AioClient aioClient
-    protected core.aio.AioServer aioServer
+    protected AioClient aioClient
+    protected AioServer aioServer
 
 
     Remoter() { super("remoter") }
@@ -78,8 +79,8 @@ class Remoter extends ServerTpl {
 
     @EL(name = "sys.stopping", async = false)
     void stop() {
-        localBean(core.aio.AioClient)?.stop()
-        localBean(core.aio.AioServer)?.stop()
+        localBean(AioClient)?.stop()
+        localBean(AioServer)?.stop()
     }
 
 
@@ -100,7 +101,7 @@ class Remoter extends ServerTpl {
     def fire(String appName, String eName, List remoteMethodArgs) {
         final def latch = new CountDownLatch(1)
         def ec = EC.of(this).args(appName, eName, remoteMethodArgs).completeFn({latch.countDown()})
-        ep.fire("remote", ec)
+        ep.fire("remote", ec) // 不能直接用doFire, 因为 isNoListener() == true
         latch.await()
         if (ec.success) return ec.result
         else throw new Exception(ec.failDesc())
@@ -128,7 +129,7 @@ class Remoter extends ServerTpl {
      * @param msg 消息内容
      * @param target 可用值: 'any', 'all'
      */
-    Remoter sendMsg(String appName, AioMsg msg, String target = 'any') {
+    Remoter sendMsg(String appName, String msg, String target = 'any') {
         def ls = appInfos.get(appName)
         if (!ls) {
             log.warn("Not found app '$appName' system online")
@@ -138,14 +139,14 @@ class Remoter extends ServerTpl {
         final def doSend = {Map<String, Object> appInfo ->
             if (appInfo['id'] == app.id) return false
 
-            String[] arr = appInfo.get('tcp').split(":")
+            String[] arr = ((String) appInfo.get('tcp')).split(":")
             aioClient.send(arr[0], Integer.valueOf(arr[1]), msg)
             return true
         }
 
         if ('any' == target) {
             doSend(ls.get(new Random().nextInt(ls.size())))
-        } else if ('all' == target) {
+        } else if ('all' == target) { // 网络不可靠
             ls.each {app -> async { doSend(app) }}
         } else {
             throw new IllegalArgumentException("Not support target '$target'")
@@ -191,7 +192,7 @@ class Remoter extends ServerTpl {
     @EL(name = "remote", async = false)
     protected void doFire(EC ec, String appName, String eName, List remoteMethodArgs) {
         if (aioClient == null) throw new RuntimeException("$aioClient.name not is running")
-        if (app.name == null) throw new IllegalArgumentException("app.name is empty")
+        if (app.name == null) throw new IllegalArgumentException("sys.name is empty")
         ec.suspend()
         JSONObject params = new JSONObject(5, true)
         try {
@@ -214,7 +215,7 @@ class Remoter extends ServerTpl {
                 ecMap.put(ec.id(), ec)
                 // 数据发送成功. 如果需要响应, 则添加等待响应超时处理
                 sched.after(Duration.ofSeconds(
-                    (long) ec.getAttr("timeout", Integer, getInteger("timeout_$eName", getInteger("eventTimeout", 20)))
+                    (long) ec.getAttr("timeout", Integer, getInteger("timeout_$eName", getInteger("eventTimeout", 10)))
                 ), {
                     ecMap.remove(ec.id())?.errMsg("'${appName}_$eName' Timeout")?.resume()?.tryFinish()
                 })
@@ -235,13 +236,11 @@ class Remoter extends ServerTpl {
                 .fluentPut("source", new JSONObject(2).fluentPut('name', app.name).fluentPut('id', app.id))
                 .fluentPut("data", params)
             if (ec.getAttr('toAll', Boolean.class, false)) {
-                if (trace) {log.info("Fire Remote Event(toAll). app:"+ appName +", params: " + params)}
-                AtomicInteger count = new AtomicInteger(0); ec.attr('sendCount', count) // 发送了多少个
-                ec.attr('receiveCount', new AtomicInteger(0)) // 成功接收了多少个
-                sendMsg(appName, AioMsg.of(data.toString(), {msg, se -> count.incrementAndGet()}), 'all')
+                if (trace) {log.info("Fire Remote Event(toAll). app: "+ appName +", params: " + params)}
+                sendMsg(appName, data.toString(), 'all')
             } else {
-                if (trace) {log.info("Fire Remote Event(toAny). app:"+ appName +", params: " + params)}
-                sendMsg(appName, AioMsg.of(data.toString()), 'any')
+                if (trace) {log.info("Fire Remote Event(toAny). app: "+ appName +", params: " + params)}
+                sendMsg(appName, data.toString(), 'any')
             }
         } catch (Throwable ex) {
             log.error("Error fire remote event to '" +appName+ "'. params: " + params, ex)
@@ -256,7 +255,7 @@ class Remoter extends ServerTpl {
      * @param msg 消息内容
      * @param se AioSession
      */
-    protected void receiveMsg(final String msg, final core.aio.AioSession se) {
+    protected void receiveMsg(final String msg, final AioSession se) {
         JSONObject msgJo = null
         try {
             msgJo = JSON.parseObject(msg, Feature.OrderedField)
@@ -319,7 +318,7 @@ class Remoter extends ServerTpl {
      * @param reply 回应消息
      * @param se AioSession
      */
-    protected void receiveReply(final String reply, final core.aio.AioSession se) {
+    protected void receiveReply(final String reply, final AioSession se) {
         log.trace("Receive reply from '{}': {}", se.sc.remoteAddress, reply)
         def jo = JSON.parseObject(reply, Feature.OrderedField)
         if ("updateAppInfo" == jo['type']) {
@@ -337,21 +336,8 @@ class Remoter extends ServerTpl {
      */
     protected void receiveEventResp(JSONObject data) {
         log.debug("Receive event response: {}", data)
-        EC ec = ecMap.get(data.getString("id"))
-        if (ec == null) {
-            log.warn("ec null. toAll: " + ec.getAttr('toAll'))
-        }
-        if (ec.getAttr('toAll', Boolean)) {
-            def send = ec.getAttr('sendCount', AtomicInteger).get()
-            def receive = ec.getAttr('receiveCount', AtomicInteger).incrementAndGet()
-            if (send == receive) {
-                ecMap.remove(ec.id())
-                ec.errMsg(data.getString("exMsg")).result(data["result"]).resume().tryFinish()
-            }
-        } else {
-            ecMap.remove(ec.id())
-            ec.errMsg(data.getString("exMsg")).result(data["result"]).resume().tryFinish()
-        }
+        EC ec = ecMap.remove(data.getString("id"))
+        if (ec != null) ec.errMsg(data.getString("exMsg")).result(data["result"]).resume().tryFinish()
     }
 
 
@@ -360,7 +346,7 @@ class Remoter extends ServerTpl {
      * @param data 数据
      * @param se AioSession
      */
-    protected void receiveEventReq(final JSONObject data, final core.aio.AioSession se) {
+    protected void receiveEventReq(final JSONObject data, final AioSession se) {
         log.debug("Receive event request: {}", data)
         boolean fReply = (Boolean.TRUE == data.getBoolean("reply")) // 是否需要响应
         try {
@@ -427,7 +413,7 @@ class Remoter extends ServerTpl {
      * @param data
      * @param se
      */
-    protected void appUp(final Map data, final core.aio.AioSession se) {
+    protected void appUp(final Map data, final AioSession se) {
         if (!data || !data['name'] || !data['tcp'] || !data['id']) { // 数据验证
             log.warn("App up data incomplete: " + data)
             return

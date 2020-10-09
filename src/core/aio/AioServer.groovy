@@ -7,6 +7,7 @@ import core.ServerTpl
 import java.nio.channels.AsynchronousChannelGroup
 import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.AsynchronousSocketChannel
+import java.nio.channels.ClosedChannelException
 import java.nio.channels.CompletionHandler
 import java.text.SimpleDateFormat
 import java.time.Duration
@@ -18,7 +19,7 @@ import java.util.function.BiConsumer
 import static core.Utils.ipv4
 
 /**
- * Aio 服务端
+ * TCP(Aio) 服务端
  */
 class AioServer extends ServerTpl {
     protected final List<BiConsumer<String, AioSession>>                    msgFns  = new LinkedList<>()
@@ -126,8 +127,8 @@ class AioServer extends ServerTpl {
                 def rAddr = ((InetSocketAddress) sc.remoteAddress)
                 srv.log.info("New TCP(AIO) Connection from: " + rAddr.hostString + ":" + rAddr.port)
                 sc.setOption(StandardSocketOptions.SO_REUSEADDR, true)
-                sc.setOption(StandardSocketOptions.SO_RCVBUF, getInteger('so_rcvbuf', 1024 * 1024))
-                sc.setOption(StandardSocketOptions.SO_SNDBUF, getInteger('so_sndbuf', 1024 * 1024))
+                sc.setOption(StandardSocketOptions.SO_RCVBUF, getInteger('so_rcvbuf', 1024 * 1024 * 2))
+                sc.setOption(StandardSocketOptions.SO_SNDBUF, getInteger('so_sndbuf', 1024 * 1024 * 2))
                 sc.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
                 sc.setOption(StandardSocketOptions.TCP_NODELAY, true)
 
@@ -145,7 +146,7 @@ class AioServer extends ServerTpl {
 
         protected void handleExpire(AioSession se) {
             long expire = Duration.ofMinutes(getInteger("session.maxIdle", 30)).toMillis()
-            final AtomicBoolean end = new AtomicBoolean(false)
+            final def end = new AtomicBoolean(false)
             long cur = System.currentTimeMillis()
             sched?.dyn({
                 if (System.currentTimeMillis() - (se.lastUsed?:cur) > expire && end.compareAndSet(false, true)) {
@@ -164,7 +165,9 @@ class AioServer extends ServerTpl {
 
         @Override
         void failed(Throwable ex, AioServer srv) {
-            srv.log.error(ex.message?:ex.class.simpleName, ex)
+            if (ex !instanceof ClosedChannelException) {
+                srv.log.error(ex.message?:ex.class.simpleName, ex)
+            }
         }
     }
 }

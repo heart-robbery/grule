@@ -179,8 +179,8 @@ class TestService extends ServerTpl {
 
     def remote(String app, String eName, String param = 'xx', Consumer fn) {
         // 远程调用
-        // fn.accept(bean(Remoter).fire(app?:'gy', eName?:'eName1', ['p1']))
-        bean(Remoter).fireAsync(app?:'gy', eName?:'eName1', fn, [])
+        fn.accept(bean(Remoter).fire(app?:'gy', eName?:'eName1', ['p1']))
+        // bean(Remoter).fireAsync(app?:'gy', eName?:'eName1', fn, [])
     }
 
 

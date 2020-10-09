@@ -99,15 +99,17 @@ class Utils {
     /**
      * 随机字符串(区分大小写)
      * @param length 长度
+     * @param prefix 前缀
+     * @param suffix 后缀
      */
-    static String random(int length) {
+    static String random(int length, String prefix = null, String suffix = null) {
         if (length < 1) throw new IllegalArgumentException("length must le 1")
         final cs = new char[length]
         def r = new Random()
         for (int i = 0; i < cs.length; i++) {
             cs[i] = CS[r.nextInt(CS.length)]
         }
-        return String.valueOf(cs)
+        return (prefix?:'') + String.valueOf(cs) + (suffix?:'')
     }
 
 

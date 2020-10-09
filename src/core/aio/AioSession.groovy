@@ -1,6 +1,6 @@
 package core.aio
 
-
+import core.Devourer
 import core.ServerTpl
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -9,30 +9,30 @@ import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.ClosedChannelException
 import java.nio.channels.CompletionHandler
-import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.function.BiConsumer
 
+/**
+ * 一条AIO tcp连接会话
+ */
 class AioSession {
-    protected static final Logger                        log = LoggerFactory.getLogger(AioSession)
-    protected final AsynchronousSocketChannel            sc
-    protected final                                      readHandler = new ReadHandler(this)
-    protected final ServerTpl                            server
-    protected final List<BiConsumer<String, AioSession>> msgFns      = new LinkedList<>()
+    protected static final Logger                               log         = LoggerFactory.getLogger(AioSession)
+    protected final        AsynchronousSocketChannel            sc
+    protected final                                             readHandler = new ReadHandler(this)
+    protected final        ServerTpl                            server
+    protected final        List<BiConsumer<String, AioSession>> msgFns      = new LinkedList<>()
     // 消息发送队列
-    protected final Queue<AioMsg>                             sendQueue = new ConcurrentLinkedQueue<>()
-    // 是否正在有消息发送
-    final        AtomicBoolean                   sending     = new AtomicBoolean(false)
+    @Lazy protected        Devourer                             sendQueue   = new Devourer(AioSession.simpleName + ":" + sc.toString(), server.exec)
     // close 回调函数
-    protected Runnable                                   closeFn
-    protected Long                                       lastUsed
+    protected              Runnable                             closeFn
+    protected              Long                                 lastUsed
     // 上次读写时间
-    protected final AtomicBoolean                        closed      = new AtomicBoolean(false)
+    protected final        AtomicBoolean                        closed      = new AtomicBoolean(false)
     // 数据分割符(半包和粘包) 默认换行符分割
-    @Lazy protected String                               delimiter   = server.getStr('delimiter', '\n')
+    @Lazy protected        String                               delimiter   = server.getStr('delimiter', '\n')
     // 每次接收消息的内存空间
-    @Lazy protected             def                      buf         = ByteBuffer.allocate(server.getInteger('maxMsgSize', 1024 * 1024))
+    @Lazy protected             def                             buf         = ByteBuffer.allocate(server.getInteger('maxMsgSize', 1024 * 1024))
 
 
     AioSession(AsynchronousSocketChannel sc, ServerTpl server) {
@@ -70,65 +70,31 @@ class AioSession {
     }
 
 
-
-    void send(String msg) { send(AioMsg.of(msg)) }
-    /**
-     * 发送消息到客户端
-     * @param msg
-     */
-    void send(AioMsg msg) {
-        if (msg == null || msg.content == null) return
-        if (closed.get()) {
-            msg.failCallback?.accept(null, this)
-            return
-        }
-        lastUsed = System.currentTimeMillis()
-        sendQueue.offer(msg)
-        server.async { trigger() }
-    }
-
-
-    /**
-     * 自动遍历消息发送
-     */
-    protected final void trigger() {
-        if (closed.get() || sendQueue.isEmpty()) return
-        if (!sending.compareAndSet(false, true)) return
-        def msg = sendQueue.poll()
-        if (msg == null) return
-        sc.write( // 写入tcp通道
-            ByteBuffer.wrap((msg.content + (delimiter?:'')).getBytes('utf-8')),
-            msg.timeout.toMillis(), TimeUnit.MICROSECONDS, this,
-            new CompletionHandler<Integer, AioSession>() {
-                @Override
-                void completed(Integer result, AioSession se) {
-                    if (result > 0) {
-                        if (msg.okCallback) se.server.async { msg.okCallback.accept(msg, se) }
-                        se.trigger()
-                    }
-                    else {
-                        if (msg.failCallback) se.server.async { msg.failCallback.accept(null, se) }
-                    }
-                }
-                @Override
-                void failed(Throwable ex, AioSession se) {
-                    if (msg.failCallback) se.server.async { msg.failCallback.accept(ex, se) }
-                    else {
-                        if (ex !instanceof ClosedChannelException) {
-                            log.error(ex.class.simpleName + " " + sc.localAddress.toString() + " ->" + sc.remoteAddress.toString())
-                        }
-                        se.close()
-                    }
-                }
-            })
-    }
-
-
     /**
      * 当前会话渠道是否忙
      * @return
      */
-    boolean busy() { sendQueue.size() > 1 }
+    boolean busy() { sendQueue.waitingCount > 1 }
+
+
+    /**
+     * 发送消息到客户端
+     * @param msg
+     */
+    void send(String msg) {
+        if (closed.get() || msg == null) return
+        lastUsed = System.currentTimeMillis()
+        sendQueue.offer { // 排对发送消息. 避免 WritePendingException
+            try {
+                sc.write(ByteBuffer.wrap((msg + (delimiter?:'')).getBytes('utf-8'))).get(server.getLong("aioWriteTimeout", 8000L), TimeUnit.MILLISECONDS)
+            } catch (ex) {
+                if (ex !instanceof ClosedChannelException) {
+                    log.error(sc.localAddress.toString() + " ->" + sc.remoteAddress.toString(), ex)
+                }
+                close()
+            }
+        }
+    }
 
 
     /**
@@ -159,7 +125,7 @@ class AioSession {
 
     @Override
     String toString() {
-        return getClass().simpleName + "@" + Integer.toHexString(hashCode()) + "[" + sc?.toString() + "]"
+        return super.toString() + "[" + sc?.toString() + "]"
     }
 
 
@@ -179,7 +145,7 @@ class AioSession {
                     buf.get(bs)
                     receive(new String(bs, 'utf-8'))
                 } else delimit(buf)
-                // 避免 ReadPendingException
+                // 同一时间只有一个 read, 避免 ReadPendingException
                 session.read()
             }
             else {
