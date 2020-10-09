@@ -77,13 +77,16 @@ class HttpDecoder {
             }
             return false
         }
-        def arr = firstLine.split(" ")
-        request.method = arr[0]
-        request.rowUrl = arr[1]
-        request.protocol = arr[2].split("/")[0]
-        request.version = arr[2].split("/")[1]
-
-        // TODO 验证
+        try {
+            def arr = firstLine.split(" ")
+            request.method = arr[0]
+            request.rowUrl = arr[1]
+            request.protocol = arr[2].split("/")[0]
+            request.version = arr[2].split("/")[1]
+        } catch (ex) {
+            log.error("非Http数据. " + firstLine)
+            throw ex
+        }
         return true
     }
 

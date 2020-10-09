@@ -268,7 +268,7 @@ class HttpContext {
 
         fullResponse(body)
         int chunkedSize = chunkedSize(body)
-        if (chunkedSize > 0) { //分块传送
+        if (chunkedSize > 0) { //分块传送. js 加载不全, 可能是网速限制的原因
             chunked(body, chunkedSize)
         } else { //整体传送
             // HttpResponseEncoder
