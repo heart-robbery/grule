@@ -87,7 +87,7 @@ class Chain {
 
     /**
      * 指定方法,路径处理器
-     * @param method get, post ...
+     * @param method get, post, delete ...
      * @param path 匹配路径
      * @param contentTypes application/json, multipart/form-data, application/x-www-form-urlencoded
      * @param handler 处理器
@@ -110,7 +110,7 @@ class Chain {
                 boolean matched = super.match(ctx)
                 if (!matched) return false
                 if (method && !method.equalsIgnoreCase(ctx.request.method)) {
-                    ctx.response.status(415)
+                    ctx.response.status(405)
                     return false
                 }
                 if (contentTypes) {
@@ -121,12 +121,12 @@ class Chain {
                         }
                     }
                     if (!f) {
-                        ctx.response.status(405)
+                        ctx.response.status(415)
                         return false
                     }
                 }
                 if (415 == ctx.response.status || 405 == ctx.response.status) ctx.response.status(200)
-                return matched
+                return true
             }
         })
     }
@@ -183,6 +183,11 @@ class Chain {
 
     Chain post(String path, Handler handler) {
         method('post', path, handler)
+    }
+
+
+    Chain delete(String path, Handler handler) {
+        method('delete', path, handler)
     }
 
 

@@ -6,7 +6,7 @@ import groovy.transform.ToString
  * 接口响应数据结构
  * @param <T>
  */
-@ToString(includePackage = false, ignoreNulls = true, allNames = true)
+@ToString(includePackage = false, allNames = true)
 class ApiResp<T> implements Serializable {
     /**
      * 请求是否成功

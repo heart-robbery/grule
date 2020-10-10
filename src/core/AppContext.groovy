@@ -16,6 +16,13 @@ import java.util.function.Function
 import static core.Utils.*
 import static java.util.Collections.emptyList
 
+/**
+ * 应用执行上下文
+ * 1. 应用执行环境属性 {@link #env}
+ * 2. 应用执行公用唯一线程池 {@link #exec}
+ * 3. 应用事件中心 {@link #ep}
+ * 4. 应用所有服务实例 {@link #sourceMap}
+ */
 class AppContext {
     protected static final Logger log     = LoggerFactory.getLogger(AppContext)
     @Lazy ConfigObject            env     = initEnv()
@@ -69,11 +76,10 @@ class AppContext {
 
 
     /**
-     * 初始化环境属性
+     * 初始化环境属性(加载配置文件)
      * @return
      */
     protected ConfigObject initEnv() {
-        // 加载配置文件
         def cs = new ConfigSlurper()
         ConfigObject config = new ConfigObject()
         // 共用初始化属性
@@ -81,7 +87,7 @@ class AppContext {
         cs.setBinding(config) // 共享配置属性(按顺序:后加载的属性,可以使用之前加载的属性)
         try {
             def ps = System.properties
-            config.merge(cs.parse(ps)) // 方便 app.conf, app-[profile].conf 配置文件中使用系统属性
+            config.merge(cs.parse(ps)) // 预合并系统属性, 方便 app.conf, app-[profile].conf 配置文件中使用
 
             // 首先加载 app.conf 配置文件
             def f = baseDir('conf/app.conf')
@@ -90,7 +96,7 @@ class AppContext {
                 if (s) config.merge(cs.parse(s))
             }
 
-            // 加载 app-profile.conf 配置文件
+            // 加载 app-[profile].conf 配置文件
             def profile = ps.containsKey('profile') ? ps.getProperty('profile') : config.getProperty('profile')
             if (profile) {
                 f = baseDir("conf/app-${profile}.conf")
@@ -192,7 +198,7 @@ class AppContext {
                     if (v) return // 已经存在值则不需要再注入
 
                     // 取值
-                    if (EP.class.isAssignableFrom(f.getType())) v = wrapEpForSource(o)
+                    if (EP.isAssignableFrom(f.type)) v = wrapEpForSource(o)
                     else v = ep.fire("bean.get", EC.of(this).sync().args(f.type, aR.name())) // 全局获取bean对象
 
                     if (v == null) return
@@ -430,15 +436,13 @@ class AppContext {
 
     /**
      * 监控负载值的变化
-     * @param i 新的负载值
+     * @param load 新的负载值
      */
-    protected void setSysLoad(Integer i) {
-        if (sysLoad == i) return
-        if (sysLoad > 5 && i > sysLoad) {
-            log.info("System load average " + sysLoad + " up to " + i)
+    protected void setSysLoad(Integer load) {
+        if (sysLoad == load) return
+        if (sysLoad > 5 && load > sysLoad) {
+            log.info("System load average " + sysLoad + " up to " + load)
         }
-        this.sysLoad = i
-//        if (sysLoad == 10) log.info(exec)
-//        else log.info("===================" + i)
+        this.sysLoad = load
     }
 }

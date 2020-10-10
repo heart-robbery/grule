@@ -16,6 +16,9 @@ import static org.ehcache.config.builders.ResourcePoolsBuilder.newResourcePoolsB
 import static org.ehcache.config.units.EntryUnit.ENTRIES
 import static org.ehcache.config.units.MemoryUnit.MB
 
+/**
+ * ehcache 服务
+ */
 class EhcacheSrv extends ServerTpl {
     static final F_NAME = 'ehcache'
     protected CacheManager cm

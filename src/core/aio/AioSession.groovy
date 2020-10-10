@@ -103,12 +103,8 @@ class AioSession {
      */
     protected void receive(String msg) {
         msgFns?.each {fn ->
-            server.async {
-                try {
-                    fn.accept(msg, this)
-                } catch (ex) {
-                    log.error("数据处理错误. " + msg, ex)
-                }
+            server.async({fn.accept(msg, this)}) {ex ->
+                log.error("数据处理错误. " + msg, ex)
             }
         }
     }

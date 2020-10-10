@@ -3,6 +3,9 @@ package core.http
 
 import java.util.concurrent.atomic.AtomicBoolean
 
+/**
+ * http 响应对象
+ */
 class HttpResponse {
     Integer status
     protected final Map<String, String> headers = new HashMap<>()
@@ -41,9 +44,6 @@ class HttpResponse {
         String cName, String cValue, Long maxAge = null, String domain = null,
         String path = null, Boolean secure = null, Boolean httpOnly = null
     ) {
-        // 删除已存在的
-        cookies.remove(cName)
-
         cookies.put(cName,
             (cValue == null ? '' : cValue)
             + (maxAge == null ? "" : "; max-age="+maxAge)

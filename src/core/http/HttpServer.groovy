@@ -63,10 +63,10 @@ class HttpServer extends ServerTpl {
         def addr = new InetSocketAddress(port)
         if (host) {addr = new InetSocketAddress(host, port)}
 
-        ssc.bind(addr, getInteger('backlog', 100))
+        ssc.bind(addr, getInteger('backlog', 128))
         initChain()
-        log.info("Start listen HTTP(AIO) {}", hpCfg)
         accept()
+        log.info("Start listen HTTP(AIO) {}", hpCfg)
     }
 
 

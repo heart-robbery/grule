@@ -42,7 +42,7 @@ class AioServer extends ServerTpl {
         def addr = new InetSocketAddress(port)
         if (host) {addr = new InetSocketAddress(host, port)}
 
-        ssc.bind(addr, getInteger('backlog', 100))
+        ssc.bind(addr, getInteger('backlog', 128))
         log.info("Start listen TCP(AIO) {}", port)
         msgFns.add {msg, se -> receive(msg, se)}
         accept()
