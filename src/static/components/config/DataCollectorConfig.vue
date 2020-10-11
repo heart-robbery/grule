@@ -105,7 +105,7 @@
                             <div ref="dslEditor" style="height: 260px; width: 670px"></div>
                         </h-formitem>
                         <h-formitem v-if="model.type == 'script'" label="值计算函数" icon="h-icon-complete" prop="computeScript" single>
-                            <div ref="dslEditor" style="height: 385px; width: 670px"></div>
+                            <div ref="dslEditor" style="height: 380px; width: 670px"></div>
                         </h-formitem>
                         <h-formitem v-if="model.type == 'sql'" label="sql执行脚本" icon="h-icon-complete" prop="sqlScript" single>
                             <div ref="dslEditor" style="height: 260px; width: 670px"></div>

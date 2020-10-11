@@ -43,7 +43,7 @@
         props: ['item'],
         template:`
             <div>
-                <header class="h-modal-header text-center">{{item.decisionName + '&nbsp;' + item.id + '&nbsp;' + item.decision}}</header>
+                <header class="h-modal-header text-center">{{title}}</header>
                 <h-layout>
                     <h-header>
                         <h-form readonly>
@@ -102,14 +102,14 @@
             </div>
         `,
         data() {
-            // let jo = JSON.parse(this.item.attrs);
-            // let attrs = [];
-            // for (let k in jo) {
-            //     attrs.push({name: k, value: jo[k]})
-            // }
             return {
                 attrs: this.item.attrs,
                 rules: this.item.rules,
+            }
+        },
+        computed: {
+            title: function () {
+                return this.item.decisionName + ' ' + this.item.id + ' ' + this.formatType(this.item.decision);
             }
         },
         methods: {
@@ -151,6 +151,15 @@
         },
         mounted() {
             this.load()
+        },
+        activated() {
+            if (
+                app.$data.tmp.testResultId &&
+                !this.model.id &&
+                this.list && this.list.filter(o => o.id == app.$data.tmp.testResultId).length == 0
+            ) {
+                this.load()
+            }
         },
         methods: {
             jumpToDecision(item) {

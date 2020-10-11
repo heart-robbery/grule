@@ -22,7 +22,9 @@
         el: '#app',
         data: {
             // 当前登录用户信息
-            user: null
+            user: null,
+            // 用于各个组件临时数据传递
+            tmp: {}
         },
         mounted: function () {
             this.getCurrentUser();

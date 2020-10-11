@@ -97,6 +97,7 @@
                             this.result = JSON.stringify(res.data, null, 4).trim();
                             this.$Message.success(`测试调用: ${this.decision.decisionId}成功`);
                             localStorage.setItem(this.cacheKey, JSON.stringify(this.items))
+                            app.$data.tmp.testResultId = res.data.id;
                         } else this.$Notice.error(res.desc);
                     }
                 })

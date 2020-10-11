@@ -125,6 +125,15 @@
         mounted() {
             this.load()
         },
+        activated() {
+            if (
+                app.$data.tmp.testResultId &&
+                !this.model.decideId &&
+                this.list && this.list.filter(o => o.decideId == app.$data.tmp.testResultId).length == 0
+            ) {
+                this.load()
+            }
+        },
         methods: {
             jumpToDataCollector(item) {
                 this.tabs.showId = item.collector;
