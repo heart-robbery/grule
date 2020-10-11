@@ -27,7 +27,8 @@ class HttpAioSession {
     @Lazy protected               def                buf         = ByteBuffer.allocate(server.getInteger('maxMsgSize', 1024 * 1024 * 1))
     // 不为空代表是WebSocket
     WebSocket ws
-    @Lazy protected List<File> tmpFiles = new LinkedList<>()
+    // 临时文件
+    protected final List<File> tmpFiles = new LinkedList<>()
 
 
     HttpAioSession(AsynchronousSocketChannel sc, HttpServer server) {
@@ -87,7 +88,7 @@ class HttpAioSession {
 
     @Override
     String toString() {
-        return getClass().simpleName + "@" + Integer.toHexString(hashCode()) + "[" + sc?.toString() + "]"
+        return super.toString() + "[" + sc?.toString() + "]"
     }
 
 

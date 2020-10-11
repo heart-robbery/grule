@@ -25,7 +25,7 @@ class HttpContext {
     protected final HttpServer server
     final HttpResponse response
     final Map<String, Object> pathToken = new HashMap<>(7)
-    // 路径块
+    // 路径块, 用于路径匹配
     String[] pieces
     protected final AtomicBoolean closed = new AtomicBoolean(false)
     @Lazy protected Map<String, Object> attrs = new ConcurrentHashMap<>()

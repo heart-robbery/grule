@@ -28,7 +28,7 @@ class BaseRepo {
     protected final Map attr
 
     // 传过来 不能注入(@Resource注入多数据源有问题)
-    BaseRepo(SessionFactory sf, Map attr = []) {
+    BaseRepo(SessionFactory sf, Map attr = [:]) {
         if (sf == null) throw new NullPointerException("SessionFactory must not be null")
         this.sf = sf
         this.attr = attr

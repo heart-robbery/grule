@@ -58,7 +58,7 @@ class AioClient extends ServerTpl {
         AioSession se = null
         List<AioSession> ls = ses.get(key)
         if (ls == null) {
-            synchronized (this) {
+            synchronized (ses) {
                 ls = ses.get(key)
                 if (ls == null) {
                     ls = safeList(); ses.put(key, ls)
@@ -143,12 +143,11 @@ class AioClient extends ServerTpl {
         sc.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
         sc.setOption(StandardSocketOptions.SO_RCVBUF, getInteger('so_rcvbuf', 1024 * 1024 * 2))
         sc.setOption(StandardSocketOptions.SO_SNDBUF, getInteger('so_sndbuf', 1024 * 1024 * 2))
-        // asc.bind(new InetSocketAddress('localhost', bean(AioServer).port))
         try {
             sc.connect(new InetSocketAddress(host, port)).get(getLong("aioConnectTimeout", 3000L), TimeUnit.MILLISECONDS)
             log.info("New TCP(AIO) connection to " + key)
         } catch(ex) {
-            sc.close()
+            try {sc.close()} catch(exx) {}
             throw new Exception("连接错误. $key", ex)
         }
         def se = new AioSession(sc, this)

@@ -93,7 +93,7 @@ class HttpRequest {
     }()
 
     @Lazy Map<String, Object> jsonParams = {
-        if (bodyStr && getHeader('content-type')?.contains('application/json')) {
+        if (bodyStr && contentType?.contains('application/json')) {
             try {
                 return JSON.parseObject(bodyStr)
             } catch (ex) {

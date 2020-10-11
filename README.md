@@ -17,17 +17,12 @@ groovy 快速开发代码
 
 前端文件 src/static
 
-###### 集常用功能: 
-    httpServer, sched(quartz), cache(ehcache), 
-    redis, jpa(hibernate), OkHttpClient, Remoter(多应用tcp通信)
-
-
 #### 配置:
-    共用属性: baseDir(当前项目目录), System.properties
-    app.conf: 可像 $baseDir 这样使用共用属性
-    app-[profile].conf: 可使用共用属性和app.conf中的属性
-    优先级: 系统属性 > app-[profile].conf > app.conf
-    
+    配置一般包含两个文件:
+        1. 默认加载 系统属性 和 配置文件conf/app.conf
+        2. 通过启动参数 -Dprofile=dev 指定 加载conf/app-dev.conf 配置文件,不配置则不加载
+        3. 优先级: 系统属性 > app-[profile].conf > app.conf
+
 
 #### Remoter 集群分布式
 ```

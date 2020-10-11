@@ -2,6 +2,9 @@ package core.http.mvc
 
 import core.http.HttpContext
 
+/**
+ * 对应一个 控制层 的一个处理器
+ */
 abstract class Handler {
 
 

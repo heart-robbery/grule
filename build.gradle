@@ -43,7 +43,7 @@ dependencies {
     compile 'com.alibaba:fastjson:1.2.73'
     compile 'ch.qos.logback:logback-classic:1.2.3'
     compile 'cn.xnatural.enet:enet-event:0.0.14'
-    compile 'org.hibernate:hibernate-core:5.4.20.Final'
+    compile 'org.hibernate:hibernate-core:5.4.22.Final'
 
     // 连接池
     compile 'com.alibaba:druid:1.1.23'
@@ -102,6 +102,7 @@ task tgz(dependsOn: ['deps'], type: Tar) {
     into("conf") {from "conf"}
     into("src") {from("src")}
     into("lib") {from "lib"}
+    from "Dockerfile"
     from "build.gradle"
     from "start.bat"
     from("start.sh")
@@ -119,6 +120,7 @@ task tarDir(dependsOn: ['deps'], type: Copy) {
     into("conf") {from "conf"}
     into("src") {from("src")}
     into("lib") {from "lib"}
+    from "Dockerfile"
     from "build.gradle"
     from "start.bat"
     from("start.sh")
