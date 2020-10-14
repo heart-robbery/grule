@@ -399,9 +399,12 @@ class MntCtrl extends ServerTpl {
             if (!computeScript) return ApiResp.fail('computeScript must not be empty')
             collector.computeScript = computeScript
         } else if ('sql' == collector.type) {
+            if (!url) return ApiResp.fail('url must not be empty')
             if (!sqlScript) return ApiResp.fail('sqlScript must not be empty')
+            if (!url.startsWith("jdbc")) return ApiResp.fail('url incorrect')
             if (minIdle < 0 || collector.minIdle > 50) return ApiResp.fail('0 <= minIdle <= 50')
             if (maxActive < 1 || collector.maxActive > 100) return ApiResp.fail('1 <= minIdle <= 100')
+            collector.url = url
             collector.sqlScript = sqlScript
             collector.minIdle = minIdle
             collector.maxActive = maxActive
@@ -482,15 +485,18 @@ class MntCtrl extends ServerTpl {
                 return ApiResp.fail('computeScript is pure script. cannot startWith { or endWith }')
             }
         } else if ('sql' == collector.type) {
+            if (!url) return ApiResp.fail('url must not be empty')
             if (!sqlScript) return ApiResp.fail('sqlScript must not be empty')
+            if (!url.startsWith("jdbc")) return ApiResp.fail('url incorrect')
             if (minIdle < 0 || minIdle > 50) return ApiResp.fail('0 <= minIdle <= 50')
             if (maxActive < 1 || maxActive > 100) return ApiResp.fail('1 <= minIdle <= 100')
+            collector.url = url
             collector.minIdle = minIdle
             collector.maxActive = maxActive
             collector.sqlScript = sqlScript
         }
         def updateRelateField
-        if (enName != collector.enName ) {// 不让修改名字
+        if (enName != collector.enName) {// 不让修改名字
             return ApiResp.fail('enName can not change')
             if (repo.count(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), enName)}) {
                 return ApiResp.fail("$enName aleady exist")

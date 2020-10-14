@@ -7,7 +7,6 @@ import service.rule.spec.DecisionSpec
 import service.rule.spec.PolicySpec
 import service.rule.spec.RuleSpec
 
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -31,23 +30,23 @@ class DecisionContext {
                     AttrManager      attrManager
                     EP               ep
     // 运行状态. TODO 以后做暂停时 running == false
-    protected final def                              running           = new AtomicBoolean(false)
+    protected final def                 running           = new AtomicBoolean(false)
     // 是否已启动
-    protected final def                              started           = new AtomicBoolean(false)
+    protected final def                 started           = new AtomicBoolean(false)
     // 是否执行结束
-    protected final def                              end               = new AtomicBoolean(false)
+    protected final def                 end               = new AtomicBoolean(false)
     // 输入参数
-    Map<String, Object>                                              input
+    Map<String, Object>                 input
     // 最终数据属性值
-    @Lazy protected Map<String, Object>              data              = new Data(this)
-    // 数据收集器名 -> 数据收集结果集
-    @Lazy protected Map<String, Object> dataCollectResult = new ConcurrentHashMap<>()
+    @Lazy protected Map<String, Object> data              = new Data(this)
+    // 数据收集器名 -> 数据收集结果集. 不用 ConcurrentHashMap 因为不能放null值
+    @Lazy protected Map<String, Object> dataCollectResult = new LinkedHashMap<>()
     // 规则执行迭代器
-    @Lazy protected def                              ruleIterator      = new RuleIterator(this)
+    @Lazy protected def                 ruleIterator      = new RuleIterator(this)
     // 执行结果 异常
-    protected Exception exception
+    protected Exception                 exception
     // 执行状态
-    protected String status = '0000'
+    protected String                    status            = '0000'
 
 
     /**

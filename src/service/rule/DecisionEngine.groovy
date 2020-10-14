@@ -27,7 +27,8 @@ class DecisionEngine extends ServerTpl {
         queue(SAVE_RESULT)
             .failMaxKeep(getInteger(SAVE_RESULT + ".failMaxKeep", 10000))
             .errorHandle {ex, devourer ->
-                if (lastWarn == null || (System.currentTimeMillis() - lastWarn >= Duration.ofSeconds(getInteger(SAVE_RESULT + ".warnInterval", 60 * 5)))) {
+                if (lastWarn == null || (System.currentTimeMillis() - lastWarn >= Duration.ofSeconds(getLong(SAVE_RESULT + ".warnInterval", 60 * 5L)))) {
+                    lastWarn = System.currentTimeMillis()
                     log.error("保存决策结果到数据库错误", ex)
                     ep.fire("globalMsg", "保存决策结果到数据库错误: " + (ex.message?:ex.class.simpleName))
                 }

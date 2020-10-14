@@ -22,7 +22,6 @@ import service.rule.UserSrv
 
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Field final AppContext app = new AppContext()
-@Lazy @Field EP ep = app.bean(EP)
 
 // 系统功能添加区
 app.addSource(new OkHttpSrv())
