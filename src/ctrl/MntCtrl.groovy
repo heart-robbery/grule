@@ -370,14 +370,10 @@ class MntCtrl extends ServerTpl {
     ApiResp addDataCollector(
         HttpContext ctx, String enName, String cnName, String type, String url, String bodyStr,
         String method, String parseScript, String contentType, String comment, String computeScript,
-        String sqlScript, Integer minIdle, Integer maxActive, Integer timeout
+        String sqlScript, Integer minIdle, Integer maxActive, Integer timeout, Boolean enabled
     ) {
         ctx.auth('dataCollector-add')
-        DataCollector collector = new DataCollector()
-        collector.enName = enName
-        collector.cnName = cnName
-        collector.type = type
-        collector.comment = comment
+        DataCollector collector = new DataCollector(enName: enName, cnName: cnName, type: type, comment: comment, enabled: enabled)
         if (!collector.enName) return ApiResp.fail('enName must not be empty')
         if (!collector.cnName) return ApiResp.fail('cnName must not be empty')
         if (!collector.type) return ApiResp.fail('type must not be empty')
@@ -456,7 +452,7 @@ class MntCtrl extends ServerTpl {
     ApiResp updateDataCollector(
         HttpContext ctx, Long id, String enName, String cnName, String url, String bodyStr,
         String method, String parseScript, String contentType, String comment, String computeScript,
-        String sqlScript, Integer minIdle, Integer maxActive, Integer timeout
+        String sqlScript, Integer minIdle, Integer maxActive, Integer timeout, Boolean enabled
     ) {
         ctx.auth('dataCollector-update')
         if (!id) return ApiResp.fail("id not legal")
@@ -505,7 +501,11 @@ class MntCtrl extends ServerTpl {
             updateRelateField = { // 修改RuleField相关联
                 repo.find(RuleField) {root, query, cb -> cb.equal(root.get('dataCollector'), collector.cnName)}.each {field ->
                     field.dataCollector = enName
+
                     repo.saveOrUpdate(field)
+                    ep.fire('updateField', field.enName)
+                    ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'updateField', [field.enName]))
+                    ep.fire('enHistory', field, ctx.getSessionAttr('name'))
                 }
             }
         }
@@ -516,6 +516,7 @@ class MntCtrl extends ServerTpl {
             collector.cnName = cnName
         }
         collector.comment = comment
+        collector.enabled = enabled
 
         if (updateRelateField) {
             repo.trans {

@@ -22,7 +22,11 @@
                 <h-tableitem title="流水id" prop="id" align="center"></h-tableitem>
                 <h-tableitem title="身份证" prop="idNum" align="center" :width="140"></h-tableitem>
                 <h-tableitem title="决策" prop="decision" align="center" :format="formatType" :width="70"></h-tableitem>
-                <h-tableitem title="决策时间" prop="occurTime" align="center" :format="formatDate" :width="140"></h-tableitem>
+                <h-tableitem title="决策时间" align="center" :width="140">
+                    <template slot-scope="{data}">
+                        <date-item :time="data.occurTime" />
+                    </template>
+                </h-tableitem>
                 <h-tableitem title="耗时(ms)" prop="spend" align="center" :width="70"></h-tableitem>
                 <h-tableitem title="异常信息" prop="exception" align="center"></h-tableitem>
                 <div slot="empty">暂时无数据</div>
@@ -188,9 +192,6 @@
                     if (type.key == v) return type.title
                 }
                 return v
-            },
-            formatDate(v) {
-                return moment(v).format('YYYY-MM-DD HH:mm:ss')
             },
             load(page) {
                 if (page == undefined || page == null) page = {page: 1};

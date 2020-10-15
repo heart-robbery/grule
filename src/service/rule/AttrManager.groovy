@@ -202,7 +202,6 @@ class AttrManager extends ServerTpl {
     void listenUpdateDataCollector(String enName) {
         def collector = repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), enName)}
         initDataCollector(collector)
-        loadField()
         log.info("updateDataCollector: " + enName)
     }
     @EL(name = 'delDataCollector', async = true)
@@ -217,12 +216,11 @@ class AttrManager extends ServerTpl {
      */
     void loadField() {
         initDefaultAttr()
-        log.info("加载属性配置")
-        Set<String> enNames = (attrMap.isEmpty() ? null : new HashSet<>())
-        for (int page = 1; ; page++) {
-            def p = repo.findPage(RuleField, page, 100)
-            if (!p.list) break
-            p.list.each {field ->
+        Set<String> enNames = (attrMap.isEmpty() ? null : new HashSet<>(100))
+        for (int page = 0, limit = 100; ; page++) {
+            def ls = repo.findList(RuleField, page * limit, limit)
+            if (!ls) break
+            ls.each {field ->
                 attrMap.put(field.enName, field)
                 attrMap.put(field.cnName, field)
                 enNames?.add(field.enName)
@@ -234,6 +232,7 @@ class AttrManager extends ServerTpl {
                 attrMap.remove(e.key)
             }
         }
+        log.info("加载属性配置 {}个", attrMap.size() / 2)
     }
 
 
@@ -258,12 +257,11 @@ class AttrManager extends ServerTpl {
      */
     void loadDataCollector() {
         initDefaultCollector()
-        log.info("加载数据集成配置")
-        Set<String> enNames = (collectors.isEmpty() ? null : new HashSet<>())
-        for (int page = 1; ; page++) {
-            def p = repo.findPage(DataCollector, page, 100)
-            if (!p.list) break
-            p.list.each {collector ->
+        Set<String> enNames = (collectors.isEmpty() ? null : new HashSet<>(50))
+        for (int page = 0, limit = 100; ; page++) {
+            def ls = repo.findList(DataCollector, page * limit, limit)
+            if (!ls) break
+            ls.each {collector ->
                 initDataCollector(collector)
                 enNames?.add(collector.enName)
             }
@@ -273,6 +271,7 @@ class AttrManager extends ServerTpl {
                 collectors.remove(e.key)
             }
         }
+        log.info("加载数据集成配置 {}个", collectors.size())
     }
 
 
@@ -318,12 +317,12 @@ if (idNumber && idNumber.length() > 17) {
      * @param collector
      */
     void initDataCollector(DataCollector collector) {
-        if (!collector || collector.enabled == false) return
+        if (!collector) return
         if ('http' == collector.type) { // http 接口
             initHttpCollector(collector)
-        } else if ('script' == collector.type) {
+        } else if ('script' == collector.type) { // groovy 脚本
             initScriptCollector(collector)
-        } else if ('sql' == collector.type) {
+        } else if ('sql' == collector.type) { // 数据库查询脚本
             initSqlCollector(collector)
         } else throw new Exception("Not support type: $collector.type")
     }
@@ -334,7 +333,11 @@ if (idNumber && idNumber.length() > 17) {
      * @param collector
      */
     protected void initSqlCollector(DataCollector collector) {
-        if (collector.enabled == false || 'sql' != collector.type) return
+        if ('sql' != collector.type) return
+        if(!collector.enabled) {
+            collectors.remove(collector.enName)?.close()
+            return
+        }
         if (!collector.url) {
             log.warn('sql url must not be empty')
             return
@@ -395,7 +398,11 @@ if (idNumber && idNumber.length() > 17) {
      * @param collector
      */
     protected void initScriptCollector(DataCollector collector) {
-        if (collector.enabled == false || 'script' != collector.type) return
+        if ('script' != collector.type) return
+        if(!collector.enabled) {
+            collectors.remove(collector.enName)?.close()
+            return
+        }
         if (!collector.computeScript) {
             log.warn("Script collector'$collector.enName' script must not be empty".toString())
             return
@@ -434,7 +441,11 @@ if (idNumber && idNumber.length() > 17) {
      * @param collector
      */
     protected void initHttpCollector(DataCollector collector) {
-        if (collector.enabled == false || 'http' != collector.type) return
+        if ('http' != collector.type) return
+        if(!collector.enabled) {
+            collectors.remove(collector.enName)?.close()
+            return
+        }
         // 创建 http 客户端
         def http = new OkHttpSrv('okHttp_' + collector.enName)
         http.attr('connectTimeout', getLong('http.connectTimeout', 3L))

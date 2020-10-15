@@ -7,11 +7,11 @@
     </div>
 </template>
 <script>
-    loadJs('moment');
+    // loadJs('moment');
     module.exports = {
         props: ['menu'],
         data() {
-            let types = {DecisionResult: '决策记录', CollectResult: '收集记录'}
+            let types = {DecisionResult: '决策记录', CollectResult: '收集记录'};
             let type = localStorage.getItem('rule.dataCenter.tab')  || 'DecisionResult';
             if (!types[(type)]) {
                 type = 'DecisionResult';

@@ -7,6 +7,7 @@ import core.jpa.BaseRepo
 import service.rule.spec.DecisionSpec
 
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 决策管理器
@@ -54,15 +55,43 @@ class DecisionManager extends ServerTpl {
         if (s == null) return null
         def p = DecisionSpec.of(s)
         decisionMap.put(p.决策id, p)
-        log.debug("添加决策: " + p.决策id)
+        log.debug("添加决策: {}:{}", p.决策名, p.决策id)
         p
     }
 
 
     protected void load() {
         log.info("加载决策")
-        if (!decisionMap.isEmpty()) decisionMap.clear()
-        // create(Utils.baseDir("/src/service/rule/policy/test1.decision").getText('utf-8'))
-        repo.findList(dao.entity.Decision).each { create(it.dsl) }
+        Set<String> ids = (decisionMap ? new HashSet<>() : null)
+        def threshold = new AtomicInteger(1)
+        def tryCompleteFn = {
+            if (threshold.decrementAndGet() > 0) return
+            if (ids) {
+                decisionMap.collect {it.key}.each { decisionId ->
+                    if (!ids.contains(decisionId)) { // 删除库里面没有, 内存里面有的数据
+                        decisionMap.remove(decisionId)
+                    }
+                }
+            }
+        }
+        for (int page = 0, limit = 50; ; page++) {
+            def ls = repo.findList(dao.entity.Decision, page * limit, limit)
+            if (!ls) { // 结束
+                tryCompleteFn()
+                break
+            }
+            threshold.incrementAndGet()
+            async {
+                ls.each {
+                    ids?.add(it.decisionId)
+                    try {
+                        create(it.dsl)
+                    } catch (ex) {
+                        log.error("创建决策'${it.name}:${it.decisionId}'错误", ex)
+                    }
+                }
+                tryCompleteFn()
+            }
+        }
     }
 }

@@ -14,12 +14,19 @@
         </div>
         <div class="h-panel-body">
             <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading">
-                <!--                <h-tableitem title="ID" prop="id" align="center"></h-tableitem>-->
                 <h-tableitem title="英文名" prop="enName" align="center"></h-tableitem>
                 <h-tableitem title="中文名" prop="cnName" align="center"></h-tableitem>
                 <h-tableitem title="类型" prop="type" align="center" :format="formatType"></h-tableitem>
                 <h-tableitem title="更新时间" prop="updateTime" align="center" :format="formatDate"></h-tableitem>
                 <h-tableitem title="描述" prop="comment" align="center"></h-tableitem>
+                <h-tableitem title="状态" align="center" :width="80">
+                    <template slot-scope="{data}">
+                        <h-switch v-model="data.enabled" @change="enableSwitch(data)" small>
+                            <span slot="open">可用</span>
+                            <span slot="close">禁用</span>
+                        </h-switch>
+                    </template>
+                </h-tableitem>
                 <h-tableitem v-if="sUser.permissions.find((e) => e == 'dataCollector-update' || e == 'dataCollector-del')" title="操作" align="center" :width="100">
                     <template slot-scope="{data}">
                         <span v-if="sUser.permissions.find((e) => e == 'dataCollector-update') == 'dataCollector-update'" class="text-hover" @click="showUpdatePop(data)">编辑</span>
@@ -289,6 +296,22 @@
                     },
                     width: 850,
                     hasCloseIcon: true, fullScreen: false, middle: false, transparent: false
+                })
+            },
+            enableSwitch(item) {
+                $.ajax({
+                    url: 'mnt/updateDataCollector',
+                    type: 'post',
+                    data: item,
+                    success: (res) => {
+                        if (res.code == '00') {
+                            this.$Message.success(`${item.enabled ? '启用' : '禁用'}: ${item.cnName} 成功`);
+                        } else {
+                            this.$Notice.error(res.desc);
+                            setTimeout(() => item.enabled = !item.enabled, 200)
+                        }
+                    },
+                    error: () => this.isLoading = false
                 })
             },
             del(field) {

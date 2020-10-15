@@ -35,7 +35,11 @@
                         <a href="javascript:void(0)" @click="model.decideId = data.decideId; load()">{{data.decideId}}</a>
                     </template>
                 </h-tableitem>
-                <h-tableitem title="收集时间" prop="collectDate" align="center" :format="formatDate"></h-tableitem>
+                <h-tableitem title="收集时间" align="center" >
+                    <template slot-scope="{data}">
+                        <date-item :time="data.collectDate" />
+                    </template>
+                </h-tableitem>
                 <h-tableitem title="耗时(ms)" prop="spend" align="center"></h-tableitem>
                 <h-tableitem title="成功" prop="success" align="center" :format="formatSuccessType"></h-tableitem>
                 <h-tableitem title="操作" align="center" :width="80">
@@ -143,9 +147,6 @@
             jumpToDecision(item) {
                 this.tabs.showId = item.decisionId;
                 this.tabs.type = 'DecisionConfig';
-            },
-            formatDate(v) {
-                return moment(v).format('YYYY-MM-DD HH:mm:ss')
             },
             formatType(v) {
                 for (let type of types) {
