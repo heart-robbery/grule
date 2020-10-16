@@ -43,7 +43,7 @@ abstract class Handler {
      * @return
      */
     static String extract(String path) {
-        if (path.endsWith("/") && path.length() > 1) path = path.substring(0, path.length() - 2)
+        if (path.endsWith("/") && path.length() > 1) path = path.substring(0, path.length() - 1)
         if (path.startsWith("/")) path = path.substring(1)
         return path
     }

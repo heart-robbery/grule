@@ -183,17 +183,35 @@ class BaseRepo {
      * 查询多条数据
      * @param eType 实体类型
      * @param spec 条件
-     * @return list
+     * @return
      */
     def <E extends IEntity> List<E> findList(Class<E> eType, CriteriaSpec spec) {
-        if (eType == null) throw new IllegalArgumentException("eType must not be null");
+        findList(eType, null, null, spec)
+    }
+
+
+    /**
+     * 查询多条数据
+     * @param eType 实体类型
+     * @param start 开始行 从0开始
+     * @param limit 条数限制
+     * @param spec 条件
+     * @return list
+     */
+    def <E extends IEntity> List<E> findList(Class<E> eType, Integer start = null, Integer limit = null, CriteriaSpec spec = null) {
+        if (eType == null) throw new IllegalArgumentException("eType must not be null")
+        if (start != null && start < 0) throw new IllegalArgumentException("start must >= 0 or not give")
+        if (limit != null && limit <= 0) throw new IllegalArgumentException("limit must > 0 or not give")
         return trans(s -> {
             CriteriaBuilder cb = s.getCriteriaBuilder()
-            CriteriaQuery<E> query = cb.createQuery(eType)
-            Root<E> root = query.from(eType)
-            Object p = spec == null? null :spec.toPredicate(root, query, cb)
-            if (p instanceof Predicate) query.where((Predicate) p)
-            return s.createQuery(query).list()
+            CriteriaQuery<E> cQuery = cb.createQuery(eType)
+            Root<E> root = cQuery.from(eType)
+            Object p = spec == null? null :spec.toPredicate(root, cQuery, cb)
+            if (p instanceof Predicate) cQuery.where((Predicate) p)
+            def query = s.createQuery(cQuery)
+            if (start) query.setFirstResult(start)
+            if (limit) query.setMaxResults(limit)
+            return query.list()
         })
     }
 

@@ -158,22 +158,23 @@ class HttpServer extends ServerTpl {
                     log.error("@Path path must not be empty. {}#{}", ctrl.class.simpleName, method.name)
                     return
                 }
-                log.info("Request mapping: /" + ((aCtrl.prefix() ? aCtrl.prefix() + "/" : '') + aPath.path()))
                 def ps = method.getParameters(); method.setAccessible(true)
-                chain.method(aPath.method(), aPath.path(), aPath.consumer()) {HttpContext hCtx -> // 实际@Path 方法 调用
-                    try {
-                        def result = method.invoke(ctrl,
-                            ps.collect {p ->
-                                if (HttpContext.isAssignableFrom(p.type)) return hCtx
-                                hCtx.param(p.name, p.type)
-                            }.toArray()
-                        )
-                        if (!void.class.isAssignableFrom(method.returnType)) {
-                            log.debug("Invoke Handler '" + (ctrl.class.simpleName + '#' + method.name) + "', result: " + result)
-                            hCtx.render(result)
+                aPath.path().each {path ->
+                    if (!path) {
+                        log.error("@Path path must not be empty. {}#{}", ctrl.class.simpleName, method.name)
+                        return
+                    }
+                    log.info("Request mapping: /" + ((aCtrl.prefix() ? aCtrl.prefix() + "/" : '') + (path == '/' ? '' : path)))
+                    chain.method(aPath.method(), path, aPath.consumer()) {HttpContext hCtx -> // 实际@Path 方法 调用
+                        try {
+                            def result = method.invoke(ctrl, ps.collect {p -> hCtx.param(p.name, p.type)}.toArray())
+                            if (!void.class.isAssignableFrom(method.returnType)) {
+                                log.debug("Invoke Handler '" + (ctrl.class.simpleName + '#' + method.name) + "', result: " + result)
+                                hCtx.render(result)
+                            }
+                        } catch (InvocationTargetException ex) {
+                            throw ex.cause
                         }
-                    } catch (InvocationTargetException ex) {
-                        throw ex.cause
                     }
                 }
                 return

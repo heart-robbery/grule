@@ -2,6 +2,9 @@ package core.http.mvc
 
 import core.http.HttpContext
 
+/**
+ * 路径处理器
+ */
 abstract class PathHandler extends Handler {
 
     abstract String path()
@@ -11,7 +14,8 @@ abstract class PathHandler extends Handler {
     @Lazy String[] pieces = {
         def p = path()
         if (p == null) throw new IllegalArgumentException('PathHandler path must not be null')
-        extract(p).split('/')
+        if (p == '/') ['/']
+        else extract(p).split('/')
     }()
 
 
