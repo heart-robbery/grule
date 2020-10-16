@@ -4,6 +4,7 @@ import core.http.HttpContext
 import core.http.HttpServer
 import org.slf4j.LoggerFactory
 
+import java.util.concurrent.ConcurrentHashMap
 import java.util.function.Consumer
 
 /**
@@ -13,6 +14,8 @@ class Chain {
     protected static final def log = LoggerFactory.getLogger(Chain)
     protected final LinkedList<Handler> handlers = new LinkedList<>()
     protected final HttpServer server
+    // 子Chain: prefix(前缀) -> Chain
+    @Lazy protected Map<String, Chain> subChains = new ConcurrentHashMap<>()
 
 
     Chain(HttpServer server) { this.server = server }
@@ -94,6 +97,7 @@ class Chain {
      * @return
      */
     Chain method(String method, String path, String[] contentTypes = null, Handler handler) {
+        if (!path) throw new IllegalArgumentException("path mut not be empty")
         add(new PathHandler() {
             @Override
             void handle(HttpContext ctx) {
@@ -193,37 +197,40 @@ class Chain {
 
     /**
      * 前缀(一组Handler)
-     * @param prefix
-     * @param handlerBuilder
+     * 相同的prefix用同一个Chain
+     * 如果前缀包含多个路径, 则拆开每个路径都对应一个Chain
+     * 例: 前缀: a/b, a/c a对应的Chain下边有两个子Chain b和c
+     * @param prefix 路径前缀
+     * @param handlerBuilder mvc执行链builder
      * @return Chain
      */
-    Chain prefix(String prefix, Consumer<Chain> handlerBuilder) {
-        prefix = Handler.extract(prefix)
-        add(new PathHandler() {
-            final Chain chain = {
-                Chain c = new Chain(server)
-                handlerBuilder.accept(c)
-                c
-            }()
+    Chain prefix(final String prefix, final Consumer<Chain> handlerBuilder) {
+        Chain subChain = this
+        Handler.extract(prefix).split("/").each {singlePrefix -> // 折成单路径(没有/分割的路径片)
+            Chain parentChain = subChain
+            subChain = subChain.subChains.computeIfAbsent(singlePrefix, s -> new Chain(server))
+            parentChain.add(new PathHandler() {
+                @Override
+                String path() { singlePrefix }
 
-            @Override
-            String path() { prefix }
-
-            @Override
-            boolean match(HttpContext ctx) {
-                boolean f = false
-                for (int i = 0; i < pieces.length; i++) {
-                    f = (pieces[i] == ctx.pieces[i])
-                    if (!f) break
+                @Override
+                boolean match(HttpContext ctx) {
+                    boolean f = false
+                    for (int i = 0; i < pieces.length; i++) {
+                        f = (pieces[i] == ctx.pieces[i])
+                        if (!f) break
+                    }
+                    if (f) ctx.pieces = ctx.pieces.drop(pieces.length)
+                    f
                 }
-                if (f) ctx.pieces = ctx.pieces.drop(pieces.length)
-                f
-            }
 
-            @Override
-            void handle(HttpContext ctx) {
-                chain.handle(ctx)
-            }
-        })
+                @Override
+                void handle(HttpContext ctx) {
+                    subChain.handle(ctx)
+                }
+            })
+        }
+        handlerBuilder.accept(subChain)
+        this
     }
 }

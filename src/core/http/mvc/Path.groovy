@@ -14,7 +14,7 @@ import java.lang.annotation.*
      * 接口路径
      * @return
      */
-    String path()
+    String[] path()
     /**
      * get,post,delete
      * @return

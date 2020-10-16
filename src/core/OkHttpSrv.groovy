@@ -40,9 +40,9 @@ class OkHttpSrv extends ServerTpl {
      */
     @Lazy OkHttpClient client = {
         new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(getLong('connectTimeout', 5)))
-            .readTimeout(Duration.ofSeconds(getLong('readTimeout', 20)))
-            .writeTimeout(Duration.ofSeconds(getLong('writeTimeout', 32)))
+            .connectTimeout(Duration.ofSeconds(getLong('connectTimeout', 5L)))
+            .readTimeout(Duration.ofSeconds(getLong('readTimeout', 20L)))
+            .writeTimeout(Duration.ofSeconds(getLong('writeTimeout', 32L)))
             .dispatcher(new Dispatcher(exec))
             .cookieJar(new CookieJar() {// 共享cookie
                 @Override

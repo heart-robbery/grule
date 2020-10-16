@@ -38,12 +38,12 @@ class TestCtrl extends ServerTpl {
 
     @Filter(order = 1)
     void filter1(HttpContext ctx) {
-        log.info('filter1 ============')
+        log.info('test filter1 ============')
     }
 
     @Filter(order = 0)
     void filter2(HttpContext ctx) {
-        log.info('filter2 ============')
+        // log.info('test filter2 ============')
     }
 
 

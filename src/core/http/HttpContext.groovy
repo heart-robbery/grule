@@ -50,7 +50,12 @@ class HttpContext {
         this.aioSession = request.session
         this.server = server
         this.response = new HttpResponse()
-        this.pieces = Handler.extract(request.path).split('/')
+
+        if (request.path == '/') this.pieces = ["/"]
+        else {
+            this.pieces = Handler.extract(request.path).split('/')
+            if (request.path.endsWith("/")) this.pieces += '/'
+        }
     }
 
 
