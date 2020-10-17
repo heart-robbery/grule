@@ -13,7 +13,7 @@ class MainCtrl extends ServerTpl {
     @Lazy def fu = bean(FileUploader)
 
 
-    @Path(path = 'index.html')
+    @Path(path = ['index.html', '/'])
     File index(HttpContext ctx) {
         ctx.response.cacheControl(10)
         Utils.baseDir("src/static/index.html")
