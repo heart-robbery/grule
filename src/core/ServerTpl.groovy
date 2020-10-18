@@ -116,8 +116,8 @@ class ServerTpl {
 
     /**
      * 暴露 bean 给其它模块用. {@link #localBean}
+     * @param bean bean实例
      * @param names bean 名字.
-     * @param bean
      */
     protected ServerTpl exposeBean(Object bean, List<String> names = [bean.class.simpleName.uncapitalize()]) {
         if (beanCtx == null) beanCtx = new HashMap<>()

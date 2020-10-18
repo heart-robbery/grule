@@ -210,6 +210,7 @@ class Chain {
             Chain parentChain = subChain
             subChain = subChain.subChains.computeIfAbsent(singlePrefix, s -> new Chain(server))
             parentChain.add(new PathHandler() {
+                final Chain chain = subChain
                 @Override
                 String path() { singlePrefix }
 
@@ -226,7 +227,7 @@ class Chain {
 
                 @Override
                 void handle(HttpContext ctx) {
-                    subChain.handle(ctx)
+                    chain.handle(ctx)
                 }
             })
         }
