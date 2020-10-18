@@ -172,6 +172,12 @@ class AttrManager extends ServerTpl {
 
 
     // ======================= 监听变化 ==========================
+    @EL(name = '${name}.synchronizer')
+    void onchange() {
+
+    }
+
+
     @EL(name = 'addField', async = true)
     void listenFieldAdd(String enName) {
         def field = repo.find(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}
@@ -510,7 +516,7 @@ if (idNumber && idNumber.length() > 17) {
                         break
                     } catch (ex) {
                         if ((ex instanceof ConnectException) && (i + 1) < times) {
-                            log.error(logMsg.toString() + ". " + (ex.class.simpleName + ': ' + ex.message))
+                            log.error(logMsg.toString() + ", 异常: " + (ex.class.simpleName + ': ' + ex.message))
                             continue
                         } else throw ex
                     } finally {
@@ -519,7 +525,7 @@ if (idNumber && idNumber.length() > 17) {
                 }
             }
             catch (ex) {
-                log.error(logMsg.toString(), ex)
+                log.error(logMsg.toString() + ", 异常: ", ex)
                 dataCollected(new CollectResult(
                     decideId: ctx.id, decisionId: ctx.decisionSpec.决策id, collector: collector.enName,
                     status: (ex instanceof ConnectException) ? 'E001': 'EEEE',
