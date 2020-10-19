@@ -36,7 +36,10 @@ class Remoter extends ServerTpl {
      * ecId -> {@link EC}
      */
     protected final Map<String, EC>                        ecMap      = new ConcurrentHashMap<>()
-
+    /**
+     * 集群数据版本管理
+     */
+    protected final Map<String, DataVersion> dataVersionMap = new ConcurrentHashMap<>()
     protected AioClient aioClient
     protected AioServer aioServer
 
@@ -55,17 +58,15 @@ class Remoter extends ServerTpl {
         // 如果系统中没有AioClient, 则创建
         aioClient = bean(core.aio.AioClient)
         if (aioClient == null) {
-            aioClient = new core.aio.AioClient()
-            ep.addListenerSource(aioClient); ep.fire("inject", aioClient)
+            aioClient = new AioClient()
             aioClient.attr('delimiter', delimiter)
             exposeBean(aioClient)
         }
 
         // 如果系统中没有AioServer, 则创建
-        aioServer = bean(core.aio.AioServer)
+        aioServer = bean(AioServer)
         if (aioServer == null) {
-            aioServer = new core.aio.AioServer()
-            ep.addListenerSource(aioServer); ep.fire("inject", aioServer)
+            aioServer = new AioServer()
             aioServer.attr('delimiter', delimiter)
             exposeBean(aioServer)
             aioServer.start()
@@ -152,6 +153,83 @@ class Remoter extends ServerTpl {
             throw new IllegalArgumentException("Not support target '$target'")
         }
         this
+    }
+
+
+    /**
+     * 获取数据集的数据版本
+     * @param key 同步器的key
+     * @param dataKey 数据key
+     * @param version
+     * @return
+     */
+    Remoter setDataVersion(String key, String dataKey, Long version) {
+        if (!key) throw new IllegalAccessException("sendDataVersion key must not be empty")
+        dataVersionMap.computeIfAbsent(key, {new DataVersion(key: key)}).send(dataKey, version)
+        this
+    }
+
+
+    @EL(name = 'dataVersion')
+    protected void receiveDataVersion(String key, String dataKey, Long version) {
+        dataVersionMap.computeIfAbsent(key, {new DataVersion(key: key)}).receive(dataKey, version)
+    }
+
+
+    /**
+     * 数据版本同步器, 同步集群数据
+     */
+    class DataVersion {
+        // 数据集key
+        String key
+        // 数据key -> (版本, 最开始同步时间, 发送)
+        protected final Map<String, Tuple3<Long, Long, Boolean>> data = new ConcurrentHashMap<>()
+        /**
+         * 发送 新数据版本到集群
+         * @param dataKey
+         * @param version
+         * @return
+         */
+        DataVersion send(String dataKey, Long version) {
+            if (!dataKey) throw new IllegalAccessException("send dataVersion dataKey must not be empty")
+            if (!version) throw new IllegalAccessException("send dataVersion version must not be empty")
+            def record = data.computeIfAbsent(dataKey, {Tuple.tuple(null, null, true)})
+            if (record.v1 == null || record.v1 < version) { // 有新版本数据更新
+                record.v1 = version
+                record.v2 = System.currentTimeMillis()
+                record.v3 = true
+                ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'dataVersion', [key, dataKey, version]))
+            }
+            this
+        }
+
+        /**
+         * 接收远程数据更新
+         * @param dataKey
+         * @param version
+         * @return
+         */
+        DataVersion receive(String dataKey, Long version) {
+            def record = data.computeIfAbsent(dataKey, {Tuple.tuple(null, null, false)})
+            if (record.v1 == null || record.v1 < version) {
+                record.v1 = version
+                record.v3 = false
+                ep.fire("${key}.dataVersion", dataKey, version)
+            }
+            this
+        }
+
+
+        void sync() { // 连续同步
+            data.findAll {e -> e.value.v3}
+                    .each {e ->
+                        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'dataVersion', [key, e.key, e.value.v1]))
+                    }.findAll {e ->
+                        if (System.currentTimeMillis() - e.value.v2 > Duration.ofMillis(getLong('dataVersion.dropTimeout', 30L))) {
+                            data.remove(e.key)
+                        }
+                    }
+        }
     }
 
 
@@ -521,7 +599,7 @@ class Remoter extends ServerTpl {
     /**
      * 向master同步函数
      */
-    @Lazy protected def doSyncFn = new Runnable() {
+    @Lazy protected Runnable doSyncFn = new Runnable() {
         def hps = masterHps?.split(",").collect {
             if (!it) return null
             try {
@@ -553,7 +631,7 @@ class Remoter extends ServerTpl {
                 .fluentPut("data", info)
                 .toString()
         }
-        // 用 hps 函数
+        // 用 hps 函数同步集群应用信息
         @Lazy def sendToHps = { String data->
             // 如果是域名,得到所有Ip, 除本机
             List<Tuple2<String, Integer>> ls = hps.collectMany {hp ->
@@ -590,6 +668,7 @@ class Remoter extends ServerTpl {
                     sendToHps(data)
                 }
                 log.debug("App Up success. {}", data)
+                dataVersionMap.each {it.value.sync() }
             } finally {
                 running.set(false)
             }

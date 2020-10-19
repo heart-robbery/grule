@@ -76,7 +76,7 @@ class HttpServer extends ServerTpl {
 
     @EL(name = 'sys.started', async = true)
     protected void started() {
-        ctrls.each {app.inject(it)}; enabled = true
+        enabled = true
 //        chain.handlers.each {h ->
 //            log.info(((h instanceof PathHandler) ? h.path() : '') + ": " + h.order())
 //        }
@@ -131,7 +131,7 @@ class HttpServer extends ServerTpl {
      */
     protected void initChain() {
         ctrls?.each {ctrl ->
-            ep.addListenerSource(ctrl)
+            exposeBean(ctrl)
             def anno = ctrl.class.getAnnotation(Ctrl)
             if (anno) {
                 if (anno.prefix()) {

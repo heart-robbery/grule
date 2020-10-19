@@ -208,9 +208,9 @@ class Chain {
         Chain subChain = this
         Handler.extract(prefix).split("/").each {singlePrefix -> // 折成单路径(没有/分割的路径片)
             Chain parentChain = subChain
-            subChain = parentChain.subChains.computeIfAbsent(singlePrefix, s -> new Chain(server))
+            subChain = subChain.subChains.computeIfAbsent(singlePrefix, s -> new Chain(server))
             parentChain.add(new PathHandler() {
-                final chain = subChain
+                final Chain chain = subChain
                 @Override
                 String path() { singlePrefix }
 
