@@ -1,24 +1,15 @@
 import cn.xnatural.enet.event.EL
-import cn.xnatural.enet.event.EP
 import core.*
 import core.http.HttpServer
 import core.jpa.HibernateSrv
-import ctrl.MainCtrl
-import ctrl.MntCtrl
-import ctrl.MntUserCtrl
-import ctrl.RuleCtrl
-import ctrl.TestCtrl
+import ctrl.*
 import dao.entity.*
 import groovy.transform.Field
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import service.FileUploader
 import service.TestService
-import service.rule.AttrManager
-import service.rule.DecisionEngine
-import service.rule.DecisionManager
-import service.rule.OpHistorySrv
-import service.rule.UserSrv
+import service.rule.*
 
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Field final AppContext app = new AppContext()
@@ -33,7 +24,7 @@ app.addSource(new HibernateSrv('jpa_rule').entities(
     User, Permission, GlobalConfig
 ))
 app.addSource(new HttpServer().ctrls(
-    TestCtrl, MainCtrl, RuleCtrl, MntCtrl, MntUserCtrl
+        TestCtrl, MainCtrl, RuleCtrl, MntCtrl, MntUserCtrl, MntDecisionCtrl, MntAnalyseCtrl
 ))
 app.addSource(new FileUploader())
 app.addSource(new TestService())

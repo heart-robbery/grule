@@ -63,6 +63,10 @@
                                 this.isLoading = false;
                                 this.$Notice.error(res.desc)
                             }
+                        },
+                        error: (xhr) => {
+                            this.isLoading = false
+                            this.$Message.error('网络错误')
                         }
                     })
                 } else {
