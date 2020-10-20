@@ -30,7 +30,7 @@ class OpHistorySrv extends ServerTpl {
             .addConverter('updateTime', {v -> if (v instanceof Date) new SimpleDateFormat("yyyy-MM-dd HH:mm:ss:SSS").format(v) else v})
             .build()
         repo.saveOrUpdate(
-            new OpHistory(tbName: repo.tbName(entity.class), operator: operator, content: JSON.toJSONString(data, SerializerFeature.DisableCircularReferenceDetect))
+            new OpHistory(tbName: repo.tbName(entity.class), operator: operator, content: JSON.toJSONString(data, SerializerFeature.WriteMapNullValue, SerializerFeature.DisableCircularReferenceDetect))
         )
     }
 }

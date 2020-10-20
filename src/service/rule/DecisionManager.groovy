@@ -1,7 +1,8 @@
 package service.rule
 
-
+import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
+import core.Remoter
 import core.ServerTpl
 import core.jpa.BaseRepo
 import service.rule.spec.DecisionSpec
@@ -27,22 +28,28 @@ class DecisionManager extends ServerTpl {
     DecisionSpec findDecision(String decisionId) {
         def spec = decisionMap.get(decisionId)
         if (spec == null) {
-            loadDecision(decisionId)
+            create(repo.find(dao.entity.Decision) {root, query, cb -> cb.equal(root.get('decisionId'), decisionId)}?.dsl)
             spec = decisionMap.get(decisionId)
         }
         return spec
     }
 
 
-    @EL(name = 'delDecision')
-    void remove(String decisionId) {
-        decisionMap.remove(decisionId)
-        log.info("delDecision: " + decisionId)
-    }
-    @EL(name = 'loadDecision')
-    void loadDecision(String decisionId) {
-        create(repo.find(dao.entity.Decision) {root, query, cb -> cb.equal(root.get('decisionId'), decisionId)}?.dsl)
-        log.info("loadDecision: " + decisionId)
+    @EL(name = ['decisionChange', 'decision.dataVersion'], async = true)
+    void listenDecisionChange(EC ec, String decisionId) {
+        if (!decisionId) return
+        def decision = repo.find(dao.entity.Decision) {root, query, cb -> cb.equal(root.get('decisionId'), decisionId)}
+        if (decision == null) {
+            decisionMap.remove(decisionId)
+            log.info("delDecision: " + decisionId)
+        } else {
+            create(decision.dsl)
+            log.info("decisionChange: " + decisionId)
+        }
+        def remoter = bean(Remoter)
+        if (remoter && ec?.source() != remoter) { // 不是远程触发的事件
+            remoter.dataVersion('decision').update(decisionId, decision ? decision.updateTime.time : System.currentTimeMillis())
+        }
     }
 
 
@@ -81,7 +88,7 @@ class DecisionManager extends ServerTpl {
                 break
             }
             threshold.incrementAndGet()
-            async {
+            async { // 异步加载
                 ls.each {
                     ids?.add(it.decisionId)
                     try {

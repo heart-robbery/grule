@@ -1,7 +1,6 @@
 package ctrl
 
 import cn.xnatural.enet.event.EC
-import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
 import core.Page
@@ -10,15 +9,9 @@ import core.Utils
 import core.http.HttpContext
 import core.http.mvc.ApiResp
 import core.http.mvc.Ctrl
-import core.http.mvc.Filter
 import core.http.mvc.Path
-import core.http.ws.Listener
-import core.http.ws.WS
-import core.http.ws.WebSocket
 import core.jpa.BaseRepo
 import dao.entity.*
-import org.hibernate.query.internal.NativeQueryImpl
-import org.hibernate.transform.Transformers
 import service.rule.AttrManager
 import service.rule.DecisionManager
 import service.rule.spec.DecisionSpec
@@ -26,8 +19,6 @@ import service.rule.spec.DecisionSpec
 import javax.persistence.criteria.Predicate
 import java.text.SimpleDateFormat
 import java.util.Map.Entry
-import java.util.concurrent.ConcurrentHashMap
-
 
 @Ctrl(prefix = 'mnt')
 class MntDecisionCtrl extends ServerTpl {
@@ -231,7 +222,7 @@ class MntDecisionCtrl extends ServerTpl {
         }
 
         Decision decision
-        def removeFn
+        String delDecisionId
         if (id) { // 更新
             ctx.auth('decision-update')
             decision = repo.findById(Decision, id)
@@ -239,13 +230,7 @@ class MntDecisionCtrl extends ServerTpl {
                 if (repo.find(Decision) {root, query, cb -> cb.equal(root.get('decisionId'), spec.决策id)}) { // 决策id 不能重
                     return ApiResp.fail("决策id($spec.决策id)已存在")
                 }
-                removeFn = {
-                    def dId = decision.decisionId
-                    bean(DecisionManager).remove(dId)
-                    bean(DecisionManager).loadDecision(spec.决策id)
-                    ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'delDecision', [dId]))
-                    ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'loadDecision', [spec.决策id]))
-                }
+                delDecisionId = decision.decisionId
             }
         } else { // 创建
             ctx.auth('decision-add')
@@ -256,11 +241,8 @@ class MntDecisionCtrl extends ServerTpl {
         decision.comment = spec.决策描述
         decision.dsl = dsl
         repo.saveOrUpdate(decision)
-        if (removeFn) removeFn()
-        if (!id) {
-            bean(DecisionManager).loadDecision(decision.decisionId)
-            ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'loadDecision', [decision.decisionId]))
-        }
+        if (delDecisionId) ep.fire("decisionChange", delDecisionId)
+        ep.fire("decisionChange", decision.decisionId)
         ep.fire('enHistory', decision, ctx.getSessionAttr('name'))
         ApiResp.ok(decision)
     }
@@ -276,8 +258,7 @@ class MntDecisionCtrl extends ServerTpl {
         if (repo.count(RuleField) {root, query, cb -> cb.equal(root.get('cnName'), cnName)}) return ApiResp.fail("$cnName aleady exist")
         def field = new RuleField(enName: enName, cnName: cnName, type: type, comment: comment, dataCollector: dataCollector)
         repo.saveOrUpdate(field)
-        ep.fire('addField', field.enName)
-        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'addField', [enName]))
+        ep.fire('fieldChange', field.enName)
         ep.fire('enHistory', field, ctx.getSessionAttr('name'))
         ApiResp.ok(field)
     }
@@ -329,8 +310,7 @@ class MntDecisionCtrl extends ServerTpl {
             return ApiResp.fail("$collector.cnName 已存在")
         }
         repo.saveOrUpdate(collector)
-        ep.fire('addDataCollector', collector.enName)
-        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'addDataCollector', [collector.enName]))
+        ep.fire('dataCollectorChange', collector.enName)
         ep.fire('enHistory', collector, ctx.getSessionAttr('name'))
         ApiResp.ok(collector)
     }
@@ -358,8 +338,7 @@ class MntDecisionCtrl extends ServerTpl {
         field.comment = comment
         field.dataCollector = dataCollector
         repo.saveOrUpdate(field)
-        ep.fire('updateField', field.enName)
-        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'updateField', [field.enName]))
+        ep.fire('fieldChange', field.enName)
         ep.fire('enHistory', field, ctx.getSessionAttr('name'))
         ApiResp.ok(field)
     }
@@ -420,8 +399,7 @@ class MntDecisionCtrl extends ServerTpl {
                     field.dataCollector = enName
 
                     repo.saveOrUpdate(field)
-                    ep.fire('updateField', field.enName)
-                    ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'updateField', [field.enName]))
+                    ep.fire('fieldChange', field.enName)
                     ep.fire('enHistory', field, ctx.getSessionAttr('name'))
                 }
             }
@@ -443,8 +421,7 @@ class MntDecisionCtrl extends ServerTpl {
         } else {
             repo.saveOrUpdate(collector)
         }
-        ep.fire('updateDataCollector', collector.enName)
-        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'updateDataCollector', [collector.enName]))
+        ep.fire('dataCollectorChange', collector.enName)
         ep.fire('enHistory', collector, ctx.getSessionAttr('name'))
         ApiResp.ok(collector)
     }
@@ -464,8 +441,7 @@ class MntDecisionCtrl extends ServerTpl {
     ApiResp delField(HttpContext ctx, String enName) {
         ctx.auth('field-del')
         repo.delete(repo.find(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)})
-        ep.fire('delField', enName)
-        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'delField', [enName]))
+        ep.fire('fieldChange', enName)
         ApiResp.ok()
     }
 
@@ -474,8 +450,7 @@ class MntDecisionCtrl extends ServerTpl {
     ApiResp delDataCollector(HttpContext ctx, String enName) {
         ctx.auth('dataCollector-del')
         repo.delete(repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), enName)})
-        ep.fire('delDataCollector', enName)
-        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'delDataCollector', [enName]))
+        ep.fire('dataCollectorChange', enName)
         ApiResp.ok()
     }
 }

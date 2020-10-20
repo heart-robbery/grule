@@ -1,11 +1,12 @@
 package service.rule
 
-
+import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
 import com.alibaba.fastjson.serializer.SerializerFeature
 import core.OkHttpSrv
+import core.Remoter
 import core.ServerTpl
 import core.Utils
 import core.jpa.BaseRepo
@@ -172,48 +173,41 @@ class AttrManager extends ServerTpl {
 
 
     // ======================= 监听变化 ==========================
-    @EL(name = '${name}.synchronizer')
-    void onchange() {
-
-    }
-
-
-    @EL(name = 'addField', async = true)
-    void listenFieldAdd(String enName) {
+    @EL(name = ['fieldChange', 'field.dataVersion'], async = true)
+    void listenFieldChange(EC ec, String enName) {
         def field = repo.find(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}
-        attrMap.put(field.enName, field)
-        attrMap.put(field.cnName, field)
-        log.info("addField: " + enName)
+        if (field == null) {
+            def f = attrMap.remove(enName)
+            if (f) attrMap.remove(f.cnName)
+            log.info("delField: " + f)
+        } else {
+            boolean isNew = true
+            if (attrMap.containsKey(field.enName)) isNew = false
+            attrMap.put(field.enName, field)
+            attrMap.put(field.cnName, field)
+            log.info("${isNew ? 'addField' : 'updateField'}: $enName".toString())
+        }
+        def remoter = bean(Remoter)
+        if (remoter && ec?.source() != remoter) { // 不是远程触发的事件
+            remoter.dataVersion('field').update(enName, field ? field.updateTime.time : System.currentTimeMillis())
+        }
     }
-    @EL(name = 'updateField', async = true)
-    void listenFieldUpdate(String enName) {
-        def field = repo.find(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}
-        attrMap.put(field.enName, field)
-        attrMap.put(field.cnName, field)
-        log.info("updateField: " + enName)
-    }
-    @EL(name = 'delField')
-    void listenDelField(String enName) {
-        def field = attrMap.remove(enName)
-        attrMap.remove(field.cnName)
-        log.info("delField: " + enName)
-    }
-    @EL(name = 'addDataCollector', async = true)
-    void listenAddDataCollector(String enName) {
+
+
+    @EL(name = ['dataCollectorChange', 'dataCollector.dataVersion'], async = true)
+    void listenDataCollectorChange(EC ec, String enName) {
         def collector = repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), enName)}
-        initDataCollector(collector)
-        log.info("addDataCollector: " + enName)
-    }
-    @EL(name = 'updateDataCollector', async = true)
-    void listenUpdateDataCollector(String enName) {
-        def collector = repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), enName)}
-        initDataCollector(collector)
-        log.info("updateDataCollector: " + enName)
-    }
-    @EL(name = 'delDataCollector', async = true)
-    void listenDelCollector(String enName) {
-        collectors.remove(enName)
-        log.info("delDataCollector: " + enName)
+        if (collector == null) {
+            collectors.remove(enName)?.close()
+            log.info("del dataCollector: " + enName)
+        } else {
+            initDataCollector(collector)
+            log.info("dataCollectorChange: " + enName)
+        }
+        def remoter = bean(Remoter)
+        if (remoter && ec?.source() != remoter) { // 不是远程触发的事件
+            remoter.dataVersion('dataCollector').update(enName, collector ? collector.updateTime.time : System.currentTimeMillis())
+        }
     }
 
 
@@ -287,15 +281,15 @@ class AttrManager extends ServerTpl {
     protected void initDefaultCollector() {
         if (repo.count(DataCollector) == 0) {
             log.info("初始化默认数据集")
-            repo.saveOrUpdate(new DataCollector(type: 'script', enName: 'week', cnName: '星期几', comment: '值: 1,2,3,4,5,6,7', computeScript: """
+            repo.saveOrUpdate(new DataCollector(type: 'script', enName: 'week', cnName: '星期几', enabled: true, comment: '值: 1,2,3,4,5,6,7', computeScript: """
 Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1
             """.trim()))
-            repo.saveOrUpdate(new DataCollector(type: 'script', enName: 'gender', cnName: '性别', comment: '根据身份证计算. 值: F,M', computeScript: """
+            repo.saveOrUpdate(new DataCollector(type: 'script', enName: 'gender', cnName: '性别', enabled: true, comment: '根据身份证计算. 值: F,M', computeScript: """
 if (idNumber && idNumber.length() > 17) {
     Integer.parseInt(idNumber.substring(16, 17)) % 2 == 0 ? 'F' : 'M'
 } else null
             """.trim()))
-            repo.saveOrUpdate(new DataCollector(type: 'script', enName: 'age', cnName: '年龄', comment: '根据身份证计算', computeScript: """
+            repo.saveOrUpdate(new DataCollector(type: 'script', enName: 'age', cnName: '年龄', enabled: true, comment: '根据身份证计算', computeScript: """
 if (idNumber && idNumber.length() > 17) {
     Calendar cal = Calendar.getInstance()
     int yearNow = cal.get(Calendar.YEAR)

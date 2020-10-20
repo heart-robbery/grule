@@ -13,10 +13,10 @@ import javax.persistence.Entity
 @DynamicUpdate
 class GlobalConfig extends LongIdEntity {
     /**
-     * 配置 key
+     * 属性名
      */
     @Column(unique = true)
-    String key
+    String aName
     /**
      * 值
      */
