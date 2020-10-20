@@ -1,11 +1,16 @@
 package ctrl
 
+import core.Remoter
 import core.ServerTpl
 import core.Utils
 import core.http.HttpContext
+import core.http.mvc.ApiResp
 import core.http.mvc.Ctrl
 import core.http.mvc.Path
 import service.FileUploader
+
+import java.text.SimpleDateFormat
+import java.time.Duration
 
 @Ctrl
 class MainCtrl extends ServerTpl {
@@ -23,6 +28,40 @@ class MainCtrl extends ServerTpl {
     File testHtml(HttpContext ctx) {
         ctx.response.cacheControl(3)
         Utils.baseDir("src/static/test.html")
+    }
+
+
+    @Path(path = 'health')
+    ApiResp health() {
+        ApiResp.ok(
+            ['status': app.sysLoad <= 5 ? 'GREEN' : (app.sysLoad < 8 ? 'YELLOW' : 'RED'), 'detail':
+                [
+                    'db': ['status': 'UP'],
+                    'remoter': [
+                        'status': {
+                            def remoter = bean(Remoter)
+                            if (remoter == null || remoter.lastSyncSuccess == null) return 'DOWN'
+                            else {
+                                def interval = System.currentTimeMillis() - remoter.lastSyncSuccess
+                                if (interval < Duration.ofMinutes(5).toMillis()) return 'GREEN'
+                                else if (interval < Duration.ofMinutes(20).toMillis()) return 'YELLOW'
+                                else return 'RED'
+                            }
+                        }(),
+                        'detail': {
+                            def remoter = bean(Remoter)
+                            def ret = [:]
+                            if (remoter == null) return ret
+                            ret.put('lastSyncSuccess', new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(remoter.lastSyncSuccess))
+                            remoter.appInfos.each {e ->
+                                ret.put(e.key + '_total', e.value.size())
+                            }
+                            return ret
+                        }()
+                    ]
+                ],
+            ]
+        )
     }
 
 

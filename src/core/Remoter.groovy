@@ -12,6 +12,7 @@ import com.alibaba.fastjson.serializer.SerializerFeature
 import core.aio.AioClient
 import core.aio.AioServer
 import core.aio.AioSession
+import groovy.transform.PackageScope
 
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
@@ -22,6 +23,9 @@ import java.util.function.Consumer
 
 import static core.Utils.ipv4
 
+/**
+ * 集群分布式 核心类
+ */
 class Remoter extends ServerTpl {
     @Lazy def                                              sched      = bean(SchedSrv)
     // 集群的服务中心地址 [host]:port,[host1]:port2. 例 :8001 or localhost:8001
@@ -42,6 +46,8 @@ class Remoter extends ServerTpl {
     protected final Map<String, DataVersion> dataVersionMap = new ConcurrentHashMap<>()
     protected AioClient aioClient
     protected AioServer aioServer
+    // 上次成功同步时间
+    Long lastSyncSuccess
 
 
     Remoter() { super("remoter") }
@@ -157,78 +163,101 @@ class Remoter extends ServerTpl {
 
 
     /**
-     * 获取数据集的数据版本
+     * 获取数据集的数据版本集群同步器
      * @param key 同步器的key
-     * @param dataKey 数据key
-     * @param version
-     * @return
+     * @return {@link DataVersion}
      */
-    Remoter setDataVersion(String key, String dataKey, Long version) {
-        if (!key) throw new IllegalAccessException("sendDataVersion key must not be empty")
-        dataVersionMap.computeIfAbsent(key, {new DataVersion(key: key)}).send(dataKey, version)
-        this
+    DataVersion dataVersion(String key) {
+        if (!key) throw new IllegalArgumentException("dataVersion key must not be empty")
+        dataVersionMap.computeIfAbsent(key, {new DataVersion(key: key)})
     }
 
 
     @EL(name = 'dataVersion')
-    protected void receiveDataVersion(String key, String dataKey, Long version) {
-        dataVersionMap.computeIfAbsent(key, {new DataVersion(key: key)}).receive(dataKey, version)
+    protected void receiveDataVersion(String key, String dataKey, Long version, Object data) {
+        dataVersionMap.computeIfAbsent(key, {new DataVersion(key: key)}).receive(dataKey, version, data)
     }
 
 
     /**
      * 数据版本同步器, 同步集群数据
+     * 多个系统之前的数据同步
+     * NOTE: 最终一致性. 场景1: 内存数据和数据库数据同步
      */
     class DataVersion {
         // 数据集key
-        String key
+        protected String                    key
         // 数据key -> (版本, 最开始同步时间, 发送)
-        protected final Map<String, Tuple3<Long, Long, Boolean>> data = new ConcurrentHashMap<>()
+        protected final Map<String, Record> records = new ConcurrentHashMap<>()
+
         /**
-         * 发送 新数据版本到集群
-         * @param dataKey
-         * @param version
-         * @return
+         * 数据记录
+         * 集群中数据同步的数据记录
          */
-        DataVersion send(String dataKey, Long version) {
-            if (!dataKey) throw new IllegalAccessException("send dataVersion dataKey must not be empty")
-            if (!version) throw new IllegalAccessException("send dataVersion version must not be empty")
-            def record = data.computeIfAbsent(dataKey, {Tuple.tuple(null, null, true)})
-            if (record.v1 == null || record.v1 < version) { // 有新版本数据更新
-                record.v1 = version
-                record.v2 = System.currentTimeMillis()
-                record.v3 = true
-                ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'dataVersion', [key, dataKey, version]))
+        protected class Record {
+            //数据版本
+            Long    version
+            //上次发送时间
+            Long    lastSendTime
+            //状态: 发送 or 接收
+            Boolean send
+            //具体数据
+            Object  data
+        }
+
+        /**
+         * 更新数据到集群
+         * @param dataKey 数据key
+         * @param version 数据更新版本. NOTE: 每次更新得保证比之前的版本大
+         * @param data 数据内容 支持基本类型, String NOTE: 建议数据持久化
+         * @return {@link DataVersion}
+         */
+        DataVersion update(String dataKey, Long version, Object data = null) {
+            if (!dataKey) throw new IllegalArgumentException("update dataVersion dataKey must not be empty")
+            if (!version) throw new IllegalArgumentException("update dataVersion version must not be empty")
+            def record = records.computeIfAbsent(dataKey, {new Record()})
+            if (record.version == null || record.version < version) { // 有新版本数据更新
+                record.version = version
+                record.data = data
+                record.lastSendTime = System.currentTimeMillis()
+                record.send = true
+                log.debug("Update DataVersion: key: " + key + ", dataKey: " + dataKey + ", version: " + version + ", data: " + data)
+                ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'dataVersion', [key, dataKey, version, data]))
             }
             this
         }
 
         /**
          * 接收远程数据更新
-         * @param dataKey
-         * @param version
+         * @param dataKey 数据key
+         * @param version 数据更新版本
+         * @param data 数据
          * @return
          */
-        DataVersion receive(String dataKey, Long version) {
-            def record = data.computeIfAbsent(dataKey, {Tuple.tuple(null, null, false)})
-            if (record.v1 == null || record.v1 < version) {
-                record.v1 = version
-                record.v3 = false
-                ep.fire("${key}.dataVersion", dataKey, version)
+        @PackageScope
+        DataVersion receive(String dataKey, Long version, Object data) {
+            if (!dataKey) throw new IllegalArgumentException("receive dataVersion dataKey must not be empty")
+            if (!version) throw new IllegalArgumentException("receive dataVersion version must not be empty")
+            def record = records.computeIfAbsent(dataKey, {new Record()})
+            if (record.version == null || record.version < version) {
+                record.version = version
+                record.send = false
+                record.data = data
+                log.debug("Receive DataVersion: key: " + key + ", dataKey: " + dataKey + ", version: " + version + ", data: " + data)
+                ep.fire("${key}.dataVersion", dataKey, version, data)
             }
             this
         }
 
-
+        @PackageScope
         void sync() { // 连续同步
-            data.findAll {e -> e.value.v3}
-                    .each {e ->
-                        ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'dataVersion', [key, e.key, e.value.v1]))
-                    }.findAll {e ->
-                        if (System.currentTimeMillis() - e.value.v2 > Duration.ofMillis(getLong('dataVersion.dropTimeout', 30L))) {
-                            data.remove(e.key)
-                        }
-                    }
+            long interval = Duration.ofMinutes(getLong('dataVersion.dropTimeout', 120L)).toMillis()
+            records.each {e ->
+                if (e.value.send && e.value.lastSendTime && System.currentTimeMillis() - e.value.lastSendTime <= interval) {
+                    ep.fire('remote', EC.of(this).attr('toAll', true).args(app.name, 'dataVersion', [key, e.key, e.value.version, e.value.data]))
+                    log.trace("Sync DataVersion: key: " + key + ", dataKey: " + e.key + ", version: " + e.value.version + ", data: " + e.value.data)
+                }
+            }
         }
     }
 
@@ -250,6 +279,7 @@ class Remoter extends ServerTpl {
                     sched.after(Duration.ofSeconds(new Random().nextInt(20) + 10), {sync(true)})
                 }
             }
+            lastSyncSuccess = System.currentTimeMillis()
         } catch (ex) {
             if (next) sched.after(Duration.ofSeconds(getInteger('upInterval', 30) + new Random().nextInt(60)), {sync(true)})
             log.error("App Up error. " + (ex.message?:ex.class.simpleName), ex)
