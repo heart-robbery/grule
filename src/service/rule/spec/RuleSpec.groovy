@@ -1,6 +1,6 @@
 package service.rule.spec
 
-import service.rule.Decision
+import service.rule.DecisionEnum
 
 /**
  * 规则定义 spec
@@ -28,7 +28,7 @@ class RuleSpec {
     void 拒绝(Closure<Boolean> 条件) {
         decisionFn << Tuple.tuple('Reject', { Map ctx ->
             def cl = 条件.rehydrate(ctx, 条件, this)
-            if (cl()) return Decision.Reject
+            if (cl()) return DecisionEnum.Reject
             null
         })
     }
@@ -37,7 +37,7 @@ class RuleSpec {
     void 通过(Closure<Boolean> 条件) {
         decisionFn << Tuple.tuple('Accept', { Map ctx ->
             def cl = 条件.rehydrate(ctx, 条件, this)
-            if (cl()) return Decision.Accept
+            if (cl()) return DecisionEnum.Accept
             null
         })
     }
@@ -46,7 +46,7 @@ class RuleSpec {
     void 人工审核(Closure<Boolean> 条件) {
         decisionFn << Tuple.tuple('Review', { Map ctx ->
             def cl = 条件.rehydrate(ctx, 条件, this)
-            if (cl()) return Decision.Review
+            if (cl()) return DecisionEnum.Review
             null
         })
     }

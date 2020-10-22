@@ -102,17 +102,20 @@ class DecisionEngine extends ServerTpl {
      * @param params 参数
      * @return
      */
-    Map<String, Object> run(String decisionId, boolean async = true, String id = null, Map<String, Object> params = Collections.emptyMap()) {
+    Map<String, Object> run(String decisionId, boolean async = true, String id = null, Map<String, Object> params = [:]) {
         def decision = dm.findDecision(decisionId)
         if (decision == null) throw new IllegalArgumentException("未找到决策: " + decisionId)
+        id = id?:UUID.randomUUID().toString().replaceAll('-', '')
+        log.info("Run decision. decisionId: " + decisionId + ", id: " + id + ", async: " + async  + ", params: " + params)
+        decision.paramValidator?.apply(params) // 参数验证
+
         DecisionContext ctx = new DecisionContext()
-        ctx.setDecisionSpec(decision)
-        ctx.setId(id?:UUID.randomUUID().toString().replaceAll('-', ''))
+        ctx.setDecisionHolder(decision)
+        ctx.setId(id)
         ctx.setAttrManager(am)
         ctx.setEp(ep)
         ctx.setInput(params)
 
-        log.info("Run decision. decisionId: " + decisionId + ", id: " + ctx.getId() + ", async: " + async  + ", params: " + params)
         repo.saveOrUpdate(new DecisionResult(id: ctx.id, decisionId: decisionId, occurTime: ctx.startup))
         if (async) {
             super.async { ctx.start() }

@@ -224,7 +224,6 @@
                 }
             },
             save() {
-                this.$Message('保存中...');
                 let decision = this.curDecision;
                 $.ajax({
                     url: 'mnt/setDecision',
@@ -234,10 +233,10 @@
                         if (res.code == '00') {
                             if (decision.id) {
                                 $.extend(decision, res.data);
-                                this.$Message.success('保存成功: ' + decision.decisionId);
+                                this.$Message.success('更新成功: ' + decision.decisionId);
                             } else {
                                 this.load();
-                                this.$Message.success('保存成功: ' + res.data.decisionId);
+                                this.$Message.success('新增成功: ' + res.data.decisionId);
                             }
                         } else this.$Notice.error(res.desc)
                     }

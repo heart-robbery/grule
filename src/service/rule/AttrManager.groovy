@@ -30,16 +30,16 @@ import java.util.function.Function
  * 属性值函数
  */
 class AttrManager extends ServerTpl {
-    static final String                    DATA_COLLECTED = "data_collected"
-    @Lazy def                              repo           = bean(BaseRepo, 'jpa_rule_repo')
+    static final String                          DATA_COLLECTED = "data_collected"
+    @Lazy def                                    repo           = bean(BaseRepo, 'jpa_rule_repo')
     /**
      * RuleField(enName, cnName), RuleField
      */
-    final Map<String, RuleField>           attrMap        = new ConcurrentHashMap<>(1000)
+    final Map<String, RuleField>                 attrMap        = new ConcurrentHashMap<>(1000)
     /**
      * 数据获取函数. 收集器名 -> 收集器
      */
-    protected final Map<String, Collector> collectors     = new ConcurrentHashMap(100)
+    protected final Map<String, CollectorHolder> collectors     = new ConcurrentHashMap(100)
 
 
     @EL(name = 'jpa_rule.started', async = true)
@@ -370,7 +370,7 @@ if (idNumber && idNumber.length() > 17) {
         Closure sqlScript = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("{ -> $collector.sqlScript }")
 
         collectors.remove(collector.enName)?.close()
-        collectors.put(collector.enName, new Collector(collector: collector, sql: db, computeFn: {ctx ->
+        collectors.put(collector.enName, new CollectorHolder(collector: collector, sql: db, computeFn: { ctx ->
             def start = new Date()
             Object result
             Exception exx
@@ -382,7 +382,7 @@ if (idNumber && idNumber.length() > 17) {
                 log.error(ctx.logPrefix() + "Sql脚本函数'$collector.enName'执行失败".toString(), ex)
             }
             dataCollected(new CollectResult(
-                decideId: ctx.id, decisionId: ctx.decisionSpec.决策id, collector: collector.enName,
+                decideId: ctx.id, decisionId: ctx.decisionHolder.决策id, collector: collector.enName,
                 status: (exx ? 'EEEE' : '0000'), collectDate: start, collectorType: collector.type,
                 spend: System.currentTimeMillis() - start.time,
                 result: result instanceof Map ? JSON.toJSONString(result, SerializerFeature.WriteMapNullValue) : result?.toString(),
@@ -413,7 +413,7 @@ if (idNumber && idNumber.length() > 17) {
         config.addCompilationCustomizers(icz)
         icz.addImports(JSON.class.name, JSONObject.class.name)
         Closure script = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("{ -> $collector.computeScript}")
-        collectors.put(collector.enName, new Collector(collector: collector, computeFn: { ctx ->
+        collectors.put(collector.enName, new CollectorHolder(collector: collector, computeFn: { ctx ->
             Object result
             final def start = new Date()
             Exception ex
@@ -425,7 +425,7 @@ if (idNumber && idNumber.length() > 17) {
                 log.error(ctx.logPrefix() + "脚本函数'$collector.enName'执行失败".toString(), ex)
             }
             dataCollected(new CollectResult(
-                decideId: ctx.id, decisionId: ctx.decisionSpec.决策id, collector: collector.enName,
+                decideId: ctx.id, decisionId: ctx.decisionHolder.决策id, collector: collector.enName,
                 status: (ex ? 'EEEE' : '0000'), collectDate: start, collectorType: collector.type,
                 spend: System.currentTimeMillis() - start.time,
                 result: result instanceof Map ? JSON.toJSONString(result, SerializerFeature.WriteMapNullValue) : result?.toString(),
@@ -463,7 +463,7 @@ if (idNumber && idNumber.length() > 17) {
         }
         // GString 模板替换
         def tplEngine = new GStringTemplateEngine(Thread.currentThread().contextClassLoader)
-        collectors.put(collector.enName, new Collector(collector: collector, computeFn: { ctx -> // 数据集成中3方接口访问过程
+        collectors.put(collector.enName, new CollectorHolder(collector: collector, computeFn: { ctx -> // 数据集成中3方接口访问过程
             // http请求 url
             String url = tplEngine.createTemplate(collector.url).make(new HashMap(1) {
                 @Override
@@ -521,7 +521,7 @@ if (idNumber && idNumber.length() > 17) {
             catch (ex) {
                 log.error(logMsg.toString() + ", 异常: ", ex)
                 dataCollected(new CollectResult(
-                    decideId: ctx.id, decisionId: ctx.decisionSpec.决策id, collector: collector.enName,
+                    decideId: ctx.id, decisionId: ctx.decisionHolder.决策id, collector: collector.enName,
                     status: (ex instanceof ConnectException) ? 'E001': 'EEEE',
                     collectDate: start, collectorType: collector.type,
                     spend: spend, url: url, body: bodyStr, result: result, httpException: ex.message?:ex.class.simpleName
@@ -544,7 +544,7 @@ if (idNumber && idNumber.length() > 17) {
                         log.info(logMsg.toString())
                     }
                     dataCollected(new CollectResult(
-                        decideId: ctx.id, decisionId: ctx.decisionSpec.决策id, collector: collector.enName,
+                        decideId: ctx.id, decisionId: ctx.decisionHolder.决策id, collector: collector.enName,
                         status: ex ? 'E002': '0000', collectDate: start, collectorType: collector.type,
                         spend: spend, url: url, body: bodyStr, result: result, parseException: ex == null ? null : ex.message?:ex.class.simpleName,
                         resolveResult: resolveResult instanceof Map ? JSON.toJSONString(resolveResult, SerializerFeature.WriteMapNullValue) : resolveResult?.toString()
@@ -554,7 +554,7 @@ if (idNumber && idNumber.length() > 17) {
             }
             log.info(logMsg.toString())
             dataCollected(new CollectResult(
-                decideId: ctx.id, decisionId: ctx.decisionSpec.决策id, collector: collector.enName,
+                decideId: ctx.id, decisionId: ctx.decisionHolder.决策id, collector: collector.enName,
                 status: '0000', collectDate: start, collectorType: collector.type,
                 spend: spend, url: url, body: bodyStr, result: result
             ))
@@ -564,9 +564,9 @@ if (idNumber && idNumber.length() > 17) {
 
 
     /**
-     * 收集器
+     * 收集器 Holder
      */
-    class Collector {
+    class CollectorHolder {
         // 对应数据库中的实体
         DataCollector collector
         // 把收集器转换的执行函数

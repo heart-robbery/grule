@@ -1,5 +1,6 @@
 // web socket
 function ws(cfg) {
+    cfg = cfg || {};
     // web socket
     let client = null;
     if (client && (client.readyState == 1 || client.readyState == 2)) {

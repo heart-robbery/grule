@@ -13,6 +13,7 @@ import core.http.mvc.Path
 import core.jpa.BaseRepo
 import dao.entity.*
 import service.rule.AttrManager
+import service.rule.DecisionEnum
 import service.rule.DecisionManager
 import service.rule.spec.DecisionSpec
 
@@ -105,7 +106,7 @@ class MntDecisionCtrl extends ServerTpl {
 
     @Path(path = 'decisionResultPage')
     ApiResp decisionResultPage(
-        Integer page, Integer pageSize, String id, String decisionId, service.rule.Decision decision,
+        Integer page, Integer pageSize, String id, String decisionId, DecisionEnum decision,
         String idNum, Long spend, String exception, String input, String attrs, String rules
     ) {
         if (pageSize && pageSize > 10) return ApiResp.fail("pageSize max 10")
@@ -209,7 +210,7 @@ class MntDecisionCtrl extends ServerTpl {
     ApiResp setDecision(String id, String dsl, HttpContext ctx) {
         DecisionSpec spec
         try {
-            spec = bean(DecisionManager).create(dsl)
+            spec = DecisionSpec.of(dsl)
         } catch (ex) {
             log.error("语法错误", ex)
             return ApiResp.fail('语法错误: ' + ex.message)

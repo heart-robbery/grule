@@ -36,4 +36,8 @@ class Decision extends UUIDEntity {
     @Basic
     @Type(type = "text")
     String dsl
+    /**
+     * api 接口配置
+     */
+    String apiConfig
 }

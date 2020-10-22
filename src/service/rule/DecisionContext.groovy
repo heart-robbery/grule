@@ -3,7 +3,6 @@ package service.rule
 import cn.xnatural.enet.event.EP
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import service.rule.spec.DecisionSpec
 import service.rule.spec.PolicySpec
 import service.rule.spec.RuleSpec
 
@@ -13,40 +12,40 @@ import java.util.concurrent.atomic.AtomicBoolean
  * 决策执行上下文
  */
 class DecisionContext {
-    protected static final Logger    log     = LoggerFactory.getLogger(DecisionContext)
+    protected static final Logger                         log     = LoggerFactory.getLogger(DecisionContext)
     // 决策执行标识(id)
-                    String           id
+                           String                         id
     // 开始时间
-    final           Date             startup = new Date()
-                    DecisionSpec     decisionSpec
-    protected       RuleSpec         curRuleSpec
+    final                  Date                           startup = new Date()
+                           DecisionManager.DecisionHolder decisionHolder
+    protected              RuleSpec                       curRuleSpec
     // 当前正在执行的规则
-    protected       PassedRule       curPassedRule
-    protected       PolicySpec       curPolicySpec
+    protected              PassedRule                     curPassedRule
+    protected              PolicySpec                     curPolicySpec
     // 执行过的规则记录
-    protected final List<PassedRule> rules   = new LinkedList<>()
+    protected final        List<PassedRule>               rules   = new LinkedList<>()
     // 最终决策结果
-                    Decision         finalDecision
-                    AttrManager      attrManager
-                    EP               ep
+                           DecisionEnum                   decisionResult
+                           AttrManager                    attrManager
+                           EP                             ep
     // 运行状态. TODO 以后做暂停时 running == false
-    protected final def                 running           = new AtomicBoolean(false)
+    protected final def                                   running           = new AtomicBoolean(false)
     // 是否已启动
-    protected final def                 started           = new AtomicBoolean(false)
+    protected final def                                   started           = new AtomicBoolean(false)
     // 是否执行结束
-    protected final def                 end               = new AtomicBoolean(false)
+    protected final def                                   end               = new AtomicBoolean(false)
     // 输入参数
-    Map<String, Object>                 input
+                           Map<String, Object> input
     // 最终数据属性值
     @Lazy protected Map<String, Object> data              = new Data(this)
     // 数据收集器名 -> 数据收集结果集. 不用 ConcurrentHashMap 因为不能放null值
     @Lazy protected Map<String, Object> dataCollectResult = new LinkedHashMap<>()
     // 规则执行迭代器
-    @Lazy protected def                 ruleIterator      = new RuleIterator(this)
+    @Lazy protected def                                   ruleIterator      = new RuleIterator(this)
     // 执行结果 异常
-    protected Exception                 exception
+    protected              Exception                      exception
     // 执行状态
-    protected String                    status            = '0000'
+    protected              String                         status            = '0000'
 
 
     /**
@@ -57,7 +56,7 @@ class DecisionContext {
         log.info(logPrefix() + "开始")
         input?.forEach {k, v -> setAttr(k, v) }
         if (!ruleIterator.hasNext()) {
-            finalDecision = Decision.Reject
+            decisionResult = DecisionEnum.Reject
             exception = "没有可执行的策略"
             log.warn(logPrefix() + exception)
         }
@@ -77,19 +76,19 @@ class DecisionContext {
                 if (!r) break
                 if (!r.enabled) continue
                 def decision = decide(r)
-                if (finalDecision == Decision.Review && decision == Decision.Accept) {
+                if (decisionResult == DecisionEnum.Review && decision == DecisionEnum.Accept) {
                     // 保留decision并继续往下执行
-                } else finalDecision = decision
-                if (Decision.Reject == finalDecision) break
+                } else decisionResult = decision
+                if (DecisionEnum.Reject == decisionResult) break
             }
-            if (Decision.Reject == finalDecision || !ruleIterator.hasNext()) {
-                end.set(true); finalDecision = finalDecision?:Decision.Accept
+            if (DecisionEnum.Reject == decisionResult || !ruleIterator.hasNext()) {
+                end.set(true); decisionResult = decisionResult?:DecisionEnum.Accept
                 running.set(false); curPolicySpec = null; curPassedRule = null; curRuleSpec = null
                 log.info(logPrefix() + "结束成功. 共执行: " + (System.currentTimeMillis() - startup.time) + "ms "  + result())
                 ep?.fire("decision.end", this)
             }
         } catch (ex) {
-            end.set(true); finalDecision = Decision.Reject
+            end.set(true); decisionResult = DecisionEnum.Reject
             running.set(false); curPolicySpec = null; curPassedRule = null; curRuleSpec = null
             status = 'EEEE'; this.exception = ex
             log.error(logPrefix() + "结束错误. 共执行: " + (System.currentTimeMillis() - startup.getTime()) + "ms " + result(), ex)
@@ -103,13 +102,13 @@ class DecisionContext {
      * @param RuleSpec 规则描述
      * @return Decision 决策结果
      */
-    protected Decision decide(RuleSpec r) {
+    protected DecisionEnum decide(RuleSpec r) {
         if (!r.enabled) return null
         curRuleSpec = r
         curPassedRule = new PassedRule(attrs: [*:r.attrs, 规则名: r.规则名]); rules.add(curPassedRule)
         log.trace(logPrefix() + "开始执行规则")
 
-        Decision decision
+        DecisionEnum decision
         try {
             r.decisionFn?.forEach(e -> {
                 def d = e.v2(this.data)
@@ -130,7 +129,7 @@ class DecisionContext {
             })
             log.debug(logPrefix() + "结束执行规则. decision: " + decision  + ", attrs: " + curPassedRule.data)
         } catch (ex) {
-            decision = Decision.Reject
+            decision = DecisionEnum.Reject
             log.error(logPrefix() + "规则执行错误. " + decision + ", attrs: " + curPassedRule.data)
             throw ex
         } finally {
@@ -179,7 +178,7 @@ class DecisionContext {
         RuleIterator(DecisionContext ctx) {this.ctx = ctx}
 
         // 策略迭代器
-        Iterator<PolicySpec> policyItt = ctx.getDecisionSpec().policies.iterator()
+        Iterator<PolicySpec> policyItt = ctx.getDecisionHolder().spec.policies.iterator()
         // 规则迭代器
         Iterator<RuleSpec>   itt
 
@@ -264,9 +263,9 @@ class DecisionContext {
      */
     protected class PassedRule {
         // 规则 最终决策
-        Decision  decision
+              DecisionEnum        decision
         // 规则属性
-        Map<String, Object> attrs
+              Map<String, Object> attrs
         // 执行规则过程中产生的或用到的数据集
         final Map<String, Object> data = new LinkedHashMap()
 
@@ -279,7 +278,7 @@ class DecisionContext {
 
     // 日志前缀
     protected String logPrefix() {
-        "[${id? "$id, " :''}${decisionSpec.决策id? "决策: $decisionSpec.决策id" :''}${curPolicySpec? ", 策略: ${curPolicySpec.策略名}" :''}${curRuleSpec ? ", 规则: ${curRuleSpec.规则名}" :''}] -> "
+        "[${id? "$id, " :''}${decisionHolder.decision.decisionId? "决策: $decisionHolder.spec.决策id" :''}${curPolicySpec? ", 策略: ${curPolicySpec.策略名}" :''}${curRuleSpec ? ", 规则: ${curRuleSpec.规则名}" :''}] -> "
     }
 
 
@@ -291,10 +290,10 @@ class DecisionContext {
     Map<String, Object> summary() {
         if (this.summary && end.get()) return this.summary
         this.summary = [
-            id         : id, occurTime: startup, spend: System.currentTimeMillis() - startup.time,
-            decision   : finalDecision, decisionId: decisionSpec.决策id, input: input,
-            status     : status, exception : this.exception?.toString(),
-            attrs      : data.collect {e ->
+            id               : id, occurTime: startup, spend: System.currentTimeMillis() - startup.time,
+            decision         : decisionResult, decisionId: decisionHolder.decision.decisionId, input: input,
+            status           : status, exception: this.exception?.toString(),
+            attrs            : data.collect {e ->
                  if (!e.key.matches("[a-zA-Z0-9]+") && attrManager.alias(e.key)) {
                      return null
                  }
@@ -303,7 +302,7 @@ class DecisionContext {
                  }
                  return e
             }.findAll {it} .collectEntries(),
-            rules: rules.collect { r ->
+            rules            : rules.collect { r ->
                 [attrs: r.attrs, decision: r.decision, data: r.data.collectEntries { e ->
                     String k = e.key
                     def v = e.value
@@ -325,10 +324,10 @@ class DecisionContext {
      */
     Map<String, Object> result() {
         [
-            id: id, decision: finalDecision, decisionId: decisionSpec.决策id,
+            id    : id, decision: decisionResult, decisionId: decisionHolder.decision.decisionId,
             status: status,
-            desc: exception?.toString(),
-            attrs: decisionSpec.returnAttrs.collectEntries { n ->
+            desc  : exception?.toString(),
+            attrs : decisionHolder.spec.returnAttrs.collectEntries { n ->
                 def v = data.get(n)
                 if (v instanceof Optional) {v = v.orElseGet({null})}
                 if (n.matches("[a-zA-Z0-9]+")) return [n, v] // 取英文属性名
