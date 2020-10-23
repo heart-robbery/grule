@@ -8,32 +8,51 @@ import core.http.mvc.Path
 import core.jpa.BaseRepo
 import dao.entity.DecisionResult
 import service.rule.AttrManager
-import service.rule.DecisionEngine
+import service.rule.DecisionContext
+import service.rule.DecisionManager
+import service.rule.DecisionSrv
 
 @Ctrl
 class RuleCtrl extends ServerTpl {
 
-    @Lazy def engine = bean(DecisionEngine)
-    @Lazy def repo = bean(BaseRepo, 'jpa_rule_repo')
+    @Lazy def decisionSrv = bean(DecisionSrv)
+    @Lazy def dm          = bean(DecisionManager)
+    @Lazy def am = bean(AttrManager)
+    @Lazy def repo        = bean(BaseRepo, 'jpa_rule_repo')
 
 
     /**
      * 执行一条决策
      */
     @Path(path = 'decision')
-    void decision(HttpContext ctx) {
-        Map<String, Object> params = ctx.params()
-        String decisionId = params['decisionId']
+    ApiResp decision(String decisionId, HttpContext ctx) {
         if (!decisionId) {
-            ctx.render ApiResp.fail('decisionId must not be empty')
-            return
+            return ApiResp.fail('decisionId must not be empty')
         }
-        boolean async = params['async'] == 'true'
-        ctx.render(
-            ApiResp.ok(
-                engine.run(decisionId, async, ctx.request.id, params)
-            )
-        )
+        def decision = dm.findDecision(decisionId)
+        if (decision == null) {
+            return ApiResp.fail("未找到决策: $decisionId")
+        }
+        Map<String, Object> params = ctx.params()
+        log.info("Run decision. decisionId: " + decisionId + ", id: " + ctx.request.id + ", params: " + params)
+        try {
+            decision.paramValidator?.apply(params) // 参数验证
+        } catch (IllegalArgumentException ex) {
+            return ApiResp.fail(ex.message)
+        }
+
+        DecisionContext dCtx = new DecisionContext()
+        dCtx.setDecisionHolder(decision)
+        dCtx.setId(ctx.request.id)
+        dCtx.setAttrManager(am)
+        dCtx.setEp(ep)
+        dCtx.setInput(params)
+        repo.saveOrUpdate(new DecisionResult(id: dCtx.id, decisionId: decisionId, occurTime: dCtx.startup))
+
+        boolean isAsync = Boolean.valueOf(params.getOrDefault('async', false).toString())
+        if (isAsync) async { dCtx.start() }
+        else dCtx.start()
+        return ApiResp.ok(dCtx.result())
     }
 
 

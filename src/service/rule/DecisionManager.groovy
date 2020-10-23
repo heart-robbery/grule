@@ -118,69 +118,96 @@ class DecisionManager extends ServerTpl {
                 }
                 def fixValue // 固定值
                 def enumValues // 枚举值
-                def defaultValue // 默认值 // TODO
                 def type = FieldType.valueOf(paramCfg.getString('type')) // 参数类型. FieldType
-                if (FieldType.Bool == type && value != null) { // Boolean 值验证
-                    if (!'true'.equalsIgnoreCase(value) && !'false'.equalsIgnoreCase(value)) {
-                        throw new IllegalArgumentException("Param '$code' type is boolean. value is 'true' or 'false'")
+                if (type == null || !FieldType.enumConstants.find {it == type}) throw new Exception("参数验证类型配置错误. type: $type")
+
+                if (FieldType.Bool == type) { // Boolean 值验证
+                    if (value == null) value = paramCfg.getBoolean('defaultValue')
+                    if (value != null) {
+                        if (!'true'.equalsIgnoreCase(value) && !'false'.equalsIgnoreCase(value)) {
+                            throw new IllegalArgumentException("Param '$code' type is boolean. value is 'true' or 'false'")
+                        }
+                        value = value instanceof Boolean ? value : Boolean.valueOf(value)
                     }
-                    value = Boolean.valueOf(value)
                     fixValue = paramCfg.getBoolean('fixValue')
-                    // enumValues = paramCfg.getJSONArray('enumValues')?.findAll{it}?.collect {Boolean.valueOf(it)}
                 }
-                if (FieldType.Int == type && value != null) { // 整数验证
-                    value = Long.valueOf(value)
-                    def min = paramCfg.getLong('min')
-                    if (min != null && value < min) {
-                        throw new IllegalArgumentException("Param '$code' must >= $min")
-                    }
-                    def max = paramCfg.getLong('max')
-                    if (max != null && value > max) {
-                        throw new IllegalArgumentException("Param '$code' must <= $max")
+                if (FieldType.Int == type) { // 整数验证
+                    if (value == null) value = paramCfg.getLong('defaultValue')
+                    if (value != null) {
+                        try {
+                            value = value instanceof Long ? value : Long.valueOf(value)
+                        } catch (ex) {
+                            throw new IllegalArgumentException("Param '$code' is not a number. value: $value", ex)
+                        }
+                        def min = paramCfg.getLong('min')
+                        if (min != null && value < min) {
+                            throw new IllegalArgumentException("Param '$code' must >= $min")
+                        }
+                        def max = paramCfg.getLong('max')
+                        if (max != null && value > max) {
+                            throw new IllegalArgumentException("Param '$code' must <= $max")
+                        }
                     }
                     fixValue = paramCfg.getLong('fixValue')
                     enumValues = paramCfg.getJSONArray('enumValues')?.collect {JSONObject jo -> jo?.getLong('value')}?.findAll{it}
                 }
-                if (FieldType.Decimal == type && value != null) { // 小数验证
-                    value = new BigDecimal(value.toString())
-                    def min = paramCfg.getBigDecimal('min')
-                    if (min != null && value < min) {
-                        throw new IllegalArgumentException("Param '$code' must >= $min")
+                if (FieldType.Decimal == type) { // 小数验证
+                    if (value == null) value = paramCfg.getBigDecimal('defaultValue')
+                    if (value != null) {
+                        try {
+                            value = value instanceof BigDecimal ? value : new BigDecimal(value.toString())
+                        } catch (ex) {
+                            throw new IllegalArgumentException("Param '$code' is not a decimal. value: $value", ex)
+                        }
+                        def min = paramCfg.getBigDecimal('min')
+                        if (min != null && value < min) {
+                            throw new IllegalArgumentException("Param '$code' must >= $min")
+                        }
+                        def max = paramCfg.getBigDecimal('max')
+                        if (max != null && value > max) {
+                            throw new IllegalArgumentException("Param '$code' must <= $max")
+                        }
                     }
-                    def max = paramCfg.getBigDecimal('max')
-                    if (max != null && value > max) {
-                        throw new IllegalArgumentException("Param '$code' must <= $max")
-                    }
-                    params.put(code, value)
                     fixValue = paramCfg.getBigDecimal('fixValue')
                     enumValues = paramCfg.getJSONArray('enumValues')?.collect {JSONObject jo -> jo?.getBigDecimal('value')}?.findAll{it}
                 }
-                if (FieldType.Str == type && value != null) { // 字符串验证
-                    def length = paramCfg.getLong('length')
-                    if (length != null && value.toString().length() > length) {
-                        throw new IllegalArgumentException("Param '$code' length must < $length")
+                if (FieldType.Str == type) { // 字符串验证
+                    if (value == null) value = paramCfg.getString('defaultValue')
+                    if (value != null) {
+                        def maxLength = paramCfg.getInteger('maxLength')
+                        if (maxLength != null && value.toString().length() > maxLength) {
+                            throw new IllegalArgumentException("Param '$code' length must < $maxLength")
+                        }
+                        def fixLength = paramCfg.getInteger('fixLength')
+                        if (fixLength != null && value.toString().length() != fixLength) {
+                            throw new IllegalArgumentException("Param '$code' length must equal $fixLength")
+                        }
                     }
                     fixValue = paramCfg.getString('fixValue')
                     enumValues = paramCfg.getJSONArray('enumValues')?.collect {JSONObject jo -> jo?.getString('value')}?.findAll{it}
                 }
-                if (FieldType.Time == type && value != null) { // 时间验证
-                    String format = paramCfg.getString('format')
-                    if (!format) throw new IllegalArgumentException("Param '$code' type is Time, format must config")
-                    try {
-                        value = new SimpleDateFormat(format).parse(value.toString())
-                    } catch (ex) {
-                        throw new IllegalArgumentException("Param '$code' format error. format: $format, value: $value")
+                if (FieldType.Time == type) { // 时间验证
+                    if (value == null) value = paramCfg.getString('defaultValue')
+                    if (value != null) {
+                        String format = paramCfg.getString('format')
+                        if (!format) throw new IllegalArgumentException("Param '$code' type is Time, format must config")
+                        try {
+                            // if (value.toString().length() != format.length()) throw new Exception()
+                            value = new SimpleDateFormat(format).parse(value.toString())
+                        } catch (ex) {
+                            throw new IllegalArgumentException("Param '$code' format error. format: $format, value: $value")
+                        }
                     }
-                    def min = paramCfg.getDate('min')
-                    if (min != null && value < min) {
-                        throw new IllegalArgumentException("Param '$code' must >= ${paramCfg.getString('min')}")
-                    }
-                    def max = paramCfg.getDate('max')
-                    if (max != null && value > max) {
-                        throw new IllegalArgumentException("Param '$code' must <= ${paramCfg.getString('max')}")
-                    }
-                    fixValue = paramCfg.getDate('fixValue')
-                    enumValues = paramCfg.getJSONArray('enumValues')?.collect {JSONObject jo -> jo?.getDate('value')}?.findAll{it}
+//                    def min = paramCfg.getDate('min')
+//                    if (min != null && value < min) {
+//                        throw new IllegalArgumentException("Param '$code' must >= ${paramCfg.getString('min')}")
+//                    }
+//                    def max = paramCfg.getDate('max')
+//                    if (max != null && value > max) {
+//                        throw new IllegalArgumentException("Param '$code' must <= ${paramCfg.getString('max')}")
+//                    }
+//                    fixValue = paramCfg.getDate('fixValue')
+//                    enumValues = paramCfg.getJSONArray('enumValues')?.collect {JSONObject jo -> jo?.getDate('value')}?.findAll{it}
                 }
 
                 if (fixValue != null && value != fixValue) {  // 固定值验证

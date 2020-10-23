@@ -207,7 +207,7 @@ class MntDecisionCtrl extends ServerTpl {
      * @return
      */
     @Path(path = 'setDecision', method = 'post')
-    ApiResp setDecision(String id, String dsl, HttpContext ctx) {
+    ApiResp setDecision(String id, String dsl, String apiConfig, HttpContext ctx) {
         DecisionSpec spec
         try {
             spec = DecisionSpec.of(dsl)
@@ -241,6 +241,7 @@ class MntDecisionCtrl extends ServerTpl {
         decision.name = spec.决策名
         decision.comment = spec.决策描述
         decision.dsl = dsl
+        decision.apiConfig = apiConfig
         repo.saveOrUpdate(decision)
         if (delDecisionId) ep.fire("decisionChange", delDecisionId)
         ep.fire("decisionChange", decision.decisionId)

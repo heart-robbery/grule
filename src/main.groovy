@@ -29,7 +29,7 @@ app.addSource(new HttpServer().ctrls(
 app.addSource(new FileUploader())
 app.addSource(new TestService())
 app.addSource(new AttrManager())
-app.addSource(new DecisionEngine())
+app.addSource(new DecisionSrv())
 app.addSource(new DecisionManager())
 app.addSource(new OpHistorySrv())
 app.addSource(new UserSrv())

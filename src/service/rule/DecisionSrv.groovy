@@ -11,12 +11,11 @@ import dao.entity.DecisionResult
 import java.time.Duration
 
 /**
- * 决策执行引擎
+ * 决策Service
  */
-class DecisionEngine extends ServerTpl {
+class DecisionSrv extends ServerTpl {
     static final String SAVE_RESULT = 'save_result'
-    @Lazy def dm = bean(DecisionManager)
-    @Lazy def am = bean(AttrManager)
+
     @Lazy def http = bean(OkHttpSrv)
     @Lazy def repo = bean(BaseRepo, 'jpa_rule_repo')
 
@@ -57,7 +56,7 @@ class DecisionEngine extends ServerTpl {
         log.info("end decision: " + JSON.toJSONString(ctx.summary(), SerializerFeature.WriteMapNullValue))
 
         super.async { // 异步查询的, 异步回调通知
-            if (ctx.input['async'] == 'true') {
+            if (Boolean.valueOf(ctx.input.getOrDefault('async', false).toString())) {
                 String cbUrl = ctx.input['callback'] // 回调Url
                 if (cbUrl && cbUrl.startsWith('http')) {
                     (1..2).each {
@@ -91,37 +90,5 @@ class DecisionEngine extends ServerTpl {
                 }
             )
         }
-    }
-
-
-    /**
-     * 执行决策
-     * @param decisionId
-     * @param async 是否异步
-     * @param id id
-     * @param params 参数
-     * @return
-     */
-    Map<String, Object> run(String decisionId, boolean async = true, String id = null, Map<String, Object> params = [:]) {
-        def decision = dm.findDecision(decisionId)
-        if (decision == null) throw new IllegalArgumentException("未找到决策: " + decisionId)
-        id = id?:UUID.randomUUID().toString().replaceAll('-', '')
-        log.info("Run decision. decisionId: " + decisionId + ", id: " + id + ", async: " + async  + ", params: " + params)
-        decision.paramValidator?.apply(params) // 参数验证
-
-        DecisionContext ctx = new DecisionContext()
-        ctx.setDecisionHolder(decision)
-        ctx.setId(id)
-        ctx.setAttrManager(am)
-        ctx.setEp(ep)
-        ctx.setInput(params)
-
-        repo.saveOrUpdate(new DecisionResult(id: ctx.id, decisionId: decisionId, occurTime: ctx.startup))
-        if (async) {
-            super.async { ctx.start() }
-        } else {
-            ctx.start()
-        }
-        return ctx.result()
     }
 }

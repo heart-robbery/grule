@@ -18,7 +18,7 @@
                             &nbsp;&nbsp;&nbsp;
                             <date-item :time="item.updateTime"></date-item>
                             <span class="float-right">
-                                <h-button text-color="yellow" :circle="true" @click.stop="showTestPop(item)">测试</h-button>
+                                <h-button text-color="yellow" :circle="true" @click.stop="showTestPop(item)">API配置</h-button>
                                 <h-button v-if="sUser.permissions.find((e) => e == 'decision-del') == 'decision-del'" text-color="red" :circle="true" icon="h-icon-trash" @click.stop="del(item)">删除</h-button>
                             </span>
                         </template>
@@ -43,7 +43,7 @@
         loadJs('ace-lang-groovy');
         loadJs('ace-snip-groovy');
     });
-    const testPop = {
+    const apiConfig = {
         props: ['decision'],
         template: `
             <div>
@@ -52,13 +52,24 @@
                         <input type="text" :value="items.url" placeholder="请求地址" style="width: 100%"/>
                     </h-cell>
                 </h-row>
-                <h-row :space="10" v-for="(param,index) in items.params">
-                    <h-cell width="8"><input type="text" v-model="param.name" placeholder="参数名" style="float: left; width: 100%"/></h-cell>
-                    <h-cell width="12"><input type="text" v-model="param.value" placeholder="参数值" style="float: left; width: 100%"/></h-cell>
-                    <h-cell width="2">
-                        <i v-if="items.params.length == (index + 1)" class="h-icon-plus" @click="add"></i>
-                        <i class="h-icon-minus" @click="del(param)"></i>
-                    </h-cell>
+                <h-row :space="10" v-for="(item,index) in decision.apiConfig">
+                    <h-form mode="threecolumn">
+                        <h-formitem label="参数说明">
+                            <input type="text" v-model="item.name"/>
+                        </h-formitem>
+                        <h-formitem label="参数名">
+                            <input type="text" v-model="item.code"/>
+                        </h-formitem>
+                        <h-formitem label="类型">
+                            <h-select v-model="item.type" :datas="types"></h-select>
+                        </h-formitem>
+                        <h-formitem label="是否必须">
+                            <h-switch v-model="item.require" small>
+                                <span slot="open">必须</span>
+                                <span slot="close">性必须</span>
+                            </h-switch>
+                        </h-formitem>
+                    </h-form>
                 </h-row>
                 <h-row>
                     <h-cell width="24">
@@ -83,7 +94,13 @@
             return {
                 cacheKey: cacheKey,
                 items: items,
-                result: ''
+                result: '',
+                types: [
+                    { title: '字符串', key: 'Str'},
+                    { title: '整形', key: 'Int' },
+                    { title: '布尔', key: 'Bool' },
+                    { title: '小数', key: 'Decimal' },
+                ]
             }
         },
         methods: {
@@ -96,7 +113,7 @@
                         if (res.code == '00') {
                             this.result = JSON.stringify(res.data, null, 4).trim();
                             this.$Message.success(`测试调用: ${this.decision.decisionId}成功`);
-                            localStorage.setItem(this.cacheKey, JSON.stringify(this.items))
+                            localStorage.setItem(this.cacheKey, JSON.stringify(this.items));
                             app.$data.tmp.testResultId = res.data.id;
                         } else this.$Notice.error(res.desc);
                     }
@@ -135,7 +152,7 @@
                 this.$Modal({
                     title: `测试决策: ${item.name}`, middle: true, draggable: true,
                     component: {
-                        vue: testPop,
+                        vue: apiConfig,
                         datas: {decision: item}
                     },
                     width: 700, closeOnMask: false,
@@ -247,6 +264,23 @@
                 this.decision.list.unshift({
                     decisionId: decisionId,
                     name: '决策名',
+                    apiConfig: [
+                        {
+                            "code": "decisionId", "name": "决策id", "type": "Str", "require": true, "fixValue": decisionId
+                        },
+                        {
+                            "code": "async", "name": "是否异步", "type": "Bool", "require": false, "defaultValue": false
+                        },
+                        {
+                            "code": "idNumber", "name": "身份证", "type": "Str", "require": true, "fixLength": 18
+                        },
+                        {
+                            "code": "mobileNo", "name": "手机号", "type": "Str", "require": true, "fixLength": 11
+                        },
+                        {
+                            "code": "name", "name": "姓名", "type": "Str", "require": true, "maxLength": 100
+                        }
+                    ],
                     dsl:
 `// 决策id: 必须唯一
 决策id = '${decisionId}'
