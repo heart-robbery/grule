@@ -18,7 +18,8 @@
                             &nbsp;&nbsp;&nbsp;
                             <date-item :time="item.updateTime"></date-item>
                             <span class="float-right">
-                                <h-button text-color="yellow" :circle="true" @click.stop="showTestPop(item)">API配置</h-button>
+                                <h-button text-color="yellow" :circle="true" @click.stop="showApiPop(item)">API配置</h-button>
+                                <h-button text-color="yellow" :circle="true" @click.stop="showTestPop(item)">测试</h-button>
                                 <h-button v-if="sUser.permissions.find((e) => e == 'decision-del') == 'decision-del'" text-color="red" :circle="true" icon="h-icon-trash" @click.stop="del(item)">删除</h-button>
                             </span>
                         </template>
@@ -46,41 +47,113 @@
     const apiConfig = {
         props: ['decision'],
         template: `
-            <div>
-                <h-row :space="10">
-                    <h-cell>
-                        <input type="text" :value="items.url" placeholder="请求地址" style="width: 100%"/>
-                    </h-cell>
-                </h-row>
-                <h-row :space="10" v-for="(item,index) in decision.apiConfig">
-                    <h-form mode="threecolumn">
-                        <h-formitem label="参数说明">
-                            <input type="text" v-model="item.name"/>
-                        </h-formitem>
-                        <h-formitem label="参数名">
-                            <input type="text" v-model="item.code"/>
-                        </h-formitem>
-                        <h-formitem label="类型">
-                            <h-select v-model="item.type" :datas="types"></h-select>
-                        </h-formitem>
-                        <h-formitem label="是否必须">
-                            <h-switch v-model="item.require" small>
-                                <span slot="open">必须</span>
-                                <span slot="close">性必须</span>
-                            </h-switch>
-                        </h-formitem>
-                    </h-form>
-                </h-row>
-                <h-row>
-                    <h-cell width="24">
-                        <h-button @click="test">测试</h-button>
-                    </h-cell>
-                </h-row>
-                <h-row>
-                  <pre style="white-space: pre-wrap">
-                      {{result}}
-                    </pre>
-                </h-row>
+            <div class="h-panel">
+                <div class="h-panel-bar">
+                    <h-button @click="add"><i class="h-icon-plus"></i></h-button>
+                </div>
+                <div class="h-panel-body">
+                    <h-table :datas="apiConfig" stripe select-when-click-tr border :height="480">
+                        <h-tableitem title="参数名" align="center" :width="200">
+                            <template slot-scope="{data}">
+                                <input type="text" v-model="data.code" :readonly="data._readonly"/>
+                            </template>
+                        </h-tableitem>
+                        <h-tableitem title="参数说明" align="center" :width="200">
+                            <template slot-scope="{data}">
+                                <input type="text" v-model="data.name"/>
+                            </template>
+                        </h-tableitem>
+                        <h-tableitem title="类型" align="center" :width="90">
+                            <template slot-scope="{data}">
+                                <h-select v-model="data.type" :datas="types" :deletable="false" style="width: 80px" :disabled="data._readonly"></h-select>
+                            </template>
+                        </h-tableitem>
+                        <h-tableitem title="是否必须" align="center" :width="80">
+                            <template slot-scope="{data}">
+                                <h-switch v-model="data.require" small>
+                                    <span slot="open">必须</span>
+                                    <span slot="close">性必须</span>
+                                </h-switch>
+                            </template>
+                        </h-tableitem>
+                        <h-tableitem title="值" align="center" :width="250">
+                            <template slot-scope="{data}">
+                                <h-form>
+                                    <h-formitem v-if="data.type == 'Str'" label="固定值">
+                                        <input type="text" v-model="data.fixValue" :readonly="data._readonly"/>
+                                    </h-formitem>
+                                    <h-formitem v-if="data.type == 'Str'" label="默认值">
+                                        <input type="text" v-model="data.defaultValue" :readonly="data._readonly"/>
+                                    </h-formitem>
+                                    <h-formitem v-if="data.type == 'Str'" label="枚举值">
+                                        <h-taginput v-model="data.enumValues"></h-taginput>
+                                    </h-formitem>
+
+                                    <h-formitem v-if="data.type == 'Int'" label="固定值">
+                                        <h-numberinput v-model="data.fixValue" useInt></h-numberinput>
+                                    </h-formitem>
+                                    <h-formitem v-if="data.type == 'Int'" label="默认值">
+                                        <h-numberinput v-model="data.defaultValue" useInt></h-numberinput>
+                                    </h-formitem>
+
+                                    <h-formitem v-if="data.type == 'Decimal'" label="固定值">
+                                        <h-numberinput v-model="data.fixValue"></h-numberinput>
+                                    </h-formitem>
+                                    <h-formitem v-if="data.type == 'Decimal'" label="默认值">
+                                        <h-numberinput v-model="data.defaultValue"></h-numberinput>
+                                    </h-formitem>
+
+                                    <h-formitem v-if="data.type == 'Bool'" label="固定值">
+                                        <h-switch v-model="data.fixValue" small>
+                                            <span slot="open">true</span>
+                                            <span slot="close">false</span>
+                                        </h-switch>
+                                    </h-formitem>
+                                    <h-formitem v-if="data.type == 'Bool'" label="默认值">
+                                        <h-switch v-model="data.defaultValue" small>
+                                            <span slot="open">true</span>
+                                            <span slot="close">false</span>
+                                        </h-switch>
+                                    </h-formitem>
+                                </h-form>
+                            </template>
+                        </h-tableitem>
+                        <h-tableitem title="验证" align="center" :width="250">
+                            <template slot-scope="{data}">
+                            <h-form>
+                                <h-formitem v-if="data.type == 'Str'" label="最大长度">
+                                    <h-numberinput v-model="data.maxLength"></h-numberinput>
+                                </h-formitem>
+                                <h-formitem v-if="data.type == 'Str'" label="固定长度">
+                                    <h-numberinput v-model="data.fixLength"></h-numberinput>
+                                </h-formitem>
+
+                                <h-formitem v-if="data.type == 'Int'" label="最小值">
+                                    <h-numberinput v-model="data.min" useInt></h-numberinput>
+                                </h-formitem>
+                                <h-formitem v-if="data.type == 'Int'" label="最大值">
+                                    <h-numberinput v-model="data.max" useInt></h-numberinput>
+                                </h-formitem>
+
+                                <h-formitem v-if="data.type == 'Decimal'" label="最小值">
+                                    <h-numberinput v-model="data.min"></h-numberinput>
+                                </h-formitem>
+                                <h-formitem v-if="data.type == 'Decimal'" label="最大值">
+                                    <h-numberinput v-model="data.max"></h-numberinput>
+                                </h-formitem>
+
+                            </h-form>
+                        </template>
+                        </h-tableitem>
+                        <h-tableitem title="操作" align="center" :width="60" fixed="right">
+                            <template slot-scope="{data}">
+                                <h-button class="h-btn h-btn-s h-btn-red" @click="del(data)"><i class="h-icon-trash"></i></h-button>
+                            </template>
+                        </h-tableitem>
+                    </h-table>
+                </div>
+                <div class="h-panel-bar">
+                </div>
             </div>
         `,
         data() {
@@ -91,10 +164,17 @@
             let cacheKey = 'rule.test.' + this.decision.decisionId;
             let itemsStr = localStorage.getItem(cacheKey);
             if (itemsStr) items = JSON.parse(itemsStr);
+            this.decision.apiConfigO = this.decision.apiConfigO ? this.decision.apiConfigO : (this.decision.apiConfig ? JSON.parse(this.decision.apiConfig) : null);
+            if (this.decision.apiConfigO) {
+                for (let item of this.decision.apiConfigO) {
+                    if (item.code == 'decisionId' || item.code == 'async') item._readonly = true
+                }
+            }
             return {
                 cacheKey: cacheKey,
                 items: items,
                 result: '',
+                apiConfig: this.decision.apiConfigO,
                 types: [
                     { title: '字符串', key: 'Str'},
                     { title: '整形', key: 'Int' },
@@ -114,6 +194,74 @@
                             this.result = JSON.stringify(res.data, null, 4).trim();
                             this.$Message.success(`测试调用: ${this.decision.decisionId}成功`);
                             localStorage.setItem(this.cacheKey, JSON.stringify(this.items));
+                            app.$data.tmp.testResultId = res.data.id;
+                        } else this.$Notice.error(res.desc);
+                    }
+                })
+            },
+            add() {
+                this.decision.apiConfigO.push({name: `参数${this.decision.apiConfigO.length + 1}`, code: null, type: 'Str'})
+            },
+            del(item) {
+                let index = this.decision.apiConfigO.indexOf(item);
+                this.decision.apiConfigO.splice(index, 1)
+            }
+        }
+    };
+    const testPop = {
+        props: ['decision'],
+        template: `
+            <div>
+            <h-row :space="10">
+                <h-cell>
+                    <input type="text" :value="items.url" placeholder="请求地址" style="width: 100%"/>
+                </h-cell>
+            </h-row>
+            <h-row :space="10" v-for="(param,index) in items.params">
+                <h-cell width="8"><input type="text" v-model="param.name" placeholder="参数名" style="float: left; width: 100%"/></h-cell>
+                <h-cell width="12"><input type="text" v-model="param.value" placeholder="参数值" style="float: left; width: 100%"/></h-cell>
+                <h-cell width="2">
+                    <i v-if="items.params.length == (index + 1)" class="h-icon-plus" @click="add"></i>
+                    <i class="h-icon-minus" @click="del(param)"></i>
+                </h-cell>
+            </h-row>
+            <h-row>
+                <h-cell width="24">
+                    <h-button @click="test">测试</h-button>
+                </h-cell>
+            </h-row>
+            <h-row>
+                  <pre style="white-space: pre-wrap">
+                      {{result}}
+                    </pre>
+            </h-row>
+            </div>
+        `,
+        data() {
+            let items = {
+                url: location.protocol + '//' + location.host + '/decision?decisionId=' + this.decision.decisionId,
+                params: [{name: '参数1', value: null}]
+            };
+            let cacheKey = 'rule.test.' + this.decision.decisionId;
+            let itemsStr = localStorage.getItem(cacheKey);
+            if (itemsStr) items = JSON.parse(itemsStr);
+            return {
+                cacheKey: cacheKey,
+                items: items,
+                result: ''
+            }
+        },
+        methods: {
+            test() {
+                this.result = '';
+                $.ajax({
+                    url: this.items.url,
+                    data: this.items.params.map((param) => {let o={}; o[param.name] = param.value; return o}).reduce((o1, o2) => {let o = {...o1, ...o2}; return o}),
+                    success: (res) => {
+                        if (res.code == '00') {
+                            this.result = JSON.stringify(res.data, null, 4).trim();
+                            this.$Message.success(`测试调用: ${this.decision.decisionId}成功`);
+                            localStorage.setItem(this.cacheKey, JSON.stringify(this.items))
                             app.$data.tmp.testResultId = res.data.id;
                         } else this.$Notice.error(res.desc);
                     }
@@ -148,14 +296,30 @@
             if (this.tabs.showId) this.load()
         },
         methods: {
-            showTestPop(item) {
+            showApiPop(item) {
                 this.$Modal({
-                    title: `测试决策: ${item.name}`, middle: true, draggable: true,
+                    title: `API配置: ${item.name}`, middle: true, draggable: true,
                     component: {
                         vue: apiConfig,
                         datas: {decision: item}
                     },
-                    width: 700, closeOnMask: false,
+                    width: 1000, closeOnMask: false,
+                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false,
+                    // events: {
+                    //     reload: () => {
+                    //         this.load()
+                    //     }
+                    // }
+                })
+            },
+            showTestPop(item) {
+                this.$Modal({
+                    title: `测试策略: ${item.name}`, middle: true, draggable: true,
+                    component: {
+                        vue: testPop,
+                        datas: {decision: item}
+                    },
+                    width: 800, closeOnMask: false,
                     hasCloseIcon: true, fullScreen: false, middle: false, transparent: false,
                     // events: {
                     //     reload: () => {
@@ -245,7 +409,7 @@
                 $.ajax({
                     url: 'mnt/setDecision',
                     type: 'post',
-                    data: {id: decision.id, dsl: decision.dsl},
+                    data: {id: decision.id, dsl: decision.dsl, apiConfig: decision.apiConfigO ? JSON.stringify(decision.apiConfigO) : decision.apiConfig},
                     success: (res) => {
                         if (res.code == '00') {
                             if (decision.id) {
@@ -264,7 +428,7 @@
                 this.decision.list.unshift({
                     decisionId: decisionId,
                     name: '决策名',
-                    apiConfig: [
+                    apiConfigO: [
                         {
                             "code": "decisionId", "name": "决策id", "type": "Str", "require": true, "fixValue": decisionId
                         },

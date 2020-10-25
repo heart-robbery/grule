@@ -210,11 +210,17 @@ class DecisionManager extends ServerTpl {
 //                    enumValues = paramCfg.getJSONArray('enumValues')?.collect {JSONObject jo -> jo?.getDate('value')}?.findAll{it}
                 }
 
-                if (fixValue != null && value != fixValue) {  // 固定值验证
-                    throw new IllegalArgumentException("Param '$code' value fixed be '$fixValue'")
-                }
-                if (enumValues && !enumValues.find {it == value}) { // 枚举值验证
-                    throw new IllegalArgumentException("Param '$code' enum values: '${enumValues.join(",")}'")
+                if (value) {
+                    if (fixValue != null) {  // 固定值验证
+                        if (value != fixValue) {
+                            throw new IllegalArgumentException("Param '$code' value fixed be '$fixValue'")
+                        }
+                    }
+                    else if (enumValues) { // 枚举值验证
+                        if (!enumValues.find {it == value}) {
+                            throw new IllegalArgumentException("Param '$code' enum values: '${enumValues.join(",")}'")
+                        }
+                    }
                 }
                 params.put(code, value) // 类型矫正
                 true

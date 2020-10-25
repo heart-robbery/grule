@@ -56,5 +56,8 @@ class Decision extends UUIDEntity {
      }
      ]
      */
+    @Lob
+    @Basic
+    @Type(type = "text")
     String apiConfig
 }
