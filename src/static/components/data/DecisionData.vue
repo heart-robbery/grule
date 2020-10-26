@@ -7,7 +7,6 @@
     </div>
 </template>
 <script>
-    // loadJs('moment');
     module.exports = {
         props: ['menu'],
         data() {

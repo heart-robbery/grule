@@ -38,6 +38,7 @@ class RuleCtrl extends ServerTpl {
         try {
             decision.paramValidator?.apply(params) // 参数验证
         } catch (IllegalArgumentException ex) {
+            log.error("参数验证失败: id: " + ctx.request.id + ", decisionId: " + decisionId + ", errMsg: " + ex.message)
             return ApiResp.fail(ex.message)
         }
 

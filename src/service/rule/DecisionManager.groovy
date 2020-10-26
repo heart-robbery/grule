@@ -124,10 +124,10 @@ class DecisionManager extends ServerTpl {
                 if (FieldType.Bool == type) { // Boolean 值验证
                     if (value == null) value = paramCfg.getBoolean('defaultValue')
                     if (value != null) {
-                        if (!'true'.equalsIgnoreCase(value) && !'false'.equalsIgnoreCase(value)) {
+                        if (!'true'.equalsIgnoreCase(value.toString()) && !'false'.equalsIgnoreCase(value.toString())) {
                             throw new IllegalArgumentException("Param '$code' type is boolean. value is 'true' or 'false'")
                         }
-                        value = value instanceof Boolean ? value : Boolean.valueOf(value)
+                        value = value instanceof Boolean ? value : Boolean.valueOf(value.toString())
                     }
                     fixValue = paramCfg.getBoolean('fixValue')
                 }

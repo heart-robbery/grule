@@ -50,6 +50,9 @@
             <div class="h-panel">
                 <div class="h-panel-bar">
                     <h-button @click="add"><i class="h-icon-plus"></i></h-button>
+                    <div class="h-panel-right">
+                        <h-button @click="save">保存</h-button>
+                    </div>
                 </div>
                 <div class="h-panel-body">
                     <h-table :datas="apiConfig" stripe select-when-click-tr border :height="480">
@@ -120,30 +123,33 @@
                         </h-tableitem>
                         <h-tableitem title="验证" align="center" :width="250">
                             <template slot-scope="{data}">
-                            <h-form>
-                                <h-formitem v-if="data.type == 'Str'" label="最大长度">
-                                    <h-numberinput v-model="data.maxLength"></h-numberinput>
-                                </h-formitem>
-                                <h-formitem v-if="data.type == 'Str'" label="固定长度">
-                                    <h-numberinput v-model="data.fixLength"></h-numberinput>
-                                </h-formitem>
+                                <h-form>
+                                    <h-formitem v-if="data.type == 'Time'" label="格式">
+                                        <input type="text" v-model="data.format" placeholder="例: yyyy-MM-dd HH:mm:ss" />
+                                    </h-formitem>
 
-                                <h-formitem v-if="data.type == 'Int'" label="最小值">
-                                    <h-numberinput v-model="data.min" useInt></h-numberinput>
-                                </h-formitem>
-                                <h-formitem v-if="data.type == 'Int'" label="最大值">
-                                    <h-numberinput v-model="data.max" useInt></h-numberinput>
-                                </h-formitem>
+                                    <h-formitem v-if="data.type == 'Str'" label="最大长度">
+                                        <h-numberinput v-model="data.maxLength"></h-numberinput>
+                                    </h-formitem>
+                                    <h-formitem v-if="data.type == 'Str'" label="固定长度">
+                                        <h-numberinput v-model="data.fixLength"></h-numberinput>
+                                    </h-formitem>
 
-                                <h-formitem v-if="data.type == 'Decimal'" label="最小值">
-                                    <h-numberinput v-model="data.min"></h-numberinput>
-                                </h-formitem>
-                                <h-formitem v-if="data.type == 'Decimal'" label="最大值">
-                                    <h-numberinput v-model="data.max"></h-numberinput>
-                                </h-formitem>
+                                    <h-formitem v-if="data.type == 'Int'" label="最小值">
+                                        <h-numberinput v-model="data.min" useInt></h-numberinput>
+                                    </h-formitem>
+                                    <h-formitem v-if="data.type == 'Int'" label="最大值">
+                                        <h-numberinput v-model="data.max" useInt></h-numberinput>
+                                    </h-formitem>
 
-                            </h-form>
-                        </template>
+                                    <h-formitem v-if="data.type == 'Decimal'" label="最小值">
+                                        <h-numberinput v-model="data.min"></h-numberinput>
+                                    </h-formitem>
+                                    <h-formitem v-if="data.type == 'Decimal'" label="最大值">
+                                        <h-numberinput v-model="data.max"></h-numberinput>
+                                    </h-formitem>
+                                </h-form>
+                            </template>
                         </h-tableitem>
                         <h-tableitem title="操作" align="center" :width="60" fixed="right">
                             <template slot-scope="{data}">
@@ -157,13 +163,6 @@
             </div>
         `,
         data() {
-            let items = {
-                url: location.protocol + '//' + location.host + '/decision?decisionId=' + this.decision.decisionId,
-                params: [{name: '参数1', value: null}]
-            };
-            let cacheKey = 'rule.test.' + this.decision.decisionId;
-            let itemsStr = localStorage.getItem(cacheKey);
-            if (itemsStr) items = JSON.parse(itemsStr);
             this.decision.apiConfigO = this.decision.apiConfigO ? this.decision.apiConfigO : (this.decision.apiConfig ? JSON.parse(this.decision.apiConfig) : null);
             if (this.decision.apiConfigO) {
                 for (let item of this.decision.apiConfigO) {
@@ -171,36 +170,22 @@
                 }
             }
             return {
-                cacheKey: cacheKey,
-                items: items,
-                result: '',
                 apiConfig: this.decision.apiConfigO,
                 types: [
                     { title: '字符串', key: 'Str'},
                     { title: '整形', key: 'Int' },
                     { title: '布尔', key: 'Bool' },
                     { title: '小数', key: 'Decimal' },
+                    { title: '时间', key: 'Time' },
                 ]
             }
         },
         methods: {
-            test() {
-                this.result = '';
-                $.ajax({
-                    url: this.items.url,
-                    data: this.items.params.map((param) => {let o={}; o[param.name] = param.value; return o}).reduce((o1, o2) => {let o = {...o1, ...o2}; return o}),
-                    success: (res) => {
-                        if (res.code == '00') {
-                            this.result = JSON.stringify(res.data, null, 4).trim();
-                            this.$Message.success(`测试调用: ${this.decision.decisionId}成功`);
-                            localStorage.setItem(this.cacheKey, JSON.stringify(this.items));
-                            app.$data.tmp.testResultId = res.data.id;
-                        } else this.$Notice.error(res.desc);
-                    }
-                })
-            },
             add() {
                 this.decision.apiConfigO.push({name: `参数${this.decision.apiConfigO.length + 1}`, code: null, type: 'Str'})
+            },
+            save() {
+                this.$emit('update');
             },
             del(item) {
                 let index = this.decision.apiConfigO.indexOf(item);
@@ -214,14 +199,14 @@
             <div>
             <h-row :space="10">
                 <h-cell>
-                    <input type="text" :value="items.url" placeholder="请求地址" style="width: 100%"/>
+                    <input type="text" :value="url" placeholder="请求地址" style="width: 100%"/>
                 </h-cell>
             </h-row>
-            <h-row :space="10" v-for="(param,index) in items.params">
-                <h-cell width="8"><input type="text" v-model="param.name" placeholder="参数名" style="float: left; width: 100%"/></h-cell>
-                <h-cell width="12"><input type="text" v-model="param.value" placeholder="参数值" style="float: left; width: 100%"/></h-cell>
+            <h-row :space="10" v-for="(param,index) in items">
+                <h-cell width="8"><input type="text" v-model="param.code" placeholder="参数名" style="float: left; width: 100%" :readonly="param.type"/></h-cell>
+                <h-cell width="12"><input type="text" v-model="param.value" :placeholder="param.name" style="float: left; width: 100%"/></h-cell>
                 <h-cell width="2">
-                    <i v-if="items.params.length == (index + 1)" class="h-icon-plus" @click="add"></i>
+                    <i v-if="items.length == (index + 1)" class="h-icon-plus" @click="add"></i>
                     <i class="h-icon-minus" @click="del(param)"></i>
                 </h-cell>
             </h-row>
@@ -231,23 +216,36 @@
                 </h-cell>
             </h-row>
             <h-row>
-                  <pre style="white-space: pre-wrap">
-                      {{result}}
-                    </pre>
+                <pre style="white-space: pre-wrap">
+                  {{result}}
+                </pre>
             </h-row>
             </div>
         `,
         data() {
-            let items = {
-                url: location.protocol + '//' + location.host + '/decision?decisionId=' + this.decision.decisionId,
-                params: [{name: '参数1', value: null}]
-            };
+            this.decision.apiConfigO = this.decision.apiConfigO ? this.decision.apiConfigO : (this.decision.apiConfig ? JSON.parse(this.decision.apiConfig) : null);
             let cacheKey = 'rule.test.' + this.decision.decisionId;
-            let itemsStr = localStorage.getItem(cacheKey);
-            if (itemsStr) items = JSON.parse(itemsStr);
+            let items = (() => {
+                let itemsStr = localStorage.getItem(cacheKey);
+                if (itemsStr) return JSON.parse(itemsStr);
+                return []
+            })();
             return {
+                url: location.protocol + '//' + location.host + '/decision',
                 cacheKey: cacheKey,
-                items: items,
+                items: (() => {
+                    let arr = this.decision.apiConfigO.map(cfg => {
+                        let item = items.find(i => i && i.code == cfg.code);
+                        return $.extend({value: cfg.fixValue || cfg.defaultValue || (item ? item.value : null)}, cfg)
+                    });
+                    for (let index in items) {
+                        let item = items[index];
+                        if (item && item.code != null && !arr.find(i => i && i.code == item.code)) {
+                            arr.push(item)
+                        }
+                    }
+                    return arr
+                })(),
                 result: ''
             }
         },
@@ -255,24 +253,24 @@
             test() {
                 this.result = '';
                 $.ajax({
-                    url: this.items.url,
-                    data: this.items.params.map((param) => {let o={}; o[param.name] = param.value; return o}).reduce((o1, o2) => {let o = {...o1, ...o2}; return o}),
+                    url: this.url,
+                    data: this.items.map((param) => {let o={}; o[param.code] = param.value; return o}).reduce((o1, o2) => {let o = {...o1, ...o2}; return o}),
                     success: (res) => {
                         if (res.code == '00') {
                             this.result = JSON.stringify(res.data, null, 4).trim();
-                            this.$Message.success(`测试调用: ${this.decision.decisionId}成功`);
-                            localStorage.setItem(this.cacheKey, JSON.stringify(this.items))
+                            this.$Message.success(`测试调用: ${this.decision.name} 成功`);
                             app.$data.tmp.testResultId = res.data.id;
+                            localStorage.setItem(this.cacheKey, JSON.stringify(this.items.map(o => {return {code: o.code, value: o.value}})));
                         } else this.$Notice.error(res.desc);
                     }
                 })
             },
             add() {
-                this.items.params.push({name: `参数${this.items.params.length + 1}`, value: null})
+                this.items.push({name: `参数${this.items.length + 1}`, value: null})
             },
             del(param) {
-                let index = this.items.params.indexOf(param);
-                this.items.params.splice(index, 1)
+                let index = this.items.indexOf(param);
+                this.items.splice(index, 1)
             }
         }
     };
@@ -297,6 +295,7 @@
         },
         methods: {
             showApiPop(item) {
+                this.curDecision = item;
                 this.$Modal({
                     title: `API配置: ${item.name}`, middle: true, draggable: true,
                     component: {
@@ -305,27 +304,22 @@
                     },
                     width: 1000, closeOnMask: false,
                     hasCloseIcon: true, fullScreen: false, middle: false, transparent: false,
-                    // events: {
-                    //     reload: () => {
-                    //         this.load()
-                    //     }
-                    // }
+                    events: {
+                        update: () => {
+                            this.save()
+                        }
+                    }
                 })
             },
             showTestPop(item) {
                 this.$Modal({
-                    title: `测试策略: ${item.name}`, middle: true, draggable: true,
+                    title: `测试: ${item.name}`, middle: true, draggable: true,
                     component: {
                         vue: testPop,
                         datas: {decision: item}
                     },
-                    width: 800, closeOnMask: false,
+                    width: 750, closeOnMask: false,
                     hasCloseIcon: true, fullScreen: false, middle: false, transparent: false,
-                    // events: {
-                    //     reload: () => {
-                    //         this.load()
-                    //     }
-                    // }
                 })
             },
             initEditor() {

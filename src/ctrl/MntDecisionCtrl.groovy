@@ -129,7 +129,7 @@ class MntDecisionCtrl extends ServerTpl {
                 {
                     def am = bean(AttrManager)
                     Utils.toMapper(it).addConverter('decisionId', 'decisionName', {String dId ->
-                        bean(DecisionManager).findDecision(dId).决策名
+                        bean(DecisionManager).findDecision(dId).spec.决策名
                     }).addConverter('attrs', {
                         it == null ? null : JSON.parseObject(it).collect { e ->
                             [enName: e.key, cnName: am.attrMap.get(e.key)?.cnName, value: e.value]
@@ -183,7 +183,7 @@ class MntDecisionCtrl extends ServerTpl {
             },
             {record ->
                 def m = Utils.toMapper(record).addConverter('decisionId', 'decisionName', {String dId ->
-                    bean(DecisionManager).findDecision(dId).决策名
+                    bean(DecisionManager).findDecision(dId).spec.决策名
                 }).build()
                 m.put('success', record.httpException == null && record.parseException == null && record.scriptException == null)
                 m
@@ -208,6 +208,7 @@ class MntDecisionCtrl extends ServerTpl {
      */
     @Path(path = 'setDecision', method = 'post')
     ApiResp setDecision(String id, String dsl, String apiConfig, HttpContext ctx) {
+        if (!dsl) return ApiResp.fail("dsl must not be empty")
         DecisionSpec spec
         try {
             spec = DecisionSpec.of(dsl)
@@ -215,6 +216,7 @@ class MntDecisionCtrl extends ServerTpl {
             log.error("语法错误", ex)
             return ApiResp.fail('语法错误: ' + ex.message)
         }
+        if (!spec.决策id) return ApiResp.fail("decisionId must not be empty")
 
         for (def policy : spec.policies) {
             for (def rule : policy.rules) {
@@ -431,6 +433,7 @@ class MntDecisionCtrl extends ServerTpl {
 
     @Path(path = 'delDecision/:decisionId')
     ApiResp delDecision(HttpContext ctx, String decisionId) {
+        if (!decisionId) return ApiResp.fail("decisionId must not be empty")
         repo.delete(repo.find(Decision) {root, query, cb -> cb.equal(root.get('decisionId'), decisionId)})
         ctx.auth('decision-del')
         ep.fire('delDecision', decisionId)
@@ -441,6 +444,7 @@ class MntDecisionCtrl extends ServerTpl {
 
     @Path(path = 'delField/:enName')
     ApiResp delField(HttpContext ctx, String enName) {
+        if (!enName) return ApiResp.fail("enName must not be empty")
         ctx.auth('field-del')
         repo.delete(repo.find(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)})
         ep.fire('fieldChange', enName)
@@ -450,6 +454,7 @@ class MntDecisionCtrl extends ServerTpl {
 
     @Path(path = 'delDataCollector/:enName')
     ApiResp delDataCollector(HttpContext ctx, String enName) {
+        if (!enName) return ApiResp.fail("enName must not be empty")
         ctx.auth('dataCollector-del')
         repo.delete(repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), enName)})
         ep.fire('dataCollectorChange', enName)

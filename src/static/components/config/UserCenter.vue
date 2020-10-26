@@ -10,7 +10,6 @@
     </div>
 </template>
 <script>
-    loadJs('moment');
     module.exports = {
         data() {
             return {

@@ -33,7 +33,6 @@
     </div>
 </template>
 <script>
-    loadJs('moment');
     const addEditPop = { //添加,编辑窗口组件
         template: `
                 <div v-width="600" style="padding-top: 10px">

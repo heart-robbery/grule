@@ -45,7 +45,7 @@ class MntAnalyseCtrl extends ServerTpl {
             record.each {e ->
                 data.put(e.key.toLowerCase(), e.value)
             }
-            data['decisionName'] = bean(DecisionManager).findDecision(data['decision_id']).决策名
+            data['decisionName'] = bean(DecisionManager).findDecision(data['decision_id']).spec.决策名
             data
         })
     }

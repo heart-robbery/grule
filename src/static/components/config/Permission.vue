@@ -15,7 +15,11 @@
             <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading">
                 <h-tableitem title="权限标识" prop="enName" align="center"></h-tableitem>
                 <h-tableitem title="权限名称" prop="cnName" align="center"></h-tableitem>
-                <h-tableitem title="更新时间" prop="updateTime" align="center" :format="formatDate"></h-tableitem>
+                <h-tableitem title="更新时间" align="center">
+                    <template slot-scope="{data}">
+                        <date-item :time="data.updateTime" />
+                    </template>
+                </h-tableitem>
                 <!-- <h-tableitem title="创建时间" prop="createTime" align="center"></h-tableitem> -->
                 <h-tableitem title="描述" prop="comment" align="center"></h-tableitem>
                 <h-tableitem v-if="sUser.permissions.find((e) => e == 'grant' || e == 'grant')" title="操作" align="center" :width="100">
@@ -122,9 +126,6 @@
             this.load()
         },
         methods: {
-            formatDate(v) {
-                return moment(v).format('YYYY-MM-DD HH:mm:ss')
-            },
             showAddPop() {
                 this.$Modal({
                     title: '添加权限', middle: true, draggable: true,

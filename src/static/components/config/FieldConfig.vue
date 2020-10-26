@@ -17,7 +17,11 @@
                 <h-tableitem title="英文名" prop="enName" align="center"></h-tableitem>
                 <h-tableitem title="中文名" prop="cnName" align="center"></h-tableitem>
                 <h-tableitem title="类型" prop="type" align="center" :format="formatType"></h-tableitem>
-                <h-tableitem title="更新时间" prop="updateTime" align="center" :format="formatDate"></h-tableitem>
+                <h-tableitem title="更新时间" align="center">
+                    <template slot-scope="{data}">
+                        <date-item :time="data.updateTime" />
+                    </template>
+                </h-tableitem>
                 <!--                    <h-tableitem title="创建时间" prop="createTime" align="center"></h-tableitem>-->
                 <h-tableitem title="描述" prop="comment" align="center"></h-tableitem>
                 <h-tableitem title="值函数名" align="center">
@@ -42,7 +46,6 @@
     </div>
 </template>
 <script>
-    loadJs('moment');
     loadJs('md5');
     const types = [
         { title: '字符串', key: 'Str'},
@@ -179,9 +182,6 @@
                     if (type.key == v) return type.title
                 }
                 return v
-            },
-            formatDate(v) {
-                return moment(v).format('YYYY-MM-DD HH:mm:ss')
             },
             showAddPop() {
                 this.$Modal({

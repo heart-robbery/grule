@@ -17,7 +17,11 @@
                 <h-tableitem title="英文名" prop="enName" align="center"></h-tableitem>
                 <h-tableitem title="中文名" prop="cnName" align="center"></h-tableitem>
                 <h-tableitem title="类型" prop="type" align="center" :format="formatType"></h-tableitem>
-                <h-tableitem title="更新时间" prop="updateTime" align="center" :format="formatDate"></h-tableitem>
+                <h-tableitem title="更新时间" align="center">
+                    <template slot-scope="{data}">
+                        <date-item :time="data.updateTime" />
+                    </template>
+                </h-tableitem>
                 <h-tableitem title="描述" prop="comment" align="center"></h-tableitem>
                 <h-tableitem title="状态" align="center" :width="80">
                     <template slot-scope="{data}">
@@ -44,7 +48,6 @@
     </div>
 </template>
 <script>
-    loadJs('moment');
     loadJs('ace', () => {
         ace.config.set("basePath", "js/lib");
         loadJs('ace-tools');
@@ -262,9 +265,6 @@
             // 'add-pop': addEditPop
         },
         methods: {
-            formatDate(v) {
-                return moment(v).format('YYYY-MM-DD HH:mm:ss')
-            },
             formatType(v) {
                 for (let type of types) {
                     if (type.key == v) return type.title

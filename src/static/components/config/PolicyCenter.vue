@@ -18,7 +18,6 @@
         loadJs('ace-lang-groovy');
         loadJs('ace-snip-groovy');
     });
-    loadJs('moment');
     module.exports = {
         props: ['menu'],
         data() {
