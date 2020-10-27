@@ -64,6 +64,7 @@ let jsMap = new Map([
     ['ace-lang-rule', 'js/lib/mode-rule.js'],
     ['ace-snip-rule', 'js/lib/rule-snippets.js'],
     ['ace-lang-groovy', 'js/lib/mode-groovy.js'],
+    ['ace-lang-json', 'js/lib/mode-json.js'],
     ['ace-snip-groovy', 'js/lib/groovy-snippets.min.js'],
     ['moment', 'js/lib/moment.min.js'],
     ['echarts', 'js/lib/echarts.min.js'],
@@ -114,6 +115,117 @@ Vue.component('date-item', (resolve, reject) => {
             }
         })
     })
+});
+
+// json编辑器
+Vue.component('ace-json', (resolve, reject) => {
+    loadJs('ace', () => {
+        ace.config.set("basePath", "js/lib");
+        loadJs('ace-tools', 'ace-lang-json', () => {
+            resolve({
+                model: {prop: 'content', event: 'update'},
+                props: ['content', 'width', 'height', 'readonly'],
+                template: '<div ref="editor" v-bind:style="{height: heightPx, width: widthPx}">{{content}}</div>',
+                data() {
+                    return {
+                        widthPx: this.width || '100%', heightPx: this.height || '250px',
+                        editor: null
+                    }
+                },
+                mounted: function () {
+                    this.$nextTick(this.initEditor)
+                },
+                watch: {
+                    content(v) {
+                        if (this.editor && v != this.editor.session.getValue()) {
+                            this.editor.session.setValue(v);
+                        }
+                    }
+                },
+                methods: {
+                    initEditor() {
+                        // if (this.editor) {this.editor.destroy()}
+                        this.editor = ace.edit(this.$refs.editor);
+                        this.editor.session.setValue(this.content);
+                        this.editor.setReadOnly(this.readonly == true ? true : false);
+                        this.editor.setOptions({
+                            enableBasicAutocompletion: true,
+                            enableSnippets: true,
+                            enableLiveAutocompletion: true
+                        });
+                        this.editor.on('change', (e) => {
+                            // this.content = this.editor.session.getValue();
+                            this.$emit('update', this.editor.session.getValue())
+                        });
+                        this.editor.session.setMode('ace/mode/json');
+                        this.editor.commands.addCommand({
+                            name: 'save',
+                            bindKey: {win: 'Ctrl-S', mac: 'Command-S'},
+                            exec: (editor) => {
+                                // this.content = this.editor.session.getValue();
+                                this.$emit('change', this.editor.session.getValue())
+                            },
+                            // readOnly: false // 如果不需要使用只读模式，这里设置false
+                        });
+                    },
+                }
+            })
+        });
+    });
+});
+Vue.component('ace-groovy', (resolve, reject) => {
+    loadJs('ace', () => {
+        ace.config.set("basePath", "js/lib");
+        loadJs('ace-tools', 'ace-lang-groovy', () => {
+            resolve({
+                props: ['content', 'width', 'height', 'readonly'],
+                template: '<div ref="editor" v-bind:style="{height: heightPx, width: widthPx}"></div>',
+                data() {
+                    return {
+                        widthPx: this.width || '100%', heightPx: this.height || '250px',
+                        editor: null
+                    }
+                },
+                mounted: function () {
+                    this.$nextTick(this.initEditor)
+                },
+                watch: {
+                    content: function (v) {
+                        this.editor.session.setValue(this.content);
+                    }
+                },
+                methods: {
+                    initEditor() {
+                        // if (this.editor) {this.editor.destroy()}
+                        this.editor = ace.edit(this.$refs.editor);
+                        // console.log('editor: ', this.editor);
+                        this.editor.session.setValue(this.content);
+                        this.editor.setReadOnly(this.readonly == true ? true : false);
+                        // console.log('$options', this.editor.$options);
+                        this.editor.setOptions({
+                            enableBasicAutocompletion: true,
+                            enableSnippets: true,
+                            enableLiveAutocompletion: true
+                        });
+                        this.editor.on('change', (e) => {
+                            //console.log('change: ', e);
+                            // this.content = this.editor.session.getValue()
+                        });
+                        this.editor.session.setMode('ace/mode/groovy');
+                        this.editor.commands.addCommand({
+                            name: 'save',
+                            bindKey: {win: 'Ctrl-S', mac: 'Command-S'},
+                            exec: (editor) => {
+                                // this.curDecision.dsl = editor.session.getValue();
+                                // this.save()
+                            },
+                            // readOnly: false // 如果不需要使用只读模式，这里设置false
+                        });
+                    },
+                }
+            })
+        });
+    });
 });
 
 

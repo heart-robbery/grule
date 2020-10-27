@@ -216,9 +216,7 @@
                 </h-cell>
             </h-row>
             <h-row>
-                <pre style="white-space: pre-wrap">
-                  {{result}}
-                </pre>
+                <ace-json v-model="result" height="200px" width="99%"></ace-json>
             </h-row>
             </div>
         `,
