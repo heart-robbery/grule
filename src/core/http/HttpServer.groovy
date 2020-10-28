@@ -75,7 +75,7 @@ class HttpServer extends ServerTpl {
     @EL(name = 'sys.started', async = true)
     protected void started() {
         enabled = true
-        bean(SchedSrv)?.cron(getStr("0 */3 * * * ?", "cleanCron")) {clean()}
+        bean(SchedSrv)?.cron(getStr("cleanCron", "0 */3 * * * ?")) {clean()}
     }
 
 
