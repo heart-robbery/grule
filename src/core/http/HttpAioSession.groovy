@@ -21,7 +21,7 @@ class HttpAioSession {
     // close 回调函数
     protected              Runnable                  closeFn
     // 上次读写时间
-    protected              Long                      lastUsed
+    protected              Long                      lastUsed    = System.currentTimeMillis()
     protected final        AtomicBoolean             closed      = new AtomicBoolean(false)
     // 每次接收消息的内存空间(文件上传大小限制)
     @Lazy protected               def                buf         = ByteBuffer.allocate(server.getInteger('maxMsgSize', 1024 * 1024 * 1))
@@ -134,7 +134,7 @@ class HttpAioSession {
                 //2. 浏览器老发送空的字节
                 // TODO 待研究
                 // log.warn("接收字节为空. 关闭 " + session.sc.toString())
-                // session.close()
+                if (!sc.isOpen()) session.close()
             }
         }
 

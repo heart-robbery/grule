@@ -23,8 +23,7 @@ import java.security.cert.X509Certificate
 import java.text.SimpleDateFormat
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.LongAdder
 import java.util.function.Consumer
 
@@ -35,17 +34,16 @@ import static core.Utils.ipv4
  */
 class HttpServer extends ServerTpl {
     protected final CompletionHandler<AsynchronousSocketChannel, HttpServer> handler = new AcceptHandler()
-    protected       AsynchronousServerSocketChannel                          ssc
-    @Lazy protected  String                                                  hpCfg   = getStr('hp', ":8080")
-    @Lazy           Integer                                                  port    = hpCfg.split(":")[1] as Integer
-    protected final Chain                                                    chain   = new Chain(this)
-    protected final List                                                     ctrls   = new LinkedList<>()
+    protected       AsynchronousServerSocketChannel ssc
+    @Lazy protected  String                hpCfg        = getStr('hp', ":8080")
+    @Lazy           Integer                port         = hpCfg.split(":")[1] as Integer
+    protected final Chain                  chain        = new Chain(this)
+    protected final List                   ctrls        = new LinkedList<>()
     // 是否可用
-    boolean                                                  enabled = false
-    @Lazy def                                                                sched   = bean(SchedSrv)
+    boolean                                enabled      = false
     // 当前连接数
-    protected      final def                                                 connected = new AtomicInteger(0)
-    @Lazy protected Set<String> ignoreSuffix = new HashSet(['.js', '.css', '.html', '.vue', '.png', '.ttf', '.woff', '.woff2', 'favicon.ico', '.map', *attrs()['ignorePrintUrlSuffix']?:[]])
+    protected  final Queue<HttpAioSession> connections  = new ConcurrentLinkedQueue<>()
+    @Lazy protected Set<String>            ignoreSuffix = new HashSet(['.js', '.css', '.html', '.vue', '.png', '.ttf', '.woff', '.woff2', 'favicon.ico', '.map', *attrs()['ignorePrintUrlSuffix']?:[]])
 
     HttpServer(String name) { super(name) }
     HttpServer() { super('web') }
@@ -77,9 +75,7 @@ class HttpServer extends ServerTpl {
     @EL(name = 'sys.started', async = true)
     protected void started() {
         enabled = true
-//        chain.handlers.each {h ->
-//            log.info(((h instanceof PathHandler) ? h.path() : '') + ": " + h.order())
-//        }
+        bean(SchedSrv)?.cron(getStr("0 */3 * * * ?", "cleanCron")) {clean()}
     }
 
 
@@ -97,7 +93,7 @@ class HttpServer extends ServerTpl {
         try {
             hCtx = new HttpContext(request, this)
             if (enabled) {
-                if (app.sysLoad == 10) { // 限流
+                if (app.sysLoad == 10 || connections.size() > getInteger("maxConnections", 128)) { // 限流
                     hCtx.response.status(503)
                     hCtx.render(ApiResp.of('503', "服务忙, 请稍后再试!"))
                     return
@@ -349,47 +345,51 @@ class HttpServer extends ServerTpl {
     }
 
 
+    /**
+     * 清除已关闭或已过期的连接
+     */
+    protected void clean() {
+        if (connections.isEmpty()) return
+        long expire = Duration.ofMinutes(getInteger("aioSession.maxIdle",
+            connections.size() > 100 ? 3 : (connections.size() > 50 ? 5 : (connections.size() > 30 ? 10 : 20))
+        )).toMillis()
+
+        for (def itt = connections.iterator().iterator(); itt.hasNext(); ) {
+            def se = itt.next()
+            if (se == null) break
+            if (!se.sc.isOpen()) {
+                connections.remove(se)
+                se.close()
+                log.debug("Cleaned unavailable HttpAioSession: " + se + ", connected: " + connections.size())
+            } else if (!se.ws && System.currentTimeMillis() - se.lastUsed > expire) {
+                connections.remove(se)
+                se.close()
+                log.debug("Closed expired HttpAioSession: " + se + ", connected: " + connections.size())
+                break
+            }
+        }
+    }
+
+
     protected class AcceptHandler implements CompletionHandler<AsynchronousSocketChannel, HttpServer> {
 
         @Override
         void completed(final AsynchronousSocketChannel sc, final HttpServer srv) {
             async {
-                connected.incrementAndGet()
                 def rAddr = ((InetSocketAddress) sc.remoteAddress)
-                srv.log.debug("New HTTP(AIO) Connection from: " + rAddr.hostString + ":" + rAddr.port)
+                srv.log.debug("New HTTP(AIO) Connection from: " + rAddr.hostString + ":" + rAddr.port + ", connected: " + connections.size())
                 sc.setOption(StandardSocketOptions.SO_REUSEADDR, true)
                 sc.setOption(StandardSocketOptions.SO_RCVBUF, getInteger('so_rcvbuf', 1024 * 1024 * 2))
                 sc.setOption(StandardSocketOptions.SO_SNDBUF, getInteger('so_sndbuf', 1024 * 1024 * 4)) // 必须大于 chunk 最小值
                 sc.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
                 sc.setOption(StandardSocketOptions.TCP_NODELAY, true)
-                def se = new HttpAioSession(sc, srv)
-                se.closeFn = {connected.decrementAndGet()}
+                def se = new HttpAioSession(sc, srv); connections.offer(se)
+                se.closeFn = {connections.remove(se)}
                 se.start()
-                handleExpire(se)
+                if (connections.size() > 80) clean()
             }
             // 继续接入
             srv.accept()
-        }
-
-        protected void handleExpire(HttpAioSession se) {
-            // websocket 也主动关
-            long expire = Duration.ofMinutes(getInteger("aioSession.maxIdle",
-                connected.get() > 100 ? 2: (connected.get() > 60 ? 5 : (connected.get() > 30 ? 10 : 20))
-            )).toMillis()
-            final AtomicBoolean end = new AtomicBoolean(false)
-            long cur = System.currentTimeMillis()
-            sched?.dyn({
-                if (!se.ws && System.currentTimeMillis() - (se.lastUsed?:cur) > expire && end.compareAndSet(false, true)) {
-                    log.debug("Closing expired HttpAioSession: " + se)
-                    se.close()
-                }
-            }, {
-                if (end.get()) return null
-                long left = expire - (System.currentTimeMillis() - (se.lastUsed?:cur))
-                if (left < 1000L) return new Date(System.currentTimeMillis() + (1000L * 30)) // 执行函数之前会计算下次执行的时间
-                def d = new Date(System.currentTimeMillis() + (left?:0) + 10L)
-                d
-            })
         }
 
         @Override

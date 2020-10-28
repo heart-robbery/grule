@@ -4,15 +4,11 @@ import cn.xnatural.enet.event.EL
 import core.SchedSrv
 import core.ServerTpl
 
-import java.nio.channels.AsynchronousChannelGroup
-import java.nio.channels.AsynchronousServerSocketChannel
-import java.nio.channels.AsynchronousSocketChannel
-import java.nio.channels.ClosedChannelException
-import java.nio.channels.CompletionHandler
+import java.nio.channels.*
 import java.text.SimpleDateFormat
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.LongAdder
 import java.util.function.BiConsumer
 
@@ -22,12 +18,13 @@ import static core.Utils.ipv4
  * TCP(Aio) 服务端
  */
 class AioServer extends ServerTpl {
-    protected final List<BiConsumer<String, AioSession>>                    msgFns  = new LinkedList<>()
-    protected final CompletionHandler<AsynchronousSocketChannel, AioServer> handler = new AcceptHandler()
+    protected final List<BiConsumer<String, AioSession>>                    msgFns      = new LinkedList<>()
+    protected final CompletionHandler<AsynchronousSocketChannel, AioServer> handler     = new AcceptHandler()
     protected AsynchronousServerSocketChannel                               ssc
-    private @Lazy String                                                    hpCfg   = getStr('hp', ":7001")
-    @Lazy Integer                                                           port    = hpCfg.split(":")[1] as Integer
-    @Lazy def                                                               sched   = bean(SchedSrv)
+    private @Lazy String                                                    hpCfg       = getStr('hp', ":7001")
+    @Lazy Integer                                                           port        = hpCfg.split(":")[1] as Integer
+    // 当前连接数
+    protected  final Queue<AioSession>                                      connections = new ConcurrentLinkedQueue<>()
 
 
     @EL(name = 'sys.starting', async = true)
@@ -51,6 +48,12 @@ class AioServer extends ServerTpl {
 
     @EL(name = 'sys.stopping', async = true)
     void stop() { ssc?.close() }
+
+
+    @EL(name = 'sys.started', async = true)
+    protected void started() {
+        bean(SchedSrv)?.cron(getStr("0 */10 * * * ?", "cleanCron")) {clean()}
+    }
 
 
     /**
@@ -119,47 +122,52 @@ class AioServer extends ServerTpl {
     }
 
 
+    /**
+     * 清除已关闭或已过期的连接
+     */
+    protected void clean() {
+        if (connections.isEmpty()) return
+        long expire = Duration.ofMinutes(getInteger("aioSession.maxIdle",
+            connections.size() > 100 ? 3 : (connections.size() > 50 ? 5 : (connections.size() > 30 ? 10 : 20))
+        )).toMillis()
+
+        for (def itt = connections.iterator().iterator(); itt.hasNext(); ) {
+            def se = itt.next()
+            if (se == null) break
+            if (!se.sc.isOpen()) {
+                connections.remove(se)
+                se.close()
+                log.debug("Cleaned unavailable AioSession: " + se + ", connected: " + connections.size())
+            } else if (System.currentTimeMillis() - se.lastUsed > expire) {
+                connections.remove(se)
+                se.close()
+                log.debug("Closed expired AioSession: " + se + ", connected: " + connections.size())
+                break
+            }
+        }
+    }
+
+
     protected class AcceptHandler implements CompletionHandler<AsynchronousSocketChannel, AioServer> {
 
         @Override
         void completed(final AsynchronousSocketChannel sc, final AioServer srv) {
             async {
                 def rAddr = ((InetSocketAddress) sc.remoteAddress)
-                srv.log.info("New TCP(AIO) Connection from: " + rAddr.hostString + ":" + rAddr.port)
+                srv.log.info("New TCP(AIO) Connection from: " + rAddr.hostString + ":" + rAddr.port + ", connected: " + connections.size())
                 sc.setOption(StandardSocketOptions.SO_REUSEADDR, true)
                 sc.setOption(StandardSocketOptions.SO_RCVBUF, getInteger('so_rcvbuf', 1024 * 1024 * 2))
                 sc.setOption(StandardSocketOptions.SO_SNDBUF, getInteger('so_sndbuf', 1024 * 1024 * 2))
                 sc.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
                 sc.setOption(StandardSocketOptions.TCP_NODELAY, true)
 
-                def se = new AioSession(sc, srv)
+                def se = new AioSession(sc, srv); connections.offer(se)
                 msgFns?.each {se.msgFn(it)}
+                se.closeFn = {connections.remove(se)}
                 se.start()
-
-                // AioSession过期 则关闭会话
-                handleExpire(se)
             }
             // 继续接入新连接
             srv.accept()
-        }
-
-
-        protected void handleExpire(AioSession se) {
-            long expire = Duration.ofMinutes(getInteger("session.maxIdle", 30)).toMillis()
-            final def end = new AtomicBoolean(false)
-            long cur = System.currentTimeMillis()
-            sched?.dyn({
-                if (System.currentTimeMillis() - (se.lastUsed?:cur) > expire && end.compareAndSet(false, true)) {
-                    log.info("Closing expired AioSession: " + se)
-                    se.close()
-                }
-            }, {
-                if (end.get()) return null
-                long left = expire - (System.currentTimeMillis() - (se.lastUsed?:cur))
-                if (left < 1000L) return new Date(System.currentTimeMillis() + (1000L * 30)) // 执行函数之前会计算下次执行的时间
-                def d = new Date(System.currentTimeMillis() + (left?:0) + 10L)
-                d
-            })
         }
 
 
