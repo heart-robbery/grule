@@ -11,7 +11,7 @@
         </div>
         <div class="h-panel-body">
             <div>
-                <h-collapse v-model="collapse" accordion @change="showEditor">
+                <h-collapse v-model="collapse" accordion>
                     <h-collapseitem v-for="item in decision.list" :key="item.decisionId" :name="item.decisionId">
                         <template slot='title'>
                             {{item.name + '(' + item.decisionId + ')' + (item.comment ? ': ' + item.comment : '')}}
@@ -23,9 +23,13 @@
                                 <h-button v-if="sUser.permissions.find((e) => e == 'decision-del') == 'decision-del'" text-color="red" :circle="true" icon="h-icon-trash" @click.stop="del(item)">删除</h-button>
                             </span>
                         </template>
-                        <div style="height: 650px; width: 100vh">
-                            <div v-if="collapse && collapse.length > 0 && collapse[0] == item.decisionId " ref="dslEditor" style="height: 650px; width: 800px"></div>
-                        </div>
+                        <ace-groovy v-if="collapse && collapse.length > 0 && collapse[0] == item.decisionId"
+                                    v-model="item.dsl" height="650px" width="90%" @save="save(item)"
+                                    :readonly="sUser.permissions.find((e) => e == 'decision-update') != 'decision-update'">
+                        </ace-groovy>
+<!--                        <div style="height: 650px; width: 100vh">-->
+<!--                            <div v-if="collapse && collapse.length > 0 && collapse[0] == item.decisionId " ref="dslEditor" style="height: 650px; width: 800px"></div>-->
+<!--                        </div>-->
                     </h-collapseitem>
                 </h-collapse>
             </div>
@@ -36,14 +40,6 @@
     </div>
 </template>
 <script>
-    loadJs('ace', () => {
-        ace.config.set("basePath", "js/lib");
-        loadJs('ace-tools');
-        // loadJs('ace-lang-rule');
-        // loadJs('ace-snip-rule');
-        loadJs('ace-lang-groovy');
-        loadJs('ace-snip-groovy');
-    });
     const apiConfig = {
         props: ['decision'],
         template: `
@@ -216,7 +212,7 @@
                 </h-cell>
             </h-row>
             <h-row>
-                <ace-json v-model="result" height="200px" width="99%"></ace-json>
+                <ace-json v-model="result" height="200px" width="99%" :readonly="true"></ace-json>
             </h-row>
             </div>
         `,
@@ -320,60 +316,6 @@
                     hasCloseIcon: true, fullScreen: false, middle: false, transparent: false,
                 })
             },
-            initEditor() {
-                // if (this.editor) {this.editor.destroy()}
-                this.editor = ace.edit(this.$refs.dslEditor[0]);
-                // console.log('editor: ', this.editor);
-                this.editor.session.setValue(this.curDecision.dsl);
-                if (this.sUser.permissions.find((e) => e == 'decision-update') != 'decision-update') {
-                    this.editor.setReadOnly(true)
-                }
-                // console.log('$options', this.editor.$options);
-                this.editor.setOptions({
-                    enableBasicAutocompletion: true,
-                    enableSnippets: true,
-                    enableLiveAutocompletion: true
-                });
-                this.editor.on('change', (e) => {
-                    //console.log('change: ', e);
-                    this.curDecision.dsl = this.editor.session.getValue()
-                });
-                this.editor.session.setMode('ace/mode/groovy');
-                this.editor.commands.addCommand({
-                    name: 'save',
-                    bindKey: {win: 'Ctrl-S', mac: 'Command-S'},
-                    exec: (editor) => {
-                        this.curDecision.dsl = editor.session.getValue();
-                        this.save()
-                    },
-                    // readOnly: false // 如果不需要使用只读模式，这里设置false
-                });
-
-                let languageTools = ace.require("ace/ext/language_tools");
-                // console.log('languageTools', ace.require("ace/ext/language_tools"));
-                languageTools.addCompleter({
-                    getCompletions: (editor, session, pos, prefix, callback) => {
-                        callback(null, [
-                            {
-                                name : "第一行", //名称
-                                value : "身份证号码",//值，这就是匹配我们输入的内容，比如输入s或者select,这一行就会出现在提示框里，可根据自己需求修改，就是你想输入什么显示出北京呢，就改成什么
-                                caption: "身",//字幕，下拉提示左侧内容,这也就是我们输入前缀匹配出来的内容，所以这里必须包含我们的前缀
-                                meta: "字段-身份证号码", //类型，下拉提示右侧内容
-                                type: "local",//可写为keyword
-                                score : 1000 // 让它排在最上面，类似权值的概念
-                            },
-                            {
-                                name : "年龄", //名称
-                                value : "年龄",//值，这就是匹配我们输入的内容，比如输入s或者select,这一行就会出现在提示框里，可根据自己需求修改，就是你想输入什么显示出北京呢，就改成什么
-                                caption: "年",//字幕，下拉提示左侧内容,这也就是我们输入前缀匹配出来的内容，所以这里必须包含我们的前缀
-                                meta: "字段-年龄", //类型，下拉提示右侧内容
-                                type: "local",//可写为keyword
-                                score : 1000 // 让它排在最上面，类似权值的概念
-                            }
-                        ]);
-                    }
-                });
-            },
             del(item) {
                 if (item.id) {
                     this.$Confirm('确定删除?', `删除决策: ${item.decisionId}`).then(() => {
@@ -396,8 +338,8 @@
                     this.decision.list.splice(index, 1);
                 }
             },
-            save() {
-                let decision = this.curDecision;
+            save(decision) {
+                decision = decision || this.curDecision;
                 $.ajax({
                     url: 'mnt/setDecision',
                     type: 'post',
@@ -449,7 +391,7 @@
 策略定义 {
     策略名 = 'P_预处理'
 
-    条件 { // 执行此策略的条件, false: 不执行, true/不配置默认 执行此策略
+    条件 { // 执行此策略的条件, false: 不执行, true 或者 不配置默认 执行此策略
         true
     }
 
@@ -473,27 +415,6 @@
                     `
                 })
             },
-            showEditor(e) {
-                // console.log('showEditor', e);
-                if (e && e.length > 0) {
-                    this.decision.list.forEach((v, i) => {
-                        if (v.decisionId == e[0]) {
-                            this.curDecision = v;
-                        }
-                    });
-                    if (window.ace == undefined) {
-                        // loadJs('ace', this.initEditor);
-                        loadJs('ace', 'ace-lang-tools', this.initEditor);
-                    } else {
-                        // 必须用$nextTick 保证dom节点渲染完成
-                        this.$nextTick(this.initEditor)
-                    }
-                }
-            },
-            // tabSwitch(data) {
-            //     console.log(data);
-            //     this.$emit('tab-switch', 'PolicyConfig', data.decisionId)
-            // },
             load(page) {
                 if (page == undefined || page == null) page = {page: 1};
                 this.decisionLoading = true;

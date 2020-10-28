@@ -117,15 +117,15 @@ Vue.component('date-item', (resolve, reject) => {
     })
 });
 
-// json编辑器
+// json 编辑器
 Vue.component('ace-json', (resolve, reject) => {
     loadJs('ace', () => {
         ace.config.set("basePath", "js/lib");
         loadJs('ace-tools', 'ace-lang-json', () => {
             resolve({
                 model: {prop: 'content', event: 'update'},
-                props: ['content', 'width', 'height', 'readonly'],
-                template: '<div ref="editor" v-bind:style="{height: heightPx, width: widthPx}">{{content}}</div>',
+                props: {content: String, width: String, height: String, readonly: Boolean},
+                template: '<div ref="editor" v-bind:style="{height: heightPx, width: widthPx}"></div>',
                 data() {
                     return {
                         widthPx: this.width || '100%', heightPx: this.height || '250px',
@@ -163,7 +163,8 @@ Vue.component('ace-json', (resolve, reject) => {
                             bindKey: {win: 'Ctrl-S', mac: 'Command-S'},
                             exec: (editor) => {
                                 // this.content = this.editor.session.getValue();
-                                this.$emit('change', this.editor.session.getValue())
+                                this.$emit('update', this.editor.session.getValue());
+                                this.$emit('save', this.editor.session.getValue());
                             },
                             // readOnly: false // 如果不需要使用只读模式，这里设置false
                         });
@@ -173,12 +174,14 @@ Vue.component('ace-json', (resolve, reject) => {
         });
     });
 });
+// groovy 编辑器
 Vue.component('ace-groovy', (resolve, reject) => {
     loadJs('ace', () => {
         ace.config.set("basePath", "js/lib");
-        loadJs('ace-tools', 'ace-lang-groovy', () => {
+        loadJs('ace-tools', 'ace-lang-groovy', 'ace-snip-groovy', () => {
             resolve({
-                props: ['content', 'width', 'height', 'readonly'],
+                model: {prop: 'content', event: 'update'},
+                props: {content: String, width: String, height: String, readonly: Boolean},
                 template: '<div ref="editor" v-bind:style="{height: heightPx, width: widthPx}"></div>',
                 data() {
                     return {
@@ -190,37 +193,62 @@ Vue.component('ace-groovy', (resolve, reject) => {
                     this.$nextTick(this.initEditor)
                 },
                 watch: {
-                    content: function (v) {
-                        this.editor.session.setValue(this.content);
+                    content(v) {
+                        if (this.editor && v != this.editor.session.getValue()) {
+                            this.editor.session.setValue(v);
+                        }
                     }
                 },
                 methods: {
                     initEditor() {
                         // if (this.editor) {this.editor.destroy()}
                         this.editor = ace.edit(this.$refs.editor);
-                        // console.log('editor: ', this.editor);
                         this.editor.session.setValue(this.content);
                         this.editor.setReadOnly(this.readonly == true ? true : false);
-                        // console.log('$options', this.editor.$options);
                         this.editor.setOptions({
                             enableBasicAutocompletion: true,
                             enableSnippets: true,
                             enableLiveAutocompletion: true
                         });
                         this.editor.on('change', (e) => {
-                            //console.log('change: ', e);
-                            // this.content = this.editor.session.getValue()
+                            // this.content = this.editor.session.getValue();
+                            this.$emit('update', this.editor.session.getValue())
                         });
                         this.editor.session.setMode('ace/mode/groovy');
                         this.editor.commands.addCommand({
                             name: 'save',
                             bindKey: {win: 'Ctrl-S', mac: 'Command-S'},
                             exec: (editor) => {
-                                // this.curDecision.dsl = editor.session.getValue();
-                                // this.save()
+                                // this.content = this.editor.session.getValue();
+                                this.$emit('update', this.editor.session.getValue());
+                                this.$emit('save', this.editor.session.getValue());
                             },
                             // readOnly: false // 如果不需要使用只读模式，这里设置false
                         });
+                        // let languageTools = ace.require("ace/ext/language_tools");
+                        // console.log('languageTools', ace.require("ace/ext/language_tools"));
+                        // languageTools.addCompleter({
+                        //     getCompletions: (editor, session, pos, prefix, callback) => {
+                        //         callback(null, [
+                        //             {
+                        //                 name : "第一行", //名称
+                        //                 value : "身份证号码",//值，这就是匹配我们输入的内容，比如输入s或者select,这一行就会出现在提示框里，可根据自己需求修改，就是你想输入什么显示出北京呢，就改成什么
+                        //                 caption: "身",//字幕，下拉提示左侧内容,这也就是我们输入前缀匹配出来的内容，所以这里必须包含我们的前缀
+                        //                 meta: "字段-身份证号码", //类型，下拉提示右侧内容
+                        //                 type: "local",//可写为keyword
+                        //                 score : 1000 // 让它排在最上面，类似权值的概念
+                        //             },
+                        //             {
+                        //                 name : "年龄", //名称
+                        //                 value : "年龄",//值，这就是匹配我们输入的内容，比如输入s或者select,这一行就会出现在提示框里，可根据自己需求修改，就是你想输入什么显示出北京呢，就改成什么
+                        //                 caption: "年",//字幕，下拉提示左侧内容,这也就是我们输入前缀匹配出来的内容，所以这里必须包含我们的前缀
+                        //                 meta: "字段-年龄", //类型，下拉提示右侧内容
+                        //                 type: "local",//可写为keyword
+                        //                 score : 1000 // 让它排在最上面，类似权值的概念
+                        //             }
+                        //         ]);
+                        //     }
+                        // });
                     },
                 }
             })

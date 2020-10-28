@@ -48,14 +48,6 @@
     </div>
 </template>
 <script>
-    loadJs('ace', () => {
-        ace.config.set("basePath", "js/lib");
-        loadJs('ace-tools');
-        // loadJs('ace-lang-rule');
-        // loadJs('ace-snip-rule');
-        loadJs('ace-lang-groovy');
-        loadJs('ace-snip-groovy');
-    });
     const types = [
         { title: '接口', key: 'http'},
         { title: '脚本', key: 'script' },
@@ -112,13 +104,13 @@
                         </h-formitem>
 
                         <h-formitem v-if="model.type == 'http'" label="解析脚本" icon="h-icon-complete" prop="parseScript" single>
-                            <div ref="dslEditor" style="height: 260px; width: 670px"></div>
+                            <ace-groovy v-if="model.type == 'http'" v-model="model.parseScript" height="260px" width="670px" />
                         </h-formitem>
                         <h-formitem v-if="model.type == 'script'" label="值计算函数" icon="h-icon-complete" prop="computeScript" single>
-                            <div ref="dslEditor" style="height: 380px; width: 670px"></div>
+                            <ace-groovy v-if="model.type == 'script'" v-model="model.computeScript" height="380px" width="670px" />
                         </h-formitem>
                         <h-formitem v-if="model.type == 'sql'" label="sql执行脚本" icon="h-icon-complete" prop="sqlScript" single>
-                            <div ref="dslEditor" style="height: 260px; width: 670px"></div>
+                            <ace-groovy v-if="model.type == 'sql'" v-model="model.sqlScript" height="260px" width="670px" />
                         </h-formitem>
                         <h-formitem single>
                                 <h-button v-if="model.id" color="primary" :loading="isLoading" @click="update">提交</h-button>
@@ -149,64 +141,7 @@
                 ],
             }
         },
-        mounted() {
-            this.showEditor()
-        },
-        watch: {
-            'model.type': function () {
-                this.showEditor()
-            }
-        },
         methods: {
-            showEditor() {
-                // 必须用$nextTick 保证dom节点渲染完成
-                this.$nextTick(this.initEditor);
-            },
-            initEditor() {
-                // if (this.editor) {this.editor.destroy()}
-                // console.log('this.$refs.dslEditor', this.$refs.dslEditor);
-                this.editor = ace.edit(this.$refs.dslEditor);
-                // console.log('editor: ', this.editor);
-                if (this.model.type == 'http') {
-                    if (this.model.parseScript) this.editor.session.setValue(this.model.parseScript);
-                } else if (this.model.type == 'script') {
-                    if (this.model.computeScript) this.editor.session.setValue(this.model.computeScript);
-                } else if (this.model.type == 'sql') {
-                    if (this.model.sqlScript) this.editor.session.setValue(this.model.sqlScript);
-                }
-                this.editor.setOptions({
-                    enableBasicAutocompletion: true,
-                    enableSnippets: true,
-                    enableLiveAutocompletion: true,
-                    //fontSize: "50pt",
-                });
-                this.editor.getSession().setUseSoftTabs(true);
-                this.editor.on('change', (e) => {
-                    if (this.model.type == 'http') {
-                        this.model.parseScript = this.editor.session.getValue();
-                    } else if (this.model.type == 'script') {
-                        this.model.computeScript = this.editor.session.getValue();
-                    } else if (this.model.type == 'sql') {
-                        this.model.sqlScript = this.editor.session.getValue();
-                    }
-                });
-                this.editor.session.setMode('ace/mode/groovy');
-                this.editor.commands.addCommand({
-                    name: 'save',
-                    bindKey: {win: 'Ctrl-S', mac: 'Command-S'},
-                    exec: (editor) => {
-                        if (this.model.type == 'http') {
-                            this.model.parseScript = this.editor.session.getValue();
-                        } else if (this.model.type == 'script') {
-                            this.model.computeScript = this.editor.session.getValue();
-                        } else if (this.model.type == 'sql') {
-                            this.model.sqlScript = this.editor.session.getValue();
-                        }
-                        // this.save()
-                    },
-                    // readOnly: false // 如果不需要使用只读模式，这里设置false
-                });
-            },
             update() {
                 this.isLoading = true;
                 $.ajax({
