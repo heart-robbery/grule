@@ -26,7 +26,7 @@ class AioSession {
     @Lazy protected        Devourer                             sendQueue   = new Devourer(AioSession.simpleName + ":" + sc.toString(), server.exec)
     // close 回调函数
     protected              Runnable                             closeFn
-    protected              Long                                 lastUsed
+    protected              Long                                 lastUsed    = System.currentTimeMillis()
     // 上次读写时间
     protected final        AtomicBoolean                        closed      = new AtomicBoolean(false)
     // 数据分割符(半包和粘包) 默认换行符分割
