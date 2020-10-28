@@ -52,7 +52,7 @@ class AioServer extends ServerTpl {
 
     @EL(name = 'sys.started', async = true)
     protected void started() {
-        bean(SchedSrv)?.cron(getStr("0 */10 * * * ?", "cleanCron")) {clean()}
+        bean(SchedSrv)?.cron(getStr("cleanCron", "0 */10 * * * ?")) {clean()}
     }
 
 
