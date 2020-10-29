@@ -42,6 +42,7 @@
 <script>
     const apiConfig = {
         props: ['decision'],
+        // language=HTML
         template: `
             <div class="h-panel">
                 <div class="h-panel-bar">
@@ -71,7 +72,7 @@
                             <template slot-scope="{data}">
                                 <h-switch v-model="data.require" small>
                                     <span slot="open">必须</span>
-                                    <span slot="close">性必须</span>
+                                    <span slot="close">非必须</span>
                                 </h-switch>
                             </template>
                         </h-tableitem>
@@ -79,10 +80,10 @@
                             <template slot-scope="{data}">
                                 <h-form>
                                     <h-formitem v-if="data.type == 'Str'" label="固定值">
-                                        <input type="text" v-model="data.fixValue" :readonly="data._readonly"/>
+                                        <input type="text" v-model="data.fixValue" />
                                     </h-formitem>
                                     <h-formitem v-if="data.type == 'Str'" label="默认值">
-                                        <input type="text" v-model="data.defaultValue" :readonly="data._readonly"/>
+                                        <input type="text" v-model="data.defaultValue"/>
                                     </h-formitem>
                                     <h-formitem v-if="data.type == 'Str'" label="枚举值">
                                         <h-taginput v-model="data.enumValues"></h-taginput>
@@ -103,16 +104,10 @@
                                     </h-formitem>
 
                                     <h-formitem v-if="data.type == 'Bool'" label="固定值">
-                                        <h-switch v-model="data.fixValue" small>
-                                            <span slot="open">true</span>
-                                            <span slot="close">false</span>
-                                        </h-switch>
+                                        <h-select v-model="data.fixValue" :datas="['true', 'false']" />
                                     </h-formitem>
                                     <h-formitem v-if="data.type == 'Bool'" label="默认值">
-                                        <h-switch v-model="data.defaultValue" small>
-                                            <span slot="open">true</span>
-                                            <span slot="close">false</span>
-                                        </h-switch>
+                                        <h-select v-model="data.defaultValue" :datas="['true', 'false']" />
                                     </h-formitem>
                                 </h-form>
                             </template>
@@ -154,8 +149,7 @@
                         </h-tableitem>
                     </h-table>
                 </div>
-                <div class="h-panel-bar">
-                </div>
+                <div class="h-panel-bar"></div>
             </div>
         `,
         data() {
@@ -200,7 +194,12 @@
             </h-row>
             <h-row :space="10" v-for="(param,index) in items">
                 <h-cell width="8"><input type="text" v-model="param.code" placeholder="参数名" style="float: left; width: 100%" :readonly="param.type"/></h-cell>
-                <h-cell width="12"><input type="text" v-model="param.value" :placeholder="param.name" style="float: left; width: 100%"/></h-cell>
+                <h-cell width="12">
+                    <h-select v-if="param.type == 'Bool'" v-model="param.value" :datas="['true', 'false']" :placeholder="param.name" />
+                    <h-select v-else-if="param.enumValues" v-model="param.value" :datas="param.enumValues" :placeholder="param.name" />
+                    <input v-else-if="param.type == 'Time'" type="text" v-model="param.value" :placeholder="param.name + ', ' + param.format" style="float: left; width: 100%"/>
+                    <input v-else type="text" v-model="param.value" :placeholder="param.name" style="float: left; width: 100%"/>
+                </h-cell>
                 <h-cell width="2">
                     <i v-if="items.length == (index + 1)" class="h-icon-plus" @click="add"></i>
                     <i class="h-icon-minus" @click="del(param)"></i>
@@ -228,10 +227,10 @@
                 url: location.protocol + '//' + location.host + '/decision',
                 cacheKey: cacheKey,
                 items: (() => {
-                    let arr = this.decision.apiConfigO.map(cfg => {
-                        let item = items.find(i => i && i.code == cfg.code);
-                        return $.extend({value: cfg.fixValue || cfg.defaultValue || (item ? item.value : null)}, cfg)
-                    });
+                    let arr = this.decision.apiConfigO ? this.decision.apiConfigO.map(cfg => {
+                        let item = items ? items.find(i => i && i.code == cfg.code) : null;
+                        return $.extend({value: (cfg.fixValue != null ? cfg.fixValue : (cfg.defaultValue != null ? cfg.defaultValue : (item ? item.value : null)))}, cfg)
+                    }) : [];
                     for (let index in items) {
                         let item = items[index];
                         if (item && item.code != null && !arr.find(i => i && i.code == item.code)) {
@@ -367,7 +366,7 @@
                             "code": "decisionId", "name": "决策id", "type": "Str", "require": true, "fixValue": decisionId
                         },
                         {
-                            "code": "async", "name": "是否异步", "type": "Bool", "require": false, "defaultValue": false
+                            "code": "async", "name": "是否异步", "type": "Bool", "require": false, "defaultValue": 'false'
                         },
                         {
                             "code": "idNumber", "name": "身份证", "type": "Str", "require": true, "fixLength": 18

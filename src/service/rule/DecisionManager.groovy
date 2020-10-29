@@ -149,7 +149,7 @@ class DecisionManager extends ServerTpl {
                         }
                     }
                     fixValue = paramCfg.getLong('fixValue')
-                    enumValues = paramCfg.getJSONArray('enumValues')?.collect {JSONObject jo -> jo?.getLong('value')}?.findAll{it}
+                    enumValues = paramCfg.getJSONArray('enumValues')?.findAll{it}
                 }
                 if (FieldType.Decimal == type) { // 小数验证
                     if (value == null) value = paramCfg.getBigDecimal('defaultValue')
@@ -169,7 +169,7 @@ class DecisionManager extends ServerTpl {
                         }
                     }
                     fixValue = paramCfg.getBigDecimal('fixValue')
-                    enumValues = paramCfg.getJSONArray('enumValues')?.collect {JSONObject jo -> jo?.getBigDecimal('value')}?.findAll{it}
+                    enumValues = paramCfg.getJSONArray('enumValues')?.findAll{it}
                 }
                 if (FieldType.Str == type) { // 字符串验证
                     if (value == null) value = paramCfg.getString('defaultValue')
@@ -184,7 +184,7 @@ class DecisionManager extends ServerTpl {
                         }
                     }
                     fixValue = paramCfg.getString('fixValue')
-                    enumValues = paramCfg.getJSONArray('enumValues')?.collect {JSONObject jo -> jo?.getString('value')}?.findAll{it}
+                    enumValues = paramCfg.getJSONArray('enumValues')?.findAll{it}
                 }
                 if (FieldType.Time == type) { // 时间验证
                     if (value == null) value = paramCfg.getString('defaultValue')

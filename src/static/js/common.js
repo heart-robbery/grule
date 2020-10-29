@@ -203,7 +203,7 @@ Vue.component('ace-groovy', (resolve, reject) => {
                     initEditor() {
                         // if (this.editor) {this.editor.destroy()}
                         this.editor = ace.edit(this.$refs.editor);
-                        this.editor.session.setValue(this.content);
+                        if (this.content) this.editor.session.setValue(this.content);
                         this.editor.setReadOnly(this.readonly == true ? true : false);
                         this.editor.setOptions({
                             enableBasicAutocompletion: true,

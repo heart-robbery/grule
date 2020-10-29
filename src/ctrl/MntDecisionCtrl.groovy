@@ -275,7 +275,7 @@ class MntDecisionCtrl extends ServerTpl {
         String sqlScript, Integer minIdle, Integer maxActive, Integer timeout, Boolean enabled
     ) {
         ctx.auth('dataCollector-add')
-        DataCollector collector = new DataCollector(enName: enName, cnName: cnName, type: type, comment: comment, enabled: enabled)
+        DataCollector collector = new DataCollector(enName: enName, cnName: cnName, type: type, comment: comment, enabled: (enabled == null ? true : enabled))
         if (!collector.enName) return ApiResp.fail('enName must not be empty')
         if (!collector.cnName) return ApiResp.fail('cnName must not be empty')
         if (!collector.type) return ApiResp.fail('type must not be empty')

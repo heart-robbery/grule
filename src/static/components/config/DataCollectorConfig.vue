@@ -115,18 +115,16 @@
                         <h-formitem single>
                                 <h-button v-if="model.id" color="primary" :loading="isLoading" @click="update">提交</h-button>
                                 <h-button v-else color="primary" :loading="isLoading" @click="add">提交</h-button>
-                                &nbsp;&nbsp;&nbsp;
-                                <h-button v-if="model.id" @click="model = {type: 'http', method: 'GET', contentType: 'application/x-www-form-urlencoded'}">清除</h-button>
-                                <h-button v-else @click="model = {type: 'http', method: 'GET', contentType: 'application/x-www-form-urlencoded', minIdle: 1, maxActive: 8}">重置</h-button>
                             </h-formitem>
                     </h-form>
                 </div>
                 `,
         props: ['collector'],
         data() {
+            let defaultModel = {type: 'http', method: 'GET', timeout: 10000, contentType: 'application/x-www-form-urlencoded', minIdle: 1, maxActive: 8};
             return {
-                isLoading: false,
-                model: this.collector ? $.extend({}, this.collector) : {type: 'http', method: 'GET', timeout: 10000, contentType: 'application/x-www-form-urlencoded', minIdle: 1, maxActive: 8},
+                isLoading: false, defaultModel: defaultModel,
+                model: this.collector ? $.extend({sqlScript: '', computeScript: '', parseScript: ''}, this.collector) : defaultModel,
                 validationRules: {
                     required: ['enName', 'cnName']
                 },
