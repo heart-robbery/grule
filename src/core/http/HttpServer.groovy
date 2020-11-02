@@ -10,10 +10,7 @@ import core.http.ws.WebSocket
 import sun.security.x509.*
 
 import java.lang.reflect.InvocationTargetException
-import java.nio.channels.AsynchronousChannelGroup
-import java.nio.channels.AsynchronousServerSocketChannel
-import java.nio.channels.AsynchronousSocketChannel
-import java.nio.channels.CompletionHandler
+import java.nio.channels.*
 import java.security.AccessControlException
 import java.security.KeyPairGenerator
 import java.security.PrivateKey
@@ -75,7 +72,7 @@ class HttpServer extends ServerTpl {
     @EL(name = 'sys.started', async = true)
     protected void started() {
         enabled = true
-        bean(SchedSrv)?.cron(getStr("cleanCron", "0 */3 * * * ?")) {clean()}
+        bean(SchedSrv)?.cron(getStr("cleanCron", "0 */5 * * * ?")) {clean()}
     }
 
 
@@ -358,13 +355,11 @@ class HttpServer extends ServerTpl {
             def se = itt.next()
             if (se == null) break
             if (!se.sc.isOpen()) {
-                connections.remove(se)
                 se.close()
-                log.debug("Cleaned unavailable HttpAioSession: " + se + ", connected: " + connections.size())
+                log.info("Cleaned unavailable HttpAioSession: " + se + ", connected: " + connections.size())
             } else if (!se.ws && System.currentTimeMillis() - se.lastUsed > expire) {
-                connections.remove(se)
                 se.close()
-                log.debug("Closed expired HttpAioSession: " + se + ", connected: " + connections.size())
+                log.info("Closed expired HttpAioSession: " + se + ", connected: " + connections.size())
                 break
             }
         }
@@ -377,16 +372,17 @@ class HttpServer extends ServerTpl {
         void completed(final AsynchronousSocketChannel sc, final HttpServer srv) {
             async {
                 def rAddr = ((InetSocketAddress) sc.remoteAddress)
-                srv.log.debug("New HTTP(AIO) Connection from: " + rAddr.hostString + ":" + rAddr.port + ", connected: " + connections.size())
                 sc.setOption(StandardSocketOptions.SO_REUSEADDR, true)
                 sc.setOption(StandardSocketOptions.SO_RCVBUF, getInteger('so_rcvbuf', 1024 * 1024 * 2))
                 sc.setOption(StandardSocketOptions.SO_SNDBUF, getInteger('so_sndbuf', 1024 * 1024 * 4)) // 必须大于 chunk 最小值
                 sc.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
                 sc.setOption(StandardSocketOptions.TCP_NODELAY, true)
+
                 def se = new HttpAioSession(sc, srv); connections.offer(se)
                 se.closeFn = {connections.remove(se)}
+                srv.log.debug("New HTTP(AIO) Connection from: " + rAddr.hostString + ":" + rAddr.port + ", connected: " + connections.size())
                 se.start()
-                if (connections.size() > 80) clean()
+                if (connections.size() > 20 && connections.size() % 3 == 0) clean()
             }
             // 继续接入
             srv.accept()
@@ -394,7 +390,9 @@ class HttpServer extends ServerTpl {
 
         @Override
         void failed(Throwable ex, HttpServer srv) {
-            srv.log.error(ex.message?:ex.class.simpleName, ex)
+            if (ex !instanceof ClosedChannelException) {
+                srv.log.error(ex.message?:ex.class.simpleName, ex)
+            }
         }
     }
 }
