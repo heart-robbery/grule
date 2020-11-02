@@ -135,13 +135,11 @@ class AioServer extends ServerTpl {
             def se = itt.next()
             if (se == null) break
             if (!se.sc.isOpen()) {
-                connections.remove(se)
                 se.close()
-                log.debug("Cleaned unavailable AioSession: " + se + ", connected: " + connections.size())
+                log.info("Cleaned unavailable AioSession: " + se + ", connected: " + connections.size())
             } else if (System.currentTimeMillis() - se.lastUsed > expire) {
-                connections.remove(se)
                 se.close()
-                log.debug("Closed expired AioSession: " + se + ", connected: " + connections.size())
+                log.info("Closed expired AioSession: " + se + ", connected: " + connections.size())
                 break
             }
         }
@@ -154,7 +152,6 @@ class AioServer extends ServerTpl {
         void completed(final AsynchronousSocketChannel sc, final AioServer srv) {
             async {
                 def rAddr = ((InetSocketAddress) sc.remoteAddress)
-                srv.log.info("New TCP(AIO) Connection from: " + rAddr.hostString + ":" + rAddr.port + ", connected: " + connections.size())
                 sc.setOption(StandardSocketOptions.SO_REUSEADDR, true)
                 sc.setOption(StandardSocketOptions.SO_RCVBUF, getInteger('so_rcvbuf', 1024 * 1024 * 2))
                 sc.setOption(StandardSocketOptions.SO_SNDBUF, getInteger('so_sndbuf', 1024 * 1024 * 2))
@@ -164,7 +161,9 @@ class AioServer extends ServerTpl {
                 def se = new AioSession(sc, srv); connections.offer(se)
                 msgFns?.each {se.msgFn(it)}
                 se.closeFn = {connections.remove(se)}
+                srv.log.info("New TCP(AIO) Connection from: " + rAddr.hostString + ":" + rAddr.port + ", connected: " + connections.size())
                 se.start()
+                if (connections.size() > 20 && connections.size() % 3 == 0) clean()
             }
             // 继续接入新连接
             srv.accept()

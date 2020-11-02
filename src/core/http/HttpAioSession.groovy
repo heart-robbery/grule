@@ -70,7 +70,7 @@ class HttpAioSession {
             sc.write(buf).get()
         } catch (ex) {
             if (ex !instanceof ClosedChannelException) {
-                log.error(ex.class.simpleName + " " + sc.localAddress.toString() + " ->" + sc.remoteAddress.toString())
+                log.error(ex.class.simpleName + " " + sc.localAddress.toString() + " ->" + sc.remoteAddress.toString(), ex)
             }
             close()
         }
@@ -141,7 +141,7 @@ class HttpAioSession {
 
         @Override
         void failed(Throwable ex, ByteBuffer buf) {
-            if (ex !instanceof ClosedChannelException) log.error("", ex)
+            if (ex !instanceof ClosedChannelException) log.error(ex.class.simpleName + " " + session.sc.localAddress.toString() + " ->" + session.sc.remoteAddress.toString(), ex)
             session.close()
         }
     }
