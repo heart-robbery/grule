@@ -72,7 +72,7 @@ class HttpServer extends ServerTpl {
     @EL(name = 'sys.started', async = true)
     protected void started() {
         enabled = true
-        bean(SchedSrv)?.cron(getStr("cleanCron", "0 */5 * * * ?")) {clean()}
+        // bean(SchedSrv)?.cron(getStr("cleanCron", "0 */3 * * * ?")) {clean()}
     }
 
 
@@ -93,6 +93,7 @@ class HttpServer extends ServerTpl {
                 if (app.sysLoad == 10 || connections.size() > getInteger("maxConnections", 128)) { // 限流
                     hCtx.response.status(503)
                     hCtx.render(ApiResp.of('503', "服务忙, 请稍后再试!"))
+                    hCtx.close()
                     return
                 }
                 chain.handle(hCtx)
@@ -347,20 +348,33 @@ class HttpServer extends ServerTpl {
      */
     protected void clean() {
         if (connections.isEmpty()) return
-        long expire = Duration.ofMinutes(getInteger("aioSession.maxIdle",
-            connections.size() > 100 ? 3 : (connections.size() > 50 ? 5 : (connections.size() > 30 ? 10 : 20))
+        int size = connections.size()
+        long expire = Duration.ofSeconds(getInteger("aioSession.maxIdle",
+            {
+                if (size > 80) return 60
+                if (size > 50) return 120
+                if (size > 30) return 180
+                if (size > 20) return 300
+                if (size > 10) return 400
+                return 600
+            }()
         )).toMillis()
 
-        for (def itt = connections.iterator().iterator(); itt.hasNext(); ) {
+        int limit = {
+            if (size > 80) return 8
+            if (size > 50) return 5
+            if (size > 30) return 3
+            return 2
+        }()
+        for (def itt = connections.iterator(); itt.hasNext() && limit > 0; ) {
             def se = itt.next()
             if (se == null) break
             if (!se.sc.isOpen()) {
-                se.close()
+                itt.remove(); se.close()
                 log.info("Cleaned unavailable HttpAioSession: " + se + ", connected: " + connections.size())
             } else if (!se.ws && System.currentTimeMillis() - se.lastUsed > expire) {
-                se.close()
+                limit--; itt.remove(); se.close()
                 log.info("Closed expired HttpAioSession: " + se + ", connected: " + connections.size())
-                break
             }
         }
     }
@@ -382,7 +396,7 @@ class HttpServer extends ServerTpl {
                 se.closeFn = {connections.remove(se)}
                 srv.log.debug("New HTTP(AIO) Connection from: " + rAddr.hostString + ":" + rAddr.port + ", connected: " + connections.size())
                 se.start()
-                if (connections.size() > 20 && connections.size() % 3 == 0) clean()
+                if (connections.size() > 10) clean()
             }
             // 继续接入
             srv.accept()
