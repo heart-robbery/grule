@@ -152,7 +152,7 @@ class AioServer extends ServerTpl {
             if (!se.sc.isOpen()) {
                 itt.remove(); se.close()
                 log.info("Cleaned unavailable AioSession: " + se + ", connected: " + connections.size())
-            } else if (!se.ws && System.currentTimeMillis() - se.lastUsed > expire) {
+            } else if (System.currentTimeMillis() - se.lastUsed > expire) {
                 limit--; itt.remove(); se.close()
                 log.info("Closed expired AioSession: " + se + ", connected: " + connections.size())
             }
