@@ -94,7 +94,6 @@ class Remoter extends ServerTpl {
     @EL(name = 'sys.started', async = true)
     protected void started() {
         queue('appUp') { appUp(appInfo, null) }
-        sync(true)
     }
 
 
@@ -264,24 +263,17 @@ class Remoter extends ServerTpl {
 
     /**
      * 集群应用同步函数
-     * @param next 是否触发下一次自动同步
      */
-    void sync(boolean next = false) {
+    @EL(name = 'sys.heartbeat', async = true)
+    void sync() {
         try {
             if (!masterHps && !masterName) {
                 log.warn("'masterHps' or 'masterName' must config one"); return
             }
             doSyncFn.run()
-            if (next) { // 下次触发策略, upInterval master越多可设置时间越长
-                if (System.currentTimeMillis() - app.startup.time > 60 * 1000L) {
-                    sched.after(Duration.ofSeconds(getInteger('upInterval', 120) + new Random().nextInt(90)), {sync(true)})
-                } else {
-                    sched.after(Duration.ofSeconds(new Random().nextInt(20) + 10), {sync(true)})
-                }
-            }
             lastSyncSuccess = System.currentTimeMillis()
         } catch (ex) {
-            if (next) sched.after(Duration.ofSeconds(getInteger('upInterval', 30) + new Random().nextInt(60)), {sync(true)})
+            sched.after(Duration.ofSeconds(getInteger('errorUpInterval', 30) + new Random().nextInt(60)), {sync()})
             log.error("App Up error. " + (ex.message?:ex.class.simpleName), ex)
         }
     }

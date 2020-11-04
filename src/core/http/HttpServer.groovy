@@ -346,6 +346,7 @@ class HttpServer extends ServerTpl {
     /**
      * 清除已关闭或已过期的连接
      */
+    @EL(name = "sys.heartbeat", async = true)
     protected void clean() {
         if (connections.isEmpty()) return
         int size = connections.size()
@@ -393,7 +394,6 @@ class HttpServer extends ServerTpl {
                 sc.setOption(StandardSocketOptions.TCP_NODELAY, true)
 
                 def se = new HttpAioSession(sc, srv); connections.offer(se)
-                se.closeFn = {connections.remove(se)}
                 srv.log.debug("New HTTP(AIO) Connection from: " + rAddr.hostString + ":" + rAddr.port + ", connected: " + connections.size())
                 se.start()
                 if (connections.size() > 10) clean()

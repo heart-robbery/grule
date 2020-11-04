@@ -125,6 +125,7 @@ class AioServer extends ServerTpl {
     /**
      * 清除已关闭或已过期的连接
      */
+    @EL(name = "sys.heartbeat", async = true)
     protected void clean() {
         if (connections.isEmpty()) return
         int size = connections.size()
@@ -151,7 +152,7 @@ class AioServer extends ServerTpl {
             if (!se.sc.isOpen()) {
                 itt.remove(); se.close()
                 log.info("Cleaned unavailable AioSession: " + se + ", connected: " + connections.size())
-            } else if (!se.ws && System.currentTimeMillis() - se.lastUsed > expire) {
+            } else if (System.currentTimeMillis() - se.lastUsed > expire) {
                 limit--; itt.remove(); se.close()
                 log.info("Closed expired AioSession: " + se + ", connected: " + connections.size())
             }
@@ -173,7 +174,6 @@ class AioServer extends ServerTpl {
 
                 def se = new AioSession(sc, srv); connections.offer(se)
                 msgFns?.each {se.msgFn(it)}
-                se.closeFn = {connections.remove(se)}
                 srv.log.info("New TCP(AIO) Connection from: " + rAddr.hostString + ":" + rAddr.port + ", connected: " + connections.size())
                 se.start()
                 if (connections.size() > 10) clean()

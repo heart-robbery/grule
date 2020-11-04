@@ -124,11 +124,10 @@ class Utils {
         if (v == null) return type.cast(v)
         else if (type == String) return v.toString()
         else if (type == Boolean || type == boolean) return v as Boolean
-        else if (type == Integer || type == int) return Integer.valueOf(v)
-        else if (type == Boolean || type == boolean) return v as Boolean
-        else if (type == Long || type == long) return Long.valueOf(v)
-        else if (type == Double || type == double) return Double.valueOf(v)
-        else if (type == Float || type == float) return Float.valueOf(v)
+        else if (type == Integer || type == int) return Integer.valueOf(v.toString())
+        else if (type == Long || type == long) return Long.valueOf(v.toString())
+        else if (type == Double || type == double) return Double.valueOf(v.toString())
+        else if (type == Float || type == float) return Float.valueOf(v.toString())
         else if (type == BigDecimal) return new BigDecimal(v.toString())
         else if (type == URI) return URI.create(v.toString())
         else if (type == URL) return URI.create(v.toString()).toURL()
