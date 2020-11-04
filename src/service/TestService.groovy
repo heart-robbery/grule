@@ -2,18 +2,17 @@ package service
 
 import cn.xnatural.enet.event.EL
 import com.alibaba.fastjson.JSON
+import core.OkHttpSrv
 import core.Page
+import core.Remoter
+import core.ServerTpl
+import core.jpa.BaseRepo
 import core.mode.builder.ObjBuilder
 import core.mode.pipeline.Pipeline
 import core.mode.task.TaskContext
 import core.mode.task.TaskWrapper
 import core.mode.v.VChain
 import core.mode.v.VProcessor
-import core.OkHttpSrv
-import core.Remoter
-import core.SchedSrv
-import core.ServerTpl
-import core.jpa.BaseRepo
 import dao.entity.Test
 
 import java.text.SimpleDateFormat
@@ -24,14 +23,10 @@ class TestService extends ServerTpl {
     @Lazy def http = bean(OkHttpSrv)
 
 
-    @EL(name = 'sys.started')
-    void sysStarted() {
-
+    @EL(name = 'sys.heartbeat', async = true)
+    void timeNotify() {
         // 向测试 web socket 每分钟发送消息
-        long count = 1
-        bean(SchedSrv)?.cron('0 */1 * * * ?') {
-            ep.fire("testWsMsg", (count++) + ': ' + new SimpleDateFormat('yyyy-MM-dd HH:mm:ss').format(new Date()))
-        }
+        ep.fire("testWsMsg", '系统时间: ' + new SimpleDateFormat('yyyy-MM-dd HH:mm:ss').format(new Date()))
     }
 
 

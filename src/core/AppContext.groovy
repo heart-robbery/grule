@@ -8,10 +8,12 @@ import org.slf4j.LoggerFactory
 
 import javax.annotation.Resource
 import java.lang.management.ManagementFactory
+import java.time.Duration
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.BiFunction
 import java.util.function.Function
+import java.util.function.Supplier
 
 import static core.Utils.*
 import static java.util.Collections.emptyList
@@ -132,7 +134,22 @@ class AppContext {
                 (System.currentTimeMillis() - startup.getTime()) / 1000.0,
                 ManagementFactory.getRuntimeMXBean().getUptime() / 1000.0
             )
-            ep.fire('sys.started', EC.of(this))
+            ep.fire('sys.started', EC.of(this).completeFn {
+                final Supplier<Duration> nextTimeFn = {
+                    Integer minInterval = Utils.to((env['sys']?['heartbeat']?['minInterval'])?:60, Integer)
+                    Integer randomInterval = Utils.to((env['sys']?['heartbeat']?['randomInterval'])?:180, Integer)
+                    Duration.ofSeconds(minInterval + new Random().nextInt(randomInterval))
+                }
+                // 每隔一段时间触发一次心跳, 1~4分钟随机心跳
+                final Runnable fn = new Runnable() {
+                    @Override
+                    void run() {
+                        ep.fire("sys.heartbeat")
+                        ep.fire("sched.after", nextTimeFn(), this)
+                    }
+                }
+                fn()
+            })
         }))
     }
 
