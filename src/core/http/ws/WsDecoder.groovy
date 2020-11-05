@@ -76,7 +76,6 @@ class WsDecoder {
 
         } else if (curMsg.opCode == (byte) 8) {
             ws.close()
-            ws.listener?.onClose(ws)
             return
         } else if (curMsg.opCode == (byte) 9) {
 

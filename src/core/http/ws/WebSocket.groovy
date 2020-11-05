@@ -28,7 +28,7 @@ class WebSocket {
     /**
      * 关闭 当前 websocket
      */
-    void close() { session.close() }
+    void close() { session.close(); listener?.onClose(this) }
 
 
     /**
