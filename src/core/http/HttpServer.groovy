@@ -81,13 +81,13 @@ class HttpServer extends ServerTpl {
      * @param request
      */
     protected void receive(HttpRequest request) {
-        // 打印请求
-        if (!ignoreSuffix.find{request.path.endsWith(it)}) {
-            log.info("Start Request '{}': {}. from: " + request.session.sc.remoteAddress.toString(), request.id, request.rowUrl)
-        }
-        count()
         HttpContext hCtx
         try {
+            // 打印请求
+            if (!ignoreSuffix.find{request.path.endsWith(it)}) {
+                log.info("Start Request '{}': {}. from: " + request.session.sc.remoteAddress.toString(), request.id, request.rowUrl)
+            }
+            count()
             hCtx = new HttpContext(request, this)
             if (enabled) {
                 if (app.sysLoad == 10 || connections.size() > getInteger("maxConnections", 128)) { // 限流
@@ -350,7 +350,7 @@ class HttpServer extends ServerTpl {
     protected void clean() {
         if (connections.isEmpty()) return
         int size = connections.size()
-        long expire = Duration.ofSeconds(getInteger("aioSession.maxIdle",
+        long httpExpire = Duration.ofSeconds(getInteger("httpSession.maxIdle",
             {
                 if (size > 80) return 60
                 if (size > 50) return 120
@@ -358,6 +358,14 @@ class HttpServer extends ServerTpl {
                 if (size > 20) return 300
                 if (size > 10) return 400
                 return 600
+            }()
+        )).toMillis()
+        long wsExpire = Duration.ofSeconds(getInteger("wsSession.maxIdle",
+            {
+                if (size > 60) return 300
+                if (size > 40) return 600
+                if (size > 20) return 1200
+                return 1800
             }()
         )).toMillis()
 
@@ -372,10 +380,13 @@ class HttpServer extends ServerTpl {
             if (se == null) break
             if (!se.sc.isOpen()) {
                 itt.remove(); se.close()
-                log.info("Cleaned unavailable HttpAioSession: " + se + ", connected: " + connections.size())
-            } else if (!se.ws && System.currentTimeMillis() - se.lastUsed > expire) {
+                log.info("Cleaned unavailable ${se.ws ? 'WsAioSession' : 'HttpAioSession'}: ".toString() + se + ", connected: " + connections.size())
+            } else if (se.ws && System.currentTimeMillis() - se.lastUsed > wsExpire) {
+                limit--; itt.remove(); se.ws.close()
+                log.debug("Closed expired WsAioSession: " + se + ", connected: " + connections.size())
+            } else if (System.currentTimeMillis() - se.lastUsed > httpExpire) {
                 limit--; itt.remove(); se.close()
-                log.info("Closed expired HttpAioSession: " + se + ", connected: " + connections.size())
+                log.debug("Closed expired HttpAioSession: " + se + ", connected: " + connections.size())
             }
         }
     }
