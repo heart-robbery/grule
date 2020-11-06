@@ -155,6 +155,33 @@ class AppContext {
 
 
     /**
+     * 系统心跳 清理
+     */
+    @EL(name = 'sys.heartbeat', async = true)
+    protected void heartbeat() {
+        // 删除 Classloader 中只进不出的 parallelLockMap
+        def field = ClassLoader.getDeclaredField('parallelLockMap')
+        field.setAccessible(true)
+        Map<String, Object> m = field.get(Thread.currentThread().contextClassLoader.parent.parent)
+        if (m != null) {
+            for (def itt = m.iterator(); itt.hasNext(); ) {
+                def entry = itt.next()
+                if ((entry.key.startsWith("script") && entry.key.endsWith(".groovy")) ||
+                        entry.key.contains("GStringTemplateScript") ||
+                        entry.key.contains("SimpleTemplateScript") ||
+                        entry.key.contains("XmlTemplateScript") ||
+                        entry.key.contains("StreamingTemplateScript") ||
+                        entry.key.contains("GeneratedMarkupTemplate")
+                ) {
+                    itt.remove()
+                    log.trace("Removed class parallelLock: {}", entry.key)
+                }
+            }
+        }
+    }
+
+
+    /**
      * 添加对象源
      * {@link #ep} 会找出source对象中所有其暴露的功能. 即: 用 @EL 标注的方法
      * 注: 为每个对象源都配一个 name 属性标识

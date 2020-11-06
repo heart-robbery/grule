@@ -11,6 +11,10 @@ import javax.annotation.Resource
 import java.util.concurrent.ExecutorService
 import java.util.function.Consumer
 
+
+/**
+ * 服务模板类
+ */
 class ServerTpl {
     protected final Logger log  = LoggerFactory.getLogger(getClass().name.contains('$') ? getClass().superclass : getClass())
     /**
@@ -95,7 +99,7 @@ class ServerTpl {
      */
     def async(Runnable fn, Consumer<Throwable> exFn = null) {
         exec.execute {
-            try {fn.run()} catch(Throwable ex) {
+            try {fn.run()} catch (Throwable ex) {
                 if (exFn) exFn.accept(ex)
                 else log.error("", ex)
             }
@@ -117,7 +121,7 @@ class ServerTpl {
     /**
      * 暴露 bean 给其它模块用. {@link #localBean}
      * @param bean bean实例
-     * @param names bean 名字.
+     * @param names bean 名字
      */
     protected ServerTpl exposeBean(Object bean, List<String> names = [bean.class.simpleName.uncapitalize()]) {
         if (beanCtx == null) beanCtx = new HashMap<>()
@@ -148,7 +152,7 @@ class ServerTpl {
 
 
     /**
-     * 属性值
+     * 获取属性
      * @param key 属性key, 含逗号.
      * @return
      */
@@ -168,7 +172,12 @@ class ServerTpl {
     }
 
 
-    // 设置属性
+    /**
+     * 设置属性
+     * @param aName 属性名
+     * @param aValue 属性值
+     * @return
+     */
     ServerTpl attr(String aName, Object aValue) {
         attrs().put(aName, aValue)
         this

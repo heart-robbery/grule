@@ -12,6 +12,10 @@ import org.hibernate.engine.jdbc.connections.spi.ConnectionProvider
 
 import javax.sql.DataSource
 
+/**
+ * JPA(Hibernate) 封装
+ * 通用用法: 例: bean(BaseRepo).saveOrUpdate(实体)
+ */
 class HibernateSrv extends ServerTpl {
     protected SessionFactory    sf
     protected DataSource        datasource

@@ -254,7 +254,7 @@
                             this.$Message.success(`测试调用: ${this.decision.name} 成功`);
                             app.$data.tmp.testResultId = res.data.id;
                             localStorage.setItem(this.cacheKey, JSON.stringify(this.items.map(o => {return {code: o.code, value: o.value}})));
-                        } else this.$Notice.error(res.desc);
+                        } else this.$Message.error(res.desc);
                     }
                 })
             },
