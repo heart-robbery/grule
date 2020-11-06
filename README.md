@@ -48,7 +48,7 @@ jdk8, gradle6.5+
 * 暴露bean给应用: exposeBean(bean实例) 
 * bean容器 和AppContext一样都提供bean容器功能. 获取实例bean: bean(OkHttpSrv)
 
-###特色1: [Remoter](https://gitee.com/xnat/gy/blob/master/src/core/Remoter.groovy) 集群分布式
+### 特色1: [Remoter](https://gitee.com/xnat/gy/blob/master/src/core/Remoter.groovy) 集群分布式
 Remoter是多应用之间的连接器,简化跨系统调用,由 [AIO](https://gitee.com/xnat/gy/blob/master/src/core/aio/AioServer.groovy) 实现
 ```
 // 暴露集群通信端口
@@ -68,7 +68,7 @@ remoter {
     - 例: [远程调用](https://gitee.com/xnat/gy/blob/master/src/service/TestService.groovy#L178)
 
     
-###特色2: 自实现 [HttpServer](https://gitee.com/xnat/gy/blob/master/src/core/http/HttpServer.groovy) [例](https://gitee.com/xnat/gy/blob/master/src/ctrl/TestCtrl.groovy)
+### 特色2: 自实现 [HttpServer](https://gitee.com/xnat/gy/blob/master/src/core/http/HttpServer.groovy) [例](https://gitee.com/xnat/gy/blob/master/src/ctrl/TestCtrl.groovy)
     @Ctrl: 标明类是个Controller层类
     
     @Path: 标明是个路径匹配的处理器
