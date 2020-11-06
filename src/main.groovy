@@ -18,16 +18,16 @@ import java.text.SimpleDateFormat
 import java.time.Duration
 
 @Field final Logger log = LoggerFactory.getLogger(getClass())
-@Field final AppContext app = new AppContext()
+@Field final AppContext app = new AppContext() //应用上下文
 @Lazy @Field EP ep = app.bean(EP)
 
 
 // 系统功能添加区
-app.addSource(new OkHttpSrv())
-app.addSource(new EhcacheSrv())
-app.addSource(new SchedSrv())
-app.addSource(new Remoter())
-app.addSource(new HibernateSrv().entities(
+app.addSource(new OkHttpSrv()) // http 客户端
+app.addSource(new EhcacheSrv()) // ehcache 封装
+app.addSource(new SchedSrv()) // 定时任务封装 base on quartz库
+app.addSource(new Remoter()) // 集群分布式
+app.addSource(new HibernateSrv().entities( // jpa封装
     Test, VersionFile, Permission
 ))
 app.addSource(new HttpServer().ctrls(
@@ -39,47 +39,19 @@ app.addSource(this)
 app.start() // 启动系统
 
 
-@EL(name = 'sys.inited')
+@EL(name = 'sys.inited') //系统初始化完成
 void sysInited() {
-    if (app.env['redis']) {
+    if (app.env['redis']) { //根据配置是否有redis,创建redis客户端工具
         app.addSource(new RedisClient())
     }
 }
 
 
-@EL(name = 'sys.started', async = true)
+@EL(name = 'sys.started', async = true) //系统启动完成
 void sysStarted() {
     return
-//    app.bean(SchedSrv).dyn({
-//        log.info("执行 dyn sched " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()))
-//    }, {
-//        def cal = Calendar.getInstance()
-//        cal.add(Calendar.SECOND, 5)
-//        if (cal.get(Calendar.MINUTE) > 05) return null
-//        cal.getTime()
-//    })
-
-//    (1..100).each {i ->
-//        (1..2).each {j ->
-//            app.bean(OkHttpSrv).get("http://localhost:7070/test/remote?event=eName"+(new Random().nextInt(11) + 1)).debug().execute({s ->
-//                log.info("==============" + s)
-//            }, null)
-//        }
-//        log.info "==========" + app.bean(OkHttpSrv).get("http://localhost:7070/test/remote?event=eName"+(new Random().nextInt(11) + 1)).debug().execute()
-//    }
-//    app.bean(AioServer).msgFn {s ->
-//        log.info("收到的消息: " + s)
-//        "i received " + System.currentTimeMillis()
-//    }
-//    def sc = AsynchronousSocketChannel.open(AsynchronousChannelGroup.withThreadPool(app.bean(ExecutorService)))
-//    sc.connect(new InetSocketAddress("localhost",8000)).get()
-//    for (int i = 0; i < 5; i++) {
-//        sc.write(ByteBuffer.wrap("send a msg $i".getBytes("utf-8")))
-//    }
-
     TestService ts = app.bean(TestService)
     //ts.wsClientTest()
-    return
     try {
         ts.authTest()
 

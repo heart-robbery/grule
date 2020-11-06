@@ -20,7 +20,7 @@ import java.util.function.Consumer
 import java.util.function.Function
 
 /**
- * hibernate 基本操作方法集
+ * hibernate 数据库基本操作方法集
  */
 class BaseRepo {
     protected static final Logger         log = LoggerFactory.getLogger(BaseRepo)

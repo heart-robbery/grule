@@ -7,7 +7,7 @@ import core.http.HttpAioSession
  */
 class WebSocket {
     // 关联的Http aio 会话
-    protected final HttpAioSession session
+    protected HttpAioSession session
     // 消息监听
     protected Listener             listener
     protected final WsDecoder      decoder = new WsDecoder(this)
@@ -28,7 +28,11 @@ class WebSocket {
     /**
      * 关闭 当前 websocket
      */
-    void close() { session.close(); listener?.onClose(this) }
+    void close() {
+        // session 为大内存对象, 主动回收
+        def se = session; session = null; se?.close()
+        listener?.onClose(this)
+    }
 
 
     /**

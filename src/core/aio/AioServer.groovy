@@ -1,7 +1,6 @@
 package core.aio
 
 import cn.xnatural.enet.event.EL
-import core.SchedSrv
 import core.ServerTpl
 
 import java.nio.channels.*
@@ -18,15 +17,27 @@ import static core.Utils.ipv4
  * TCP(Aio) 服务端
  */
 class AioServer extends ServerTpl {
+    /**
+     * 接收TCP消息的处理函数集
+     */
     protected final List<BiConsumer<String, AioSession>>                    msgFns      = new LinkedList<>()
-    protected final CompletionHandler<AsynchronousSocketChannel, AioServer> handler     = new AcceptHandler()
+    /**
+     * 新TCP连接 接受处理
+     */
+    protected final CompletionHandler<AsynchronousSocketChannel, AioServer> acceptor = new AcceptHandler()
     protected AsynchronousServerSocketChannel                               ssc
+    /**
+     * 绑定配置 hp -> host:port
+     */
     private @Lazy String                                                    hpCfg       = getStr('hp', ":7001")
     @Lazy Integer                                                           port        = hpCfg.split(":")[1] as Integer
-    // 当前连接数
+    // 当前连会话
     protected  final Queue<AioSession>                                      connections = new ConcurrentLinkedQueue<>()
 
 
+    /**
+     * 启动
+     */
     @EL(name = 'sys.starting', async = true)
     void start() {
         if (ssc) throw new RuntimeException("$name is already running")
@@ -46,14 +57,11 @@ class AioServer extends ServerTpl {
     }
 
 
+    /**
+     * 关闭
+     */
     @EL(name = 'sys.stopping', async = true)
     void stop() { ssc?.close() }
-
-
-//    @EL(name = 'sys.started', async = true)
-//    protected void started() {
-//        bean(SchedSrv)?.cron(getStr("cleanCron", "0 */5 * * * ?")) {clean()}
-//    }
 
 
     /**
@@ -79,7 +87,7 @@ class AioServer extends ServerTpl {
      * 接收新连接
      */
     protected void accept() {
-        ssc.accept(this, handler)
+        ssc.accept(this, acceptor)
     }
 
 
@@ -124,6 +132,7 @@ class AioServer extends ServerTpl {
 
     /**
      * 清除已关闭或已过期的连接
+     * 接收系统心跳事件
      */
     @EL(name = "sys.heartbeat", async = true)
     protected void clean() {
@@ -160,6 +169,9 @@ class AioServer extends ServerTpl {
     }
 
 
+    /**
+     * 连接处理器
+     */
     protected class AcceptHandler implements CompletionHandler<AsynchronousSocketChannel, AioServer> {
 
         @Override

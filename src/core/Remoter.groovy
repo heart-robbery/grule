@@ -25,18 +25,30 @@ import static core.Utils.ipv4
 
 /**
  * 集群分布式 核心类
+ * 多应用之间的连接器,简化跨系统调用
+ * 依赖 {@link AioServer}, {@link AioClient}
  */
 class Remoter extends ServerTpl {
     @Lazy def                                              sched      = bean(SchedSrv)
-    // 集群的服务中心地址 [host]:port,[host1]:port2. 例 :8001 or localhost:8001
+    /**
+     * 集群的服务中心地址 [host]:port,[host1]:port2. 例 :8001 or localhost:8001
+     */
     @Lazy String                                           masterHps  = getStr('masterHps', null)
-    // 集群的服务中心应用名
+    /**
+     * 集群的服务中心应用名
+     */
     @Lazy String                                           masterName = getStr('masterName', null)
-    // 是否为master
+    /**
+     * 是否为master
+     * true: 则向同为master的应用同步集群应用信息, false: 只向 masterHps 指向的服务同步集群应用信息
+     */
     @Lazy boolean                                          master     = getBoolean('master', false)
-    // 保存 app info 的属性信息
+    /**
+     * 保存集群中的应用信息
+     */
     protected final Map<String, List<Map<String, Object>>> appInfos   = new ConcurrentHashMap<>()
     /**
+     * 远程事件临时持有
      * ecId -> {@link EC}
      */
     protected final Map<String, EC>                        ecMap      = new ConcurrentHashMap<>()
@@ -53,6 +65,9 @@ class Remoter extends ServerTpl {
     Remoter() { super("remoter") }
 
 
+    /**
+     * 启动
+     */
     @EL(name = "sys.starting", async = true)
     void start() {
         if (aioClient || aioServer) throw new RuntimeException("$name is already running")
@@ -263,6 +278,7 @@ class Remoter extends ServerTpl {
 
     /**
      * 集群应用同步函数
+     * 监听系统心跳事件, 随心跳去向master同步集群应用信息
      */
     @EL(name = 'sys.heartbeat', async = true)
     void sync() {
@@ -700,7 +716,7 @@ class Remoter extends ServerTpl {
 
     /**
      * 应用自己的信息
-     * 例: {"id":"rc_GRLD5JhT4g", "name":"rc", "tcp":"192.168.2.104:8001", "http":"192.168.2.104:8000", "master": true}
+     * 例: {"id":"gy_GRLD5JhT4g", "name":"rc", "tcp":"192.168.2.104:8001", "http":"192.168.2.104:8000", "master": true}
      */
     Map getAppInfo() {
         final Map info = new LinkedHashMap(5)
