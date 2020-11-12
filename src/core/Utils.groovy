@@ -1,7 +1,6 @@
 package core
 
 import com.alibaba.fastjson.JSON
-import org.codehaus.groovy.runtime.InvokerHelper
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -15,9 +14,9 @@ import java.lang.reflect.Method
 import java.security.MessageDigest
 import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.locks.ReadWriteLock
+import java.util.concurrent.locks.ReentrantReadWriteLock
 import java.util.function.Consumer
 import java.util.function.Function
 
@@ -625,6 +624,86 @@ class Utils {
                 }
             })
             return map
+        }
+    }
+
+
+    static <E> SafeList<E> safelist(Class<E> type) { new SafeList<E>()}
+
+
+    static class SafeList<E> {
+        protected final ArrayList<E> data = new ArrayList<>()
+        final ReadWriteLock lock = new ReentrantReadWriteLock()
+
+        E findAny(Function<E, Boolean> fn) {
+            try {
+                lock.readLock().lock()
+                for (def e : data) {
+                    if (fn.apply(e)) return e
+                }
+            } finally {
+                lock.readLock().unlock()
+            }
+        }
+
+        E findRandom() {
+            try {
+                lock.readLock().lock()
+                data.get(new Random().nextInt(data.size()))
+            } finally {
+                lock.readLock().unlock()
+            }
+        }
+
+        void withWriteLock(Runnable fn) {
+            try {
+                lock.writeLock().lock()
+                fn?.run()
+            } finally {
+                lock.writeLock().unlock()
+            }
+        }
+
+        void withReadLock(Runnable fn) {
+            try {
+                lock.readLock().lock()
+                fn?.run()
+            } finally {
+                lock.readLock().unlock()
+            }
+        }
+
+        Iterator<E> iterator() { data.iterator() }
+
+        int size() { data.size() }
+
+        boolean isEmpty() { data.isEmpty() }
+
+        boolean contains(Object o) {
+            try {
+                lock.readLock().lock()
+                return data.contains(o)
+            } finally {
+                lock.readLock().unlock()
+            }
+        }
+
+        boolean remove(Object o) {
+            try {
+                lock.writeLock().lock()
+                return data.remove(o)
+            } finally {
+                lock.writeLock().unlock()
+            }
+        }
+
+        boolean add(E e) {
+            try {
+                lock.writeLock().lock()
+                return data.add(e)
+            } finally {
+                lock.writeLock().unlock()
+            }
         }
     }
 }

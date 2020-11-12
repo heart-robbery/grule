@@ -2,27 +2,29 @@ package core.aio
 
 import cn.xnatural.enet.event.EL
 import core.ServerTpl
+import core.Utils
 
 import java.nio.channels.AsynchronousChannelGroup
 import java.nio.channels.AsynchronousSocketChannel
+import java.nio.channels.ClosedChannelException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.locks.ReadWriteLock
-import java.util.concurrent.locks.ReentrantReadWriteLock
 import java.util.function.BiConsumer
+import java.util.function.Consumer
+import java.util.function.Supplier
 
 /**
  * TCP(AIO) 客户端
  */
 class AioClient extends ServerTpl {
-    protected final List<BiConsumer<String, AioSession>> msgFns = new LinkedList<>()
-    protected final Map<String, List<AioSession>> ses    = new ConcurrentHashMap<>()
-    @Lazy protected AsynchronousChannelGroup group = AsynchronousChannelGroup.withThreadPool(exec)
+    protected final List<BiConsumer<String, AioSession>>    msgFns     = new LinkedList<>()
+    protected final Map<String, Utils.SafeList<AioSession>> sessionMap = new ConcurrentHashMap<>()
+    @Lazy protected AsynchronousChannelGroup                group      = AsynchronousChannelGroup.withThreadPool(exec)
 
 
     @EL(name = 'sys.stopping', async = true)
     void stop() {
-        ses?.each {it.value?.each {se -> se.close()}}
+        sessionMap?.each {it.value?.each { se -> se.close()}}
     }
 
 
@@ -39,9 +41,36 @@ class AioClient extends ServerTpl {
      * @param host 主机名
      * @param port 端口
      * @param msg 消息内容
+     * @param failFn 失败回调
+     * @param okFn 成功回调
      */
-    AioClient send(String host, Integer port, String msg) {
-        getSession(host, port).send(msg)
+    AioClient send(String host, Integer port, String msg, Consumer<Exception> failFn = null, Consumer<AioSession> okFn = null) {
+        final sessionSupplier = new Supplier<AioSession>() {
+            @Override
+            AioSession get() {
+                try {
+                    return getSession(host, port)
+                } catch (ex) {
+                    failFn?.accept(ex)
+                }
+                null
+            }
+        }
+        final Consumer<Exception> subFailFn = new Consumer<Exception>() {
+            @Override
+            void accept(Exception ex) {
+                if (ex instanceof ClosedChannelException) { // 连接关闭时 重试
+                    AioSession se = sessionSupplier.get()
+                    if (se) {
+                        se.send(msg, this, {okFn?.accept(se)})
+                    }
+                }
+            }
+        }
+        AioSession se = sessionSupplier.get()
+        if (se) {
+            se.send(msg, subFailFn, {okFn?.accept(se)})
+        }
         this
     }
 
@@ -56,75 +85,23 @@ class AioClient extends ServerTpl {
         host = host.trim()
         String key = host+":"+port
         AioSession se = null
-        List<AioSession> ls = ses.get(key)
+        def ls = sessionMap.get(key)
         if (ls == null) {
-            synchronized (ses) {
-                ls = ses.get(key)
+            synchronized (sessionMap) {
+                ls = sessionMap.get(key)
                 if (ls == null) {
-                    ls = safeList(); ses.put(key, ls)
+                    ls = Utils.safelist(AioSession); sessionMap.put(key, ls)
                     se = create(host, port); ls.add(se)
                 }
             }
         }
 
-        ls.findAll {!it.sc.isOpen()}.each {it.close()}
-        se = ls.find {!it.busy()}
-
+        se = ls.findAny {!it.busy()}
         if (se == null) {
             se = create(host, port); ls.add(se)
         }
 
         return se
-    }
-
-
-    /**
-     * 安全列表
-     * @return
-     */
-    protected List<AioSession> safeList() {
-        final ReadWriteLock lock = new ReentrantReadWriteLock()
-        new LinkedList<AioSession>() {
-            @Override
-            AioSession get(int index) {
-                try {
-                    lock.readLock().lock()
-                    return super.get(index)
-                } finally {
-                    lock.readLock().unlock()
-                }
-            }
-
-            @Override
-            boolean contains(Object o) {
-                try {
-                    lock.readLock().lock()
-                    return super.contains(o)
-                } finally {
-                    lock.readLock().unlock()
-                }
-            }
-
-            @Override
-            boolean remove(Object o) {
-                try {
-                    lock.writeLock().lock()
-                    return super.remove(o)
-                } finally {
-                    lock.writeLock().unlock()
-                }
-            }
-
-            @Override
-            boolean add(AioSession e) {
-                try {
-                    lock.writeLock().lock()
-                    return super.add(e)
-                } finally {
-                    lock.writeLock().unlock()
-                }
-            }
-        }
     }
 
 
@@ -152,7 +129,7 @@ class AioClient extends ServerTpl {
         }
         def se = new AioSession(sc, this)
         msgFns?.each {se.msgFn(it)}
-        se.closeFn = {ses.get(key).remove(se)}
+        se.closeFn = {sessionMap.get(key).remove(se)}
         se.start()
         se
     }

@@ -13,6 +13,7 @@ import core.aio.AioClient
 import core.aio.AioServer
 import core.aio.AioSession
 import groovy.transform.PackageScope
+import groovy.transform.ToString
 
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
@@ -33,33 +34,34 @@ class Remoter extends ServerTpl {
     /**
      * 集群的服务中心地址 [host]:port,[host1]:port2. 例 :8001 or localhost:8001
      */
-    @Lazy String                                           masterHps  = getStr('masterHps', null)
+    @Lazy String                                      masterHps      = getStr('masterHps', null)
     /**
      * 集群的服务中心应用名
      */
-    @Lazy String                                           masterName = getStr('masterName', null)
+    @Lazy String                                      masterName     = getStr('masterName', null)
     /**
      * 是否为master
      * true: 则向同为master的应用同步集群应用信息, false: 只向 masterHps 指向的服务同步集群应用信息
      */
-    @Lazy boolean                                          master     = getBoolean('master', false)
+    @Lazy boolean                                     master         = getBoolean('master', false)
     /**
-     * 保存集群中的应用信息
+     * 保存集群中的应用节点信息
+     * name -> Node
      */
-    protected final Map<String, List<Map<String, Object>>> appInfos   = new ConcurrentHashMap<>()
+    protected final Map<String, Utils.SafeList<Node>> nodeMap        = new ConcurrentHashMap<>()
     /**
      * 远程事件临时持有
      * ecId -> {@link EC}
      */
-    protected final Map<String, EC>                        ecMap      = new ConcurrentHashMap<>()
+    protected final Map<String, EC>                   ecMap          = new ConcurrentHashMap<>()
     /**
      * 集群数据版本管理
      */
-    protected final Map<String, DataVersion> dataVersionMap = new ConcurrentHashMap<>()
-    protected AioClient aioClient
-    protected AioServer aioServer
+    protected final Map<String, DataVersion>          dataVersionMap = new ConcurrentHashMap<>()
+    protected AioClient                               aioClient
+    protected AioServer                               aioServer
     // 上次成功同步时间
-    Long lastSyncSuccess
+    Long                                              lastSyncSuccess
 
 
     Remoter() { super("remoter") }
@@ -77,7 +79,7 @@ class Remoter extends ServerTpl {
 
         String delimiter = getStr('delimiter', '\n')
         // 如果系统中没有AioClient, 则创建
-        aioClient = bean(core.aio.AioClient)
+        aioClient = bean(AioClient)
         if (aioClient == null) {
             aioClient = new AioClient()
             aioClient.attr('delimiter', delimiter)
@@ -151,24 +153,34 @@ class Remoter extends ServerTpl {
      * @param target 可用值: 'any', 'all'
      */
     Remoter sendMsg(String appName, String msg, String target = 'any') {
-        def ls = appInfos.get(appName)
+        Utils.SafeList<Node> ls = nodeMap.get(appName).findAll {it.id != app.id}
         if (!ls) {
             log.warn("Not found app '$appName' system online")
             return this
         }
 
-        final def doSend = {Map<String, Object> appInfo ->
-            if (appInfo['id'] == app.id) return false
-
-            String[] arr = ((String) appInfo.get('tcp')).split(":")
-            aioClient.send(arr[0], Integer.valueOf(arr[1]), msg)
-            return true
+        final def doSend = {Node node, Consumer<Exception> failFn ->
+            String[] arr = node.tcp.split(":")
+            aioClient.send(arr[0], Integer.valueOf(arr[1]), msg, {ex ->
+                if (ls.size() > 1) ls.remove(node)
+                log.error("Send fail msg: $msg to Node: $node".toString(), ex)
+                failFn?.accept(ex)
+            }, {se ->
+                log.trace("Send success msg: {} to Node: {}", msg, node)
+            })
         }
 
         if ('any' == target) {
-            doSend(ls.get(new Random().nextInt(ls.size())))
+            final Consumer<Exception> failFn = new Consumer<Exception>() {
+                @Override
+                void accept(Exception e) {
+                    def node = ls.findRandom()
+                    if (node) doSend(node, this)
+                }
+            }
+            doSend(ls.findRandom(), failFn)
         } else if ('all' == target) { // 网络不可靠
-            ls.each {app -> async { doSend(app) }}
+            ls.each {node -> async { doSend(node, null) }}
         } else {
             throw new IllegalArgumentException("Not support target '$target'")
         }
@@ -418,9 +430,9 @@ class Remoter extends ServerTpl {
             // {"type":"ls apps"}$_$
             def arr = t.split(" ")
             if (arr?[1] = "apps") {
-                se.send(JSON.toJSONString(appInfos))
+                se.send(JSON.toJSONString(nodeMap))
             } else if (arr?[1] == 'app' && arr?[2]) {
-                se.send(JSON.toJSONString(appInfos[arr?[2]]))
+                se.send(JSON.toJSONString(nodeMap[arr?[2]]))
             }
         } else {
             log.error("Not support exchange data type '{}'", t)
@@ -531,56 +543,69 @@ class Remoter extends ServerTpl {
      */
     protected void appUp(final Map data, final AioSession se) {
         if (!data || !data['name'] || !data['tcp'] || !data['id']) { // 数据验证
-            log.warn("App up data incomplete: " + data)
+            log.warn("Node up data incomplete: " + data)
             return
         }
-        log.debug("Receive app up: {}", data)
         data["_uptime"] = System.currentTimeMillis()
+        log.debug("Receive node up: {}", data)
 
         //1. 先删除之前的数据,再添加新的
         boolean isNew = true
-        final List<Map<String, Object>> apps = appInfos.computeIfAbsent(data["name"], {new LinkedList<>()})
-        for (final def it = apps.iterator(); it.hasNext(); ) {
-            if (it.next()["id"] == data["id"]) {it.remove(); isNew = false; break}
+        final Utils.SafeList<Node> apps = nodeMap.computeIfAbsent(data["name"].toString(), {new Utils.SafeList<Node>()})
+        apps.withReadLock {
+            for (final def itt = apps.iterator(); itt.hasNext(); ) {
+                def node = itt.next()
+                if (node.id == data["id"]) { // 更新
+                    node.tcp = data['tcp']; node.http = data['http']; node.udp = data['udp']; node.master = data['master']
+                    isNew = false; break
+                }
+            }
         }
-        apps << data
-        if (isNew && data['id'] != app.id) log.info("New app '{}' online. {}", data["name"], data)
-        // if (data['id'] != app.id) ep.fire("updateAppInfo", data) // 同步信息给本服务器的tcp-client
+        if (isNew && data['id'] != app.id) { // 新增
+            def node = new Node(id: data['id'], name: data['name'], tcp: data['tcp'], http: data['http'], master: data['master'])
+            apps.add(node)
+            log.info("New node '{}' online. {}", node.name, node)
+        }
 
         //2. 遍历所有的数据,删除不必要的数据, 同步注册信息
-        for (final def it = appInfos.entrySet().iterator(); it.hasNext(); ) {
-            def e = it.next()
-            for (final def it2 = e.value.iterator(); it2.hasNext(); ) {
-                final def cur = it2.next()
-                // 删除空的坏数据
-                if (!cur) {it2.remove(); continue}
-                // 删除和当前up的app 相同的tcp的节点(节点重启,但节点上次的信息还没被移除)
-                if (data['id'] != cur['id'] && data['tcp'] && data['tcp'] == cur['tcp']) {
-                    it2.remove()
-                    log.info("Drop same tcp node: {}", cur)
-                    continue
-                }
-                // 删除一段时间未活动的注册信息, dropAppTimeout 单位: 分钟
-                if ((System.currentTimeMillis() - (Long) cur.getOrDefault("_uptime", System.currentTimeMillis()) > getInteger("dropAppTimeout", 15) * 60 * 1000)  && cur["id"] != app.id) {
-                    it2.remove()
-                    log.warn("Drop timeout node: {}", cur)
-                    continue
-                }
-                // 更新当前App up的时间
-                if (cur["id"] == app.id && (System.currentTimeMillis() - cur['_uptime'] > 1000 * 60)) { // 超过1分钟更新一次,不必每次更新
-                    cur['_uptime'] = System.currentTimeMillis()
-                    def self = appInfo // 判断当前机器ip是否变化
-                    if (self && self['tcp'] != cur['tcp']) cur.putAll(self)
-                }
-                // 返回所有的注册信息给当前来注册的客户端
-                if (cur["id"] != data["id"]) {
-                    se?.send(new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", cur).toString())
+        for (final def itt = nodeMap.entrySet().iterator(); itt.hasNext(); ) {
+            def e = itt.next()
+            e.value.withWriteLock {
+                for (final def itt2 = e.value.iterator(); itt2.hasNext(); ) {
+                    final Node node = itt2.next()
+                    // 删除空的坏数据
+                    if (!node) {itt2.remove(); continue}
+                    // 删除和当前up的节点相同的tcp的节点(节点重启,但节点上次的信息还没被移除)
+                    if (data['id'] != node.id && data['tcp'] == node.tcp) {
+                        itt2.remove()
+                        log.info("Drop same tcp node: {}", node)
+                        continue
+                    }
+                    // 删除一段时间未活动的注册信息, dropAppTimeout 单位: 分钟
+                    if ((System.currentTimeMillis() - node._uptime?:System.currentTimeMillis() > getInteger("dropAppTimeout", 15) * 60 * 1000) && node["id"] != app.id) {
+                        itt2.remove()
+                        log.warn("Drop timeout node: {}", node)
+                        ep.fire("dropNode", node.tcp)
+                        continue
+                    }
+                    // 更新当前App up的时间
+                    if (node["id"] == app.id && (System.currentTimeMillis() - node._uptime > 1000 * 60)) { // 超过1分钟更新一次,不必每次更新
+                        node._uptime = System.currentTimeMillis()
+                        def self = appInfo // 判断当前机器ip是否变化
+                        if (self && self['tcp'] != node['tcp']) {
+                            node.tcp = self['tcp']; node.http = self['http']; node.udp = self['udp']; node.master = self['master']
+                        }
+                    }
+                    // 返回所有的注册信息给当前来注册的客户端
+                    if (node.id != data["id"]) {
+                        se?.send(new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", JSON.toJSON(node)).toString())
+                    }
                 }
             }
             // 删除没有对应的服务信息的应用
-            if (!e.value) {it.remove(); continue}
+            if (!e.value) {itt.remove(); continue}
             // 如果是新系统上线, 则主动通知其它系统
-            if (isNew && data['id'] != app.id && e.value?.size() > 0) {
+            if (isNew && data.id != app.id && e.value?.size() > 0) {
                 ep.fire("remote", EC.of(this).async(true).attr('toAll', true).args(e.key, "updateAppInfo", [data]))
             }
         }
@@ -604,31 +629,33 @@ class Remoter extends ServerTpl {
         if (app.id == data["id"] || appInfo?['tcp'] == data['tcp']) return // 不把系统本身的信息放进去
 
         queue('appUp') {
-            boolean add = true
-            boolean isNew = true
-            final def apps = appInfos.computeIfAbsent(data["name"], {new LinkedList<>()})
-            for (final def iter = apps.iterator(); iter.hasNext(); ) {
-                final def e = iter.next()
-                if (e["id"] == data["id"]) {
-                    isNew = false
-                    if (data['_uptime'] > e['_uptime']) {
-                        iter.remove()
-                    } else {
-                        add = false
+            final Utils.SafeList<Node> apps = nodeMap.computeIfAbsent(data["name"] as String, {new Utils.SafeList<Node>()})
+            apps.withWriteLock {
+                boolean add = true
+                for (final def itt = apps.iterator(); itt.hasNext(); ) {
+                    final Node node = itt.next()
+                    if (node.id == data["id"]) { // 更新
+                        if (data['_uptime'] > node._uptime) {
+                            node.tcp = data['tcp']; node.http = data['http']; node.udp = data['udp']; node.master = data['master']; node._uptime = data['_uptime']
+                            log.trace("Update node info: {}", node)
+                            add = false
+                        }
+                        break
+                    } else if (node.tcp == data['tcp']) {
+                        if (data['_uptime'] > node._uptime) {
+                            itt.remove()
+                            log.info("Drop same tcp expire node: {}", node)
+                        } else add = false
+                    } else if (System.currentTimeMillis() - node._uptime > getInteger("dropAppTimeout", 15) * 60 * 1000 && node.id != app.id) {
+                        itt.remove()
+                        log.warn("Drop timeout node: {}", node)
                     }
-                    break
-                } else if (e['tcp'] == data['tcp']) {
-                    iter.remove()
-                    log.info("Drop same tcp node: {}", e)
-                } else if (System.currentTimeMillis() - e['_uptime'] > getInteger("dropAppTimeout", 15) * 60 * 1000 && e['id'] != app.id) {
-                    iter.remove()
-                    log.warn("Drop timeout node: {}", e)
                 }
-            }
-            if (add) {
-                apps << data
-                if (isNew) log.info("New node added. '{}'", data)
-                else log.trace("Update app info: {}", data)
+                if (add) {
+                    def node = new Node(id: data['id'], name: data['name'], tcp: data['tcp'], http: data['http'], master: data['master'], _uptime: data['_uptime'])
+                    apps.add(node)
+                    log.info("New node added. '{}'", data)
+                }
             }
         }
     }
@@ -728,5 +755,23 @@ class Remoter extends ServerTpl {
         info.put('tcp', getStr('exposeTcp', aioServer.hp))
         info.put('master', master)
         return info
+    }
+
+
+    /**
+     * 集群节点 信息
+     */
+    @ToString(includePackage = false, allNames = true)
+    class Node {
+        /**
+         * 节点id
+         */
+        String id
+        String name
+        String tcp
+        String http
+        String udp
+        Boolean master
+        Long _uptime
     }
 }
