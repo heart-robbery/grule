@@ -50,20 +50,23 @@ class AioClient extends ServerTpl {
             AioSession get() {
                 try {
                     return getSession(host, port)
-                } catch (ex) {
-                    failFn?.accept(ex)
+                } catch (ex) { // 拿连接报错, 则回调失败函数
+                    if (failFn) failFn.accept(ex)
+                    else log.error("Send to $host:$port error. msg: $msg getSession".toString(), ex)
                 }
                 null
             }
         }
-        final Consumer<Exception> subFailFn = new Consumer<Exception>() {
+        final BiConsumer<Exception, AioSession> subFailFn = new BiConsumer<Exception, AioSession>() {
             @Override
-            void accept(Exception ex) {
+            void accept(Exception ex, AioSession session) {
                 if (ex instanceof ClosedChannelException) { // 连接关闭时 重试
                     AioSession se = sessionSupplier.get()
                     if (se) {
                         se.send(msg, this, {okFn?.accept(se)})
                     }
+                } else {
+                    log.error("Send to $host:$port error. msg: $msg ${session.sc.localAddress} -> ${session.sc.remoteAddress}".toString(), ex)
                 }
             }
         }

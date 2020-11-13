@@ -24,13 +24,19 @@ class AioServer extends ServerTpl {
     /**
      * 新TCP连接 接受处理
      */
-    protected final CompletionHandler<AsynchronousSocketChannel, AioServer> acceptor = new AcceptHandler()
+    protected final CompletionHandler<AsynchronousSocketChannel, AioServer> acceptor    = new AcceptHandler()
     protected AsynchronousServerSocketChannel                               ssc
     /**
      * 绑定配置 hp -> host:port
      */
-    private @Lazy String                                                    hpCfg       = getStr('hp', ":7001")
-    @Lazy Integer                                                           port        = hpCfg.split(":")[1] as Integer
+    protected  @Lazy String                                                 hpCfg       = getStr('hp', ":7001")
+    @Lazy Integer                                                           port        = {
+        try {
+            return hpCfg.split(":")[1] as Integer
+        } catch (ex) {
+            throw new Exception("${name}.hp 格式错误. $hpCfg".toString(), ex)
+        }
+    }()
     // 当前连会话
     protected  final Queue<AioSession>                                      connections = new ConcurrentLinkedQueue<>()
 

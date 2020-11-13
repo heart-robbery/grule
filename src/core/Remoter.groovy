@@ -20,7 +20,9 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.function.BiConsumer
 import java.util.function.Consumer
+import java.util.function.Predicate
 
 import static core.Utils.ipv4
 
@@ -30,15 +32,11 @@ import static core.Utils.ipv4
  * 依赖 {@link AioServer}, {@link AioClient}
  */
 class Remoter extends ServerTpl {
-    @Lazy def                                              sched      = bean(SchedSrv)
+    @Lazy def                                             sched      = bean(SchedSrv)
     /**
      * 集群的服务中心地址 [host]:port,[host1]:port2. 例 :8001 or localhost:8001
      */
     @Lazy String                                      masterHps      = getStr('masterHps', null)
-    /**
-     * 集群的服务中心应用名
-     */
-    @Lazy String                                      masterName     = getStr('masterName', null)
     /**
      * 是否为master
      * true: 则向同为master的应用同步集群应用信息, false: 只向 masterHps 指向的服务同步集群应用信息
@@ -153,34 +151,42 @@ class Remoter extends ServerTpl {
      * @param target 可用值: 'any', 'all'
      */
     Remoter sendMsg(String appName, String msg, String target = 'any') {
-        Utils.SafeList<Node> ls = nodeMap.get(appName).findAll {it.id != app.id}
-        if (!ls) {
+        final Utils.SafeList<Node> nodes = nodeMap.get(appName)
+        if (!nodes) {
             log.warn("Not found app '$appName' system online")
             return this
         }
 
-        final def doSend = {Node node, Consumer<Exception> failFn ->
+        final def doSend = {Node node, BiConsumer<Exception, Node> failFn ->
+            if (!node) return
             String[] arr = node.tcp.split(":")
             aioClient.send(arr[0], Integer.valueOf(arr[1]), msg, {ex ->
-                if (ls.size() > 1) ls.remove(node)
                 log.error("Send fail msg: $msg to Node: $node".toString(), ex)
-                failFn?.accept(ex)
+                failFn?.accept(ex, node)
             }, {se ->
                 log.trace("Send success msg: {} to Node: {}", msg, node)
             })
         }
 
+        Predicate<Node> predicate = {it.id != app.id}
         if ('any' == target) {
-            final Consumer<Exception> failFn = new Consumer<Exception>() {
+            final BiConsumer<Exception, Node> failFn = new BiConsumer<Exception, Node>() {
                 @Override
-                void accept(Exception e) {
-                    def node = ls.findRandom()
+                void accept(Exception e, Node n) {
+                    if (nodes.size() <= 1) return
+                    // 如果有多个(>1)节点, 则删除失败的节点
+                    nodes.remove(n)
+                    def node = nodes.findRandom(predicate)
                     if (node) doSend(node, this)
                 }
             }
-            doSend(ls.findRandom(), failFn)
+            doSend(nodes.findRandom(predicate), failFn)
         } else if ('all' == target) { // 网络不可靠
-            ls.each {node -> async { doSend(node, null) }}
+            nodes.each {node ->
+                if (predicate.test(node)) {
+                    async { doSend(node, null) }
+                }
+            }
         } else {
             throw new IllegalArgumentException("Not support target '$target'")
         }
@@ -295,8 +301,9 @@ class Remoter extends ServerTpl {
     @EL(name = 'sys.heartbeat', async = true)
     void sync() {
         try {
-            if (!masterHps && !masterName) {
-                log.warn("'masterHps' or 'masterName' must config one"); return
+            if (!masterHps) {
+                // log.warn("'${name}.masterHps' not config");
+                return
             }
             doSyncFn.run()
             lastSyncSuccess = System.currentTimeMillis()
@@ -534,7 +541,7 @@ class Remoter extends ServerTpl {
 
     /**
      * client -> master
-     * 应用上线通知
+     * 接收集群应用的数据上传, 应用上线通知
      * NOTE: 此方法线程已安全
      * 例: {"name": "应用名", "id": "应用实例id", "tcp":"localhost:8001", "http":"localhost:8080", "udp": "localhost:11111"}
      * id 和 tcp 必须唯一
@@ -546,6 +553,8 @@ class Remoter extends ServerTpl {
             log.warn("Node up data incomplete: " + data)
             return
         }
+        if (app.id == data['id']) return // 不接收本应用的数据
+
         data["_uptime"] = System.currentTimeMillis()
         log.debug("Receive node up: {}", data)
 
@@ -585,7 +594,6 @@ class Remoter extends ServerTpl {
                     if ((System.currentTimeMillis() - node._uptime?:System.currentTimeMillis() > getInteger("dropAppTimeout", 15) * 60 * 1000) && node["id"] != app.id) {
                         itt2.remove()
                         log.warn("Drop timeout node: {}", node)
-                        ep.fire("dropNode", node.tcp)
                         continue
                     }
                     // 更新当前App up的时间
@@ -596,7 +604,7 @@ class Remoter extends ServerTpl {
                             node.tcp = self['tcp']; node.http = self['http']; node.udp = self['udp']; node.master = self['master']
                         }
                     }
-                    // 返回所有的注册信息给当前来注册的客户端
+                    // 返回所有的注册信息给当前来注册的客户端应用
                     if (node.id != data["id"]) {
                         se?.send(new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", JSON.toJSON(node)).toString())
                     }
@@ -625,8 +633,8 @@ class Remoter extends ServerTpl {
             log.warn("App up data incomplete: " + data)
             return
         }
-        log.trace("Update app info: {}", data)
         if (app.id == data["id"] || appInfo?['tcp'] == data['tcp']) return // 不把系统本身的信息放进去
+        log.trace("Update app info: {}", data)
 
         queue('appUp') {
             final Utils.SafeList<Node> apps = nodeMap.computeIfAbsent(data["name"] as String, {new Utils.SafeList<Node>()})
@@ -642,12 +650,12 @@ class Remoter extends ServerTpl {
                         }
                         break
                     } else if (node.tcp == data['tcp']) {
-                        if (data['_uptime'] > node._uptime) {
+                        if (data['_uptime'] > node._uptime) { // 删除 tcp 相同, id 不同, 已过期的节点
                             itt.remove()
                             log.info("Drop same tcp expire node: {}", node)
                         } else add = false
                     } else if (System.currentTimeMillis() - node._uptime > getInteger("dropAppTimeout", 15) * 60 * 1000 && node.id != app.id) {
-                        itt.remove()
+                        itt.remove() // 删除过期不活动的的节点
                         log.warn("Drop timeout node: {}", node)
                     }
                 }
@@ -665,75 +673,84 @@ class Remoter extends ServerTpl {
      * 向master同步函数
      */
     @Lazy protected Runnable doSyncFn = new Runnable() {
-        def hps = masterHps?.split(",").collect {
-            if (!it) return null
+        // 是否正在执行
+        final def running = new AtomicBoolean(false)
+        // 数据上传的应用集(host1:port1,host2:port2 ...)
+        @Lazy def hps     = masterHps?.split(",")?.collect {hp ->
+            if (!hp) return null
             try {
-                def arr = it.split(":")
+                def arr = hp.split(":")
                 return Tuple.tuple(arr[0].trim()?:'127.0.0.1', Integer.valueOf(arr[1].trim()))
             } catch (ex) {
-                log.error("'masterHps' config error. " + it, ex)
+                log.error("'${name}.masterHps' config error. $hp".toString(), ex)
             }
             null
-        }.findAll {it && it.v1 && it.v2}
-        @Lazy Set<String> localHps = { //忽略的hp
-            Set<String> r = new HashSet<>()
-            def port = aioServer.hpCfg?.split(":")[1]
-            if (port) {
-                r.add('localhost:' + port)
-                r.add('127.0.0.1:' + port)
-                r.add(ipv4()+ ":" +port)
+        }?.findAll {it && it.v1 && it.v2}
+        // 本应用的hps(多个host:port)
+        @Lazy Set<String> selfHps   = {
+            Set<String> hps = new HashSet<>()
+            def arr = aioServer.hpCfg.split(":")
+            if (arr[0]) { // 如果指定了绑定ip
+                hps.add(aioServer.hpCfg)
+            } else { // 如果没指定绑定ip,则把本机所有ip
+                hps.add('localhost:' + arr[1])
+                hps.add('127.0.0.1:' + arr[1])
+                hps.add(ipv4() + ":" + arr[1])
             }
             def exposeTcp = getStr('exposeTcp', null)
-            if (exposeTcp) r.add(exposeTcp)
-            return r
+            if (exposeTcp) hps.add(exposeTcp)
+            return hps
         }()
-        // 上传的数据格式
-        @Lazy def dataFn = {
-            def info = appInfo
-            if (!info) return null
-            new JSONObject(3).fluentPut("type", 'appUp')
-                .fluentPut("source", new JSONObject(2).fluentPut('name', app.name).fluentPut('id', app.id))
-                .fluentPut("data", info)
-                .toString()
-        }
-        // 用 hps 函数同步集群应用信息
-        @Lazy def sendToHps = { String data->
-            // 如果是域名,得到所有Ip, 除本机
+
+        /**
+         * 上传本应用数据到集群
+         * @param data
+         */
+        void upToHps(String data) {
+            // 如果是域名,得到所有Ip, 除本机上的本应用
             List<Tuple2<String, Integer>> ls = hps.collectMany {hp ->
                 InetAddress.getAllByName(hp.v1)
                     .collect {addr ->
-                        if (localHps.contains(addr.hostAddress+ ":" +hp.v2)) return null
+                        if (selfHps.contains(addr.hostAddress+ ":" +hp.v2)) return null
                         else return Tuple.tuple(addr.hostAddress, hp.v2)
                     }
                     .findAll {it}
             }
+            if (!ls) return
 
             if (master) { // 如果是master, 则同步所有
                 ls.each {hp -> aioClient.send(hp.v1, hp.v2, data)}
+                log.debug("App Up success. {}", data)
             } else {
                 def hp = ls.get(new Random().nextInt(ls.size()))
-                aioClient.send(hp.v1, hp.v2, data)
+                aioClient.send(hp.v1, hp.v2, data, {ex ->
+                    log.warn("App Up fail. " + data, ex)
+                }, {
+                    log.debug("App Up success. {}", data)
+                })
             }
         }
-        final def running = new AtomicBoolean(false)
 
         @Override
         void run() {
             try {
-                if (!hps && !masterName) {
-                    log.error("'masterHps' or 'masterName' must config one"); return
+                if (!hps) {
+                    log.warn("Not found avilable master app, please check config '${name}.masterHps'".toString())
+                    return
                 }
                 if (!running.compareAndSet(false, true)) return
-                String data = dataFn()
+                String data = { // 构建上传的数据格式
+                    def info = appInfo
+                    if (!info) return null
+                    new JSONObject(3).fluentPut("type", 'appUp')
+                        .fluentPut("source", new JSONObject(2).fluentPut('name', app.name).fluentPut('id', app.id))
+                        .fluentPut("data", info)
+                        .toString()
+                }()
                 if (!data) return
 
-                try {
-                    sendMsg(masterName, data, (master ? 'all' : 'any'))
-                } catch (e) {
-                    sendToHps(data)
-                }
-                log.debug("App Up success. {}", data)
-                dataVersionMap.each {it.value.sync() }
+                upToHps(data) //数据上传
+                dataVersionMap.each { it.value.sync() } //集群版本数据同步
             } finally {
                 running.set(false)
             }

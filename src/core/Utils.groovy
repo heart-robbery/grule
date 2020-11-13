@@ -19,6 +19,7 @@ import java.util.concurrent.locks.ReadWriteLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import java.util.function.Consumer
 import java.util.function.Function
+import java.util.function.Predicate
 
 class Utils {
     protected static final Logger log = LoggerFactory.getLogger(Utils)
@@ -644,15 +645,29 @@ class Utils {
             } finally {
                 lock.readLock().unlock()
             }
+            null
         }
 
-        E findRandom() {
+        /**
+         * 随机取一个 元素
+         * @param predicate 符合条件的元素
+         * @return
+         */
+        E findRandom(Predicate<E> predicate = null) {
             try {
                 lock.readLock().lock()
-                data.get(new Random().nextInt(data.size()))
+                if (data.isEmpty()) return null
+                if (predicate == null) {
+                    return data.get(new Random().nextInt(data.size()))
+                } else {
+                    def ls = data.findAll {predicate.test(it)}
+                    if (ls.empty) return null
+                    return ls.get(new Random().nextInt(ls.size()))
+                }
             } finally {
                 lock.readLock().unlock()
             }
+            null
         }
 
         void withWriteLock(Runnable fn) {

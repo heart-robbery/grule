@@ -84,7 +84,7 @@ class AioSession {
      * @param failFn 失败回调
      * @param okFn 成功回调
      */
-    void send(String msg, Consumer<Exception> failFn = null, Runnable okFn = null) {
+    void send(String msg, BiConsumer<Exception, AioSession> failFn = null, Runnable okFn = null) {
         if (closed.get() || msg == null) return
         lastUsed = System.currentTimeMillis()
         sendQueue.offer { // 排对发送消息. 避免 WritePendingException
@@ -92,11 +92,13 @@ class AioSession {
                 sc.write(ByteBuffer.wrap((msg + (delimiter?:'')).getBytes('utf-8'))).get(server.getLong("aioWriteTimeout", 8000L), TimeUnit.MILLISECONDS)
                 okFn?.run()
             } catch (ex) {
-                if (ex !instanceof ClosedChannelException) {
-                    log.error(sc.localAddress.toString() + " ->" + sc.remoteAddress.toString(), ex)
-                }
                 close()
-                failFn?.accept(ex)
+                if (failFn) failFn.accept(ex, this)
+                else {
+                    if (ex !instanceof ClosedChannelException) {
+                        log.error(sc.localAddress.toString() + " ->" + sc.remoteAddress.toString(), ex)
+                    }
+                }
             }
         }
     }

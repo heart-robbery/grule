@@ -51,13 +51,13 @@ jdk8, gradle6.5+
 ### 特色1: [Remoter](https://gitee.com/xnat/gy/blob/master/src/core/Remoter.groovy) 集群分布式
 Remoter是多应用之间的连接器,简化跨系统调用,由 [AIO](https://gitee.com/xnat/gy/blob/master/src/core/aio/AioServer.groovy) 实现
 ```
-// 暴露集群通信端口
+// 暴露给集群之间通信 ip 和 端口. 例: 绑定本机所有ip ':7001' 或者只绑定某个ip 'localhost:7001'
 aioServer.hp=':9001'
 // 应用集群配置
 remoter {
     // 加入到集群. 集群的服务中心地址. 格式为: host1:port1,host2:port2. 域名可配置多个Ip
     masterHps='xnatural.cn:8001'
-    // 一般被选为master的应用设置为true, 以保证master之间信息同步
+    // 是否为master. 同为master节点相互同步. 非master节点, 则随心跳任选一个master同步
     // master=true
 }
 ```
