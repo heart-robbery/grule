@@ -53,7 +53,7 @@ class MainCtrl extends ServerTpl {
                             def ret = [:]
                             if (remoter == null) return ret
                             ret.put('lastSyncSuccess', new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(remoter.lastSyncSuccess))
-                            remoter.appInfos.each {e ->
+                            remoter.nodeMap.each { e ->
                                 ret.put(e.key + '_total', e.value.size())
                             }
                             return ret

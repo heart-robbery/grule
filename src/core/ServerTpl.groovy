@@ -1,16 +1,14 @@
 package core
 
-
 import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-import javax.annotation.Resource
+import javax.inject.Inject
 import java.util.concurrent.ExecutorService
 import java.util.function.Consumer
-
 
 /**
  * 服务模板类
@@ -28,7 +26,7 @@ class ServerTpl {
      * 1. 当此服务被加入核心时, 此值会自动设置为核心的EP.
      * 2. 如果要服务独立运行时, 请手动设置
      */
-    @Resource protected EP ep
+    @Inject protected EP ep
     @Lazy protected def    app  = bean(AppContext)
     @Lazy protected def    exec = bean(ExecutorService)
     @Lazy protected def  config = new ConfigObject()

@@ -24,7 +24,13 @@ class AioClient extends ServerTpl {
 
     @EL(name = 'sys.stopping', async = true)
     void stop() {
-        sessionMap?.each {it.value?.each { se -> se.close()}}
+        sessionMap?.each {e ->
+            for (def itt = e.value?.iterator(); itt.hasNext(); ) {
+                def se = itt.next()
+                itt.remove()
+                se.close()
+            }
+        }
     }
 
 

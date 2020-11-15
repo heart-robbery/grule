@@ -32,9 +32,10 @@ import static core.Utils.ipv4
  * 依赖 {@link AioServer}, {@link AioClient}
  */
 class Remoter extends ServerTpl {
+    protected static final String APP_UP = 'appUp'
     @Lazy def                                             sched      = bean(SchedSrv)
     /**
-     * 集群的服务中心地址 [host]:port,[host1]:port2. 例 :8001 or localhost:8001
+     * 集群的服务中心地址 [host1]:port1,[host2]:port2. 例 :8001 or localhost:8001
      */
     @Lazy String                                      masterHps      = getStr('masterHps', null)
     /**
@@ -106,9 +107,9 @@ class Remoter extends ServerTpl {
     }
 
 
-    @EL(name = 'sys.started', async = true)
+    @EL(name = 'sys.started')
     protected void started() {
-        queue('appUp') { appUp(appInfo, null) }
+        queue(APP_UP) { appUp(appInfo, null) }
     }
 
 
@@ -153,8 +154,7 @@ class Remoter extends ServerTpl {
     Remoter sendMsg(String appName, String msg, String target = 'any') {
         final Utils.SafeList<Node> nodes = nodeMap.get(appName)
         if (!nodes) {
-            log.warn("Not found app '$appName' system online")
-            return this
+            throw new Exception("Not found app '$appName' system online")
         }
 
         final def doSend = {Node node, BiConsumer<Exception, Node> failFn ->
@@ -420,7 +420,7 @@ class Remoter extends ServerTpl {
                 se.close()
                 return
             }
-            queue('appUp') {
+            queue(APP_UP) {
                 JSONObject d
                 try { d = msgJo.getJSONObject("data"); appUp(d, se) }
                 catch (Exception ex) {
@@ -553,7 +553,7 @@ class Remoter extends ServerTpl {
             log.warn("Node up data incomplete: " + data)
             return
         }
-        if (app.id == data['id']) return // 不接收本应用的数据
+        if (app.id == data['id'] && se != null) return // 不接收本应用的数据
 
         data["_uptime"] = System.currentTimeMillis()
         log.debug("Receive node up: {}", data)
@@ -565,13 +565,13 @@ class Remoter extends ServerTpl {
             for (final def itt = apps.iterator(); itt.hasNext(); ) {
                 def node = itt.next()
                 if (node.id == data["id"]) { // 更新
-                    node.tcp = data['tcp']; node.http = data['http']; node.udp = data['udp']; node.master = data['master']
+                    node.tcp = data['tcp']; node.http = data['http']; node.udp = data['udp']; node.master = data['master']; node._uptime = data['_uptime']
                     isNew = false; break
                 }
             }
         }
-        if (isNew && data['id'] != app.id) { // 新增
-            def node = new Node(id: data['id'], name: data['name'], tcp: data['tcp'], http: data['http'], master: data['master'])
+        if (isNew) { // 新增
+            def node = new Node(id: data['id'], name: data['name'], tcp: data['tcp'], http: data['http'], master: data['master'], _uptime: data['_uptime'])
             apps.add(node)
             log.info("New node '{}' online. {}", node.name, node)
         }
@@ -587,17 +587,17 @@ class Remoter extends ServerTpl {
                     // 删除和当前up的节点相同的tcp的节点(节点重启,但节点上次的信息还没被移除)
                     if (data['id'] != node.id && data['tcp'] == node.tcp) {
                         itt2.remove()
-                        log.info("Drop same tcp node: {}", node)
+                        log.info("Drop same tcp expire node: {}", node)
                         continue
                     }
                     // 删除一段时间未活动的注册信息, dropAppTimeout 单位: 分钟
-                    if ((System.currentTimeMillis() - node._uptime?:System.currentTimeMillis() > getInteger("dropAppTimeout", 15) * 60 * 1000) && node["id"] != app.id) {
+                    if ((System.currentTimeMillis() - (node._uptime?:System.currentTimeMillis()) > getInteger("dropAppTimeout", 15) * 60 * 1000) && node["id"] != app.id) {
                         itt2.remove()
                         log.warn("Drop timeout node: {}", node)
                         continue
                     }
                     // 更新当前App up的时间
-                    if (node["id"] == app.id && (System.currentTimeMillis() - node._uptime > 1000 * 60)) { // 超过1分钟更新一次,不必每次更新
+                    if (node.id == app.id && (System.currentTimeMillis() - node._uptime > 1000 * 60)) { // 超过1分钟更新一次,不必每次更新
                         node._uptime = System.currentTimeMillis()
                         def self = appInfo // 判断当前机器ip是否变化
                         if (self && self['tcp'] != node['tcp']) {
@@ -636,17 +636,17 @@ class Remoter extends ServerTpl {
         if (app.id == data["id"] || appInfo?['tcp'] == data['tcp']) return // 不把系统本身的信息放进去
         log.trace("Update app info: {}", data)
 
-        queue('appUp') {
+        queue(APP_UP) {
             final Utils.SafeList<Node> apps = nodeMap.computeIfAbsent(data["name"] as String, {new Utils.SafeList<Node>()})
             apps.withWriteLock {
                 boolean add = true
                 for (final def itt = apps.iterator(); itt.hasNext(); ) {
                     final Node node = itt.next()
                     if (node.id == data["id"]) { // 更新
+                        add = false
                         if (data['_uptime'] > node._uptime) {
                             node.tcp = data['tcp']; node.http = data['http']; node.udp = data['udp']; node.master = data['master']; node._uptime = data['_uptime']
                             log.trace("Update node info: {}", node)
-                            add = false
                         }
                         break
                     } else if (node.tcp == data['tcp']) {
@@ -654,6 +654,7 @@ class Remoter extends ServerTpl {
                             itt.remove()
                             log.info("Drop same tcp expire node: {}", node)
                         } else add = false
+                        break
                     } else if (System.currentTimeMillis() - node._uptime > getInteger("dropAppTimeout", 15) * 60 * 1000 && node.id != app.id) {
                         itt.remove() // 删除过期不活动的的节点
                         log.warn("Drop timeout node: {}", node)
@@ -662,7 +663,7 @@ class Remoter extends ServerTpl {
                 if (add) {
                     def node = new Node(id: data['id'], name: data['name'], tcp: data['tcp'], http: data['http'], master: data['master'], _uptime: data['_uptime'])
                     apps.add(node)
-                    log.info("New node added. '{}'", data)
+                    log.info("New node added. '{}'", node)
                 }
             }
         }
@@ -778,7 +779,6 @@ class Remoter extends ServerTpl {
     /**
      * 集群节点 信息
      */
-    @ToString(includePackage = false, allNames = true)
     class Node {
         /**
          * 节点id
@@ -790,5 +790,10 @@ class Remoter extends ServerTpl {
         String udp
         Boolean master
         Long _uptime
+
+        @Override
+        String toString() {
+            return JSON.toJSONString(this, SerializerFeature.WriteMapNullValue, SerializerFeature.MapSortField, SerializerFeature.SortField)
+        }
     }
 }

@@ -11,6 +11,7 @@ import core.http.ws.Listener
 import core.http.ws.WS
 import core.http.ws.WebSocket
 import core.jpa.BaseRepo
+import dao.entity.Permission
 import dao.entity.Test
 import dao.entity.UploadFile
 import dao.entity.VersionFile
@@ -211,11 +212,8 @@ class TestCtrl extends ServerTpl {
 
     // 测试登录
     @Path(path = 'login')
-    ApiResp login(String role, HttpContext ctx) {
-        ctx.setSessionAttr('uAuthorities', null)
-        ctx.setSessionAttr('uRoles',
-            role.split(',').toList().collect {it.trim()}.findAll {it}.toSet()
-        )
+    ApiResp login(String username, HttpContext ctx) {
+        ctx.setSessionAttr('permissions', repo.findList(Permission).collect {it.enName}.toSet())
         ok()
     }
 

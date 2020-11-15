@@ -212,6 +212,7 @@ class HttpContext {
                 Set<Map.Entry<String, Object>> entrySet() { cache.iterator().collect {it}.toSet() }
             }
         }
+        // sData.put('accessTime', System.currentTimeMillis())
         response.cookie('sId', sId, expire.seconds)
     }
 

@@ -6,7 +6,8 @@ import cn.xnatural.enet.event.EP
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-import javax.annotation.Resource
+import javax.inject.Inject
+import javax.inject.Named
 import java.lang.management.ManagementFactory
 import java.time.Duration
 import java.util.concurrent.*
@@ -228,14 +229,14 @@ class AppContext {
 
 
     /**
-     * 为bean对象中的{@link javax.annotation.Resource}注解字段注入对应的bean对象
+     * 为bean对象中的{@link javax.inject.Inject}注解字段注入对应的bean对象
      * @param o
      */
     @EL(name = "inject", async = false)
     void inject(Object o) {
         iterateField(o.getClass(), {f ->
-            Resource aR = f.getAnnotation(Resource.class)
-            if (aR) {
+            Inject inject = f.getAnnotation(Inject.class)
+            if (inject) {
                 try {
                     f.setAccessible(true)
                     Object v = f.get(o)
@@ -243,12 +244,28 @@ class AppContext {
 
                     // 取值
                     if (EP.isAssignableFrom(f.type)) v = wrapEpForSource(o)
-                    else v = ep.fire("bean.get", EC.of(this).sync().args(f.type, aR.name())) // 全局获取bean对象
+                    else v = ep.fire("bean.get", EC.of(this).sync().args(f.type)) // 全局获取bean对象
 
                     if (v == null) return
                     f.set(o, v)
-                    log.trace("Inject @Resource field '{}' for object '{}'", f.name, o)
-                } catch (ex) { log.error("Inject @Resource field '" + f.name + "' Error!", ex) }
+                    log.trace("Inject @Inject field '{}' for object '{}'", f.name, o)
+                } catch (ex) { log.error("Inject @Inject field '" + f.name + "' Error!", ex) }
+            }
+            Named named = f.getAnnotation(Named.class)
+            if (named) {
+                try {
+                    f.setAccessible(true)
+                    Object v = f.get(o)
+                    if (v) return // 已经存在值则不需要再注入
+
+                    // 取值
+                    if (EP.isAssignableFrom(f.type)) v = wrapEpForSource(o)
+                    else v = ep.fire("bean.get", EC.of(this).sync().args(f.type, named.value())) // 全局获取bean对象
+
+                    if (v == null) return
+                    f.set(o, v)
+                    log.trace("Inject @Named field '{}' for object '{}'", f.name, o)
+                } catch (ex) { log.error("Inject @Named field '" + f.name + "' Error!", ex) }
             }
         })
     }
