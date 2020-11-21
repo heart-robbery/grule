@@ -14,8 +14,6 @@ import org.slf4j.LoggerFactory
 import service.FileUploader
 import service.TestService
 
-import java.text.SimpleDateFormat
-import java.time.Duration
 
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Field final AppContext app = new AppContext() //应用上下文
@@ -49,25 +47,8 @@ void sysInited() {
 
 @EL(name = 'sys.started', async = true) //系统启动完成
 void sysStarted() {
-    return
-    TestService ts = app.bean(TestService)
-    //ts.wsClientTest()
     try {
-        ts.authTest()
-
-        // cache test
-        ep.fire('cache.set', 'test', 'aa', new SimpleDateFormat('yyyy-MM-dd HH:mm:ss').format(new Date()))
-
-        ep.fire('sched.after', Duration.ofSeconds(2), {
-            log.info 'cache.get: ' + ep.fire('cache.get', 'test', 'aa')
-        })
-
-        ts.hibernateTest()
-
-        ts.okHttpTest()
-
-        // sqlTest()
-        // ts.wsClientTest()
+        // TODO
     } finally {
         // System.exit(0)
         // ep.fire('sched.after', EC.of(this).args(Duration.ofSeconds(5), {System.exit(0)}).completeFn({ec -> if (ec.noListener) System.exit(0) }))

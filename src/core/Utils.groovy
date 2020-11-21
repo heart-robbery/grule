@@ -12,6 +12,7 @@ import java.lang.management.ManagementFactory
 import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.security.MessageDigest
+import java.security.SecureRandom
 import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
 import java.util.concurrent.Executor
@@ -190,51 +191,54 @@ class Utils {
      * 构建一个 http 请求, 支持 get, post. 文件上传.
      * @return
      */
-    static Http http() { return new Http() }
+    static Httper http() { return new Httper() }
 
 
-    static class Http {
-        private String                      urlStr
-        private String                      contentType
-        private String                      method
-        private String                      jsonBody
-        private Map<String, Object>         params
-        private Map<String, Object>         cookies
-        private Map<String, String>         headers
-        private int                         connectTimeout = 5000
-        private int                         readTimeout = 15000
-        private int                         respCode
-        private Consumer<HttpURLConnection> preFn
+    static class Httper {
+        protected String                      urlStr
+        protected String                      contentType
+        protected String                      method
+        protected String                      bodyStr
+        protected Map<String, Object>         params
+        protected Map<String, Object>         cookies
+        protected Map<String, String>         headers
+        protected int                         connectTimeout = 5000
+        protected int                         readTimeout = 15000
+        protected int                         respCode
+        protected Consumer<HttpURLConnection> preFn
+        protected boolean                     debug
 
-        Http get(String url) { this.urlStr = url; this.method = 'GET'; return this }
-        Http post(String url) { this.urlStr = url; this.method = 'POST'; return this }
+        Httper get(String url) { this.urlStr = url; this.method = 'GET'; return this }
+        Httper post(String url) { this.urlStr = url; this.method = 'POST'; return this }
         /**
          *  设置 content-type
-         * @param contentType application/json, multipart/form-data, application/x-www-form-urlencoded
+         * @param contentType application/json, multipart/form-data, application/x-www-form-urlencoded,text/plain
          * @return
          */
-        Http contentType(String contentType) { this.contentType = contentType; return this }
-        Http jsonBody(String jsonStr) {this.jsonBody = jsonStr; if (contentType == null) contentType = 'application/json'; return this }
-        Http readTimeout(int timeout) { this.readTimeout = timeout; return this }
-        Http connectTimeout(int timeout) { this.connectTimeout = timeout; return this }
-        Http preConnect(Consumer<HttpURLConnection> preConnect) { this.preFn = preConnect; return this }
+        Httper contentType(String contentType) { this.contentType = contentType; return this }
+        Httper jsonBody(String jsonStr) {this.bodyStr = jsonStr; if (contentType == null) contentType = 'application/json'; return this }
+        Httper textBody(String bodyStr) {this.bodyStr = bodyStr; if (contentType == null) contentType = 'text/plain'; return this }
+        Httper readTimeout(int timeout) { this.readTimeout = timeout; return this }
+        Httper connectTimeout(int timeout) { this.connectTimeout = timeout; return this }
+        Httper preConnect(Consumer<HttpURLConnection> preConnect) { this.preFn = preConnect; return this }
+        Httper debug() {this.debug = true; this}
         /**
          * 添加参数
          * @param name 参数名
          * @param value 支持 {@link File}
          * @return
          */
-        Http param(String name, Object value) {
+        Httper param(String name, Object value) {
             if (params == null) params = new LinkedHashMap<>()
             params.put(name, value)
             return this
         }
-        Http header(String name, String value) {
+        Httper header(String name, String value) {
             if (headers == null) headers = new HashMap<>(7)
             headers.put(name, value)
             return this
         }
-        Http cookie(String name, Object value) {
+        Httper cookie(String name, Object value) {
             if (cookies == null) cookies = new HashMap<>(7)
             cookies.put(name, value)
             return this
@@ -265,13 +269,14 @@ class Utils {
                         void checkServerTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException { }
                         @Override
                         X509Certificate[] getAcceptedIssuers() { return null }
-                    }}, new java.security.SecureRandom())
+                    }}, new SecureRandom())
                     ((HttpsURLConnection) conn).setHostnameVerifier({s, sslSession -> true})
                     ((HttpsURLConnection) conn).setSSLSocketFactory(sc.getSocketFactory())
                 }
                 conn.setRequestMethod(method)
                 conn.setConnectTimeout(connectTimeout)
                 conn.setReadTimeout(readTimeout)
+                conn.setUseCaches(false)
 
                 // header 设置
                 conn.setRequestProperty("Accept", "*/*") // 必加
@@ -310,9 +315,9 @@ class Utils {
 
                 if ('POST' == method) {
                     DataOutputStream os = new DataOutputStream(conn.getOutputStream())
-                    if ('application/json' == contentType && (params || jsonBody)) {
-                        if (jsonBody == null) os.write(JSON.toJSONString(params).getBytes())
-                        else os.write(jsonBody.getBytes("utf-8"))
+                    if (('application/json' == contentType || 'text/plain' == contentType) && (params || bodyStr)) {
+                        if (bodyStr == null) os.write(JSON.toJSONString(params).getBytes())
+                        else os.write(bodyStr.getBytes("utf-8"))
                         os.flush(); os.close()
                     } else if (isMulti && params) {
                         String end = "\r\n"
@@ -351,15 +356,18 @@ class Utils {
                 // http 状态码
                 respCode = conn.getResponseCode()
                 // 保存cookie
-                conn.getHeaderFields().get('Set-Cookie')?.each {c ->
+                conn.getHeaderFields()?.get('Set-Cookie')?.each {c ->
                     String[] arr = c.split(";")[0].split("=")
                     cookie(arr[0], arr[1])
                 }
 
                 // 取结果
-                ret = conn.getInputStream().getText("utf-8")
+                ret = conn.getInputStream()?.getText("utf-8")
                 if (200 != responseCode) {
                     throw new Exception("Http error. code: ${responseCode}, url: $urlStr, resp: ${Objects.toString(ret, "")}")
+                }
+                if (debug) {
+                    log.info("Send http: {}, params: {}, result: " + ret, urlStr, params?:bodyStr)
                 }
             } finally {
                 conn?.disconnect()

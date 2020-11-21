@@ -13,7 +13,6 @@ import core.aio.AioClient
 import core.aio.AioServer
 import core.aio.AioSession
 import groovy.transform.PackageScope
-import groovy.transform.ToString
 
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
@@ -168,7 +167,7 @@ class Remoter extends ServerTpl {
             })
         }
 
-        Predicate<Node> predicate = {it.id != app.id}
+        final Predicate<Node> predicate = {it.id != app.id}
         if ('any' == target) {
             final BiConsumer<Exception, Node> failFn = new BiConsumer<Exception, Node>() {
                 @Override
@@ -309,7 +308,7 @@ class Remoter extends ServerTpl {
             lastSyncSuccess = System.currentTimeMillis()
         } catch (ex) {
             sched.after(Duration.ofSeconds(getInteger('errorUpInterval', 30) + new Random().nextInt(60)), {sync()})
-            log.error("App Up error. " + (ex.message?:ex.class.simpleName), ex)
+            log.error("App up error. " + (ex.message?:ex.class.simpleName), ex)
         }
     }
 
@@ -388,9 +387,9 @@ class Remoter extends ServerTpl {
     /**
      * 接收远程发送的消息
      * @param msg 消息内容
-     * @param se AioSession
+     * @param ses AioSession
      */
-    protected void receiveMsg(final String msg, final AioSession se) {
+    protected void receiveMsg(final String msg, final AioSession ses) {
         JSONObject msgJo = null
         try {
             msgJo = JSON.parseObject(msg, Feature.OrderedField)
@@ -402,48 +401,48 @@ class Remoter extends ServerTpl {
         if ("event" == t) { // 远程事件请求
             def sJo = msgJo.getJSONObject('source')
             if (!sJo) {
-                log.warn("Unknown source. origin data: " + msg); return
+                log.warn("Unknown source. origin data: " + msg)
+                ses.close(); return
             }
             if (sJo['id'] == app.id) {
                 log.warn("Not allow fire remote event to self")
-                se.close()
-                return
+                ses.close(); return
             }
-            receiveEventReq(msgJo.getJSONObject("data"), se)
+            receiveEventReq(msgJo.getJSONObject("data"), ses)
         } else if ("appUp" == t) { // 应用注册在线通知
             def sJo = msgJo.getJSONObject('source')
             if (!sJo) {
-                log.warn("Unknown source. origin data: " + msg); return
+                log.warn("Unknown source. origin data: " + msg)
+                ses.close(); return
             }
             if (sJo['id'] == app.id) {
                 log.warn("Not allow register up to self")
-                se.close()
-                return
+                ses.close(); return
             }
             queue(APP_UP) {
                 JSONObject d
-                try { d = msgJo.getJSONObject("data"); appUp(d, se) }
+                try { d = msgJo.getJSONObject("data"); appUp(d, ses) }
                 catch (Exception ex) {
-                    log.error("Register up error!. data: " + d, ex)
+                    log.error("App up error!. data: " + d, ex)
                 }
             }
         } else if ("cmd-log" == t) { // telnet 命令行设置日志等级
             // telnet localhost 8001
-            // 例: {"type":"cmd-log", "data": "core.module.remote: debug"}$_$
+            // 例: {"type":"cmd-log", "data": "core.module.remote: debug"}
             String[] arr = msgJo.getString("data").split(":")
             // Log.setLevel(arr[0].trim(), arr[1].trim())
-            se.send("set log level success")
+            ses.send("set log level success")
         } else if (t && t.startsWith("ls ")) {
-            // {"type":"ls apps"}$_$
+            // {"type":"ls apps"}
             def arr = t.split(" ")
-            if (arr?[1] = "apps") {
-                se.send(JSON.toJSONString(nodeMap))
-            } else if (arr?[1] == 'app' && arr?[2]) {
-                se.send(JSON.toJSONString(nodeMap[arr?[2]]))
+            if (arr?[1] = "apps") { // ls apps
+                ses.send(JSON.toJSONString(nodeMap))
+            } else if (arr?[1] == 'app' && arr?[2]) { // ls app gy
+                ses.send(JSON.toJSONString(nodeMap[arr?[2]]))
             }
         } else {
             log.error("Not support exchange data type '{}'", t)
-            se.close()
+            ses.close()
         }
     }
 
@@ -488,9 +487,10 @@ class Remoter extends ServerTpl {
             String eId = data.getString("id")
             String eName = data.getString("name")
 
-            EC ec = new EC()
+            final EC ec = new EC()
             ec.id(eId)
-            ec.args(data.getJSONArray("args") == null ? null : data.getJSONArray("args").stream().map{JSONObject jo ->
+            // 组装方法参数
+            ec.args(data.getJSONArray("args") == null ? null : data.getJSONArray("args").collect{JSONObject jo ->
                 String t = jo.getString("type")
                 if (jo.isEmpty()) return null // 参数为null
                 else if (String.class.name == t) return jo.getString("value")
@@ -506,33 +506,33 @@ class Remoter extends ServerTpl {
                 else throw new IllegalArgumentException("Not support parameter type '" + t + "'")
             }.toArray())
 
-            if (fReply) {
-                ec.completeFn(ec1 -> {
-                    JSONObject r = new JSONObject(3)
-                    r.put("id", ec.id())
-                    if (!ec.success) { r.put("exMsg", ec.failDesc()) }
-                    r.put("result", ec.result)
+            if (fReply) { // 是否需要响应结果给远程的调用方
+                ec.completeFn {
+                    JSONObject result = new JSONObject(3)
+                    result.put("id", ec.id())
+                    if (!ec.success) { result.put("exMsg", ec.failDesc()) }
+                    result.put("result", ec.result)
                     se.send(JSON.toJSONString(
                         new JSONObject(3)
                             .fluentPut("type", "event")
                             .fluentPut("source", new JSONObject(2).fluentPut('name', app.name).fluentPut('id', app.id))
-                            .fluentPut("data", r),
+                            .fluentPut("data", result),
                         SerializerFeature.WriteMapNullValue
                     ))
-                })
+                }
             }
             ep.fire(eName, ec.sync()) // 同步执行, 没必要异步去切换线程
         } catch (ex) {
             log.error("invoke event error. data: " + data, ex)
             if (fReply) {
-                JSONObject r = new JSONObject(3)
-                r.put("id", data.getString("id"))
-                r.put("result", null)
-                r.put("exMsg", ex.message ? ex.message: ex.getClass().name)
+                JSONObject result = new JSONObject(3)
+                result.put("id", data.getString("id"))
+                result.put("result", null)
+                result.put("exMsg", ex.message ? ex.message: ex.getClass().name)
                 def res = new JSONObject(3)
                     .fluentPut("type", "event")
                     .fluentPut("source", new JSONObject(2).fluentPut('name', app.name).fluentPut('id', app.id))
-                    .fluentPut("data", r)
+                    .fluentPut("data", result)
                 se.send(JSON.toJSONString(res, SerializerFeature.WriteMapNullValue))
             }
         }
@@ -543,10 +543,9 @@ class Remoter extends ServerTpl {
      * client -> master
      * 接收集群应用的数据上传, 应用上线通知
      * NOTE: 此方法线程已安全
-     * 例: {"name": "应用名", "id": "应用实例id", "tcp":"localhost:8001", "http":"localhost:8080", "udp": "localhost:11111"}
      * id 和 tcp 必须唯一
-     * @param data
-     * @param se
+     * @param data 节点应用上传的数据 {"name": "应用名", "id": "应用实例id", "tcp":"host:port", "http":"host:port", "udp": "host:port"}
+     * @param se {@link AioSession}
      */
     protected void appUp(final Map data, final AioSession se) {
         if (!data || !data['name'] || !data['tcp'] || !data['id']) { // 数据验证
@@ -721,13 +720,13 @@ class Remoter extends ServerTpl {
 
             if (master) { // 如果是master, 则同步所有
                 ls.each {hp -> aioClient.send(hp.v1, hp.v2, data)}
-                log.debug("App Up success. {}", data)
+                log.debug("App up success. {}", data)
             } else {
                 def hp = ls.get(new Random().nextInt(ls.size()))
                 aioClient.send(hp.v1, hp.v2, data, {ex ->
-                    log.warn("App Up fail. " + data, ex)
+                    log.warn("App up fail. " + data, ex)
                 }, {
-                    log.debug("App Up success. {}", data)
+                    log.debug("App up success. {}", data)
                 })
             }
         }
@@ -781,19 +780,37 @@ class Remoter extends ServerTpl {
      */
     class Node {
         /**
-         * 节点id
+         * 节点id, 对应 app.id
          */
         String id
+        /**
+         * 节点名, 对应 app.name
+         */
         String name
+        /**
+         * tcp endpoint -> host:port
+         */
         String tcp
+        /**
+         * http endpoint -> host:port
+         */
         String http
+        /**
+         * udp endpoint -> host:port
+         */
         String udp
+        /**
+         * 是否为 master {@link Remoter#master}
+         */
         Boolean master
+        /**
+         * 上传数据的时间. app up 时间
+         */
         Long _uptime
 
         @Override
         String toString() {
-            return JSON.toJSONString(this, SerializerFeature.WriteMapNullValue, SerializerFeature.MapSortField, SerializerFeature.SortField)
+            return JSON.toJSONString(this, SerializerFeature.WriteMapNullValue)
         }
     }
 }
