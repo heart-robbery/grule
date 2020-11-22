@@ -49,7 +49,7 @@ jdk8, gradle6.5+
 * bean容器 和AppContext一样都提供bean容器功能. 获取实例bean: bean(OkHttpSrv)
 
 ### 特色1: [Remoter](https://gitee.com/xnat/gy/blob/master/src/core/Remoter.groovy) 集群分布式
-Remoter是多应用之间的连接器,简化跨系统调用,由 [AIO](https://gitee.com/xnat/gy/blob/master/src/core/aio/AioServer.groovy) 实现
+Remoter是多应用之间的连接器,简化跨系统调用,由 [AIO](https://gitee.com/xnat/aio) 实现
 ```
 // 暴露给集群之间通信 ip 和 端口. 例: 绑定本机所有ip ':7001' 或者只绑定某个ip 'localhost:7001'
 aioServer.hp=':9001'

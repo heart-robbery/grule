@@ -127,9 +127,7 @@ class ServerTpl {
             if (beanCtx[n]) log.warn("override exist bean name '{}'", n)
             beanCtx[n] = bean
         }
-        if (bean instanceof ServerTpl) {
-            ep.addListenerSource(bean); app.inject(bean)
-        }
+        ep.addListenerSource(bean); app.inject(bean)
         this
     }
 

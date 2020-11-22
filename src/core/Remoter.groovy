@@ -1,5 +1,8 @@
 package core
 
+import cn.xnatural.aio.AioClient
+import cn.xnatural.aio.AioServer
+import cn.xnatural.aio.AioStream
 import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
@@ -9,9 +12,6 @@ import com.alibaba.fastjson.JSONException
 import com.alibaba.fastjson.JSONObject
 import com.alibaba.fastjson.parser.Feature
 import com.alibaba.fastjson.serializer.SerializerFeature
-import core.aio.AioClient
-import core.aio.AioServer
-import core.aio.AioSession
 import groovy.transform.PackageScope
 
 import java.time.Duration
@@ -56,8 +56,8 @@ class Remoter extends ServerTpl {
      * 集群数据版本管理
      */
     protected final Map<String, DataVersion>          dataVersionMap = new ConcurrentHashMap<>()
-    protected AioClient                               aioClient
-    protected AioServer                               aioServer
+    protected AioClient aioClient
+    protected AioServer aioServer
     // 上次成功同步时间
     Long                                              lastSyncSuccess
 
@@ -79,21 +79,31 @@ class Remoter extends ServerTpl {
         // 如果系统中没有AioClient, 则创建
         aioClient = bean(AioClient)
         if (aioClient == null) {
-            aioClient = new AioClient()
-            aioClient.attr('delimiter', delimiter)
-            exposeBean(aioClient)
+            Map props = app.env['aioClient']
+            props.delimiter = delimiter
+            aioClient = new AioClient(props, exec) {
+                @Override
+                protected void receive(byte[] bs, AioStream stream) {
+                    receiveReply(new String(bs, "utf-8"), stream)
+                }
+            }
+            exposeBean(aioClient, ['aioClient'])
         }
 
         // 如果系统中没有AioServer, 则创建
         aioServer = bean(AioServer)
         if (aioServer == null) {
-            aioServer = new AioServer()
-            aioServer.attr('delimiter', delimiter)
-            exposeBean(aioServer)
+            Map props = app.env['aioServer']
+            props.delimiter = delimiter
+            aioServer = new AioServer(props, exec) {
+                @Override
+                protected void receive(byte[] bs, AioStream stream) {
+                    receiveMsg(new String(bs, "utf-8"), stream)
+                }
+            }
             aioServer.start()
+            exposeBean(aioServer, ["aioServer"])
         }
-        aioServer.msgFn {msg, se -> receiveMsg(msg, se)}
-        aioClient.msgFn {msg, se -> receiveReply(msg, se)}
 
         ep.fire("${name}.started")
     }
@@ -159,7 +169,7 @@ class Remoter extends ServerTpl {
         final def doSend = {Node node, BiConsumer<Exception, Node> failFn ->
             if (!node) return
             String[] arr = node.tcp.split(":")
-            aioClient.send(arr[0], Integer.valueOf(arr[1]), msg, {ex ->
+            aioClient.send(arr[0], Integer.valueOf(arr[1]), msg.getBytes("utf-8"), {ex ->
                 log.error("Send fail msg: $msg to Node: $node".toString(), ex)
                 failFn?.accept(ex, node)
             }, {se ->
@@ -316,7 +326,7 @@ class Remoter extends ServerTpl {
     /**
      * 调用远程事件
      * 执行流程: 1. 客户端发送事件:  {@link #doFire(EC, String, String, List)}
-     *          2. 服务端接收到事件: {@link #receiveEventReq(com.alibaba.fastjson.JSONObject, core.aio.AioSession)}
+     *          2. 服务端接收到事件: {@link #receiveEventReq(com.alibaba.fastjson.JSONObject, cn.xnatural.aio.AioStream)}
      *          3. 客户端接收到返回: {@link #receiveEventResp(com.alibaba.fastjson.JSONObject)}
      * @param ec
      * @param appName 应用名
@@ -325,7 +335,7 @@ class Remoter extends ServerTpl {
      */
     @EL(name = "remote", async = false)
     protected void doFire(EC ec, String appName, String eName, List remoteMethodArgs) {
-        if (aioClient == null) throw new RuntimeException("$aioClient.name not is running")
+        if (aioClient == null) throw new RuntimeException("aioClient not is running")
         if (app.name == null) throw new IllegalArgumentException("sys.name is empty")
         ec.suspend()
         JSONObject params = new JSONObject(5, true)
@@ -387,9 +397,9 @@ class Remoter extends ServerTpl {
     /**
      * 接收远程发送的消息
      * @param msg 消息内容
-     * @param ses AioSession
+     * @param stream AioStream
      */
-    protected void receiveMsg(final String msg, final AioSession ses) {
+    protected void receiveMsg(final String msg, final AioStream stream) {
         JSONObject msgJo = null
         try {
             msgJo = JSON.parseObject(msg, Feature.OrderedField)
@@ -402,26 +412,26 @@ class Remoter extends ServerTpl {
             def sJo = msgJo.getJSONObject('source')
             if (!sJo) {
                 log.warn("Unknown source. origin data: " + msg)
-                ses.close(); return
+                stream.close(); return
             }
             if (sJo['id'] == app.id) {
                 log.warn("Not allow fire remote event to self")
-                ses.close(); return
+                stream.close(); return
             }
-            receiveEventReq(msgJo.getJSONObject("data"), ses)
+            receiveEventReq(msgJo.getJSONObject("data"), stream)
         } else if ("appUp" == t) { // 应用注册在线通知
             def sJo = msgJo.getJSONObject('source')
             if (!sJo) {
                 log.warn("Unknown source. origin data: " + msg)
-                ses.close(); return
+                stream.close(); return
             }
             if (sJo['id'] == app.id) {
                 log.warn("Not allow register up to self")
-                ses.close(); return
+                stream.close(); return
             }
             queue(APP_UP) {
                 JSONObject d
-                try { d = msgJo.getJSONObject("data"); appUp(d, ses) }
+                try { d = msgJo.getJSONObject("data"); appUp(d, stream) }
                 catch (Exception ex) {
                     log.error("App up error!. data: " + d, ex)
                 }
@@ -431,18 +441,18 @@ class Remoter extends ServerTpl {
             // 例: {"type":"cmd-log", "data": "core.module.remote: debug"}
             String[] arr = msgJo.getString("data").split(":")
             // Log.setLevel(arr[0].trim(), arr[1].trim())
-            ses.send("set log level success")
+            stream.reply("set log level success".getBytes("utf-8"))
         } else if (t && t.startsWith("ls ")) {
             // {"type":"ls apps"}
             def arr = t.split(" ")
             if (arr?[1] = "apps") { // ls apps
-                ses.send(JSON.toJSONString(nodeMap))
+                stream.reply(JSON.toJSONString(nodeMap).getBytes("utf-8"))
             } else if (arr?[1] == 'app' && arr?[2]) { // ls app gy
-                ses.send(JSON.toJSONString(nodeMap[arr?[2]]))
+                stream.reply(JSON.toJSONString(nodeMap[arr?[2]]).getBytes("utf-8"))
             }
         } else {
             log.error("Not support exchange data type '{}'", t)
-            ses.close()
+            stream.close()
         }
     }
 
@@ -452,8 +462,8 @@ class Remoter extends ServerTpl {
      * @param reply 回应消息
      * @param se AioSession
      */
-    protected void receiveReply(final String reply, final AioSession se) {
-        log.trace("Receive reply from '{}': {}", se.sc.remoteAddress, reply)
+    protected void receiveReply(final String reply, final AioStream se) {
+        log.trace("Receive reply from '{}': {}", se.channel.remoteAddress, reply)
         def jo = JSON.parseObject(reply, Feature.OrderedField)
         if ("updateAppInfo" == jo['type']) {
             updateAppInfo(jo.getJSONObject("data"))
@@ -480,7 +490,7 @@ class Remoter extends ServerTpl {
      * @param data 数据
      * @param se AioSession
      */
-    protected void receiveEventReq(final JSONObject data, final AioSession se) {
+    protected void receiveEventReq(final JSONObject data, final AioStream se) {
         log.debug("Receive event request: {}", data)
         boolean fReply = (Boolean.TRUE == data.getBoolean("reply")) // 是否需要响应
         try {
@@ -512,13 +522,13 @@ class Remoter extends ServerTpl {
                     result.put("id", ec.id())
                     if (!ec.success) { result.put("exMsg", ec.failDesc()) }
                     result.put("result", ec.result)
-                    se.send(JSON.toJSONString(
+                    se.reply(JSON.toJSONString(
                         new JSONObject(3)
                             .fluentPut("type", "event")
                             .fluentPut("source", new JSONObject(2).fluentPut('name', app.name).fluentPut('id', app.id))
                             .fluentPut("data", result),
                         SerializerFeature.WriteMapNullValue
-                    ))
+                    ).getBytes("utf-8"))
                 }
             }
             ep.fire(eName, ec.sync()) // 同步执行, 没必要异步去切换线程
@@ -533,7 +543,7 @@ class Remoter extends ServerTpl {
                     .fluentPut("type", "event")
                     .fluentPut("source", new JSONObject(2).fluentPut('name', app.name).fluentPut('id', app.id))
                     .fluentPut("data", result)
-                se.send(JSON.toJSONString(res, SerializerFeature.WriteMapNullValue))
+                se.reply(JSON.toJSONString(res, SerializerFeature.WriteMapNullValue).getBytes('utf-8'))
             }
         }
     }
@@ -545,9 +555,9 @@ class Remoter extends ServerTpl {
      * NOTE: 此方法线程已安全
      * id 和 tcp 必须唯一
      * @param data 节点应用上传的数据 {"name": "应用名", "id": "应用实例id", "tcp":"host:port", "http":"host:port", "udp": "host:port"}
-     * @param se {@link AioSession}
+     * @param se {@link AioStream}
      */
-    protected void appUp(final Map data, final AioSession se) {
+    protected void appUp(final Map data, final AioStream se) {
         if (!data || !data['name'] || !data['tcp'] || !data['id']) { // 数据验证
             log.warn("Node up data incomplete: " + data)
             return
@@ -605,7 +615,7 @@ class Remoter extends ServerTpl {
                     }
                     // 返回所有的注册信息给当前来注册的客户端应用
                     if (node.id != data["id"]) {
-                        se?.send(new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", JSON.toJSON(node)).toString())
+                        se?.reply(new JSONObject(2).fluentPut("type", "updateAppInfo").fluentPut("data", JSON.toJSON(node)).toString().getBytes('utf-8'))
                     }
                 }
             }
@@ -719,11 +729,11 @@ class Remoter extends ServerTpl {
             if (!ls) return
 
             if (master) { // 如果是master, 则同步所有
-                ls.each {hp -> aioClient.send(hp.v1, hp.v2, data)}
+                ls.each {hp -> aioClient.send(hp.v1, hp.v2, data.getBytes('utf-8'))}
                 log.debug("App up success. {}", data)
             } else {
                 def hp = ls.get(new Random().nextInt(ls.size()))
-                aioClient.send(hp.v1, hp.v2, data, {ex ->
+                aioClient.send(hp.v1, hp.v2, data.getBytes('utf-8'), {ex ->
                     log.warn("App up fail. " + data, ex)
                 }, {
                     log.debug("App up success. {}", data)
