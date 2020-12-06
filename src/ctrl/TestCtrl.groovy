@@ -3,13 +3,17 @@ package ctrl
 import cn.xnatural.aio.AioClient
 import cn.xnatural.aio.AioServer
 import cn.xnatural.enet.event.EL
+import cn.xnatural.http.ApiResp
+import cn.xnatural.http.Ctrl
+import cn.xnatural.http.FileData
+import cn.xnatural.http.Filter
+import cn.xnatural.http.HttpContext
+import cn.xnatural.http.HttpServer
+import cn.xnatural.http.Path
+import cn.xnatural.http.WS
+import cn.xnatural.http.WebSocket
+import cn.xnatural.http.WsListener
 import core.*
-import core.http.HttpContext
-import core.http.HttpServer
-import core.http.mvc.*
-import core.http.ws.Listener
-import core.http.ws.WS
-import core.http.ws.WebSocket
 import core.jpa.BaseRepo
 import dao.entity.Permission
 import dao.entity.Test
@@ -24,8 +28,9 @@ import java.text.SimpleDateFormat
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
-import static core.http.mvc.ApiResp.fail
-import static core.http.mvc.ApiResp.ok
+import static cn.xnatural.http.ApiResp.ok
+import static cn.xnatural.http.ApiResp.fail
+
 
 @Ctrl(prefix = 'test')
 class TestCtrl extends ServerTpl {
@@ -56,8 +61,8 @@ class TestCtrl extends ServerTpl {
 
     @WS(path = 'msg')
     void wsMsg(WebSocket ws) {
-        log.info('WS connect. {}', ws.session.sc.remoteAddress)
-        ws.listen(new Listener() {
+        log.info('WS connect. {}', ws.session.remoteAddress)
+        ws.listen(new WsListener() {
 
             @Override
             void onClose(WebSocket wst) {
@@ -75,7 +80,7 @@ class TestCtrl extends ServerTpl {
 
 
     // 测试抛出错误
-    @Path(path = 'error')
+    @Path(path = 'error', produce = "application/json")
     def error() {
         throw new Exception('错误测试')
     }
@@ -212,17 +217,16 @@ class TestCtrl extends ServerTpl {
 
     // 测试登录
     @Path(path = 'login')
-    ApiResp login(String username, HttpContext ctx) {
-        ctx.setSessionAttr('permissions', repo.findList(Permission).collect {it.enName}.toSet())
-        ok()
+    ApiResp login(String username, HttpContext hCtx) {
+        hCtx.setSessionAttr('permissions', repo.findList(Permission).collect {it.enName}.toSet())
+        ok(hCtx.getSessionAttr("permissions"))
     }
 
 
     // 权限测试
     @Path(path = 'auth')
     ApiResp auth(String auth, HttpContext ctx) {
-        ctx.auth(auth?:'auth1')
-        ok()
+        ok(ctx.auth(auth?:'auth1'))
     }
 
 

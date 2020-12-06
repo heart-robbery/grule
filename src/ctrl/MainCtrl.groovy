@@ -3,10 +3,10 @@ package ctrl
 import core.Remoter
 import core.ServerTpl
 import core.Utils
-import core.http.HttpContext
-import core.http.mvc.ApiResp
-import core.http.mvc.Ctrl
-import core.http.mvc.Path
+import cn.xnatural.http.HttpContext
+import cn.xnatural.http.ApiResp
+import cn.xnatural.http.Ctrl
+import cn.xnatural.http.Path
 import service.FileUploader
 
 import java.text.SimpleDateFormat
@@ -76,11 +76,10 @@ class MainCtrl extends ServerTpl {
 
     // ====================== api-doc =========================
 
-    @Path(path = 'api-doc/:fName.json')
+    @Path(path = 'api-doc/:fName.json', produce = 'application/json')
     String swagger_data(String fName, HttpContext ctx) {
         def f = Utils.baseDir("conf/${fName}.json")
         if (f.exists()) {
-            ctx.response.contentType("application/json")
             return f.getText('utf-8')
         }
         null

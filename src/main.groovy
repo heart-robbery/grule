@@ -28,7 +28,7 @@ app.addSource(new Remoter()) // 集群分布式
 app.addSource(new HibernateSrv().entities( // jpa封装
     Test, VersionFile, Permission
 ))
-app.addSource(new HttpServer().ctrls(
+app.addSource(new HttpSrv().ctrls(
     TestCtrl, MainCtrl
 ))
 app.addSource(new FileUploader())
