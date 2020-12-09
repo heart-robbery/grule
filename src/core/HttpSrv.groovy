@@ -12,6 +12,7 @@ import java.time.Duration
 class HttpSrv extends ServerTpl {
     @Lazy protected def ehcache = bean(EhcacheSrv)
     @Lazy protected String sessionCookieName = getStr("sessionCookieName", "sId")
+    protected final List<Class> ctrlClzs = new LinkedList<>()
     @Lazy protected HttpServer server = new HttpServer(attrs(), exec) {
         @Override
         protected Map<String, Object> sessionDelegate(HttpContext hCtx) { getSessionDelegate(hCtx) }
@@ -23,8 +24,9 @@ class HttpSrv extends ServerTpl {
     HttpSrv() {super('web')}
 
 
-    @EL(name = 'sys.starting')
+    @EL(name = 'sys.starting', async = true)
     void start() {
+        ctrlClzs.each {server.ctrls(it)}
         server.start()
         ep.fire("${name}.started")
     }
@@ -128,13 +130,12 @@ class HttpSrv extends ServerTpl {
     }
 
 
-
     /**
      * 添加
      * @param clzs
      * @return
      */
-    HttpSrv ctrls(Class...clzs) { server.ctrls(clzs); this }
+    HttpSrv ctrls(Class...clzs) { clzs?.each {ctrlClzs.add(it)}; this }
 
 
     @EL(name = "sys.heartbeat", async = true)

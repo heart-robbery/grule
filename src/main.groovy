@@ -1,7 +1,6 @@
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import core.*
-import core.http.HttpServer
 import core.jpa.HibernateSrv
 import ctrl.MainCtrl
 import ctrl.TestCtrl
@@ -13,7 +12,6 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import service.FileUploader
 import service.TestService
-
 
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Field final AppContext app = new AppContext() //应用上下文
