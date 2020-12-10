@@ -1,16 +1,15 @@
 package ctrl
 
+import cn.xnatural.http.ApiResp
+import cn.xnatural.http.Ctrl
+import cn.xnatural.http.Path
 import core.ServerTpl
-import core.http.mvc.ApiResp
-import core.http.mvc.Ctrl
-import core.http.mvc.Path
 import core.jpa.BaseRepo
 import org.hibernate.query.internal.NativeQueryImpl
 import org.hibernate.transform.Transformers
 import service.rule.DecisionManager
 
 import java.text.SimpleDateFormat
-
 
 @Ctrl(prefix = 'mnt')
 class MntAnalyseCtrl extends ServerTpl {

@@ -447,7 +447,7 @@ if (idNumber && idNumber.length() > 17) {
             return
         }
         // 创建 http 客户端
-        def http = new OkHttpSrv('okHttp_' + collector.enName)
+        def http = new OkHttpSrv('okHttp_' + collector.enName); app.inject(http)
         http.attr('connectTimeout', getLong('http.connectTimeout', 3L))
         http.attr('readTimeout', getLong('http.readTimeout', Long.valueOf(collector.timeout?:20)))
         http.init()

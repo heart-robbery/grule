@@ -1,21 +1,12 @@
 package ctrl
 
-
 import cn.xnatural.enet.event.EL
+import cn.xnatural.http.*
 import core.ServerTpl
-import core.http.HttpContext
-import core.http.mvc.ApiResp
-import core.http.mvc.Ctrl
-import core.http.mvc.Filter
-import core.http.mvc.Path
-import core.http.ws.Listener
-import core.http.ws.WS
-import core.http.ws.WebSocket
 import core.jpa.BaseRepo
 import dao.entity.User
 
 import java.util.concurrent.ConcurrentHashMap
-
 
 @Ctrl(prefix = 'mnt')
 class MntCtrl extends ServerTpl {
@@ -40,13 +31,11 @@ class MntCtrl extends ServerTpl {
 
     @WS(path = 'ws')
     void receiveWs(WebSocket ws) {
-        log.info('WS connect. {}', ws.session.sc.remoteAddress)
-        ws.listen(new Listener() {
+        log.info('WS connect. {}', ws.session.getRemoteAddress())
+        ws.listen(new WsListener() {
 
             @Override
-            void onClose(WebSocket wst) {
-                wss.remove(wst)
-            }
+            void onClose(WebSocket wst) { wss.remove(wst) }
 
             @Override
             void onText(String msg) {
@@ -71,7 +60,7 @@ class MntCtrl extends ServerTpl {
         def user = repo.find(User) {root, query, cb -> cb.equal(root.get('name'), username)}
         if (!user) return ApiResp.fail("用户不存在")
         if (password != user.password) return ApiResp.fail('密码错误')
-        ctx.setSessionAttr('id', user.id)
+        ctx.setSessionAttr('uId', user.id)
         ctx.setSessionAttr('name', username)
         ctx.setSessionAttr('permissions', user.permissions?.split(",") as Set)
         user.login = new Date()
@@ -99,7 +88,7 @@ class MntCtrl extends ServerTpl {
         String name = ctx.getSessionAttr('name')
         if (name) {
             ApiResp.ok().attr('id', ctx.getSessionAttr('id')).attr('name', name)
-                .attr('permissions', ctx.getSessionAttr("permissions", Set))
+                .attr('permissions', ctx.getSessionAttr("permissions"))
         } else {
             ctx.response.status(401)
             ApiResp.fail('用户会话已失效, 请重新登录')

@@ -1,6 +1,6 @@
 package ctrl
 
-import core.http.mvc.Ctrl
+import cn.xnatural.http.Ctrl
 
 
 @Ctrl(prefix = 'data')

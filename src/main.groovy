@@ -1,6 +1,5 @@
 import cn.xnatural.enet.event.EL
 import core.*
-import core.http.HttpServer
 import core.jpa.HibernateSrv
 import ctrl.*
 import dao.entity.*
@@ -14,6 +13,7 @@ import service.rule.*
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Field final AppContext app = new AppContext()
 
+
 // 系统功能添加区
 app.addSource(new OkHttpSrv())
 app.addSource(new EhcacheSrv())
@@ -23,7 +23,7 @@ app.addSource(new HibernateSrv('jpa_rule').entities(
     Decision, RuleField, DataCollector, OpHistory, DecisionResult, CollectResult,
     User, Permission, GlobalConfig
 ))
-app.addSource(new HttpServer().ctrls(
+app.addSource(new HttpSrv().ctrls(
         TestCtrl, MainCtrl, RuleCtrl, MntCtrl, MntUserCtrl, MntDecisionCtrl, MntAnalyseCtrl
 ))
 app.addSource(new FileUploader())
