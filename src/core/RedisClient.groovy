@@ -103,7 +103,7 @@ class RedisClient extends ServerTpl {
 
 
     @EL(name = '${name}.hget', async = false)
-    Object hget(String cName, String key) { exec{it.hget(cName, key)} }
+    String hget(String cName, String key) { exec{it.hget(cName, key)} }
 
 
     @EL(name = '${name}.hexists', async = false)

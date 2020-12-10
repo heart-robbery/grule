@@ -1,10 +1,10 @@
 package service
 
 import cn.xnatural.enet.event.EL
+import cn.xnatural.http.FileData
 import core.Utils
 import core.OkHttpSrv
 import core.ServerTpl
-import core.http.mvc.FileData
 
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
