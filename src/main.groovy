@@ -1,7 +1,7 @@
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
+import cn.xnatural.jpa.Repo
 import core.*
-import core.jpa.HibernateSrv
 import ctrl.MainCtrl
 import ctrl.TestCtrl
 import dao.entity.Permission
@@ -13,6 +13,8 @@ import org.slf4j.LoggerFactory
 import service.FileUploader
 import service.TestService
 
+import java.util.concurrent.Executor
+
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Field final AppContext app = new AppContext() //应用上下文
 @Lazy @Field EP ep = app.bean(EP)
@@ -23,9 +25,19 @@ app.addSource(new OkHttpSrv()) // http 客户端
 app.addSource(new EhcacheSrv()) // ehcache 封装
 app.addSource(new SchedSrv()) // 定时任务封装 base on quartz库
 app.addSource(new Remoter()) // 集群分布式
-app.addSource(new HibernateSrv().entities( // jpa封装
-    Test, VersionFile, Permission
-))
+app.addSource(new ServerTpl("jpa_local") { //数据库 jpa_local
+    Repo repo
+    @EL(name = "sys.starting", async = true)
+    void start() {
+        repo = new Repo(attrs()).entities( // jpa封装
+            Test, VersionFile, Permission
+        ).init()
+        exposeBean(repo)
+    }
+
+    @EL(name = "sys.stopping", async = true)
+    void stop() { repo?.close() }
+})
 app.addSource(new HttpSrv().ctrls(
     TestCtrl, MainCtrl
 ))
@@ -46,6 +58,42 @@ void sysInited() {
 @EL(name = 'sys.started', async = true) //系统启动完成
 void sysStarted() {
     try {
+//        app.bean(Executor).execute {
+//            (1..1000).each {
+//                println app.bean(OkHttpSrv).get("http://localhost:7070/test/get?p1=1&p2=xx").execute()
+//                Thread.sleep(100 + new Random().nextInt(200))
+//            }
+//        }
+//        app.bean(Executor).execute {
+//            (1..1000).each {
+//                println app.bean(OkHttpSrv).get("http://localhost:7070/test/async?p1=oo").execute()
+//                Thread.sleep(100 + new Random().nextInt(200))
+//            }
+//        }
+//        app.bean(Executor).execute {
+//            (1..1000).each {
+//                println app.bean(OkHttpSrv).get("http://localhost:7070/test/get?p1=1&p2=xx").execute()
+//                Thread.sleep(100 + new Random().nextInt(200))
+//            }
+//        }
+//        app.bean(Executor).execute {
+//            (1..1000).each {
+//                println app.bean(OkHttpSrv).get("http://localhost:7070/test/async?p1=oo").execute()
+//                Thread.sleep(100 + new Random().nextInt(200))
+//            }
+//        }
+//        app.bean(Executor).execute {
+//            (1..1000).each {
+//                println app.bean(OkHttpSrv).get("http://localhost:7070/test/form?p1=1&p2=xx").execute()
+//                Thread.sleep(100 + new Random().nextInt(200))
+//            }
+//        }
+//        app.bean(Executor).execute {
+//            (1..1000).each {
+//                println app.bean(OkHttpSrv).get("http://localhost:7070/test/async?p1=oo").execute()
+//                Thread.sleep(100 + new Random().nextInt(200))
+//            }
+//        }
         // TODO
     } finally {
         // System.exit(0)

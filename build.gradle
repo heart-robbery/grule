@@ -38,14 +38,16 @@ dependencies {
     compile 'org.codehaus.groovy:groovy:3.0.5'
     compile 'javax.inject:javax.inject:1'
     compile 'ch.qos.logback:logback-classic:1.2.3'
+    // compile 'com.alibaba:fastjson:1.2.73'
+
     compile 'cn.xnatural.enet:enet-event:0.0.15'
     compile 'cn.xnatural.http:http:1.0.3'
     compile 'cn.xnatural.aio:aio:1.0.3'
-    compile 'com.alibaba:fastjson:1.2.73'
-    compile 'org.hibernate:hibernate-core:5.4.22.Final'
+    compile 'cn.xnatural.jpa:jpa:1.0.0'
+    // compile 'cn.xnatural.sched:sched:1.0.0'
 
     // 连接池
-    compile 'com.alibaba:druid:1.1.23'
+    // compile 'com.alibaba:druid:1.1.23'
     // compile 'com.zaxxer:HikariCP:3.4.1'
     // compile 'org.apache.commons:commons-dbcp2:2.7.0'
     compile 'mysql:mysql-connector-java:5.1.34'
