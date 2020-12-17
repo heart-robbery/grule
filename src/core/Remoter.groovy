@@ -6,6 +6,7 @@ import cn.xnatural.aio.AioStream
 import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
+import cn.xnatural.sched.Sched
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONArray
 import com.alibaba.fastjson.JSONException
@@ -32,7 +33,7 @@ import static core.Utils.ipv4
  */
 class Remoter extends ServerTpl {
     protected static final String APP_UP = 'appUp'
-    @Lazy def                                             sched      = bean(SchedSrv)
+    @Lazy def                                             sched      = bean(Sched)
     /**
      * 集群的服务中心地址 [host1]:port1,[host2]:port2. 例 :8001 or localhost:8001
      */

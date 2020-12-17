@@ -41,10 +41,10 @@ dependencies {
     // compile 'com.alibaba:fastjson:1.2.73'
 
     compile 'cn.xnatural.enet:enet-event:0.0.15'
-    compile 'cn.xnatural.http:http:1.0.3'
-    compile 'cn.xnatural.aio:aio:1.0.3'
+    compile 'cn.xnatural.http:http:1.0.4'
+    compile 'cn.xnatural.aio:aio:1.0.4'
     compile 'cn.xnatural.jpa:jpa:1.0.0'
-    // compile 'cn.xnatural.sched:sched:1.0.0'
+    compile 'cn.xnatural.sched:sched:1.0.0'
 
     // 连接池
     // compile 'com.alibaba:druid:1.1.23'
@@ -58,11 +58,11 @@ dependencies {
     compile 'com.squareup.okhttp3:okhttp:3.14.9'
     // compile('org.apache.httpcomponents:httpclient:4.5.12')
     compile ('org.ehcache:ehcache:3.8.1') {exclude group:'org.slf4j'}
-    compile ('org.quartz-scheduler:quartz:2.3.2') {
-        exclude group:'org.slf4j'
-        exclude group:'com.mchange'
-        exclude group:'com.zaxxer'
-    }
+//    compile ('org.quartz-scheduler:quartz:2.3.2') {
+//        exclude group:'org.slf4j'
+//        exclude group:'com.mchange'
+//        exclude group:'com.zaxxer'
+//    }
     compile 'redis.clients:jedis:3.3.0'
 
     // 分布式数据一致框架

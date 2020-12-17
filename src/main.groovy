@@ -1,6 +1,7 @@
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import cn.xnatural.jpa.Repo
+import cn.xnatural.sched.Sched
 import core.*
 import ctrl.MainCtrl
 import ctrl.TestCtrl
@@ -13,8 +14,6 @@ import org.slf4j.LoggerFactory
 import service.FileUploader
 import service.TestService
 
-import java.util.concurrent.Executor
-
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Field final AppContext app = new AppContext() //应用上下文
 @Lazy @Field EP ep = app.bean(EP)
@@ -23,7 +22,17 @@ import java.util.concurrent.Executor
 // 系统功能添加区
 app.addSource(new OkHttpSrv()) // http 客户端
 app.addSource(new EhcacheSrv()) // ehcache 封装
-app.addSource(new SchedSrv()) // 定时任务封装 base on quartz库
+app.addSource(new ServerTpl("sched") { // 定时任务
+    Sched sched
+    @EL(name = "sys.starting", async = true)
+    void start() {
+        sched = new Sched(attrs(), exec)
+        exposeBean(sched)
+    }
+
+    @EL(name = "sys.stopping", async = true)
+    void stop() { sched?.stop() }
+})
 app.addSource(new Remoter()) // 集群分布式
 app.addSource(new ServerTpl("jpa_local") { //数据库 jpa_local
     Repo repo

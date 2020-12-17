@@ -6,8 +6,8 @@ import cn.xnatural.enet.event.EL
 import cn.xnatural.http.*
 import cn.xnatural.jpa.Page
 import cn.xnatural.jpa.Repo
+import cn.xnatural.sched.Sched
 import core.OkHttpSrv
-import core.SchedSrv
 import core.ServerTpl
 import core.Utils
 import dao.entity.Permission
@@ -170,7 +170,7 @@ class TestCtrl extends ServerTpl {
             def fd = new FileData(originName: originName)
             def f = File.createTempFile(fd.finalName, '')
             tmpFiles.put(fileId, Tuple.tuple(f, fd))
-            bean(SchedSrv)?.after(Duration.ofMinutes(bean(HttpServer).getInteger('pieceUpload.maxKeep', 120))) {
+            bean(Sched)?.after(Duration.ofMinutes(bean(HttpServer).getInteger('pieceUpload.maxKeep', 120))) {
                 tmpFiles.remove(fileId)
                 f.delete()
             }
