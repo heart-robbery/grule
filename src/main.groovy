@@ -14,6 +14,10 @@ import org.slf4j.LoggerFactory
 import service.FileUploader
 import service.TestService
 
+import java.time.Duration
+import java.util.function.Supplier
+
+
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Field final AppContext app = new AppContext() //应用上下文
 @Lazy @Field EP ep = app.bean(EP)
@@ -29,7 +33,14 @@ app.addSource(new ServerTpl("sched") { // 定时任务
         sched = new Sched(attrs(), exec)
         exposeBean(sched)
     }
-
+    @EL(name = "sched.after")
+    void after(Duration duration, Runnable fn) {sched.after(duration, fn)}
+    @EL(name = "sched.time")
+    void time(Date time, Runnable fn) {sched.time(time, fn)}
+    @EL(name = "sched.cron")
+    void cron(String cron, Runnable fn) {sched.cron(cron, fn)}
+    @EL(name = "sched.dyn")
+    void dyn(Supplier<Date> dateSupplier, Runnable fn) {sched.dyn(dateSupplier, fn)}
     @EL(name = "sys.stopping", async = true)
     void stop() { sched?.stop() }
 })
