@@ -3,18 +3,13 @@ package ctrl
 import cn.xnatural.aio.AioClient
 import cn.xnatural.aio.AioServer
 import cn.xnatural.enet.event.EL
-import cn.xnatural.http.ApiResp
-import cn.xnatural.http.Ctrl
-import cn.xnatural.http.FileData
-import cn.xnatural.http.Filter
-import cn.xnatural.http.HttpContext
-import cn.xnatural.http.HttpServer
-import cn.xnatural.http.Path
-import cn.xnatural.http.WS
-import cn.xnatural.http.WebSocket
-import cn.xnatural.http.WsListener
-import core.*
-import core.jpa.BaseRepo
+import cn.xnatural.http.*
+import cn.xnatural.jpa.Page
+import cn.xnatural.jpa.Repo
+import cn.xnatural.sched.Sched
+import core.OkHttpSrv
+import core.ServerTpl
+import core.Utils
 import dao.entity.Permission
 import dao.entity.Test
 import dao.entity.UploadFile
@@ -28,14 +23,13 @@ import java.text.SimpleDateFormat
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
-import static cn.xnatural.http.ApiResp.ok
 import static cn.xnatural.http.ApiResp.fail
-
+import static cn.xnatural.http.ApiResp.ok
 
 @Ctrl(prefix = 'test')
 class TestCtrl extends ServerTpl {
     @Lazy def            ts   = bean(TestService)
-    @Lazy def            repo = bean(BaseRepo)
+    @Lazy def            repo = bean(Repo)
     @Lazy def            fu   = bean(FileUploader)
     @Lazy def            http = bean(OkHttpSrv)
 
@@ -176,7 +170,7 @@ class TestCtrl extends ServerTpl {
             def fd = new FileData(originName: originName)
             def f = File.createTempFile(fd.finalName, '')
             tmpFiles.put(fileId, Tuple.tuple(f, fd))
-            bean(SchedSrv)?.after(Duration.ofMinutes(bean(HttpServer).getInteger('pieceUpload.maxKeep', 120))) {
+            bean(Sched)?.after(Duration.ofMinutes(bean(HttpServer).getInteger('pieceUpload.maxKeep', 120))) {
                 tmpFiles.remove(fileId)
                 f.delete()
             }

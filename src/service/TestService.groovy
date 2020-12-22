@@ -1,12 +1,12 @@
 package service
 
 import cn.xnatural.enet.event.EL
+import cn.xnatural.jpa.Page
+import cn.xnatural.jpa.Repo
 import com.alibaba.fastjson.JSON
 import core.OkHttpSrv
-import core.Page
 import core.Remoter
 import core.ServerTpl
-import core.jpa.BaseRepo
 import core.mode.builder.ObjBuilder
 import core.mode.pipeline.Pipeline
 import core.mode.task.TaskContext
@@ -19,7 +19,7 @@ import java.text.SimpleDateFormat
 import java.util.function.Consumer
 
 class TestService extends ServerTpl {
-    @Lazy def repo = bean(BaseRepo)
+    @Lazy def repo = bean(Repo)
     @Lazy def http = bean(OkHttpSrv)
 
 
