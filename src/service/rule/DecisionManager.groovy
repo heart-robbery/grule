@@ -2,11 +2,11 @@ package service.rule
 
 import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
+import cn.xnatural.jpa.Repo
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
 import core.Remoter
 import core.ServerTpl
-import core.jpa.BaseRepo
 import dao.entity.Decision
 import dao.entity.FieldType
 import service.rule.spec.DecisionSpec
@@ -20,7 +20,7 @@ import java.util.function.Function
  * 决策管理器
  */
 class DecisionManager extends ServerTpl {
-    @Lazy def repo = bean(BaseRepo, 'jpa_rule_repo')
+    @Lazy def repo = bean(Repo, 'jpa_rule_repo')
 
     protected final Map<String, DecisionHolder> decisionMap = new ConcurrentHashMap<>()
 
@@ -80,7 +80,7 @@ class DecisionManager extends ServerTpl {
             }
         }
         for (int page = 0, limit = 50; ; page++) {
-            def ls = repo.findList(Decision, page * limit, limit)
+            def ls = repo.findList(Decision, page * limit, limit, null)
             if (!ls) { // 结束
                 tryCompleteFn()
                 break

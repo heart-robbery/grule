@@ -4,8 +4,8 @@ import cn.xnatural.http.ApiResp
 import cn.xnatural.http.Ctrl
 import cn.xnatural.http.HttpContext
 import cn.xnatural.http.Path
+import cn.xnatural.jpa.Repo
 import core.ServerTpl
-import core.jpa.BaseRepo
 import dao.entity.DecisionResult
 import service.rule.AttrManager
 import service.rule.DecisionContext
@@ -18,7 +18,7 @@ class RuleCtrl extends ServerTpl {
     @Lazy def decisionSrv = bean(DecisionSrv)
     @Lazy def dm          = bean(DecisionManager)
     @Lazy def am = bean(AttrManager)
-    @Lazy def repo        = bean(BaseRepo, 'jpa_rule_repo')
+    @Lazy def repo        = bean(Repo, 'jpa_rule_repo')
 
 
     /**

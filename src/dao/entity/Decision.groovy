@@ -1,7 +1,6 @@
 package dao.entity
 
-
-import core.jpa.UUIDEntity
+import cn.xnatural.jpa.UUIDEntity
 import org.hibernate.annotations.DynamicUpdate
 import org.hibernate.annotations.Type
 

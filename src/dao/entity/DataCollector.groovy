@@ -1,13 +1,10 @@
 package dao.entity
 
-import core.jpa.LongIdEntity
+import cn.xnatural.jpa.LongIdEntity
 import org.hibernate.annotations.DynamicUpdate
-import org.hibernate.annotations.Type
 
-import javax.persistence.Basic
 import javax.persistence.Column
 import javax.persistence.Entity
-import javax.persistence.Lob
 
 /**
  * 数据收集器

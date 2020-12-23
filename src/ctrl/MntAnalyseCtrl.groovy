@@ -3,8 +3,8 @@ package ctrl
 import cn.xnatural.http.ApiResp
 import cn.xnatural.http.Ctrl
 import cn.xnatural.http.Path
+import cn.xnatural.jpa.Repo
 import core.ServerTpl
-import core.jpa.BaseRepo
 import org.hibernate.query.internal.NativeQueryImpl
 import org.hibernate.transform.Transformers
 import service.rule.DecisionManager
@@ -13,7 +13,7 @@ import java.text.SimpleDateFormat
 
 @Ctrl(prefix = 'mnt')
 class MntAnalyseCtrl extends ServerTpl {
-    @Lazy def repo = bean(BaseRepo, 'jpa_rule_repo')
+    @Lazy def repo = bean(Repo, 'jpa_rule_repo')
 
     @Path(path = 'countDecide')
     ApiResp countDecide(String startTime, String endTime, String type) {

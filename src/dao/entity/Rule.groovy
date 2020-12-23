@@ -1,12 +1,8 @@
 package dao.entity
 
-import core.jpa.UUIDEntity
+import cn.xnatural.jpa.UUIDEntity
 
-import javax.persistence.ConstraintMode
-import javax.persistence.Entity
-import javax.persistence.ForeignKey
-import javax.persistence.JoinColumn
-import javax.persistence.ManyToOne
+import javax.persistence.*
 
 /**
  * 规则

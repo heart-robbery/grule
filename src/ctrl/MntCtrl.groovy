@@ -2,8 +2,8 @@ package ctrl
 
 import cn.xnatural.enet.event.EL
 import cn.xnatural.http.*
+import cn.xnatural.jpa.Repo
 import core.ServerTpl
-import core.jpa.BaseRepo
 import dao.entity.User
 
 import java.util.concurrent.ConcurrentHashMap
@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap
 @Ctrl(prefix = 'mnt')
 class MntCtrl extends ServerTpl {
 
-    @Lazy def repo = bean(BaseRepo, 'jpa_rule_repo')
+    @Lazy def repo = bean(Repo, 'jpa_rule_repo')
     protected final Set<WebSocket> wss = ConcurrentHashMap.newKeySet()
 
 

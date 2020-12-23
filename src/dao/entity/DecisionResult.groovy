@@ -1,6 +1,6 @@
 package dao.entity
 
-import core.jpa.BaseEntity
+import cn.xnatural.jpa.BaseEntity
 import org.hibernate.annotations.Type
 import service.rule.DecisionEnum
 

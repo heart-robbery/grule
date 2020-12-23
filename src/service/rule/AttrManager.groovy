@@ -2,6 +2,7 @@ package service.rule
 
 import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
+import cn.xnatural.jpa.Repo
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
 import com.alibaba.fastjson.serializer.SerializerFeature
@@ -9,8 +10,6 @@ import core.OkHttpSrv
 import core.Remoter
 import core.ServerTpl
 import core.Utils
-import core.jpa.BaseRepo
-import core.jpa.HibernateSrv
 import dao.entity.CollectResult
 import dao.entity.DataCollector
 import dao.entity.FieldType
@@ -31,7 +30,7 @@ import java.util.function.Function
  */
 class AttrManager extends ServerTpl {
     static final String                          DATA_COLLECTED = "data_collected"
-    @Lazy def                                    repo           = bean(BaseRepo, 'jpa_rule_repo')
+    @Lazy def                                    repo           = bean(Repo, 'jpa_rule_repo')
     /**
      * RuleField(enName, cnName), RuleField
      */
@@ -218,7 +217,7 @@ class AttrManager extends ServerTpl {
         initDefaultAttr()
         Set<String> enNames = (attrMap.isEmpty() ? null : new HashSet<>(100))
         for (int page = 0, limit = 100; ; page++) {
-            def ls = repo.findList(RuleField, page * limit, limit)
+            def ls = repo.findList(RuleField, page * limit, limit, null)
             if (!ls) break
             ls.each {field ->
                 attrMap.put(field.enName, field)
@@ -259,7 +258,7 @@ class AttrManager extends ServerTpl {
         initDefaultCollector()
         Set<String> enNames = (collectors.isEmpty() ? null : new HashSet<>(50))
         for (int page = 0, limit = 100; ; page++) {
-            def ls = repo.findList(DataCollector, page * limit, limit)
+            def ls = repo.findList(DataCollector, page * limit, limit, null)
             if (!ls) break
             ls.each {collector ->
                 initDataCollector(collector)
@@ -355,7 +354,7 @@ if (idNumber && idNumber.length() > 17) {
             return
         }
 
-        def db = new Sql(HibernateSrv.createDs([
+        def db = new Sql(Repo.createDataSource([
             url: collector.url, jdbcUrl: collector.url,
             minIdle: collector.minIdle, maxActive: collector.maxActive,
             minimumIdle: collector.minIdle, maximumPoolSize: collector.maxActive
@@ -497,7 +496,7 @@ if (idNumber && idNumber.length() > 17) {
             final Date start = new Date() // 调用时间
             long spend = 0 // 耗时时长
             String retryMsg = ''
-            def logMsg = "${ctx.logPrefix()}接口调用${ -> retryMsg}: name: $collector.enName, url: $url, bodyStr: $bodyStr${ -> '\nresult: ' + result}${ -> ', resolveResult: ' + resolveResult}"
+            def logMsg = "${ctx.logPrefix()}接口调用${ -> retryMsg}: name: $collector.enName, url: $url, bodyStr: $bodyStr${ -> 'result: ' + result}${ -> ', resolveResult: ' + resolveResult}"
             try {
                 for (int i = 0, times = getInteger('http.retry', 2) + 1; i < times; i++) { // 接口一般遇网络错重试2次
                     try {

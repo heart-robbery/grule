@@ -1,11 +1,11 @@
 package service.rule
 
 import cn.xnatural.enet.event.EL
+import cn.xnatural.jpa.Repo
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.serializer.SerializerFeature
 import core.OkHttpSrv
 import core.ServerTpl
-import core.jpa.BaseRepo
 import dao.entity.DecisionResult
 
 import java.time.Duration
@@ -17,7 +17,7 @@ class DecisionSrv extends ServerTpl {
     static final String SAVE_RESULT = 'save_result'
 
     @Lazy def http = bean(OkHttpSrv)
-    @Lazy def repo = bean(BaseRepo, 'jpa_rule_repo')
+    @Lazy def repo = bean(Repo, 'jpa_rule_repo')
 
 
     @EL(name = 'sys.starting', async = true)

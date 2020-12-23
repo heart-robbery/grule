@@ -5,12 +5,12 @@ import cn.xnatural.http.ApiResp
 import cn.xnatural.http.Ctrl
 import cn.xnatural.http.HttpContext
 import cn.xnatural.http.Path
+import cn.xnatural.jpa.Page
+import cn.xnatural.jpa.Repo
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
-import core.Page
 import core.ServerTpl
 import core.Utils
-import core.jpa.BaseRepo
 import dao.entity.*
 import service.rule.AttrManager
 import service.rule.DecisionEnum
@@ -24,7 +24,7 @@ import java.util.Map.Entry
 @Ctrl(prefix = 'mnt')
 class MntDecisionCtrl extends ServerTpl {
 
-    @Lazy def repo = bean(BaseRepo, 'jpa_rule_repo')
+    @Lazy def repo = bean(Repo, 'jpa_rule_repo')
 
 
     @Path(path = 'decisionPage')

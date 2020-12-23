@@ -212,7 +212,7 @@ class TestCtrl extends ServerTpl {
     // 测试登录
     @Path(path = 'login')
     ApiResp login(String username, HttpContext hCtx) {
-        hCtx.setSessionAttr('permissions', repo.findList(Permission).collect {it.enName}.toSet())
+        hCtx.setSessionAttr('permissions', repo.findList(Permission, null).collect {it.enName}.toSet())
         ok(hCtx.getSessionAttr("permissions"))
     }
 

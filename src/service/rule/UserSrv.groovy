@@ -1,14 +1,14 @@
 package service.rule
 
 import cn.xnatural.enet.event.EL
+import cn.xnatural.jpa.Repo
 import core.ServerTpl
-import core.jpa.BaseRepo
 import dao.entity.Permission
 import dao.entity.User
 
 class UserSrv extends ServerTpl {
 
-    @Lazy def repo = bean(BaseRepo, 'jpa_rule_repo')
+    @Lazy def repo = bean(Repo, 'jpa_rule_repo')
 
 
     @EL(name = "jpa_rule.started", async = true)
@@ -44,7 +44,7 @@ class UserSrv extends ServerTpl {
 
         if (repo.count(User) < 1) {
             log.info("初始化默认用户 admin")
-            repo.saveOrUpdate(new User(name: 'admin', password: 'admin', permissions: repo.findList(Permission).collect {it.enName}.join(",")))
+            repo.saveOrUpdate(new User(name: 'admin', password: 'admin', permissions: repo.findList(Permission, null).collect {it.enName}.join(",")))
         }
     }
 }

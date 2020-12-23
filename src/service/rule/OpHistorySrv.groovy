@@ -1,12 +1,12 @@
 package service.rule
 
 import cn.xnatural.enet.event.EL
+import cn.xnatural.jpa.IEntity
+import cn.xnatural.jpa.Repo
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.serializer.SerializerFeature
 import core.ServerTpl
 import core.Utils
-import core.jpa.BaseRepo
-import core.jpa.IEntity
 import dao.entity.OpHistory
 
 import java.text.SimpleDateFormat
@@ -16,7 +16,7 @@ import java.text.SimpleDateFormat
  */
 class OpHistorySrv extends ServerTpl {
 
-    @Lazy def repo = bean(BaseRepo, 'jpa_rule_repo')
+    @Lazy def repo = bean(Repo, 'jpa_rule_repo')
 
 
     /**

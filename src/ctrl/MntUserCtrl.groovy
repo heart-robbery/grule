@@ -4,17 +4,17 @@ import cn.xnatural.http.ApiResp
 import cn.xnatural.http.Ctrl
 import cn.xnatural.http.HttpContext
 import cn.xnatural.http.Path
-import core.Page
+import cn.xnatural.jpa.Page
+import cn.xnatural.jpa.Repo
 import core.ServerTpl
 import core.Utils
-import core.jpa.BaseRepo
 import dao.entity.Permission
 import dao.entity.User
 import service.rule.UserSrv
 
 @Ctrl(prefix = 'mnt/user')
 class MntUserCtrl extends ServerTpl {
-    @Lazy def repo = bean(BaseRepo, 'jpa_rule_repo')
+    @Lazy def repo = bean(Repo, 'jpa_rule_repo')
     @Lazy def userSrv = bean(UserSrv)
 
 
@@ -29,7 +29,7 @@ class MntUserCtrl extends ServerTpl {
                 {
                     Utils.toMapper(it)
                         .addConverter("permissions", {String name ->
-                            def ps = repo.findList(Permission)
+                            def ps = repo.findList(Permission, null)
                             name.split(",").collect {n ->
                                 for (def p : ps ) {
                                     if (p.enName == n) {
@@ -106,7 +106,7 @@ class MntUserCtrl extends ServerTpl {
 
     @Path(path = 'permissions')
     ApiResp permissions() {
-        ApiResp.ok(repo.findList(Permission))
+        ApiResp.ok(repo.findList(Permission, null))
     }
 
 
