@@ -32,6 +32,7 @@ app.addSource(new ServerTpl("sched") { // 定时任务
     void start() {
         sched = new Sched(attrs(), exec)
         exposeBean(sched)
+        ep.fire("${name}.started")
     }
     @EL(name = "sched.after")
     void after(Duration duration, Runnable fn) {sched.after(duration, fn)}
@@ -53,6 +54,7 @@ app.addSource(new ServerTpl("jpa_local") { //数据库 jpa_local
             Test, VersionFile, Permission
         ).init()
         exposeBean(repo)
+        ep.fire("${name}.started")
     }
 
     @EL(name = "sys.stopping", async = true)
