@@ -46,7 +46,7 @@ dependencies {
     compile 'cn.xnatural.jpa:jpa:1.0.1'
     compile 'cn.xnatural.sched:sched:1.0.1'
     compile 'cn.xnatural.remoter:remoter:1.0.1'
-    // compile 'cn.xnatural.task:task:1.0.0'
+    compile 'cn.xnatural.task:task:1.0.0'
 
     // 连接池
     // compile 'com.alibaba:druid:1.1.23'
