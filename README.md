@@ -8,7 +8,7 @@ groovy 快速开发代码, 由groovy实现的迷你类SpringBoot模板项目
 * src/main.groovy: 入口类
 * bin: 对应groovy安装包bin目录
 * conf: 对应groovy安装包conf目录, 和项目配置文件存放目录
-* src/core: 核心功能: AppContext, HttpServer, AioServer等等
+* src/core: 核心功能: AppContext, ServerTpl, HttpSrv 等等
 * src/ctr: mvc Controller层
 * src/static: 前端文件
 
@@ -35,40 +35,44 @@ jdk8, gradle6.5+
     - 初始化环境(系统配置): 事件: sys.inited
     - 初始各组件服务: 事件: sys.starting
     - 启动完成: 事件: sys.started
-##### 抽象应用由四部分组成 [AppContext](https://gitee.com/xnat/gy/blob/rule/src/core/AppContext.groovy)
+##### 应用上下文([AppContext](https://gitee.com/xnat/gy/blob/master/src/core/AppContext.groovy))由四部分组成
 1. 应用环境属性(系统所有配置). 加载app.conf,系统属性, app-[profile].conf
 2. 任务执行器(公用线程池). 系统所有任务由这一个线程池执行
 3. bean容器. 添加公用bean: app.addSource(new OkHttpSrv())
-4. 事件中心 <https://gitee.com/xnat/enet>
+4. [事件中心](https://gitee.com/xnat/enet)
 ##### 基本抽象服务模板 ServerTpl
 * 获取属性: getInteger('属性名', 默认值), getBoolean('属性名', 默认值) ... 对应配置 当前SeverTpl服务名.属性名
 * 异步任务: async {任务}
-* 事件触发: ep.fire('event1', 'param1') 参见: <https://gitee.com/xnat/enet>
+* 事件触发: ep.fire('event1', 'param1') 参见: [enet](https://gitee.com/xnat/enet)
 * 队列执行: queue('xx') {排队任务}. 加入到名为xx的队列排队执行
 * 暴露bean给应用: exposeBean(bean实例) 
 * bean容器 和AppContext一样都提供bean容器功能. 获取实例bean: bean(OkHttpSrv)
 
-### 特色1: [Remoter](https://gitee.com/xnat/gy/blob/master/src/core/Remoter.groovy) 集群分布式
-Remoter是多应用之间的连接器,简化跨系统调用,由 [AIO](https://gitee.com/xnat/aio) 实现
+### 特色1: [Remoter](https://gitee.com/xnat/remoter) 集群分布式
+Remoter是多应用之间的连接器,简化跨系统调用
 ```
-// 暴露给集群之间通信 ip 和 端口. 例: 绑定本机所有ip ':7001' 或者只绑定某个ip 'localhost:7001'
-aioServer.hp=':9001'
 // 应用集群配置
 remoter {
-    // 加入到集群. 集群的服务中心地址. 格式为: host1:port1,host2:port2. 域名可配置多个Ip
+    // 暴露给集群之间通信端口
+    hp=':9001'
+    // master集群服务中心
     masterHps='xnatural.cn:8001'
-    // 是否为master. 同为master节点相互同步. 非master节点, 则随心跳任选一个master同步
+    // 是否为master
     // master=true
 }
 ```
-##### 远程调用 
+##### [远程调用](https://gitee.com/xnat/remoter)
 * 同步调用: def result = bean(Remoter).fire(应用名, 事件名, 参数...)
-    - 例: bean(Remoter).fire('gy', 'eName1', ['p1'])
+    - 例: ```bean(Remoter).fire('gy', 'eName1', ['p1'])```
 * 异步调用: bean(Remoter).fireAsync(应用名, 事件名, 回调函数, 参数...)
-    - 例: [远程调用](https://gitee.com/xnat/gy/blob/master/src/service/TestService.groovy#L178)
+    - [例](https://gitee.com/xnat/gy/blob/master/src/service/TestService.groovy#L178)
+    ```
+        bean(Remoter).fire('gy', 'eName1', {result -> // 回调函数
+        }, ['p1'])
+    ```
 
     
-### 特色2: 自实现 [HttpServer](https://gitee.com/xnat/gy/blob/master/src/core/http/HttpServer.groovy) [例](https://gitee.com/xnat/gy/blob/master/src/ctrl/TestCtrl.groovy)
+### 特色2: 自实现 [http服务](https://gitee.com/xnat/http)
     @Ctrl: 标明类是个Controller层类
     
     @Path: 标明是个路径匹配的处理器

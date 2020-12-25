@@ -212,12 +212,12 @@ class Utils {
         Httper post(String url) { this.urlStr = url; this.method = 'POST'; return this }
         /**
          *  设置 content-type
-         * @param contentType application/json, multipart/form-data, application/x-www-form-urlencoded,text/plain
+         * @param contentType application/json, multipart/form-data, application/x-www-form-urlencoded, text/plain
          * @return
          */
         Httper contentType(String contentType) { this.contentType = contentType; return this }
-        Httper jsonBody(String jsonStr) {this.bodyStr = jsonStr; if (contentType == null) contentType = 'application/json'; return this }
-        Httper textBody(String bodyStr) {this.bodyStr = bodyStr; if (contentType == null) contentType = 'text/plain'; return this }
+        Httper jsonBody(String jsonStr) { this.bodyStr = jsonStr; if (contentType == null) contentType = 'application/json'; return this }
+        Httper textBody(String bodyStr) { this.bodyStr = bodyStr; if (contentType == null) contentType = 'text/plain'; return this }
         Httper readTimeout(int timeout) { this.readTimeout = timeout; return this }
         Httper connectTimeout(int timeout) { this.connectTimeout = timeout; return this }
         Httper preConnect(Consumer<HttpURLConnection> preConnect) { this.preFn = preConnect; return this }
@@ -328,16 +328,16 @@ class Utils {
                                 String s = "Content-Disposition: form-data; name=\"$e.key\"; filename=\"${((File) e.value).name}\"" + end
                                 os.write(s.getBytes('utf-8')) // 这样写是为了避免中文文件名乱码
                                 os.writeBytes(end)
-                                // copy
-                                def is = new FileInputStream(File)
-                                def bs = new byte[4028]
-                                int n
-                                while (-1 != (n = is.read(bs))) {os.write(bs, 0, n)}
-                            } else if (e.value instanceof String) {
+                                try (def is = new FileInputStream(e.value as File)) { // copy
+                                    def bs = new byte[4028]
+                                    int n
+                                    while (-1 != (n = is.read(bs))) {os.write(bs, 0, n)}
+                                }
+                            } else {
                                 os.write(("Content-Disposition: form-data; name=\"$e.key\"" + end).getBytes("utf-8"))
                                 os.writeBytes(end)
-                                os.write(e.value.toString().getBytes('utf-8'))
-                            } else throw new IllegalArgumentException("not support parameter")
+                                os.write(e.value?.toString()?.getBytes('utf-8'))
+                            }
                             os.writeBytes(end)
                         }
                         os.writeBytes(twoHyphens + boundary + twoHyphens + end)

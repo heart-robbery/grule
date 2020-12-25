@@ -10,7 +10,7 @@ class ObjBuilder<T> extends Builder<T> {
     /**
      * 一个javaBean.
      */
-    private       Class<T>                 javaBeanClz
+    private       Class<T>                targetClz
     /**
      * 属性的计算是可以依赖顺序的(先计算某个属性, 再根据这个属性的值, 计算另一个属性的值)
      * NOTE: 尽量每个属性的计算不会相互依赖
@@ -83,11 +83,10 @@ class ObjBuilder<T> extends Builder<T> {
 
 
     /**
-     * create instance for DTOClass.
-     *
-     * @return target instance.
+     * 创建目前对象
+     * @param ctx
+     * @return
      */
-    @SuppressWarnings("unchecked")
     protected T instance(Map ctx) {
         T targetObj = null
         Class<T> targetClass = getJavaBeanClz()
@@ -105,12 +104,12 @@ class ObjBuilder<T> extends Builder<T> {
 
 
     Class<T> getJavaBeanClz() {
-        return javaBeanClz
+        return targetClz
     }
 
 
     ObjBuilder setJavaBeanClz(Class<T> pDTOClass) {
-        javaBeanClz = pDTOClass
+        targetClz = pDTOClass
         return this
     }
 }
