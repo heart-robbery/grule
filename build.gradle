@@ -41,11 +41,11 @@ dependencies {
     // compile 'com.alibaba:fastjson:1.2.73'
 
     compile 'cn.xnatural.enet:enet-event:0.0.17'
-    compile 'cn.xnatural.http:http:1.0.4'
-    compile 'cn.xnatural.aio:aio:1.0.6'
+    compile 'cn.xnatural.http:http:1.0.5'
+    // compile 'cn.xnatural.aio:aio:1.0.6'
     compile 'cn.xnatural.jpa:jpa:1.0.1'
     compile 'cn.xnatural.sched:sched:1.0.1'
-    compile 'cn.xnatural.remoter:remoter:1.0.1'
+    compile 'cn.xnatural.remoter:remoter:1.0.2'
     compile 'cn.xnatural.task:task:1.0.0'
 
     // 连接池

@@ -106,7 +106,7 @@
                 let _this = this;
                 let fd = new FormData($('#form1')[0]);
                 let file = fd.get('file');
-                if (file.size > 1024 * 1024 * 2) { // 如果文件大于2M 就分片上传
+                if (file.size > 1024 * 1024 * 20) { // 如果文件大于20M 就分片上传
                     this.pieceUpload(file);
                     return
                 }
@@ -125,11 +125,11 @@
             pieceUpload: function(file) { // 分片上传文件
                 let uploading = {
                     file: file, name: file.name, pause: false, // 是否暂停
-                    perPieceSize: 1024 * 800,
+                    perPieceSize: 1024 * 1024 * 4,
                     totalPiece: 0, currentPiece: 0,
                     progress: 0,
                     url: null,
-                    fileId: (((1+Math.random())*0x10000)|0).toString(16) + (((1+Math.random())*0x10000)|0).toString(16) + '_' + new Date().getTime()
+                    uploadId: (((1+Math.random())*0x10000)|0).toString(16) + (((1+Math.random())*0x10000)|0).toString(16) + '_' + new Date().getTime()
                 };
                 uploading.totalPiece = Math.ceil(file.size / uploading.perPieceSize);
                 this.pendingFiles.push(uploading);
@@ -142,7 +142,7 @@
                 let endIndex = Math.min(startIndex + uploading.perPieceSize, uploading.file.size);
                 fd.append('filePiece', uploading.file.slice(startIndex, endIndex));
                 fd.append('originName', uploading.name);
-                fd.append('fileId', uploading.fileId);
+                fd.append('uploadId', uploading.uploadId);
                 fd.append('currentPiece', (++uploading.currentPiece));
                 fd.append('totalPiece', uploading.totalPiece);
                 $.ajax({
@@ -158,7 +158,7 @@
                                 _this.doUpload(uploading)
                             }
                             if (uploading.totalPiece == uploading.currentPiece) {
-                                uploading.progress = 100
+                                uploading.progress = 100;
                                 uploading.url = resp.data
                             }
                         } else app.$Notice.error({title: '错误提示', desc: resp.desc, duration: 7})
@@ -169,7 +169,7 @@
                 uploading.pause = true
             },
             resume: function(uploading) {
-                uploading.pause = false
+                uploading.pause = false;
                 this.doUpload(uploading)
             },
             downXlsx: function() {
