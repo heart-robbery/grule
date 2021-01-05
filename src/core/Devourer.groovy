@@ -9,6 +9,9 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.function.BiConsumer
 
+/**
+ * 对列执行器
+ */
 class Devourer {
     protected static final Logger                log         = LoggerFactory.getLogger(Devourer)
     protected final        Executor                        exec
@@ -27,8 +30,8 @@ class Devourer {
 
 
     Devourer(Object key, Executor exec) {
-        if (key == null) throw new NullPointerException("devourer key is null")
-        if (exec == null) throw new NullPointerException("executor is null")
+        if (key == null) throw new IllegalArgumentException("Param key required")
+        if (exec == null) throw new IllegalArgumentException("Param executor required")
         this.key = key
         this.exec = exec
     }
@@ -123,6 +126,6 @@ class Devourer {
 
     @Override
     String toString() {
-        return "running: " + running + ", waiting count: " + waiting.size()
+        return Devourer.simpleName + "@" +Integer.toHexString(hashCode()) + "{running: " + running + ", waiting count: " + waiting.size() + "}"
     }
 }

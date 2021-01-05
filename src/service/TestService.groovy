@@ -3,14 +3,14 @@ package service
 import cn.xnatural.enet.event.EL
 import cn.xnatural.jpa.Page
 import cn.xnatural.jpa.Repo
+import cn.xnatural.remoter.Remoter
+import cn.xnatural.task.TaskContext
+import cn.xnatural.task.TaskWrapper
 import com.alibaba.fastjson.JSON
 import core.OkHttpSrv
-import core.Remoter
 import core.ServerTpl
 import core.mode.builder.ObjBuilder
 import core.mode.pipeline.Pipeline
-import core.mode.task.TaskContext
-import core.mode.task.TaskWrapper
 import core.mode.v.VChain
 import core.mode.v.VProcessor
 import dao.entity.Test
@@ -117,18 +117,12 @@ class TestService extends ServerTpl {
 
     @EL(name = "eName11")
     void taskTest() {
-        new TaskContext<>('test ctx')
-            .setExecutor(exec)
-            .addTask(TaskWrapper.of{log.info("执行任务....")})
-            .addTask(new TaskWrapper() {
-                @Override
-                protected process() {
-                    log.info(logPrefix + "执行任务")
-                }
-                @Override
-                protected void post() {
-                    ctx().addTask(TaskWrapper.of({log.info(logPrefix + "执行衍生任务....")}))
-                }
+        new TaskContext<>('test ctx', null, exec)
+            .addTask(new TaskWrapper().step {param, me -> me.info("执行任务....")})
+            .addTask(new TaskWrapper().step {param, me ->
+                me.info("执行任务")
+            }.step { param, me ->
+                me.task().ctx().addTask(new TaskWrapper().step{param1, mee -> mee.info("执行衍生任务....")})
             })
             .start()
     }

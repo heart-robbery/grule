@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory
  * 执行过程是一个v型
  */
 class VChain {
-    protected final Logger log = LoggerFactory.getLogger(getClass())
+    protected static final Logger log = LoggerFactory.getLogger(VChain.class)
     protected final LinkedList<VProcessor> ps = new LinkedList<>()
 
 

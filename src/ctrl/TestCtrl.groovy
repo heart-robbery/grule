@@ -142,61 +142,54 @@ class TestCtrl extends ServerTpl {
 
 
 
-    @Lazy protected Map<String, Tuple2<File, FileData>> tmpFiles = new ConcurrentHashMap<>()
-
-    @EL(name = 'sys.started', async = true)
-    void stop() {tmpFiles?.each {it.value.v1.delete()}}
-
+    @Lazy protected Map<String, File> tmpFiles = new ConcurrentHashMap<>();
     /**
-     * 文件上传: 持续上传/分片上传
+     * 文件上传: 断点续传/持续上传/分片上传
+     * 原理: 把文件分成多块 依次上传, 用同一个标识多次上传为同一个文件
+     * 多线程上传不安全
+     * @param server {@link HttpServer}
      * @param filePiece 文件片
-     * @param fileId 文件id
+     * @param uploadId 上传id, 用于集合所有分片
      * @param originName 文件原名
      * @param totalPiece 总片数
      * @param currentPiece 当前第几片
      * @return
      */
-    @Path(path = 'pieceUpload')
-    ApiResp pieceUpload(FileData filePiece, String fileId, String originName, Integer totalPiece, Integer currentPiece) {
-        if (filePiece == null) {throw new IllegalArgumentException('文件片未上传')}
-        if (!fileId) {throw new IllegalArgumentException('参数错误: fileId 不能为空')}
-        if (!originName && currentPiece == 1) {throw new IllegalArgumentException('参数错误: originName 不能为空')}
-        if (!totalPiece) {throw new IllegalArgumentException('参数错误: totalPiece 不能为空')}
-        if (totalPiece < 2) {throw new IllegalArgumentException('参数错误: totalPiece >= 2')}
-        if (currentPiece == null) {throw new IllegalArgumentException('参数错误: currentPiece 不能为空')}
-        if (currentPiece < 1) {throw new IllegalArgumentException('参数错误: currentPiece >= 1')}
-        if (totalPiece < currentPiece) {throw new IllegalArgumentException('参数错误: totalPiece >= currentPiece')}
-        if (currentPiece == 1) { // 第一个分片
-            def fd = new FileData(originName: originName)
-            def f = File.createTempFile(fd.finalName, '')
-            tmpFiles.put(fileId, Tuple.tuple(f, fd))
-            bean(Sched)?.after(Duration.ofMinutes(bean(HttpServer).getInteger('pieceUpload.maxKeep', 120))) {
-                tmpFiles.remove(fileId)
-                f.delete()
-            }
-        }
-        def fileInfo = tmpFiles.get(fileId)
-        if (fileInfo == null) return ApiResp.of('404', '文件未找到: ' + fileId).attr('originName', originName)
+    @Path(path = "pieceUpload")
+    ApiResp pieceUpload(HttpServer server, FileData filePiece, String uploadId, String originName, Integer totalPiece, Integer currentPiece) throws Exception {
+        if (filePiece == null) {return ApiResp.fail("文件片未上传");}
+        if (uploadId == null || uploadId.isEmpty()) {return ApiResp.fail("Param: uploadId 不能为空");}
+        if (totalPiece == null) {return ApiResp.fail("Param: totalPiece 不能为空");}
+        if (totalPiece < 2) {return ApiResp.fail("Param: totalPiece >= 2");}
+        if (currentPiece == null) {return ApiResp.fail("Param: currentPiece 不能为空");}
+        if ((originName == null || originName.isEmpty()) && currentPiece == 1) {return ApiResp.fail("参数错误: originName 不能为空");}
+        if (currentPiece < 1) {return ApiResp.fail("Param: currentPiece >= 1");}
+        if (totalPiece < currentPiece) {return ApiResp.fail("Param: totalPiece >= currentPiece");}
 
-        try(def os = new FileOutputStream(fileInfo.v1, true)) { // 把每个分片文件 写入到 最终文件
-            os.write(filePiece.inputStream.bytes)
+        ApiResp<Map<String, Object>> resp = ok().attr("uploadId", uploadId).attr("currentPiece", currentPiece);
+        if (currentPiece == 1) { // 第一个分片: 保存文件
+            tmpFiles.put(uploadId, filePiece.getFile());
+            // TODO 过一段时间还没上传完 则主动删除 server.getInteger("pieceUpload.maxKeep", 120)
+        } else if (totalPiece > currentPiece) { // 后面的分片: 追加到第一个分片的文件里面去
+            File file = tmpFiles.get(uploadId);
+            if (file == null) return ApiResp.of("404", "文件未找到: " + uploadId).attr("originName", originName);
+            filePiece.appendTo(file); filePiece.delete();
+
+            long maxSize = server.getLong("pieceUpload.maxFileSize", 1024 * 1024 * 200L); // 最大上传200M
+            if (file.length() > maxSize) { // 文件大小验证
+                file = tmpFiles.remove(uploadId);
+                file.delete();
+                return ApiResp.fail("上传文件太大, <=" + maxSize);
+            }
+        } else { // 最后一个分片
+            File file = tmpFiles.remove(uploadId);
+            filePiece.appendTo(file); filePiece.delete();
+
+            FileData fd = new FileData().setOriginName(originName).setFile(file)
+            fu.save(fd)
+            return resp.attr("finalName", fd.getFinalName()).attr("url", fu.toFullUrl(fd.finalName));
         }
-        long maxSize = bean(HttpServer).getLong('pieceUpload.maxFileSize', 1024 * 1024 * 200)
-        if (fileInfo.v1.length() > maxSize) { // 大小验证
-            fileInfo = tmpFiles.remove(fileId)
-            fileInfo.v1.delete()
-            return ApiResp.fail('上传文件太大, <=' + maxSize)
-        }
-        if (totalPiece == currentPiece) { // 最后一个分片
-            fileInfo = tmpFiles.remove(fileId)
-            fileInfo.v2.size = fileInfo.v1.length()
-            def fd = fileInfo.v2
-            fd.setInputStream(new FileInputStream(fileInfo.v1))
-            fu.save(fd); fileInfo.v1.delete()
-            repo.saveOrUpdate(new VersionFile(version: '', finalName: fd.finalName, originName: fd.originName, size: fd.size))
-            return ok(fu.toFullUrl(fd.finalName))
-        }
-        ok()
+        return resp;
     }
 
 

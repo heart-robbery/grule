@@ -2,9 +2,9 @@ package service
 
 import cn.xnatural.enet.event.EL
 import cn.xnatural.http.FileData
-import core.Utils
 import core.OkHttpSrv
 import core.ServerTpl
+import core.Utils
 
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -52,7 +52,7 @@ class FileUploader extends ServerTpl {
     /**
      * 映射 文件名 到一个 url
      * @param fileName 完整的文件名
-     * @return
+     * @return 文件访问的url
      */
     String toFullUrl(String fileName) {
         accessUrlPrefix.resolve(fileName).toString()
@@ -62,22 +62,26 @@ class FileUploader extends ServerTpl {
     /**
      * 查找文件
      * @param fileName
-     * @return
+     * @return 文件
      */
-    File findFile(String fileName) { new File(localDir + File.separator + fileName) }
+    File findFile(String fileName) { new File(localDir, fileName) }
 
 
     @EL(name = 'deleteFile')
     void delete(String fileName) {
-        File f = new File(localDir + File.separator + fileName)
+        File f = new File(localDir, fileName)
         if (f.exists()) f.delete()
         else log.warn("delete file '{}' not exists", fileName)
     }
 
 
-    FileData save(FileData fd, boolean forwardRemote = false) {
-        save([fd])?[0]
-    }
+    /**
+     * 保存文件
+     * @param fd
+     * @param forwardRemote
+     * @return {@link FileData}
+     */
+    FileData save(FileData fd, boolean forwardRemote = false) { save([fd])?[0] }
 
 
     /**
@@ -99,16 +103,11 @@ class FileUploader extends ServerTpl {
                 // 2. 个人http文件服务器例子
                 if (remoteUrl) http?.post(remoteUrl).fileStream('file', fd.finalName, fd.inputStream).execute()
             } else {
-                new File(localDir).mkdirs() // 确保文件夹在
                 // 创建本地文件并写入
-                def f = new File(localDir + File.separator + fd.finalName)
-                f.withOutputStream {os ->
-                    def bs = new byte[4096]
-                    int n
-                    while (-1 != (n = fd.inputStream.read(bs))) {os.write(bs, 0, n)}
-                }
-                fd.size = f.length() // 保存文件大小
-                log.info('Saved file: {}, origin name: {}, size: ' + fd.size, f.canonicalPath, fd.originName)
+                def dir = new File(localDir)
+                dir.mkdirs()
+                fd.transferTo(dir)
+                log.info('Saved file: {}, originName: {}, size: ' + fd.size, dir.canonicalPath + File.separator + fd.finalName, fd.originName)
             }
             fd
         }

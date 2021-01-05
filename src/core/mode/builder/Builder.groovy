@@ -1,6 +1,7 @@
 package core.mode.builder
 
 import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 /**
  * This abstract class is a template which build any kind of value and return it
@@ -9,13 +10,12 @@ import org.slf4j.Logger
  * @author hubert
  */
 abstract class Builder<T> {
-    protected final Logger log = org.slf4j.LoggerFactory.getLogger(getClass())
-
+    protected static final Logger  log     = LoggerFactory.getLogger(Builder.class)
     /**
      * Enable or disable this generator. Usually it is used for feature
      * controlling.
      */
-    boolean enabled = true
+    protected boolean enabled = true
 
 
     /**
@@ -25,7 +25,7 @@ abstract class Builder<T> {
      * @param ctx . It contains the information needed to build the value.
      */
     T build(Map ctx = null) {
-        if (!isEnabled() || !isValid(ctx)) return null
+        if (!enabled || !isValid(ctx)) return null
         return doBuild(ctx)
     }
 
@@ -49,29 +49,6 @@ abstract class Builder<T> {
      */
     protected boolean isValid(Map ctx) {
         return true
-    }
-
-
-    /**
-     * check whether params exists in pGeneratorContext.
-     *
-     * @param ctx Context
-     * @param keys
-     * @return valid
-     */
-    protected boolean validateObjectInsideContext(Map ctx, Object... keys) {
-        if (ctx == null || keys == null) {
-            return true
-        }
-        boolean valid = true
-        for (Object key : keys) {
-            if (ctx.containsKey(key)) {
-                valid = false
-                log.warn("当前 ctx 中, 不存在 key: " + key)
-                break
-            }
-        }
-        return valid
     }
 
 
