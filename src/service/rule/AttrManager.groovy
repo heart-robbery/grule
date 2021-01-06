@@ -3,11 +3,11 @@ package service.rule
 import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import cn.xnatural.jpa.Repo
+import cn.xnatural.remoter.Remoter
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
 import com.alibaba.fastjson.serializer.SerializerFeature
 import core.OkHttpSrv
-import core.Remoter
 import core.ServerTpl
 import core.Utils
 import dao.entity.CollectResult
@@ -188,7 +188,7 @@ class AttrManager extends ServerTpl {
         }
         def remoter = bean(Remoter)
         if (remoter && ec?.source() != remoter) { // 不是远程触发的事件
-            remoter.dataVersion('field').update(enName, field ? field.updateTime.time : System.currentTimeMillis())
+            remoter.dataVersion('field').update(enName, field ? field.updateTime.time : System.currentTimeMillis(), null)
         }
     }
 
@@ -205,7 +205,7 @@ class AttrManager extends ServerTpl {
         }
         def remoter = bean(Remoter)
         if (remoter && ec?.source() != remoter) { // 不是远程触发的事件
-            remoter.dataVersion('dataCollector').update(enName, collector ? collector.updateTime.time : System.currentTimeMillis())
+            remoter.dataVersion('dataCollector').update(enName, collector ? collector.updateTime.time : System.currentTimeMillis(), null)
         }
     }
 

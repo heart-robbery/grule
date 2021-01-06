@@ -1,16 +1,12 @@
 package ctrl
 
-import core.Remoter
-import core.ServerTpl
-import core.Utils
-import cn.xnatural.http.HttpContext
 import cn.xnatural.http.ApiResp
 import cn.xnatural.http.Ctrl
+import cn.xnatural.http.HttpContext
 import cn.xnatural.http.Path
+import core.ServerTpl
+import core.Utils
 import service.FileUploader
-
-import java.text.SimpleDateFormat
-import java.time.Duration
 
 @Ctrl
 class MainCtrl extends ServerTpl {
@@ -37,28 +33,6 @@ class MainCtrl extends ServerTpl {
             ['status': app.sysLoad <= 5 ? 'GREEN' : (app.sysLoad < 8 ? 'YELLOW' : 'RED'), 'detail':
                 [
                     'db': ['status': 'UP'],
-                    'remoter': [
-                        'status': {
-                            def remoter = bean(Remoter)
-                            if (remoter == null || remoter.lastSyncSuccess == null) return 'DOWN'
-                            else {
-                                def interval = System.currentTimeMillis() - remoter.lastSyncSuccess
-                                if (interval < Duration.ofMinutes(5).toMillis()) return 'GREEN'
-                                else if (interval < Duration.ofMinutes(20).toMillis()) return 'YELLOW'
-                                else return 'RED'
-                            }
-                        }(),
-                        'detail': {
-                            def remoter = bean(Remoter)
-                            def ret = [:]
-                            if (remoter == null) return ret
-                            ret.put('lastSyncSuccess', new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(remoter.lastSyncSuccess))
-                            remoter.nodeMap.each { e ->
-                                ret.put(e.key + '_total', e.value.size())
-                            }
-                            return ret
-                        }()
-                    ]
                 ],
             ]
         )

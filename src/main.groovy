@@ -1,5 +1,6 @@
 import cn.xnatural.enet.event.EL
 import cn.xnatural.jpa.Repo
+import cn.xnatural.remoter.Remoter
 import cn.xnatural.sched.Sched
 import core.*
 import ctrl.*
@@ -25,7 +26,7 @@ app.addSource(new ServerTpl("sched") { // 定时任务
     Sched sched
     @EL(name = "sys.starting", async = true)
     void start() {
-        sched = new Sched(attrs(), exec)
+        sched = new Sched(attrs(), exec).init()
         exposeBean(sched)
         ep.fire("${name}.started")
     }
@@ -40,7 +41,24 @@ app.addSource(new ServerTpl("sched") { // 定时任务
     @EL(name = "sys.stopping", async = true)
     void stop() { sched?.stop() }
 })
-app.addSource(new Remoter())
+app.addSource(new ServerTpl("remoter") {
+    Remoter remoter
+    @EL(name = "sys.starting", async = true)
+    void start() {
+        remoter = new Remoter(app.name, app.id, attrs(), exec, ep, bean(Sched))
+        exposeBean(remoter)
+        exposeBean(remoter.aioClient)
+        ep.fire("${name}.started")
+    }
+
+    @EL(name = 'sys.heartbeat', async = true)
+    void heartbeat() {
+        remoter.sync()
+        remoter.aioServer.clean()
+    }
+    @EL(name = "sys.stopping", async = true)
+    void stop() { remoter.stop() }
+}) // 集群分布式
 app.addSource(new ServerTpl("jpa_rule") { //数据库 jpa_rule
     Repo repo
     @EL(name = "sys.starting", async = true)

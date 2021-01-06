@@ -3,9 +3,9 @@ package service.rule
 import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import cn.xnatural.jpa.Repo
+import cn.xnatural.remoter.Remoter
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
-import core.Remoter
 import core.ServerTpl
 import dao.entity.Decision
 import dao.entity.FieldType
@@ -59,10 +59,9 @@ class DecisionManager extends ServerTpl {
         }
         def remoter = bean(Remoter)
         if (remoter && ec?.source() != remoter) { // 不是远程触发的事件
-            remoter.dataVersion('decision').update(decisionId, decision ? decision.updateTime.time : System.currentTimeMillis())
+            remoter.dataVersion('decision').update(decisionId, decision ? decision.updateTime.time : System.currentTimeMillis(), null)
         }
     }
-
 
 
     protected void load() {
