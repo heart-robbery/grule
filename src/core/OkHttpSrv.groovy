@@ -1,5 +1,6 @@
 package core
 
+import cn.xnatural.app.ServerTpl
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import com.alibaba.fastjson.JSON
@@ -31,7 +32,7 @@ class OkHttpSrv extends ServerTpl {
     @EL(name = 'sys.starting', async = true)
     void init() {
         if (ep == null) {ep = new EP(); ep.addListenerSource(this)}
-        exposeBean(client, [name + "_client"])
+        exposeBean(client, name + "_client")
     }
 
 
@@ -43,7 +44,7 @@ class OkHttpSrv extends ServerTpl {
             .connectTimeout(Duration.ofSeconds(getLong('connectTimeout', 5L)))
             .readTimeout(Duration.ofSeconds(getLong('readTimeout', 20L)))
             .writeTimeout(Duration.ofSeconds(getLong('writeTimeout', 32L)))
-            .dispatcher(new Dispatcher(exec))
+            .dispatcher(new Dispatcher(exec()))
             .cookieJar(new CookieJar() {// 共享cookie
                 @Override
                 void saveFromResponse(HttpUrl url, List<Cookie> cookies) {

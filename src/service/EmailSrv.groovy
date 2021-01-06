@@ -1,7 +1,7 @@
 package service
 
+import cn.xnatural.app.ServerTpl
 import cn.xnatural.enet.event.EL
-import core.ServerTpl
 
 class EmailSrv extends ServerTpl {
 

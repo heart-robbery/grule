@@ -1,13 +1,19 @@
+import cn.xnatural.app.AppContext
+import cn.xnatural.app.ServerTpl
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import cn.xnatural.jpa.Repo
+import cn.xnatural.remoter.Remoter
 import cn.xnatural.sched.Sched
-import core.*
+import core.EhcacheSrv
+import core.HttpSrv
+import core.OkHttpSrv
+import core.RedisClient
 import ctrl.MainCtrl
 import ctrl.TestCtrl
-import dao.entity.Permission
-import dao.entity.Test
-import dao.entity.VersionFile
+import entity.Permission
+import entity.Test
+import entity.VersionFile
 import groovy.transform.Field
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -17,10 +23,10 @@ import service.TestService
 import java.time.Duration
 import java.util.function.Supplier
 
-
+System.setProperty("configdir", "../conf")
 @Field final Logger log = LoggerFactory.getLogger(getClass())
 @Field final AppContext app = new AppContext() //应用上下文
-@Lazy @Field EP ep = app.bean(EP)
+@Lazy @Field EP ep = app.bean(EP, null)
 
 
 // 系统功能添加区
@@ -30,7 +36,7 @@ app.addSource(new ServerTpl("sched") { // 定时任务
     Sched sched
     @EL(name = "sys.starting", async = true)
     void start() {
-        sched = new Sched(attrs(), exec).init()
+        sched = new Sched(attrs(), exec()).init()
         exposeBean(sched)
         ep.fire("${name}.started")
     }
@@ -45,12 +51,11 @@ app.addSource(new ServerTpl("sched") { // 定时任务
     @EL(name = "sys.stopping", async = true)
     void stop() { sched?.stop() }
 })
-//app.addSource(new Remoter()) // 集群分布式
 app.addSource(new ServerTpl("remoter") {
-    cn.xnatural.remoter.Remoter remoter
-    @EL(name = "sys.starting", async = true)
+    Remoter remoter
+    @EL(name = "sched.started", async = true)
     void start() {
-        remoter = new cn.xnatural.remoter.Remoter(app.name, app.id, attrs(), exec, ep, bean(Sched))
+        remoter = new Remoter(app.name(), app.id(), attrs(), exec(), ep, bean(Sched))
         exposeBean(remoter)
         exposeBean(remoter.aioClient)
         ep.fire("${name}.started")
@@ -89,7 +94,7 @@ app.start() // 启动系统
 
 @EL(name = 'sys.inited') //系统初始化完成
 void sysInited() {
-    if (app.env['redis']) { //根据配置是否有redis,创建redis客户端工具
+    if (app.attrs('redis')) { //根据配置是否有redis,创建redis客户端工具
         app.addSource(new RedisClient())
     }
 }
@@ -98,45 +103,35 @@ void sysInited() {
 @EL(name = 'sys.started', async = true) //系统启动完成
 void sysStarted() {
     try {
-//        app.bean(Executor).execute {
-//            (1..1000).each {
-//                println app.bean(OkHttpSrv).get("http://localhost:7070/test/get?p1=1&p2=xx").execute()
-//                Thread.sleep(100 + new Random().nextInt(200))
-//            }
-//        }
-//        app.bean(Executor).execute {
-//            (1..1000).each {
-//                println app.bean(OkHttpSrv).get("http://localhost:7070/test/async?p1=oo").execute()
-//                Thread.sleep(100 + new Random().nextInt(200))
-//            }
-//        }
-//        app.bean(Executor).execute {
-//            (1..1000).each {
-//                println app.bean(OkHttpSrv).get("http://localhost:7070/test/get?p1=1&p2=xx").execute()
-//                Thread.sleep(100 + new Random().nextInt(200))
-//            }
-//        }
-//        app.bean(Executor).execute {
-//            (1..1000).each {
-//                println app.bean(OkHttpSrv).get("http://localhost:7070/test/async?p1=oo").execute()
-//                Thread.sleep(100 + new Random().nextInt(200))
-//            }
-//        }
-//        app.bean(Executor).execute {
-//            (1..1000).each {
-//                println app.bean(OkHttpSrv).get("http://localhost:7070/test/form?p1=1&p2=xx").execute()
-//                Thread.sleep(100 + new Random().nextInt(200))
-//            }
-//        }
-//        app.bean(Executor).execute {
-//            (1..1000).each {
-//                println app.bean(OkHttpSrv).get("http://localhost:7070/test/async?p1=oo").execute()
-//                Thread.sleep(100 + new Random().nextInt(200))
-//            }
-//        }
-        // TODO
+
     } finally {
         // System.exit(0)
-        // ep.fire('sched.after', EC.of(this).args(Duration.ofSeconds(5), {System.exit(0)}).completeFn({ec -> if (ec.noListener) System.exit(0) }))
+    }
+}
+
+
+/**
+ * 系统心跳 清理
+ */
+@EL(name = 'sys.heartbeat', async = true)
+protected void heartbeat() {
+    // 删除 Classloader 中只进不出的 parallelLockMap
+    def field = ClassLoader.getDeclaredField('parallelLockMap')
+    field.setAccessible(true)
+    Map<String, Object> m = field.get(Thread.currentThread().contextClassLoader.parent.parent)
+    if (m != null) {
+        for (def itt = m.iterator(); itt.hasNext(); ) {
+            def entry = itt.next()
+            if ((entry.key.startsWith("script") && entry.key.endsWith(".groovy")) ||
+                entry.key.contains("GStringTemplateScript") ||
+                entry.key.contains("SimpleTemplateScript") ||
+                entry.key.contains("XmlTemplateScript") ||
+                entry.key.contains("StreamingTemplateScript") ||
+                entry.key.contains("GeneratedMarkupTemplate")
+            ) {
+                itt.remove()
+                log.trace("Removed class parallelLock: {}", entry.key)
+            }
+        }
     }
 }

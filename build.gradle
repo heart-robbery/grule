@@ -40,7 +40,8 @@ dependencies {
     compile 'ch.qos.logback:logback-classic:1.2.3'
     // compile 'com.alibaba:fastjson:1.2.73'
 
-    compile 'cn.xnatural.enet:enet-event:0.0.17'
+    compile 'cn.xnatural.app:app:1.0.0'
+    //compile 'cn.xnatural.enet:enet-event:0.0.17'
     compile 'cn.xnatural.http:http:1.0.5'
     // compile 'cn.xnatural.aio:aio:1.0.6'
     compile 'cn.xnatural.jpa:jpa:1.0.1'

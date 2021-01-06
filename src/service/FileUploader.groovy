@@ -1,10 +1,10 @@
 package service
 
+import cn.xnatural.app.ServerTpl
+import cn.xnatural.app.Utils
 import cn.xnatural.enet.event.EL
 import cn.xnatural.http.FileData
 import core.OkHttpSrv
-import core.ServerTpl
-import core.Utils
 
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -16,7 +16,7 @@ class FileUploader extends ServerTpl {
     /**
      * 文件上传的 本地保存目录
      */
-    @Lazy String localDir        = new URL('file:' + (getStr("localDir", Utils.baseDir('upload').canonicalPath))).getFile()
+    @Lazy String localDir        = new URL('file:' + (getStr("localDir", Utils.baseDir('../upload').canonicalPath))).getFile()
     /**
      * 文件上传 的访问url前缀
      */
@@ -33,19 +33,6 @@ class FileUploader extends ServerTpl {
         log.info('save upload file local dir: {}', new File(localDir).canonicalPath)
         log.info('access upload file url prefix: {}', accessUrlPrefix)
         if (remoteUrl) {log.info('remote file server http url: {}', remoteUrl)}
-    }
-
-
-    /**
-     *  返回文件名的扩展名
-     * @param fileName
-     * @return
-     */
-    static String extractFileExtension(String fileName) {
-        if (!fileName) return ''
-        int i = fileName.lastIndexOf(".")
-        if (i == -1) return ''
-        return fileName.substring(i + 1)
     }
 
 
@@ -67,7 +54,7 @@ class FileUploader extends ServerTpl {
     File findFile(String fileName) { new File(localDir, fileName) }
 
 
-    @EL(name = 'deleteFile')
+    @EL(name = 'deleteFile', async = true)
     void delete(String fileName) {
         File f = new File(localDir, fileName)
         if (f.exists()) f.delete()

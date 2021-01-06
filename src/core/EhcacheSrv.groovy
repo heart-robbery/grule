@@ -1,6 +1,6 @@
 package core
 
-
+import cn.xnatural.app.ServerTpl
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import org.ehcache.Cache
