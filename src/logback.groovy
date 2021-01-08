@@ -4,6 +4,7 @@ import ch.qos.logback.core.util.FileSize
 import cn.xnatural.app.Utils
 
 import java.nio.charset.Charset
+import java.nio.charset.StandardCharsets
 
 // 日志文件名
 def logFileName = System.getProperty('log.file.name', 'app')
@@ -37,7 +38,7 @@ if (logPath) { // 有日志输出目录配置
         appender('file', RollingFileAppender) {
             encoder(PatternLayoutEncoder) {
                 delegate.pattern = "%d{yyyy-MM-dd HH:mm:ss.SSS} [%-7thread] [%-5level] [%-40.40C :%-3L] => %m%n"
-                delegate.charset = Charset.forName("utf8")
+                delegate.charset = StandardCharsets.UTF_8
             }
             if ("/" == logPath) file = "/${logFileName}.log"
             else file = "$logPath/${logFileName}.log"

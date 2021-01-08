@@ -1,12 +1,12 @@
 repositories {
     mavenLocal()
-    maven { url 'http://maven.aliyun.com/nexus/content/groups/public/' }
-    // maven { url 'http://maven.aliyun.com/nexus/content/groups/public/' }
+    maven { url 'https://maven.aliyun.com/repository/public' }
+    maven { url 'https://maven.aliyun.com/repository/central' }
     mavenCentral()
     jcenter()
 }
 
-version = '1.2.0'
+version = '2.0.0'
 
 //apply plugin: 'java'
 apply plugin: 'groovy'
@@ -35,7 +35,7 @@ targetCompatibility = 1.8
 
 dependencies {
     compile fileTree(dir: 'sysLib', include: ['*.jar'])
-    compile 'org.codehaus.groovy:groovy:3.0.5'
+    compile 'org.codehaus.groovy:groovy:3.0.7'
     compile 'javax.inject:javax.inject:1'
     compile 'ch.qos.logback:logback-classic:1.2.3'
     // compile 'com.alibaba:fastjson:1.2.73'

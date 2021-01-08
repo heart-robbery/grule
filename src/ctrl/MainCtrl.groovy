@@ -15,14 +15,14 @@ class MainCtrl extends ServerTpl {
 
 
     @Path(path = ['index.html', '/'])
-    File index(HttpContext ctx) {
-        ctx.response.cacheControl(10)
+    File index(HttpContext hCtx) {
+        hCtx.response.cacheControl(10)
         Utils.baseDir("static/index.html")
     }
 
     @Path(path = 'test.html')
-    File testHtml(HttpContext ctx) {
-        ctx.response.cacheControl(3)
+    File testHtml(HttpContext hCtx) {
+        hCtx.response.cacheControl(3)
         Utils.baseDir("static/test.html")
     }
 
@@ -51,16 +51,16 @@ class MainCtrl extends ServerTpl {
     // ====================== api-doc =========================
 
     @Path(path = 'api-doc/:fName.json', produce = 'application/json')
-    String swagger_data(String fName, HttpContext ctx) {
-        def f = Utils.baseDir("conf/${fName}.json")
+    String swagger_data(String fName, HttpContext hCtx) {
+        def f = Utils.baseDir("../conf/${fName}.json")
         if (f.exists()) {
             return f.getText('utf-8')
         }
         null
     }
     @Path(path = 'api-doc/:fName')
-    File swagger_ui(String fName, HttpContext ctx) {
-        ctx.response.cacheControl(1800)
+    File swagger_ui(String fName, HttpContext hCtx) {
+        hCtx.response.cacheControl(1800)
         Utils.baseDir("static/swagger-ui/$fName")
     }
 
@@ -68,22 +68,22 @@ class MainCtrl extends ServerTpl {
     // ==========================js =====================
 
     @Path(path = 'js/:fName')
-    File js(String fName, HttpContext ctx) {
+    File js(String fName, HttpContext hCtx) {
         if (app().profile == 'pro') {
-            ctx.response.cacheControl(1800)
+            hCtx.response.cacheControl(1800)
         }
         Utils.baseDir("static/js/$fName")
     }
     @Path(path = 'js/lib/:fName')
-    File js_lib(String fName, HttpContext ctx) {
-        ctx.response.cacheControl(1800)
+    File js_lib(String fName, HttpContext hCtx) {
+        hCtx.response.cacheControl(1800)
         Utils.baseDir("static/js/lib/$fName")
     }
 
     @Path(path = 'components/:fName')
-    File components(String fName, HttpContext ctx) {
+    File components(String fName, HttpContext hCtx) {
         if (app().profile == 'pro') {
-            ctx.response.cacheControl(1800)
+            hCtx.response.cacheControl(1800)
         }
         Utils.baseDir("static/components/$fName")
     }
@@ -92,20 +92,20 @@ class MainCtrl extends ServerTpl {
     // =======================css ========================
 
     @Path(path = 'css/:fName')
-    File css(String fName, HttpContext ctx) {
+    File css(String fName, HttpContext hCtx) {
         if (app().profile == 'pro') {
-            ctx.response.cacheControl(1800)
+            hCtx.response.cacheControl(1800)
         }
         Utils.baseDir("static/css/$fName")
     }
     @Path(path = 'css/fonts/:fName')
-    File css_fonts(String fName, HttpContext ctx) {
-        ctx.response.cacheControl(1800)
+    File css_fonts(String fName, HttpContext hCtx) {
+        hCtx.response.cacheControl(1800)
         Utils.baseDir("static/css/fonts/$fName")
     }
     @Path(path = 'css/lib/:fName')
-    File css_lib(String fName, HttpContext ctx) {
-        ctx.response.cacheControl(1800)
+    File css_lib(String fName, HttpContext hCtx) {
+        hCtx.response.cacheControl(1800)
         Utils.baseDir("static/css/lib/$fName")
     }
 }
