@@ -1,5 +1,7 @@
 package ctrl
 
+import cn.xnatural.app.ServerTpl
+import cn.xnatural.app.Utils
 import cn.xnatural.enet.event.EC
 import cn.xnatural.http.ApiResp
 import cn.xnatural.http.Ctrl
@@ -9,9 +11,7 @@ import cn.xnatural.jpa.Page
 import cn.xnatural.jpa.Repo
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
-import core.ServerTpl
-import core.Utils
-import dao.entity.*
+import entity.*
 import service.rule.AttrManager
 import service.rule.DecisionEnum
 import service.rule.DecisionManager
@@ -52,7 +52,7 @@ class MntDecisionCtrl extends ServerTpl {
                     cb.like(root.get('comment'), '%' + kw + '%')
                 )
             }
-        }, { Utils.toMapper(it).build()})
+        }, { Utils.toMapper(it).ignore("metaClass").build()})
         def collectorNames = fieldPage.list.collect {it.dataCollector}.findAll{it}
         if (collectorNames) {
             repo.findList(DataCollector) {root, query, cb -> root.get('enName').in(collectorNames)}.each {dc ->
@@ -96,7 +96,7 @@ class MntDecisionCtrl extends ServerTpl {
                     ps << cb.like(root.get('content'), '%' + kw + '%')
                 }
                 if (type) {
-                    ps << cb.equal(root.get('tbName'), repo.tbName(Decision.package.name + "." + type))
+                    ps << cb.equal(root.get('tbName'), repo.tbName(Class.forName(Decision.package.name + "." + type)))
                 }
                 cb.and(ps.toArray(new Predicate[ps.size()]))
             }
@@ -128,11 +128,11 @@ class MntDecisionCtrl extends ServerTpl {
                 },
                 {
                     def am = bean(AttrManager)
-                    Utils.toMapper(it).addConverter('decisionId', 'decisionName', {String dId ->
+                    Utils.toMapper(it).ignore("metaClass").addConverter('decisionId', 'decisionName', {String dId ->
                         bean(DecisionManager).findDecision(dId).spec.决策名
                     }).addConverter('attrs', {
                         it == null ? null : JSON.parseObject(it).collect { e ->
-                            [enName: e.key, cnName: am.attrMap.get(e.key)?.cnName, value: e.value]
+                            [enName: e.key, cnName: am.fieldMap.get(e.key)?.cnName, value: e.value]
                         }
                     }).addConverter('input', {
                         it == null ? null : JSON.parseObject(it)
@@ -142,7 +142,7 @@ class MntDecisionCtrl extends ServerTpl {
                         def arr = it == null ? null : JSON.parseArray(it)
                         arr?.each { JSONObject jo ->
                             jo.put('data', jo.getJSONObject('data').collect { Entry<String, Object> e ->
-                                [enName: e.key, cnName: am.attrMap.get(e.key)?.cnName, value: e.value]
+                                [enName: e.key, cnName: am.fieldMap.get(e.key)?.cnName, value: e.value]
                             })
                         }
                         arr
@@ -182,7 +182,8 @@ class MntDecisionCtrl extends ServerTpl {
                 if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
             },
             {record ->
-                def m = Utils.toMapper(record).addConverter('decisionId', 'decisionName', {String dId ->
+                def m = Utils.toMapper(record).ignore("metaClass")
+                    .addConverter('decisionId', 'decisionName', {String dId ->
                     bean(DecisionManager).findDecision(dId).spec.决策名
                 }).build()
                 m.put('success', record.httpException == null && record.parseException == null && record.scriptException == null)

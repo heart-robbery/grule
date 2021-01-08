@@ -6,7 +6,7 @@ repositories {
     jcenter()
 }
 
-version = '1.2.0'
+version = '1.3.0'
 
 //apply plugin: 'java'
 apply plugin: 'groovy'
@@ -36,11 +36,10 @@ targetCompatibility = 1.8
 dependencies {
     compile fileTree(dir: 'sysLib', include: ['*.jar'])
     compile 'org.codehaus.groovy:groovy:3.0.7'
-    compile 'org.codehaus.groovy:groovy:3.0.5'
-    compile 'org.codehaus.groovy:groovy-templates:3.0.5'
-    compile 'org.codehaus.groovy:groovy-sql:3.0.5'
-    compile 'org.codehaus.groovy:groovy-json:3.0.5'
-    compile 'org.codehaus.groovy:groovy-jmx:3.0.5'
+    compile 'org.codehaus.groovy:groovy-templates:3.0.7'
+    compile 'org.codehaus.groovy:groovy-sql:3.0.7'
+    compile 'org.codehaus.groovy:groovy-json:3.0.7'
+    compile 'org.codehaus.groovy:groovy-jmx:3.0.7'
 
     //compile 'com.alibaba:fastjson:1.2.73'
     compile 'javax.inject:javax.inject:1'
@@ -67,57 +66,11 @@ dependencies {
     compile 'com.squareup.okhttp3:okhttp:3.14.9'
     // compile('org.apache.httpcomponents:httpclient:4.5.12')
     compile ('org.ehcache:ehcache:3.8.1') {exclude group:'org.slf4j'}
-//    compile ('org.quartz-scheduler:quartz:2.3.2') {
-//        exclude group:'org.slf4j'
-//        exclude group:'com.mchange'
-//        exclude group:'com.zaxxer'
-//    }
     compile 'redis.clients:jedis:3.3.0'
 
     // 分布式数据一致框架
     // compile 'io.atomix:atomix:3.1.8'
     // compile 'org.apache.zookeeper:zookeeper:3.6.2'
-
-    // web 相关
-//    compile ('io.ratpack:ratpack-core:1.8.0') {
-//        exclude group: 'io.ratpack', module: 'ratpack-guice'
-//        // exclude group: 'io.netty'
-//        //exclude group: 'com.google.guava'
-//        //exclude group: 'com.fasterxml.jackson.core'
-//        //exclude group: 'com.fasterxml.jackson.datatype'
-//        //exclude group: 'com.fasterxml.jackson.dataformat'
-//    }
-
-    // compile('org.smartboot.http:smart-http-server:1.0.14')
-
-//    compile('org.webjars.npm:swagger-ui-dist:3.27.0')
-//    compile('org.webjars:webjars-locator-core:0.40')
-//    compile('org.webjars:jquery:3.1.1')
-
-    // compile('commons-io:commons-io:2.7')
-
-//    compile('io.projectreactor.netty:reactor-netty:0.9.5.RELEASE') {
-//        exclude group: 'io.netty'
-//    }
-    // compile('com.bladejava:blade-mvc:2.0.15.BETA')
-
-    // excel
-    // compile 'org.apache.poi:poi:4.1.0'
-    // compile 'org.apache.poi:poi-ooxml:4.1.0'
-
-    // 异步sql
-    // compile 'com.github.jasync-sql:jasync-mysql:1.0.12'
-
-    // compile 'org.t-io:tio-core:3.6.0.v20200315-RELEASE'
-    // compile 'org.t-io:tio-http-server:3.6.0.v20200315-RELEASE'
-    // compile 'org.t-io:tio-websocket-server:3.6.0.v20200315-RELEASE'
-
-    // compile 'org.smartboot.socket:aio-core:1.4.10'
-
-    // compile 'cn.hutool:hutool-socket:5.3.3'
-
-    // compile('com.alibaba:dubbo:2.6.8')
-//    compile('commons-codec:commons-codec:1.14')
 
     // 工作流
 //    compile('org.activiti:activiti-engine:7.0.0.GA') {
@@ -132,14 +85,6 @@ dependencies {
     // jvm 脚本语言
 //    compile('com.googlecode.aviator:aviator:5.0.0')
 
-    // 响应式
-    //compile('io.reactivex.rxjava2:rxjava:2.2.19')
-    //compile('io.projectreactor:reactor-core:3.3.5.RELEASE')
-    //compile('io.rsocket:rsocket-core:1.0.0')
-
-//    compile('io.vertx:vertx-core:3.9.0')
-
-    // compile('org.jsoup:jsoup:1.13.1')
 }
 
 

@@ -1,15 +1,15 @@
 package ctrl
 
+import cn.xnatural.app.ServerTpl
+import cn.xnatural.app.Utils
 import cn.xnatural.http.ApiResp
 import cn.xnatural.http.Ctrl
 import cn.xnatural.http.HttpContext
 import cn.xnatural.http.Path
 import cn.xnatural.jpa.Page
 import cn.xnatural.jpa.Repo
-import core.ServerTpl
-import core.Utils
-import dao.entity.Permission
-import dao.entity.User
+import entity.Permission
+import entity.User
 import service.rule.UserSrv
 
 @Ctrl(prefix = 'mnt/user')
@@ -27,7 +27,7 @@ class MntUserCtrl extends ServerTpl {
                     query.orderBy(cb.desc(root.get('createTime')))
                 },
                 {
-                    Utils.toMapper(it)
+                    Utils.toMapper(it).ignore("metaClass")
                         .addConverter("permissions", {String name ->
                             def ps = repo.findList(Permission, null)
                             name.split(",").collect {n ->

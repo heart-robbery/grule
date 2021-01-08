@@ -2,7 +2,7 @@
 function ws(cfg) {
     cfg = cfg || {};
     // web socket
-    let client = null;
+    let client = window.client;
     if (client && (client.readyState == 1 || client.readyState == 2)) {
         console.log('Websocket连接可用不用重创建. state: ' + client.readyState);
         return;
@@ -13,10 +13,11 @@ function ws(cfg) {
             let protocol = "ws://";
             if (window.location.protocol.startsWith("https")) protocol = "wss://";
             client = new WebSocket(protocol + window.location.host + (cfg.path || "/test/msg"));
+            window.client = client;
         } catch (e) {
             console.log('创建websocket错误', e);
             setTimeout(function () {
-                ws(cfg)
+                ws(cfg);
             }, cfg.reconnection || (1000 * 60 * 2)); // 每两分钟重试
             return
         }
@@ -39,7 +40,7 @@ function ws(cfg) {
         };
         client.onopen = cfg.onOpen || function() {
             console.log('websocket onopen');
-            client.send('成功连接...')
+            client.send('成功连接...');
         };
     }
     doCreate()

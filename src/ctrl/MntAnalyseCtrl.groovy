@@ -1,10 +1,10 @@
 package ctrl
 
+import cn.xnatural.app.ServerTpl
 import cn.xnatural.http.ApiResp
 import cn.xnatural.http.Ctrl
 import cn.xnatural.http.Path
 import cn.xnatural.jpa.Repo
-import core.ServerTpl
 import org.hibernate.query.internal.NativeQueryImpl
 import org.hibernate.transform.Transformers
 import service.rule.DecisionManager

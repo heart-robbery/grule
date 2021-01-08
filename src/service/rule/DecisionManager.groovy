@@ -1,14 +1,14 @@
 package service.rule
 
+import cn.xnatural.app.ServerTpl
 import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import cn.xnatural.jpa.Repo
 import cn.xnatural.remoter.Remoter
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
-import core.ServerTpl
-import dao.entity.Decision
-import dao.entity.FieldType
+import entity.Decision
+import entity.FieldType
 import service.rule.spec.DecisionSpec
 
 import java.text.SimpleDateFormat

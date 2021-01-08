@@ -1,13 +1,13 @@
 package service.rule
 
+import cn.xnatural.app.ServerTpl
+import cn.xnatural.app.Utils
 import cn.xnatural.enet.event.EL
 import cn.xnatural.jpa.IEntity
 import cn.xnatural.jpa.Repo
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.serializer.SerializerFeature
-import core.ServerTpl
-import core.Utils
-import dao.entity.OpHistory
+import entity.OpHistory
 
 import java.text.SimpleDateFormat
 
@@ -25,7 +25,7 @@ class OpHistorySrv extends ServerTpl {
      */
     @EL(name = 'enHistory', async = true)
     void enHistory(IEntity entity, String operator) {
-        def data = Utils.toMapper(entity)
+        def data = Utils.toMapper(entity).ignore("metaClass")
             .addConverter('createTime', {v -> if (v instanceof Date) new SimpleDateFormat("yyyy-MM-dd HH:mm:ss:SSS").format(v) else v})
             .addConverter('updateTime', {v -> if (v instanceof Date) new SimpleDateFormat("yyyy-MM-dd HH:mm:ss:SSS").format(v) else v})
             .build()

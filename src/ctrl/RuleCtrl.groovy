@@ -1,12 +1,12 @@
 package ctrl
 
+import cn.xnatural.app.ServerTpl
 import cn.xnatural.http.ApiResp
 import cn.xnatural.http.Ctrl
 import cn.xnatural.http.HttpContext
 import cn.xnatural.http.Path
 import cn.xnatural.jpa.Repo
-import core.ServerTpl
-import dao.entity.DecisionResult
+import entity.DecisionResult
 import service.rule.AttrManager
 import service.rule.DecisionContext
 import service.rule.DecisionManager

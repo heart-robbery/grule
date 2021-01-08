@@ -52,7 +52,7 @@ class HttpSrv extends ServerTpl {
         Map<String, Object> sData
         String sId = hCtx.request.getCookie(sessionCookieName)
         def expire = Duration.ofMinutes(getInteger('session.expire', 30))
-        if ('redis' == getStr('session.type')) { // session的数据, 用redis 保存 session 数据
+        if ('redis' == getStr('session.type', null)) { // session的数据, 用redis 保存 session 数据
             def redis = bean(RedisClient)
             String cKey
             if (!sId || ((cKey = 'session:' + sId) && !redis.exists(cKey))) {

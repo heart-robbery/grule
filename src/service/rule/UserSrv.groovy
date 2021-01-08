@@ -1,10 +1,10 @@
 package service.rule
 
+import cn.xnatural.app.ServerTpl
 import cn.xnatural.enet.event.EL
 import cn.xnatural.jpa.Repo
-import core.ServerTpl
-import dao.entity.Permission
-import dao.entity.User
+import entity.Permission
+import entity.User
 
 class UserSrv extends ServerTpl {
 

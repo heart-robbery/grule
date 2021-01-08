@@ -1,12 +1,12 @@
 package service.rule
 
+import cn.xnatural.app.ServerTpl
 import cn.xnatural.enet.event.EL
 import cn.xnatural.jpa.Repo
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.serializer.SerializerFeature
 import core.OkHttpSrv
-import core.ServerTpl
-import dao.entity.DecisionResult
+import entity.DecisionResult
 
 import java.time.Duration
 
@@ -26,7 +26,7 @@ class DecisionSrv extends ServerTpl {
         queue(SAVE_RESULT)
             .failMaxKeep(getInteger(SAVE_RESULT + ".failMaxKeep", 10000))
             .errorHandle {ex, devourer ->
-                if (lastWarn == null || (System.currentTimeMillis() - lastWarn >= Duration.ofSeconds(getLong(SAVE_RESULT + ".warnInterval", 60 * 5L)))) {
+                if (lastWarn == null || (System.currentTimeMillis() - lastWarn >= Duration.ofSeconds(getLong(SAVE_RESULT + ".warnInterval", 60 * 5L)).toMillis())) {
                     lastWarn = System.currentTimeMillis()
                     log.error("保存决策结果到数据库错误", ex)
                     ep.fire("globalMsg", "保存决策结果到数据库错误: " + (ex.message?:ex.class.simpleName))

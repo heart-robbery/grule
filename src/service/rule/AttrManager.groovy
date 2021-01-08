@@ -1,5 +1,7 @@
 package service.rule
 
+import cn.xnatural.app.ServerTpl
+import cn.xnatural.app.Utils
 import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import cn.xnatural.jpa.Repo
@@ -8,12 +10,10 @@ import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
 import com.alibaba.fastjson.serializer.SerializerFeature
 import core.OkHttpSrv
-import core.ServerTpl
-import core.Utils
-import dao.entity.CollectResult
-import dao.entity.DataCollector
-import dao.entity.FieldType
-import dao.entity.RuleField
+import entity.CollectResult
+import entity.DataCollector
+import entity.FieldType
+import entity.RuleField
 import groovy.sql.Sql
 import groovy.text.GStringTemplateEngine
 import org.codehaus.groovy.control.CompilerConfiguration
@@ -34,7 +34,7 @@ class AttrManager extends ServerTpl {
     /**
      * RuleField(enName, cnName), RuleField
      */
-    final Map<String, RuleField>                 attrMap        = new ConcurrentHashMap<>(1000)
+    final Map<String, RuleField>                 fieldMap       = new ConcurrentHashMap<>(1000)
     /**
      * 数据获取函数. 收集器名 -> 收集器
      */
@@ -50,7 +50,7 @@ class AttrManager extends ServerTpl {
         queue(DATA_COLLECTED)
             .failMaxKeep(getInteger(DATA_COLLECTED + ".failMaxKeep", 10000))
             .errorHandle {ex, devourer ->
-                if (lastWarn == null || (System.currentTimeMillis() - lastWarn >= Duration.ofSeconds(getLong(DATA_COLLECTED + ".warnInterval", 60 * 5L)))) {
+                if (lastWarn == null || (System.currentTimeMillis() - lastWarn >= Duration.ofSeconds(getLong(DATA_COLLECTED + ".warnInterval", 60 * 5L)).toMillis())) {
                     lastWarn = System.currentTimeMillis()
                     log.error("保存数据收集结果到数据库错误", ex)
                     ep.fire("globalMsg", "保存数据收集结果到数据库错误: " + (ex.message?:ex.class.simpleName))
@@ -62,9 +62,7 @@ class AttrManager extends ServerTpl {
 
 
     @EL(name = 'sys.stop', async = true)
-    void stop() {
-        collectors.each {it.value.close()}
-    }
+    void stop() { collectors.each {it.value.close()} }
 
 
     /**
@@ -74,7 +72,7 @@ class AttrManager extends ServerTpl {
      * @return 当前属性的值
      */
     def dataCollect(String aName, DecisionContext ctx) {
-        def field = attrMap.get(aName)
+        def field = fieldMap.get(aName)
         if (field == null) {
             log.warn("未找到属性'$aName'对应的配置".toString())
             return
@@ -149,7 +147,7 @@ class AttrManager extends ServerTpl {
      * @return null: 没有别名
      */
     String alias(String aName) {
-        def record = attrMap.get(aName)
+        def record = fieldMap.get(aName)
         if (record == null) return null
         else if (record.cnName == aName) return record.enName
         else if (record.enName == aName) return record.cnName
@@ -165,7 +163,7 @@ class AttrManager extends ServerTpl {
      */
     Object convert(String aName, Object aValue) {
         if (aValue == null) return aValue
-        def field = attrMap.get(aName)
+        def field = fieldMap.get(aName)
         if (field == null) return aValue
         Utils.to(aValue, field.type.clzType)
     }
@@ -176,14 +174,14 @@ class AttrManager extends ServerTpl {
     void listenFieldChange(EC ec, String enName) {
         def field = repo.find(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}
         if (field == null) {
-            def f = attrMap.remove(enName)
-            if (f) attrMap.remove(f.cnName)
+            def f = fieldMap.remove(enName)
+            if (f) fieldMap.remove(f.cnName)
             log.info("delField: " + f)
         } else {
             boolean isNew = true
-            if (attrMap.containsKey(field.enName)) isNew = false
-            attrMap.put(field.enName, field)
-            attrMap.put(field.cnName, field)
+            if (fieldMap.containsKey(field.enName)) isNew = false
+            fieldMap.put(field.enName, field)
+            fieldMap.put(field.cnName, field)
             log.info("${isNew ? 'addField' : 'updateField'}: $enName".toString())
         }
         def remoter = bean(Remoter)
@@ -215,23 +213,23 @@ class AttrManager extends ServerTpl {
      */
     void loadField() {
         initDefaultAttr()
-        Set<String> enNames = (attrMap.isEmpty() ? null : new HashSet<>(100))
+        Set<String> enNames = (fieldMap.isEmpty() ? null : new HashSet<>(100))
         for (int page = 0, limit = 100; ; page++) {
             def ls = repo.findList(RuleField, page * limit, limit, null)
             if (!ls) break
             ls.each {field ->
-                attrMap.put(field.enName, field)
-                attrMap.put(field.cnName, field)
+                fieldMap.put(field.enName, field)
+                fieldMap.put(field.cnName, field)
                 enNames?.add(field.enName)
                 enNames?.add(field.cnName)
             }
         }
         if (enNames) { // 重新加载, 要删除内存中有, 但库中没有
-            attrMap.findAll {!enNames.contains(it.key)}.each {e ->
-                attrMap.remove(e.key)
+            fieldMap.findAll {!enNames.contains(it.key)}.each { e ->
+                fieldMap.remove(e.key)
             }
         }
-        log.info("加载属性配置 {}个", attrMap.size() / 2)
+        log.info("加载属性配置 {}个", fieldMap.size() / 2)
     }
 
 
@@ -334,27 +332,22 @@ if (idNumber && idNumber.length() > 17) {
     protected void initSqlCollector(DataCollector collector) {
         if ('sql' != collector.type) return
         if(!collector.enabled) {
-            collectors.remove(collector.enName)?.close()
-            return
+            collectors.remove(collector.enName)?.close(); return
         }
         if (!collector.url) {
-            log.warn('sql url must not be empty')
-            return
+            log.warn('sql url must not be empty'); return
         }
         if (!collector.sqlScript) {
-            log.warn('sqlScript must not be empty')
-            return
+            log.warn('sqlScript must not be empty'); return
         }
         if (collector.minIdle < 0 || collector.minIdle > 50) {
-            log.warn('0 <= minIdle <= 50')
-            return
+            log.warn('0 <= minIdle <= 50'); return
         }
         if (collector.maxActive < 1 || collector.maxActive > 100) {
-            log.warn('1 <= minIdle <= 100')
-            return
+            log.warn('1 <= minIdle <= 100'); return
         }
 
-        def db = new Sql(Repo.createDataSource([
+        def db = new Sql(Repo.createDataSource([ //创建一个DB. 用于界面配置sql脚本
             url: collector.url, jdbcUrl: collector.url,
             minIdle: collector.minIdle, maxActive: collector.maxActive,
             minimumIdle: collector.minIdle, maximumPoolSize: collector.maxActive
@@ -399,12 +392,10 @@ if (idNumber && idNumber.length() > 17) {
     protected void initScriptCollector(DataCollector collector) {
         if ('script' != collector.type) return
         if(!collector.enabled) {
-            collectors.remove(collector.enName)?.close()
-            return
+            collectors.remove(collector.enName)?.close(); return
         }
         if (!collector.computeScript) {
-            log.warn("Script collector'$collector.enName' script must not be empty".toString())
-            return
+            log.warn("Script collector'$collector.enName' script must not be empty".toString()); return
         }
         Binding binding = new Binding()
         def config = new CompilerConfiguration()
@@ -442,13 +433,12 @@ if (idNumber && idNumber.length() > 17) {
     protected void initHttpCollector(DataCollector collector) {
         if ('http' != collector.type) return
         if(!collector.enabled) {
-            collectors.remove(collector.enName)?.close()
-            return
+            collectors.remove(collector.enName)?.close(); return
         }
         // 创建 http 客户端
-        def http = new OkHttpSrv('okHttp_' + collector.enName); app.inject(http)
-        http.attr('connectTimeout', getLong('http.connectTimeout', 3L))
-        http.attr('readTimeout', getLong('http.readTimeout', Long.valueOf(collector.timeout?:20)))
+        def http = new OkHttpSrv('okHttp_' + collector.enName); app().inject(http)
+        http.setAttr('connectTimeout', getLong("http.connectTimeout." + collector.enName, getLong('http.connectTimeout', 3L)))
+        http.setAttr('readTimeout', getLong("http.readTimeout." + collector.enName, getLong('http.readTimeout', Long.valueOf(collector.timeout?:20))))
         http.init()
 
         Closure parseFn
@@ -516,8 +506,7 @@ if (idNumber && idNumber.length() > 17) {
                         spend = System.currentTimeMillis() - start.time
                     }
                 }
-            }
-            catch (ex) {
+            } catch (ex) {
                 log.error(logMsg.toString() + ", 异常: ", ex)
                 dataCollected(new CollectResult(
                     decideId: ctx.id, decisionId: ctx.decisionHolder.decision.decisionId, collector: collector.enName,
@@ -577,7 +566,7 @@ if (idNumber && idNumber.length() > 17) {
             try {
                 sql?.dataSource?.invokeMethod('close', null)
                 sql?.close()
-            } catch (e) {}
+            } catch (ex) {}
         }
     }
 }

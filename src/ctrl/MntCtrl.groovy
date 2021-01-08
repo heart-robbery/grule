@@ -1,10 +1,10 @@
 package ctrl
 
+import cn.xnatural.app.ServerTpl
 import cn.xnatural.enet.event.EL
 import cn.xnatural.http.*
 import cn.xnatural.jpa.Repo
-import core.ServerTpl
-import dao.entity.User
+import entity.User
 
 import java.util.concurrent.ConcurrentHashMap
 

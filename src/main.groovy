@@ -9,11 +9,8 @@ import core.EhcacheSrv
 import core.HttpSrv
 import core.OkHttpSrv
 import core.RedisClient
-import ctrl.MainCtrl
-import ctrl.TestCtrl
-import entity.Permission
-import entity.Test
-import entity.VersionFile
+import ctrl.*
+import entity.*
 import groovy.transform.Field
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -78,7 +75,7 @@ app.addSource(new ServerTpl("jpa_rule") { //数据库 jpa_rule
             Decision, RuleField, DataCollector, OpHistory, DecisionResult, CollectResult,
             User, Permission, GlobalConfig
         ).init()
-        exposeBean(repo, [name + "_repo"])
+        exposeBean(repo, name + "_repo")
         ep.fire("${name}.started")
     }
 
@@ -112,5 +109,31 @@ void sysStarted() {
     try {
     } finally {
         // System.exit(0)
+    }
+}
+
+/**
+ * 系统心跳 清理
+ */
+@EL(name = 'sys.heartbeat', async = true)
+protected void heartbeat() {
+    // 删除 Classloader 中只进不出的 parallelLockMap
+    def field = ClassLoader.getDeclaredField('parallelLockMap')
+    field.setAccessible(true)
+    Map<String, Object> m = field.get(Thread.currentThread().contextClassLoader.parent.parent)
+    if (m != null) {
+        for (def itt = m.iterator(); itt.hasNext(); ) {
+            def entry = itt.next()
+            if ((entry.key.startsWith("script") && entry.key.endsWith(".groovy")) ||
+                entry.key.contains("GStringTemplateScript") ||
+                entry.key.contains("SimpleTemplateScript") ||
+                entry.key.contains("XmlTemplateScript") ||
+                entry.key.contains("StreamingTemplateScript") ||
+                entry.key.contains("GeneratedMarkupTemplate")
+            ) {
+                itt.remove()
+                log.trace("Removed class parallelLock: {}", entry.key)
+            }
+        }
     }
 }

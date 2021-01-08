@@ -1,4 +1,4 @@
-package dao.entity
+package entity
 
 enum FieldType {
     // 默认高精度计算
