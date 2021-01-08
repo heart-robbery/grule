@@ -1,5 +1,6 @@
 package service
 
+import cn.xnatural.app.ServerTpl
 import cn.xnatural.enet.event.EL
 import cn.xnatural.jpa.Page
 import cn.xnatural.jpa.Repo
@@ -8,12 +9,11 @@ import cn.xnatural.task.TaskContext
 import cn.xnatural.task.TaskWrapper
 import com.alibaba.fastjson.JSON
 import core.OkHttpSrv
-import core.ServerTpl
 import core.mode.builder.ObjBuilder
 import core.mode.pipeline.Pipeline
 import core.mode.v.VChain
 import core.mode.v.VProcessor
-import dao.entity.Test
+import entity.Test
 
 import java.text.SimpleDateFormat
 import java.util.function.Consumer
@@ -31,7 +31,7 @@ class TestService extends ServerTpl {
 
 
     Page findTestData() {
-        repo?.trans{ s ->
+        repo.trans{ s ->
             repo.saveOrUpdate(
                 new Test(
                     name: new SimpleDateFormat('yyyy-MM-dd HH:mm:ss').format(new Date()),
@@ -117,7 +117,7 @@ class TestService extends ServerTpl {
 
     @EL(name = "eName11")
     void taskTest() {
-        new TaskContext<>('test ctx', null, exec)
+        new TaskContext<>('test ctx', null, exec())
             .addTask(new TaskWrapper().step {param, me -> me.info("执行任务....")})
             .addTask(new TaskWrapper().step {param, me ->
                 me.info("执行任务")

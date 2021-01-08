@@ -1,5 +1,6 @@
 package core
 
+import cn.xnatural.app.ServerTpl
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import redis.clients.jedis.Jedis
@@ -10,6 +11,9 @@ import redis.clients.jedis.Protocol
 import java.time.Duration
 import java.util.function.Function
 
+/**
+ * redis 客户端
+ */
 class RedisClient extends ServerTpl {
     protected JedisPool pool
 

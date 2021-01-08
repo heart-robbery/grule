@@ -1,5 +1,6 @@
 package core
 
+import cn.xnatural.app.ServerTpl
 import cn.xnatural.enet.event.EL
 import cn.xnatural.http.HttpContext
 import cn.xnatural.http.HttpServer
@@ -13,7 +14,7 @@ class HttpSrv extends ServerTpl {
     @Lazy protected def ehcache = bean(EhcacheSrv)
     @Lazy protected String sessionCookieName = getStr("sessionCookieName", "sId")
     protected final List<Class> ctrlClzs = new LinkedList<>()
-    @Lazy protected HttpServer server = new HttpServer(attrs(), exec) {
+    @Lazy protected HttpServer server = new HttpServer(attrs(), exec()) {
         @Override
         protected Map<String, Object> sessionDelegate(HttpContext hCtx) { getSessionDelegate(hCtx) }
     }
