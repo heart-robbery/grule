@@ -43,7 +43,7 @@ class DecisionSrv extends ServerTpl {
     void globalMsg(String msg) {
         log.info("系统消息: " + msg)
         ep.fire("wsMsg_rule", msg)
-        String url = getStr('msgNotifyUrl')
+        String url = getStr('msgNotifyUrl', null)
         if (url) {
             //bean(OkHttpSrv)?.
         }

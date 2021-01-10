@@ -12,6 +12,8 @@ import entity.Permission
 import entity.User
 import service.rule.UserSrv
 
+import javax.persistence.criteria.Predicate
+
 @Ctrl(prefix = 'mnt/user')
 class MntUserCtrl extends ServerTpl {
     @Lazy def repo = bean(Repo, 'jpa_rule_repo')
@@ -19,12 +21,20 @@ class MntUserCtrl extends ServerTpl {
 
 
     @Path(path = 'page')
-    ApiResp page(Integer page, Integer pageSize) {
-        if (pageSize && pageSize > 50) return ApiResp.fail("pageSize max 50")
+    ApiResp page(HttpContext hCtx, Integer page, Integer pageSize, String kw) {
+        if (pageSize && pageSize > 50) return ApiResp.fail("Param pageSize <=50")
         ApiResp.ok(
             Page.of(
                 repo.findPage(User, page, pageSize?:10) {root, query, cb ->
                     query.orderBy(cb.desc(root.get('createTime')))
+                    def ps = []
+                    if (!hCtx.hasAuth("grant")) {
+                        ps << cb.equal(root.get("name"), hCtx.getSessionAttr("uName")) // 当前用户只能看自己的信息
+                    }
+                    if (kw) {
+                        ps << cb.like(root.get("name"), "%" + kw + "%")
+                    }
+                    cb.and(ps.toArray(new Predicate[ps.size()]))
                 },
                 {
                     Utils.toMapper(it).ignore("metaClass")
@@ -46,20 +56,25 @@ class MntUserCtrl extends ServerTpl {
 
 
     @Path(path = 'add')
-    ApiResp add(String name, String password, String[] ps) {
+    ApiResp add(HttpContext hCtx, String name, String password, String[] ps) {
+        hCtx.auth("grant")
+        if (!name) return ApiResp.fail("Param name not empty")
+        if (!password) return ApiResp.fail("Param password not empty")
         def u = repo.saveOrUpdate(new User(name: name, password: password, permissions: ps?.findAll {it?.trim()}?.join(',')))
         ApiResp.ok(u.id)
     }
 
 
     @Path(path = 'del/:id')
-    ApiResp del(Long id) {
+    ApiResp del(HttpContext hCtx, Long id) {
+        hCtx.auth("grant")
         ApiResp.ok(repo.delete(User, id))
     }
 
 
     @Path(path = 'update')
-    ApiResp update(HttpContext ctx, Long id, String name, String[] ps) {
+    ApiResp update(HttpContext hCtx, Long id, String name, String[] ps) {
+        if (!id) return ApiResp.fail("Param id required")
         def user = repo.findById(User, id)
         if (!user) return ApiResp.fail("用户不存在")
         if (name && user.name != name) {
@@ -68,10 +83,10 @@ class MntUserCtrl extends ServerTpl {
             }
             user.name = name
         }
-        ctx.auth('grant')
+        hCtx.auth('grant')
         user.permissions = ps?.findAll {it?.trim()}.join(',')
-        if (ctx.getSessionAttr('id') == id) { //如果是当前用户
-            ctx.setSessionAttr('permissions', ps as Set)
+        if (hCtx.getSessionAttr('id') == id) { //如果是当前用户
+            hCtx.setSessionAttr('permissions', ps as Set)
         }
         repo.saveOrUpdate(user)
         ApiResp.ok().attr('id', user.id).attr('name', user.name)
@@ -80,8 +95,9 @@ class MntUserCtrl extends ServerTpl {
 
 
     @Path(path = 'changePwd')
-    ApiResp changePwd(HttpContext ctx, Long id, String newPassword, String oldPassword) {
-        if (ctx.getSessionAttr("id", Long) != id) {
+    ApiResp changePwd(HttpContext hCtx, Long id, String newPassword, String oldPassword) {
+        if (!id) return ApiResp.fail("Param id required")
+        if (Utils.to(hCtx.getSessionAttr("id"), Long) != id) {
             return ApiResp.fail('只能改当前用户的密码')
         }
         def user = repo.findById(User, id)
@@ -94,8 +110,8 @@ class MntUserCtrl extends ServerTpl {
 
 
     @Path(path = 'restPassword')
-    ApiResp restPassword(HttpContext ctx, Long id, String newPassword) {
-        ctx.auth('password-reset')
+    ApiResp restPassword(HttpContext hCtx, Long id, String newPassword) {
+        hCtx.auth('password-reset')
         def user = repo.findById(User, id)
         if (!user) return ApiResp.fail("用户不存在")
         user.password = newPassword
@@ -111,15 +127,15 @@ class MntUserCtrl extends ServerTpl {
 
 
     @Path(path = 'delPermission/:id', method = 'post')
-    ApiResp delPermission(HttpContext ctx, Long id) {
-        ctx.auth("grant")
+    ApiResp delPermission(HttpContext hCtx, Long id) {
+        hCtx.auth("grant")
         ApiResp.ok(repo.delete(Permission, id))
     }
 
 
     @Path(path = 'updatePermission', method = 'post')
-    ApiResp updatePermission(HttpContext ctx, Long id, String enName, String cnName, String comment) {
-        ctx.auth("grant")
+    ApiResp updatePermission(HttpContext hCtx, Long id, String enName, String cnName, String comment) {
+        hCtx.auth("grant")
         def p = repo.findById(Permission, id)
         if (!p) return ApiResp.fail('未找到权限: ' + id)
         if (p.enName != enName && repo.find(Permission) {root, query, cb -> cb.equal(root.get('enName'), enName)}) {
@@ -136,8 +152,8 @@ class MntUserCtrl extends ServerTpl {
 
 
     @Path(path = 'addPermission', method = 'post')
-    ApiResp addPermission(HttpContext ctx, String enName, String cnName, String comment) {
-        ctx.auth("grant")
+    ApiResp addPermission(HttpContext hCtx, String enName, String cnName, String comment) {
+        hCtx.auth("grant")
         def p = new Permission(enName: enName, cnName: cnName, comment: comment)
         if (repo.find(Permission) {root, query, cb -> cb.equal(root.get('enName'), enName)}) {
             return ApiResp.fail("权限名'$enName'已存在")
@@ -151,8 +167,9 @@ class MntUserCtrl extends ServerTpl {
 
 
     @Path(path = 'permissionPage')
-    ApiResp permissionPage(Integer page, Integer pageSize, String kw) {
-        if (pageSize && pageSize > 20) return ApiResp.fail("pageSize max 20")
+    ApiResp permissionPage(HttpContext hCtx, Integer page, Integer pageSize, String kw) {
+        if (pageSize && pageSize > 20) return ApiResp.fail("Param pageSize <=20")
+        hCtx.auth("grant")
         ApiResp.ok(
             repo.findPage(Permission, page, pageSize?:10) {root, query, cb ->
                 query.orderBy(cb.desc(root.get('updateTime')))

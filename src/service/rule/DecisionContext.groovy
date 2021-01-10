@@ -111,7 +111,7 @@ class DecisionContext {
         DecisionEnum decision
         try {
             r.decisionFn?.forEach(e -> {
-                def d = e.v2(this.data)
+                def d = e.v2.call(this.data)
                 if ("Reject" == e.v1) {
                     decision = d
                     log.trace(logPrefix() + "拒绝函数执行结果: " + d)
@@ -123,6 +123,8 @@ class DecisionContext {
                     log.trace(logPrefix() + "人工审核函数执行结果: " + d)
                 } else if ("Operate" == e.v1) {
                     log.trace(logPrefix() + "操作函数执行完成")
+                } else if ("Clear" == e.v1) {
+                    log.trace(logPrefix() + "清除函数执行完成")
                 } else {
                     log.trace(logPrefix() + e.v1 + "函数执行完成. " + d)
                 }
@@ -249,11 +251,18 @@ class DecisionContext {
             value
         }
 
-
         @Override
         Object put(String key, Object value) {
             ctx.ruleAttr(key, safeSet(key, value))
             value
+        }
+
+        @Override
+        Object remove(Object key) { // 删除缓存
+            def r = super.remove(key)
+            def field = ctx.getAttrManager().fieldMap.get(key)
+            if (field) ctx.dataCollectResult.remove(field.dataCollector)
+            return r
         }
     }
 

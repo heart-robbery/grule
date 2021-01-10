@@ -35,7 +35,7 @@
 <script>
     const addEditPop = { //添加,编辑窗口组件
         template: `
-                <div v-width="600" style="padding-top: 10px">
+                <div style="padding-top: 10px">
                     <h-form ref="form"
                             :valid-on-change="true"
                             :show-error-tip="true"
@@ -50,7 +50,7 @@
                             <input type="password" v-model="model.password">
                         </h-formitem>
                         <h-formitem label="权限" icon="h-icon-complete">
-                            <h-transfer v-model="model.ps" :datas="permissions" :option="option"></h-transfer>
+                            <h-transfer v-model="model.ps" :datas="permissions" :option="option" style="width: 680px"></h-transfer>
                         </h-formitem>
                         <h-formitem>
                                 <h-button v-if="model.id" color="primary" :loading="isLoading" @click="update">提交</h-button>
@@ -218,7 +218,7 @@
                         vue: addEditPop,
                         datas: {}
                     },
-                    width: 750,
+                    width: 800,
                     hasCloseIcon: true, fullScreen: false, middle: false, transparent: false,
                     events: {
                         reload: () => {
@@ -229,12 +229,12 @@
             },
             showUpdatePop(user) {
                 this.$Modal({
-                    title: `更新用户: ${user.name}`, middle: true, draggable: true,
+                    title: `更新用户: ${user.name}`, draggable: true,
                     component: {
                         vue: addEditPop,
                         datas: {user: user}
                     },
-                    width: 750,
+                    width: 800,
                     hasCloseIcon: true, fullScreen: false, middle: false, transparent: false,
                     events: {
                         reload: () => {
@@ -245,7 +245,7 @@
             },
             showResetPass(user) {
                 this.$Modal({
-                    title: `重置密码: ${user.name}`, middle: true, draggable: true,
+                    title: `重置密码: ${user.name}`, draggable: true,
                     component: {
                         vue: resetPass,
                         datas: {user: user}

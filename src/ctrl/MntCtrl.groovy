@@ -1,6 +1,7 @@
 package ctrl
 
 import cn.xnatural.app.ServerTpl
+import cn.xnatural.app.Utils
 import cn.xnatural.enet.event.EL
 import cn.xnatural.http.*
 import cn.xnatural.jpa.Repo
@@ -50,19 +51,19 @@ class MntCtrl extends ServerTpl {
      * 登录
      * @param username
      * @param password
-     * @param ctx
+     * @param hCtx
      * @return
      */
     @Path(path = 'login')
-    ApiResp login(String username, String password, HttpContext ctx) {
-        if (!username) return ApiResp.fail('username must not be empty')
-        if (!password) return ApiResp.fail('password must not be empty')
+    ApiResp login(String username, String password, HttpContext hCtx) {
+        if (!username) return ApiResp.fail('Param username not empty')
+        if (!password) return ApiResp.fail('Param password not empty')
         def user = repo.find(User) {root, query, cb -> cb.equal(root.get('name'), username)}
         if (!user) return ApiResp.fail("用户不存在")
         if (password != user.password) return ApiResp.fail('密码错误')
-        ctx.setSessionAttr('uId', user.id)
-        ctx.setSessionAttr('name', username)
-        ctx.setSessionAttr('permissions', user.permissions?.split(",") as Set)
+        hCtx.setSessionAttr('uId', user.id)
+        hCtx.setSessionAttr('uName', username)
+        hCtx.setSessionAttr('permissions', user.permissions)
         user.login = new Date()
         repo.saveOrUpdate(user)
         ApiResp.ok().attr('id', user.id).attr('name', username)
@@ -72,25 +73,28 @@ class MntCtrl extends ServerTpl {
 
     @Path(path = 'logout')
     ApiResp logout(HttpContext ctx) {
-        ctx.setSessionAttr('id', null)
-        ctx.setSessionAttr('name', null)
+        ctx.setSessionAttr('uId', null)
+        ctx.setSessionAttr('uName', null)
         ApiResp.ok()
     }
 
 
     /**
      * 获取当前 会话 中的用户信息
-     * @param ctx
+     * @param hCtx
      * @return
      */
     @Path(path = 'getCurrentUser')
-    ApiResp getCurrentUser(HttpContext ctx) {
-        String name = ctx.getSessionAttr('name')
+    ApiResp getCurrentUser(HttpContext hCtx) {
+        String name = hCtx.getSessionAttr('uName')
         if (name) {
-            ApiResp.ok().attr('id', ctx.getSessionAttr('id')).attr('name', name)
-                .attr('permissions', ctx.getSessionAttr("permissions"))
+            def uId = hCtx.getSessionAttr('uId')
+            def permissions = repo.findById(User, Utils.to(uId, Long)).permissions
+            hCtx.setSessionAttr('permissions', permissions)
+            ApiResp.ok().attr('id', uId).attr('name', name)
+                .attr('permissions', permissions.split(","))
         } else {
-            ctx.response.status(401)
+            hCtx.response.status(401)
             ApiResp.fail('用户会话已失效, 请重新登录')
         }
     }

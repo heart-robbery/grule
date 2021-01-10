@@ -47,19 +47,19 @@ class DecisionManager extends ServerTpl {
 
 
     @EL(name = ['decisionChange', 'decision.dataVersion'], async = true)
-    void listenDecisionChange(EC ec, String decisionId) {
-        if (!decisionId) return
-        def decision = repo.find(Decision) { root, query, cb -> cb.equal(root.get('decisionId'), decisionId)}
+    void listenDecisionChange(EC ec, String id) {
+        if (!id) return
+        def decision = repo.find(Decision) { root, query, cb -> cb.equal(root.get('id'), id)}
         if (decision == null) {
-            decisionMap.remove(decisionId)
-            log.info("delDecision: " + decisionId)
+            decisionMap.remove(id)
+            log.info("delDecision: " + id)
         } else {
             addDecision(decision)
-            log.info("decisionChange: " + decisionId)
+            log.info("decisionChange: " + id)
         }
         def remoter = bean(Remoter)
         if (remoter && ec?.source() != remoter) { // 不是远程触发的事件
-            remoter.dataVersion('decision').update(decisionId, decision ? decision.updateTime.time : System.currentTimeMillis(), null)
+            remoter.dataVersion('decision').update(id, decision ? decision.updateTime.time : System.currentTimeMillis(), null)
         }
     }
 

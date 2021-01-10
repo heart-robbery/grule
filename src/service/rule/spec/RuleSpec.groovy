@@ -25,6 +25,19 @@ class RuleSpec {
     }
 
 
+    /**
+     * 清除属性值缓存
+     * @param 属性名
+     */
+    void 清除(String... 属性名) {
+        if (!属性名) return
+        decisionFn << Tuple.tuple('Clear', { Map ctx ->
+            属性名.each {ctx.remove(it)}
+            null
+        })
+    }
+
+
     void 拒绝(Closure<Boolean> 条件) {
         decisionFn << Tuple.tuple('Reject', { Map ctx ->
             def cl = 条件.rehydrate(ctx, 条件, this)

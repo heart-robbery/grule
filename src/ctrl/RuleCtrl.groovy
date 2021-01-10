@@ -27,7 +27,7 @@ class RuleCtrl extends ServerTpl {
     @Path(path = 'decision')
     ApiResp decision(String decisionId, HttpContext ctx) {
         if (!decisionId) {
-            return ApiResp.fail('decisionId must not be empty')
+            return ApiResp.fail('Param decisionId not empty')
         }
         def decision = dm.findDecision(decisionId)
         if (decision == null) {

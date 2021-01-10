@@ -31,5 +31,13 @@ class RuleField extends LongIdEntity {
      * 值函数名 对应 {@link DataCollector#enName}
      */
     String    dataCollector
+    /**
+     * 创建者
+     */
+    String creator
+    /**
+     * 更新人
+     */
+    String updater
 
 }

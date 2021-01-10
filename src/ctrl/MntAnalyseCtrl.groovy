@@ -3,10 +3,10 @@ package ctrl
 import cn.xnatural.app.ServerTpl
 import cn.xnatural.http.ApiResp
 import cn.xnatural.http.Ctrl
+import cn.xnatural.http.HttpContext
 import cn.xnatural.http.Path
 import cn.xnatural.jpa.Repo
-import org.hibernate.query.internal.NativeQueryImpl
-import org.hibernate.transform.Transformers
+import entity.Decision
 import service.rule.DecisionManager
 
 import java.text.SimpleDateFormat
@@ -16,7 +16,7 @@ class MntAnalyseCtrl extends ServerTpl {
     @Lazy def repo = bean(Repo, 'jpa_rule_repo')
 
     @Path(path = 'countDecide')
-    ApiResp countDecide(String startTime, String endTime, String type) {
+    ApiResp countDecide(HttpContext hCtx, String startTime, String endTime, String type) {
         Date start = startTime ? new SimpleDateFormat('yyyy-MM-dd HH:mm:ss').parse(startTime) : null
         Date end = endTime ? new SimpleDateFormat('yyyy-MM-dd HH:mm:ss').parse(endTime) : null
         def cal = Calendar.getInstance()
@@ -32,14 +32,14 @@ class MntAnalyseCtrl extends ServerTpl {
         } else if (type == 'lastFiveHour') {
             cal.add(Calendar.HOUR_OF_DAY, -5)
         } else return ApiResp.fail("type: '$type' not supprot")
-        ApiResp.ok(repo.trans{se ->
-            se.createNativeQuery(
-                    "select decision_id, decision, count(*) total from decision_result where occur_time>=:occurTime group by decision_id, decision"
-            )
-                    .setParameter("occurTime", cal.getTime())
-                    .unwrap(NativeQueryImpl).setResultTransformer(Transformers.ALIAS_TO_ENTITY_MAP)
-                    .list()
-        }.collect {Map<String, Object> record ->
+        def ids = hCtx.getSessionAttr("permissions").split(",").findResults {String p -> p.replace("decision-read-", "").replace("decision-read", "")}.findAll {it}
+        if (!ids) return ApiResp.ok()
+        ids = repo.findList(Decision) {root, query, cb -> root.get("id").in(ids)}.findResults {it.decisionId}
+        if (!ids) return ApiResp.ok()
+        ApiResp.ok(repo.rows(
+                "select decision_id, decision, count(1) total from decision_result where occur_time>=? and decision_id in (${ids.collect {'\'' + it + '\''}.join(',')}) group by decision_id, decision",
+                cal.getTime()
+        ).collect {Map<String, Object> record ->
             def data = new HashMap<>(5)
             record.each {e ->
                 data.put(e.key.toLowerCase(), e.value)

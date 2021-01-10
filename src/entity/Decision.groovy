@@ -59,4 +59,12 @@ class Decision extends UUIDEntity {
     @Basic
     @Type(type = "text")
     String apiConfig
+    /**
+     * 创建者
+     */
+    String creator
+    /**
+     * 更新人
+     */
+    String updater
 }

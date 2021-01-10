@@ -172,14 +172,14 @@
             },
             trdblclick(item) {
                 this.$Modal({
-                    middle: true, draggable: false,
+                    middle: false, draggable: false,
                     type: 'drawer-right',
                     component: {
                         vue: detail,
                         datas: {item: item}
                     },
                     width: 1200,
-                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false, closeOnMask: true,
+                    hasCloseIcon: true, fullScreen: false, transparent: false, closeOnMask: true,
                     events: {
                         // reload: () => {
                         //     this.load()

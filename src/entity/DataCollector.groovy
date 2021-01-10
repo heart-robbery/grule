@@ -34,6 +34,14 @@ class DataCollector extends LongIdEntity {
      */
     String comment
     /**
+     * 创建者
+     */
+    String creator
+    /**
+     * 更新人
+     */
+    String updater
+    /**
      * 超时(ms)
      */
     Integer timeout

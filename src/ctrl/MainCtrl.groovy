@@ -85,6 +85,13 @@ class MainCtrl extends ServerTpl {
         if (app().profile == 'pro') {
             hCtx.response.cacheControl(1800)
         }
+        if (fName.contains("OpHistory.vue")) hCtx.auth("opHistory-read")
+        if (fName.contains("FieldConfig.vue")) hCtx.auth("field-read")
+        if (fName.contains("DataCollectorConfig.vue")) hCtx.auth("dataCollector-read")
+        if (fName.contains("DecisionConfig.vue")) hCtx.auth("decision-read")
+        if (fName.contains("Permission.vue")) hCtx.auth("grant")
+        if (fName.contains("DecisionResult.vue")) hCtx.auth("decisionResult-read")
+        if (fName.contains("CollectResult.vue")) hCtx.auth("collectResult-read")
         Utils.baseDir("static/components/$fName")
     }
 

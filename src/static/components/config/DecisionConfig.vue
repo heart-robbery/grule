@@ -20,12 +20,11 @@
                             <span class="float-right">
                                 <h-button text-color="yellow" :circle="true" @click.stop="showApiPop(item)">API配置</h-button>
                                 <h-button text-color="yellow" :circle="true" @click.stop="showTestPop(item)">测试</h-button>
-                                <h-button v-if="sUser.permissions.find((e) => e == 'decision-del') == 'decision-del'" text-color="red" :circle="true" icon="h-icon-trash" @click.stop="del(item)">删除</h-button>
+                                <h-button v-if="item._deletable" text-color="red" :circle="true" icon="h-icon-trash" @click.stop="del(item)">删除</h-button>
                             </span>
                         </template>
                         <ace-groovy v-if="collapse && collapse.length > 0 && collapse[0] == item.decisionId"
-                                    v-model="item.dsl" height="650px" width="90%" @save="save(item)"
-                                    :readonly="sUser.permissions.find((e) => e == 'decision-update') != 'decision-update'">
+                                    v-model="item.dsl" height="650px" width="90%" @save="save(item)" :readonly="item._readonly">
                         </ace-groovy>
 <!--                        <div style="height: 650px; width: 100vh">-->
 <!--                            <div v-if="collapse && collapse.length > 0 && collapse[0] == item.decisionId " ref="dslEditor" style="height: 650px; width: 800px"></div>-->
@@ -52,20 +51,20 @@
                     </div>
                 </div>
                 <div class="h-panel-body">
-                    <h-table :datas="apiConfig" stripe select-when-click-tr border :height="480">
-                        <h-tableitem title="参数名" align="center" :width="200">
+                    <h-table v-if="decision.apiConfigO" :datas="decision.apiConfigO" stripe select-when-click-tr border :height="480">
+                        <h-tableitem title="参数名" align="center" :width="220">
                             <template slot-scope="{data}">
                                 <input type="text" v-model="data.code" :readonly="data._readonly"/>
                             </template>
                         </h-tableitem>
-                        <h-tableitem title="参数说明" align="center" :width="200">
+                        <h-tableitem title="参数说明" align="center" :width="220">
                             <template slot-scope="{data}">
                                 <input type="text" v-model="data.name"/>
                             </template>
                         </h-tableitem>
                         <h-tableitem title="类型" align="center" :width="90">
                             <template slot-scope="{data}">
-                                <h-select v-model="data.type" :datas="types" :deletable="false" style="width: 80px" :disabled="data._readonly"></h-select>
+                                <h-select v-model="data.type" :datas="types" :deletable="false" style="width: 88px"></h-select>
                             </template>
                         </h-tableitem>
                         <h-tableitem title="是否必须" align="center" :width="80">
@@ -112,7 +111,7 @@
                                 </h-form>
                             </template>
                         </h-tableitem>
-                        <h-tableitem title="验证" align="center" :width="250">
+                        <h-tableitem title="验证" align="center" :width="200">
                             <template slot-scope="{data}">
                                 <h-form>
                                     <h-formitem v-if="data.type == 'Time'" label="格式">
@@ -154,11 +153,12 @@
         `,
         data() {
             this.decision.apiConfigO = this.decision.apiConfigO ? this.decision.apiConfigO : (this.decision.apiConfig ? JSON.parse(this.decision.apiConfig) : null);
-            if (this.decision.apiConfigO) {
-                for (let item of this.decision.apiConfigO) {
-                    if (item.code == 'decisionId' || item.code == 'async') item._readonly = true
-                }
-            }
+            // if (this.decision.apiConfigO) {
+            //     for (let item of this.decision.apiConfigO) {
+            //         if (item.code == 'decisionId' || item.code == 'async') item._readonly = true
+            //     }
+            // }
+            if (this.decision.apiConfigO == null) this.decision.apiConfigO = [];
             return {
                 apiConfig: this.decision.apiConfigO,
                 types: [
@@ -195,10 +195,10 @@
             <h-row :space="10" v-for="(param,index) in items">
                 <h-cell width="8"><input type="text" v-model="param.code" placeholder="参数名" style="float: left; width: 100%" :readonly="param.type"/></h-cell>
                 <h-cell width="12">
-                    <h-select v-if="param.type == 'Bool'" v-model="param.value" :datas="['true', 'false']" :placeholder="param.name" />
+                    <h-select v-if="param.type == 'Bool'" v-model="param.value" :datas="['true', 'false']" :placeholder="param.name" :disabled="param._readonly"/>
                     <h-select v-else-if="param.enumValues" v-model="param.value" :datas="param.enumValues" :placeholder="param.name" />
-                    <input v-else-if="param.type == 'Time'" type="text" v-model="param.value" :placeholder="param.name + ', ' + param.format" style="float: left; width: 100%"/>
-                    <input v-else type="text" v-model="param.value" :placeholder="param.name" style="float: left; width: 100%"/>
+                    <input v-else-if="param.type == 'Time'" type="text" v-model="param.value" :placeholder="param.name + ', ' + param.format" style="float: left; width: 100%" :disabled="param._readonly"/>
+                    <input v-else type="text" v-model="param.value" :placeholder="param.name" style="float: left; width: 100%" :disabled="param._readonly"/>
                 </h-cell>
                 <h-cell width="2">
                     <i v-if="items.length == (index + 1)" class="h-icon-plus" @click="add"></i>
@@ -229,7 +229,7 @@
                 items: (() => {
                     let arr = this.decision.apiConfigO ? this.decision.apiConfigO.map(cfg => {
                         let item = items ? items.find(i => i && i.code == cfg.code) : null;
-                        return $.extend({value: (cfg.fixValue != null ? cfg.fixValue : (cfg.defaultValue != null ? cfg.defaultValue : (item ? item.value : null)))}, cfg)
+                        return $.extend({value: (cfg.fixValue != null ? cfg.fixValue : (cfg.defaultValue != null ? cfg.defaultValue : (item ? item.value : null))), _readonly: cfg.fixValue != null}, cfg)
                     }) : [];
                     for (let index in items) {
                         let item = items[index];
@@ -290,13 +290,13 @@
             showApiPop(item) {
                 this.curDecision = item;
                 this.$Modal({
-                    title: `API配置: ${item.name}`, middle: true, draggable: true,
+                    title: `API配置: ${item.name}`,
                     component: {
                         vue: apiConfig,
                         datas: {decision: item}
                     },
-                    width: 1000, closeOnMask: false,
-                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false,
+                    //width: 1200,
+                    middle: false, draggable: true, closeOnMask: false, hasCloseIcon: true, fullScreen: true, transparent: false,
                     events: {
                         update: () => {
                             this.save()
@@ -347,6 +347,7 @@
                         if (res.code == '00') {
                             if (decision.id) {
                                 $.extend(decision, res.data);
+                                decision.apiConfigO = this.decision.apiConfig ? JSON.parse(decision.apiConfig) : null;
                                 this.$Message.success('更新成功: ' + decision.decisionId);
                             } else {
                                 this.load();
@@ -369,14 +370,17 @@
                             "code": "async", "name": "是否异步", "type": "Bool", "require": false, "defaultValue": 'false'
                         },
                         {
-                            "code": "idNumber", "name": "身份证", "type": "Str", "require": true, "fixLength": 18
+                            "code": "callback", "name": "回调地址", "type": "Str", "require": false,
                         },
-                        {
-                            "code": "mobileNo", "name": "手机号", "type": "Str", "require": true, "fixLength": 11
-                        },
-                        {
-                            "code": "name", "name": "姓名", "type": "Str", "require": true, "maxLength": 100
-                        }
+                        // {
+                        //     "code": "idNumber", "name": "身份证", "type": "Str", "require": true, "fixLength": 18
+                        // },
+                        // {
+                        //     "code": "mobileNo", "name": "手机号", "type": "Str", "require": true, "fixLength": 11
+                        // },
+                        // {
+                        //     "code": "name", "name": "姓名", "type": "Str", "require": true, "maxLength": 20
+                        // }
                     ],
                     dsl:
 `// 决策id: 必须唯一
@@ -385,7 +389,7 @@
 决策描述 = ''
 
 // 返回的调用决策方的结果属性值
-返回属性 '身份证号码'
+// 返回属性 '身份证号码'
 
 策略定义 {
     策略名 = 'P_预处理'
@@ -407,7 +411,7 @@
         规则名 = 'R_属性设值'
 
         操作 {
-            贷前 = true
+            测试变量 = true
         }
     }
 }
@@ -422,14 +426,14 @@
                     url: 'mnt/decisionPage',
                     data: $.extend({page: page.page || 1, decisionId: this.tabs.showId}, this.model),
                     success: (res) => {
-                        this.tabs.showId = null;
                         this.decisionLoading = false;
                         if (res.code == '00') {
                             this.decision = res.data;
                         } else this.$Notice.error(res.desc)
                     },
-                    error: () => this.decisionLoading = false
+                    error: () => this.decisionLoading = false,
                 })
+                this.tabs.showId = null;
             }
         }
     };
