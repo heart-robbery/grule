@@ -15,6 +15,18 @@ class DecisionSpec {
     @Lazy List<PolicySpec> policies    = new LinkedList<>()
     @Lazy Set<String>      returnAttrs = new LinkedHashSet<>()
     @Lazy Map<String, Object> attrs = new HashMap<>()
+    // 预操作函数
+    protected Closure operateFn
+
+
+    void 操作(Closure 操作) {
+        operateFn = { Map ctx ->
+            def cl = 操作.rehydrate(ctx, 操作, this)
+            cl.resolveStrategy = Closure.DELEGATE_FIRST
+            cl()
+            null
+        }
+    }
 
 
     DecisionSpec 属性定义(String 属性名, Object 值) {

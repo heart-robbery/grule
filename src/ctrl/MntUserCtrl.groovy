@@ -8,6 +8,7 @@ import cn.xnatural.http.HttpContext
 import cn.xnatural.http.Path
 import cn.xnatural.jpa.Page
 import cn.xnatural.jpa.Repo
+import entity.Decision
 import entity.Permission
 import entity.User
 import service.rule.UserSrv
@@ -120,10 +121,10 @@ class MntUserCtrl extends ServerTpl {
     }
 
 
-    @Path(path = 'permissions')
-    ApiResp permissions() {
-        ApiResp.ok(repo.findList(Permission, null))
-    }
+//    @Path(path = 'permissions')
+//    ApiResp permissions() {
+//        ApiResp.ok(repo.findList(Permission, null))
+//    }
 
 
     @Path(path = 'delPermission/:id', method = 'post')
@@ -168,15 +169,64 @@ class MntUserCtrl extends ServerTpl {
 
     @Path(path = 'permissionPage')
     ApiResp permissionPage(HttpContext hCtx, Integer page, Integer pageSize, String kw) {
-        if (pageSize && pageSize > 20) return ApiResp.fail("Param pageSize <=20")
-        hCtx.auth("grant")
+        if (page != null && page < 1) return ApiResp.fail("Param page >=1")
+        if (pageSize != null && pageSize > 20) return ApiResp.fail("Param pageSize <=20 and >=1")
+        List ids
+        if (!hCtx.hasAuth("grant")) {
+            ids = repo.findList(Decision) {root, query, cb ->
+                cb.equal(root.get("creator"), hCtx.getSessionAttr("uName"))
+            }.findResults {it.id}
+        }
         ApiResp.ok(
-            repo.findPage(Permission, page, pageSize?:10) {root, query, cb ->
+            repo.findPage(Permission, page?:1, pageSize?:10) {root, query, cb ->
                 query.orderBy(cb.desc(root.get('updateTime')))
+                def ps = []
                 if (kw) {
-                    return cb.or(cb.like(root.get('enName'), '%' + kw + '%'), cb.like(root.get('cnName'), '%' + kw + '%'))
+                    ps << cb.or(cb.like(root.get("enName"), "%" + kw + "%"), cb.like(root.get("cnName"), "%" + kw + "%"))
                 }
+                if (ids) {
+                    ps << root.get("mark").in(ids)
+                }
+                cb.and(ps.toArray(new Predicate[ps.size()]))
             }
         )
+    }
+
+
+    /**
+     * 是否有某个权限
+     * @param hCtx
+     * @param permission 权限标识
+     * @return
+     */
+    @Path(path = 'hasPermission')
+    ApiResp hasPermission(HttpContext hCtx, String permission) {
+        if (!permission) return ApiResp.fail("Param permission not empty")
+        ApiResp.ok(hCtx.hasAuth(permission))
+    }
+
+
+    /**
+     * 获取某个用户的所有权限
+     * @param hCtx
+     * @param uId
+     * @return
+     */
+    @Path(path = 'getUserPermissions')
+    ApiResp getUserPermissions(HttpContext hCtx, Long uId) {
+        if (!uId) return ApiResp.fail("Param uId not empty")
+        hCtx.auth("grant")
+        ApiResp.ok(repo.findById(User, uId).permissions?.split(",")?:[])
+    }
+
+
+    /**
+     * 获取当前用户的所有权限
+     * @param hCtx
+     * @return
+     */
+    @Path(path = 'getMyPermissions')
+    ApiResp getMyPermissions(HttpContext hCtx) {
+        ApiResp.ok(hCtx.getSessionAttr("permissions")?.split(",")?:[])
     }
 }

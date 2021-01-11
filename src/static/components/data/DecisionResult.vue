@@ -4,7 +4,7 @@
             <h-select v-model="model.decision" :datas="types" placeholder="所有" style="width: 70px; float: left" @change="load"></h-select>
             <h-autocomplete v-model="model.decisionId" :option="decisions" style="float:left; width: 150px" @change="load" placeholder="决策名"></h-autocomplete>
             <input type="text" v-model="model.id" placeholder="流水id(精确匹配)" style="width: 250px" @keyup.enter="load"/>
-            <input type="text" v-model="model.idNum" placeholder="身份证(精确匹配)" style="width: 155px" @keyup.enter="load"/>
+<!--            <input type="text" v-model="model.idNum" placeholder="身份证(精确匹配)" style="width: 155px" @keyup.enter="load"/>-->
             <input type="number" v-model="model.spend" placeholder=">=耗时(ms)" style="width: 100px" @keyup.enter="load"/>
             <input type="text" v-model="model.exception" placeholder="异常信息" @keyup.enter="load"/>
 <!--            <input type="text" v-model="model.attrs" placeholder="属性关键字" @keyup.enter="load"/>-->
@@ -20,7 +20,7 @@
                     </template>
                 </h-tableitem>
                 <h-tableitem title="流水id" prop="id" align="center"></h-tableitem>
-                <h-tableitem title="身份证" prop="idNum" align="center" :width="140"></h-tableitem>
+<!--                <h-tableitem title="身份证" prop="idNum" align="center" :width="140"></h-tableitem>-->
                 <h-tableitem title="决策" prop="decision" align="center" :format="formatType" :width="70"></h-tableitem>
                 <h-tableitem title="决策时间" align="center" :width="140">
                     <template slot-scope="{data}">
@@ -46,7 +46,7 @@
     const detail = {
         props: ['item'],
         template:`
-            <div>
+            <div style="max-height: 800px">
                 <header class="h-modal-header text-center">{{title}}</header>
                 <h-layout>
                     <h-header>
@@ -56,10 +56,15 @@
                     </h-header>
                     <h-layout>
                         <h-sider style="flex: none; max-width: 60%; width: auto">
-                            <div class="h-panel">
-                                <div class="h-panel-bar">执行规则集</div>
+                            <div class="h-panel" style="max-height: 700px">
+                                <div class="h-panel-bar">执行规则集
+                                    <div class="h-panel-right">
+                                        <Search placeholder="规则名" v-width="200" @search="ruleFilter" v-model="ruleKw"></Search>
+                                        <i class="h-split"></i><button class="h-btn h-btn-green h-btn-m" @click="ruleFilter">查询</button>
+                                    </div>
+                                </div>
                                 <div class="h-panel-body">
-                                    <h-table :datas="rules" stripe select-when-click-tr border>
+                                    <h-table :datas="rules" stripe select-when-click-tr border :height="800">
                                         <h-tableitem title="规则属性" :width="220" align="left">
                                             <template slot-scope="{data}">
                                                 <h-form readonly>
@@ -81,16 +86,21 @@
                             </div>
                         </h-sider>
                         <h-content>
-                            <div class="h-panel">
-                                <div class="h-panel-bar">属性结果集</div>
+                            <div class="h-panel" style="max-height: 700px">
+                                <div class="h-panel-bar">属性结果集
+                                    <div class="h-panel-right">
+                                        <Search placeholder="属性名" v-width="200" @search="attrFilter" v-model="attrKw"></Search>
+                                        <i class="h-split"></i><button class="h-btn h-btn-green h-btn-m" @click="attrFilter">查询</button>
+                                    </div>
+                                </div>
                                 <div class="h-panel-body">
-                                    <h-table :datas="attrs" stripe select-when-click-tr border>
-                                        <h-tableitem title="属性名" :width="120" align="right">
+                                    <h-table :datas="attrs" stripe select-when-click-tr border :height="800">
+                                        <h-tableitem title="属性名" :width="100" align="right">
                                             <template slot-scope="{data}">
                                                 <span>{{data.cnName ? data.cnName : data.enName}}</span>
                                             </template>
                                         </h-tableitem>
-                                        <h-tableitem title="属性值" prop="value" align="left" :width="100"></h-tableitem>
+                                        <h-tableitem title="属性值" prop="value" align="left" :width="120"></h-tableitem>
                                         <div slot="empty">无属性</div>
                                     </h-table>
                                 </div>
@@ -107,6 +117,8 @@
         `,
         data() {
             return {
+                ruleKw: null,
+                attrKw: null,
                 attrs: this.item.attrs,
                 rules: this.item.rules,
             }
@@ -123,6 +135,18 @@
                 }
                 return v
             },
+            ruleFilter() {
+                if (this.ruleKw) {
+                    // this.attrs = this.item.attrs.filter(o => o.attrs)
+                    this.item.rules.filter(o => o.attrs.规则名.indexOf(this.ruleKw))
+                }
+            },
+            attrFilter() {
+                if (this.attrKw) {
+                    // this.attrs = this.item.attrs.filter(o => o.attrs)
+                    this.attrs = this.item.attrs.filter(o => o.enName ? o.enName.indexOf(this.attrKw) : o.cnName ? o.cnName.indexOf(this.attrKw) : false)
+                }
+            }
         }
     };
     module.exports = {

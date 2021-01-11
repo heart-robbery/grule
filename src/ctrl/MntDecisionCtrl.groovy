@@ -183,6 +183,10 @@ class MntDecisionCtrl extends ServerTpl {
         Long spend, Boolean success, String startTime, String endTime
     ) {
         hCtx.auth("collectResult-read")
+        def ids = hCtx.getSessionAttr("permissions").split(",").findResults {String p -> p.replace("decision-read-", "").replace("decision-read", "")}.findAll {it}
+        if (!ids) return ApiResp.ok()
+        ids = repo.findList(Decision) {root, query, cb -> root.get("id").in(ids)}.findResults {it.decisionId}
+        if (!ids) return ApiResp.ok()
         Date start = startTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(startTime) : null
         Date end = endTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(endTime) : null
         if (pageSize && pageSize > 50) return ApiResp.fail("Param pageSize <=50")
@@ -190,6 +194,7 @@ class MntDecisionCtrl extends ServerTpl {
             repo.findPage(CollectResult, page, pageSize?:10) { root, query, cb ->
                 query.orderBy(cb.desc(root.get('collectDate')))
                 def ps = []
+                ps << root.get('decisionId').in(ids)
                 if (decideId) ps << cb.equal(root.get('decideId'), decideId)
                 if (decisionId) ps << cb.equal(root.get('decisionId'), decisionId)
                 if (collectorType) ps << cb.equal(root.get('collectorType'), collectorType)
@@ -323,7 +328,7 @@ class MntDecisionCtrl extends ServerTpl {
             if (!url) return ApiResp.fail('Param url not empty')
             if (!method) return ApiResp.fail('Param method not empty')
             if (!contentType) return ApiResp.fail('Param contentType not empty')
-            if (!url.startsWith("http")) return ApiResp.fail('Param url incorrect')
+            if (!url.startsWith("http") && !url.startsWith('${')) return ApiResp.fail('Param url incorrect')
             collector.parseScript = parseScript?.trim()
             if (collector.parseScript && !collector.parseScript.startsWith("{") && !collector.parseScript.endsWith("}")) {
                 return ApiResp.fail('Param parseScript is not a function, must startWith {, endWith }')
@@ -406,7 +411,7 @@ class MntDecisionCtrl extends ServerTpl {
             if (!url) return ApiResp.fail('Param url not empty')
             if (!method) return ApiResp.fail('Param method not empty')
             if (!contentType) return ApiResp.fail('Param contentType not empty')
-            if (!url.startsWith("http")) return ApiResp.fail('Param url incorrect')
+            if (!url.startsWith("http") && !url.startsWith('${')) return ApiResp.fail('Param url incorrect')
             collector.parseScript = parseScript?.trim()
             if (collector.parseScript && (!collector.parseScript.startsWith('{') || !collector.parseScript.endsWith('}'))) {
                 return ApiResp.fail('Param parseScript is not a function, must startWith {, endWith }')
@@ -474,12 +479,12 @@ class MntDecisionCtrl extends ServerTpl {
     }
 
 
-    @Path(path = 'delDecision/:decisionId')
-    ApiResp delDecision(HttpContext hCtx, String decisionId) {
-        if (!decisionId) return ApiResp.fail("Param decisionId not empty")
-        hCtx.auth( 'decision-del-' + decisionId)
+    @Path(path = 'delDecision/:id')
+    ApiResp delDecision(HttpContext hCtx, String id) {
+        if (!id) return ApiResp.fail("Param id required")
+        hCtx.auth( 'decision-del-' + id)
         // log.info("delDecision. decisionId: {}, byUser: {}", decisionId, hCtx.getSessionAttr("uName"))
-        def decision = repo.find(Decision) {root, query, cb -> cb.equal(root.get('decisionId'), decisionId)}
+        def decision = repo.find(Decision) {root, query, cb -> cb.equal(root.get('id'), id)}
         repo.delete(decision)
         ep.fire('decisionChange', decision.id)
         ep.fire('enHistory', decision, hCtx.getSessionAttr('uName'))

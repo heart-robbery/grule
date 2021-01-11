@@ -65,7 +65,7 @@
                             }
                         },
                         error: (xhr) => {
-                            this.isLoading = false
+                            this.isLoading = false;
                             this.$Message.error('网络错误')
                         }
                     })

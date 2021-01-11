@@ -50,7 +50,7 @@
                             <input type="password" v-model="model.password">
                         </h-formitem>
                         <h-formitem label="权限" icon="h-icon-complete">
-                            <h-transfer v-model="model.ps" :datas="permissions" :option="option" style="width: 680px"></h-transfer>
+                            <h-autocomplete v-model="model.ps" :option="permissions" :multiple="true" placeholder="权限集"/>
                         </h-formitem>
                         <h-formitem>
                                 <h-button v-if="model.id" color="primary" :loading="isLoading" @click="update">提交</h-button>
@@ -71,30 +71,34 @@
                 validationRules: {
                     required: ['name', 'password']
                 },
-                permissions: []
+                permissions: {
+                    keyName: 'enName',
+                    titleName: 'cnName',
+                    // minWord: 1,
+                    loadData: (filter, cb) => {
+                        $.ajax({
+                            url: 'mnt/user/permissionPage',
+                            data: {page: 1, pageSize: 5, kw: filter},
+                            success: (res) => {
+                                //this.isLoading = false;
+                                if (res.code == '00') {
+                                    cb(res.data.list)
+                                } else this.$Message.error(res.desc)
+                            },
+                        });
+                    }
+                },
             }
         },
         mounted() {
-            this.loadPermissions()
+            // this.loadPermissions()
+            // this.permissionPage()
         },
         methods: {
             initModel() {
                 return this.user ? $.extend({
                     ps: this.user.permissions ? this.user.permissions.filter(o => o).flatMap(p => Object.keys(p)) : []
                 }, this.user) : {ps: []}
-            },
-            loadPermissions() {
-                $.ajax({
-                    url: 'mnt/user/permissions',
-                    success: (res) => {
-                        if (res.code == '00') {
-                            this.permissions = res.data.map(o => {
-                                let p = {key: o.enName, text: o.cnName};
-                                return p;
-                            });
-                        } else this.$Notice.error(res.desc)
-                    }
-                })
             },
             update() {
                 this.isLoading = true;
@@ -125,7 +129,7 @@
                             this.$emit('close');
                             this.$Message.success(`添加用户: ${this.model.name} 成功`);
                             this.$emit('reload');
-                        } else this.$Notice.error(res.desc)
+                        } else this.$Message.error(res.desc)
                     },
                     error: () => this.isLoading = false
                 })

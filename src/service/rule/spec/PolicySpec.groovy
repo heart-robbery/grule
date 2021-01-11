@@ -10,7 +10,20 @@ class PolicySpec {
     String                         策略名
     protected final List<RuleSpec> rules = new LinkedList<>()
     @Lazy Map<String, Object> attrs = new HashMap<>()
+    // 进入条件函数
     protected Closure condition
+    // 预操作函数
+    protected Closure operateFn
+
+
+    void 操作(Closure 操作) {
+        operateFn = { Map ctx ->
+            def cl = 操作.rehydrate(ctx, 操作, this)
+            cl.resolveStrategy = Closure.DELEGATE_FIRST
+            cl()
+            null
+        }
+    }
 
 
     /**

@@ -52,14 +52,29 @@ class UserSrv extends ServerTpl {
             }
         }
 
+        // 添加历史未添加的权限
+        for (int i = 0, limit = 30; true; i++) {
+            def ls = repo.findList(Decision, i*limit, limit)
+            if (!ls) break
+            ls.each { decision ->
+                if (!repo.count(Permission) {root, query, cb -> cb.equal(root.get("mark"), decision.id)}) { // 决策权限不存在,则创建
+                    [ // 一个决策对应的所有权限
+                       new Permission(enName:  "decision-update-" + decision.id, cnName: "更新决策:" + decision.name, mark: decision.id),
+                       new Permission(enName:  "decision-del-" + decision.id, cnName: "删除决策:" + decision.name, mark: decision.id),
+                       new Permission(enName:  "decision-read-" + decision.id, cnName: "查看决策:" + decision.name, mark: decision.id)
+                    ].each {repo.saveOrUpdate(it)}
+                }
+            }
+        }
+
         [// 初始化默认用户
          new User(name: 'admin', password: 'admin', permissions: repo.findList(Permission, null).collect {it.enName}.join(","))
         ].each {u ->
             def exist = repo.find(User) {root, query, cb -> cb.equal(root.get("name"), u.name)}
             if (exist) {
-                exist.password = u.password
-                exist.permissions = u.permissions
-                repo.saveOrUpdate(exist)
+//                exist.password = u.password
+//                exist.permissions = u.permissions
+//                repo.saveOrUpdate(exist)
             } else {
                 repo.saveOrUpdate(u)
                 log.info("添加默认用户. " + u.name)

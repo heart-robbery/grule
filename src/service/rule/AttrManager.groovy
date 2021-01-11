@@ -358,7 +358,7 @@ if (idNumber && idNumber.length() > 17) {
         binding.setProperty('DB', db)
         def icz = new ImportCustomizer()
         config.addCompilationCustomizers(icz)
-        icz.addImports(JSON.class.name, JSONObject.class.name)
+        icz.addImports(JSON.class.name, JSONObject.class.name, Utils.class.name)
         Closure sqlScript = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("{ -> $collector.sqlScript }")
 
         collectors.remove(collector.enName)?.close()
@@ -401,7 +401,7 @@ if (idNumber && idNumber.length() > 17) {
         def config = new CompilerConfiguration()
         def icz = new ImportCustomizer()
         config.addCompilationCustomizers(icz)
-        icz.addImports(JSON.class.name, JSONObject.class.name)
+        icz.addImports(JSON.class.name, JSONObject.class.name, Utils.class.name)
         Closure script = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("{ -> $collector.computeScript}")
         collectors.put(collector.enName, new CollectorHolder(collector: collector, computeFn: { ctx ->
             Object result
@@ -447,7 +447,7 @@ if (idNumber && idNumber.length() > 17) {
             def config = new CompilerConfiguration()
             def icz = new ImportCustomizer()
             config.addCompilationCustomizers(icz)
-            icz.addImports(JSON.class.name, JSONObject.class.name)
+            icz.addImports(JSON.class.name, JSONObject.class.name, Utils.class.name)
             parseFn = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("$collector.parseScript")
         }
         // GString 模板替换
@@ -455,10 +455,15 @@ if (idNumber && idNumber.length() > 17) {
         collectors.put(collector.enName, new CollectorHolder(collector: collector, computeFn: { ctx -> // 数据集成中3方接口访问过程
             // http请求 url
             String url = tplEngine.createTemplate(collector.url).make(new HashMap(1) {
+                int paramIndex
+                @Override
+                boolean containsKey(Object key) { return true } // 加这行是为了 防止 MissingPropertyException
                 @Override
                 Object get(Object key) {
+                    paramIndex++ // 获取个数记录
                     def v = ctx.data.get(key)
-                    return v == null ? '' : URLEncoder.encode(v.toString(), 'utf-8')
+                    // url前缀不必编码, 其它参数需要编码
+                    return v == null ? '' : (paramIndex==1 && v.toString().startsWith("http") && collector.url.startsWith('${') ? v : URLEncoder.encode(v.toString(), 'utf-8'))
                 }
 
                 @Override
@@ -470,10 +475,9 @@ if (idNumber && idNumber.length() > 17) {
             // http 请求 body字符串
             String bodyStr = collector.bodyStr ? tplEngine.createTemplate(collector.bodyStr).make(new HashMap(1) {
                 @Override
-                Object get(Object key) {
-                    def v = ctx.data.get(key)
-                    return v == null ? '' : URLEncoder.encode(v.toString(), 'utf-8')
-                }
+                boolean containsKey(Object key) { return true } // 加这行是为了 防止 MissingPropertyException
+                @Override
+                Object get(Object key) { ctx.data.get(key)?:"" }
                 @Override
                 Object put(Object key, Object value) {
                     log.error("$collector.enName bodyStr config error, not allow set property '$key'".toString())
@@ -486,7 +490,7 @@ if (idNumber && idNumber.length() > 17) {
             final Date start = new Date() // 调用时间
             long spend = 0 // 耗时时长
             String retryMsg = ''
-            def logMsg = "${ctx.logPrefix()}接口调用${ -> retryMsg}: name: $collector.enName, url: $url, bodyStr: $bodyStr${ -> 'result: ' + result}${ -> ', resolveResult: ' + resolveResult}"
+            def logMsg = "${ctx.logPrefix()}接口调用${ -> retryMsg}: name: $collector.enName, url: $url, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}"
             try {
                 for (int i = 0, times = getInteger('http.retry', 2) + 1; i < times; i++) { // 接口一般遇网络错重试2次
                     try {

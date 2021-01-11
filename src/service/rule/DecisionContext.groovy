@@ -55,6 +55,7 @@ class DecisionContext {
         if (!started.compareAndSet(false, true)) return
         log.info(logPrefix() + "开始")
         input?.forEach {k, v -> setAttr(k, v) }
+        decisionHolder.spec.operateFn?.call(data) //预执行操作
         if (!ruleIterator.hasNext()) {
             decisionResult = DecisionEnum.Reject
             exception = "没有可执行的策略"
@@ -198,6 +199,7 @@ class DecisionContext {
                     }
                 }
                 log.debug(logPrefix() + "开始执行策略")
+                ctx.curPolicySpec.operateFn?.call(ctx.data) //策略预执行操作
             }
 
             if (itt == null || !itt.hasNext()) itt = ctx.curPolicySpec?.rules?.iterator()

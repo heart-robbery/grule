@@ -20,7 +20,7 @@
                             <span class="float-right">
                                 <h-button text-color="yellow" :circle="true" @click.stop="showApiPop(item)">API配置</h-button>
                                 <h-button text-color="yellow" :circle="true" @click.stop="showTestPop(item)">测试</h-button>
-                                <h-button v-if="item._deletable" text-color="red" :circle="true" icon="h-icon-trash" @click.stop="del(item)">删除</h-button>
+                                <h-button v-if="item._deletable || !item.id" text-color="red" :circle="true" icon="h-icon-trash" @click.stop="del(item)">删除</h-button>
                             </span>
                         </template>
                         <ace-groovy v-if="collapse && collapse.length > 0 && collapse[0] == item.decisionId"
@@ -317,15 +317,15 @@
             },
             del(item) {
                 if (item.id) {
-                    this.$Confirm('确定删除?', `删除决策: ${item.decisionId}`).then(() => {
-                        this.$Message(`删除决策: ${item.decisionId}`);
+                    this.$Confirm('确定删除?', `删除决策: ${item.name}`).then(() => {
+                        this.$Message(`删除决策: ${item.name }`);
                         $.ajax({
-                            url: 'mnt/delDecision/' + item.decisionId,
+                            url: 'mnt/delDecision/' + item.id,
                             success: (res) => {
                                 if (res.code == '00') {
-                                    this.$Message.success(`删除决策: ${item.decisionId}成功`);
+                                    this.$Message.success(`删除决策: ${item.name}成功`);
                                     this.load();
-                                    localStorage.removeItem('rule.test.' + this.item.decisionId)
+                                    localStorage.removeItem('rule.test.' + item.decisionId)
                                 } else this.$Notice.error(res.desc)
                             }
                         });
@@ -351,7 +351,7 @@
                                 this.$Message.success('更新成功: ' + decision.decisionId);
                             } else {
                                 this.load();
-                                this.$Message.success('新增成功: ' + res.data.decisionId);
+                                this.$Message.success('新增成功: ' + res.data.name);
                             }
                         } else this.$Notice.error(res.desc)
                     }
@@ -400,7 +400,7 @@
 
     规则定义 {
         规则名 = 'R_参数验证'
-        属性定义 '处置代码', 'DC_INPUT_01'
+        // 属性定义 '处置代码', 'DC_INPUT_01'
 
         拒绝 {
             !身份证号码 || !手机号码 || !姓名
@@ -432,7 +432,7 @@
                         } else this.$Notice.error(res.desc)
                     },
                     error: () => this.decisionLoading = false,
-                })
+                });
                 this.tabs.showId = null;
             }
         }
