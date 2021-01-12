@@ -56,7 +56,7 @@
                     </h-header>
                     <h-layout>
                         <h-sider style="flex: none; max-width: 60%; width: auto">
-                            <div class="h-panel" style="max-height: 700px">
+                            <div class="h-panel" style="max-height: 680px">
                                 <div class="h-panel-bar">执行规则集
                                     <div class="h-panel-right">
                                         <Search placeholder="规则名" v-width="200" @search="ruleFilter" v-model="ruleKw"></Search>
@@ -64,7 +64,7 @@
                                     </div>
                                 </div>
                                 <div class="h-panel-body">
-                                    <h-table :datas="rules" stripe select-when-click-tr border :height="800">
+                                    <h-table :datas="rules" stripe select-when-click-tr border :height="520">
                                         <h-tableitem title="规则属性" :width="220" align="left">
                                             <template slot-scope="{data}">
                                                 <h-form readonly>
@@ -86,7 +86,7 @@
                             </div>
                         </h-sider>
                         <h-content>
-                            <div class="h-panel" style="max-height: 700px">
+                            <div class="h-panel" style="max-height: 680px">
                                 <div class="h-panel-bar">属性结果集
                                     <div class="h-panel-right">
                                         <Search placeholder="属性名" v-width="200" @search="attrFilter" v-model="attrKw"></Search>
@@ -94,7 +94,7 @@
                                     </div>
                                 </div>
                                 <div class="h-panel-body">
-                                    <h-table :datas="attrs" stripe select-when-click-tr border :height="800">
+                                    <h-table :datas="attrs" stripe select-when-click-tr border :height="520">
                                         <h-tableitem title="属性名" :width="100" align="right">
                                             <template slot-scope="{data}">
                                                 <span>{{data.cnName ? data.cnName : data.enName}}</span>
@@ -137,15 +137,17 @@
             },
             ruleFilter() {
                 if (this.ruleKw) {
-                    // this.attrs = this.item.attrs.filter(o => o.attrs)
-                    this.item.rules.filter(o => o.attrs.规则名.indexOf(this.ruleKw))
-                }
+                    this.rules = this.item.rules.filter((item, index, arr) => {
+                        return item.attrs.规则名 ? item.attrs.规则名.indexOf(this.ruleKw) >= 0 : false
+                    });
+                } else this.rules = this.item.rules;
             },
             attrFilter() {
                 if (this.attrKw) {
-                    // this.attrs = this.item.attrs.filter(o => o.attrs)
-                    this.attrs = this.item.attrs.filter(o => o.enName ? o.enName.indexOf(this.attrKw) : o.cnName ? o.cnName.indexOf(this.attrKw) : false)
-                }
+                    this.attrs = this.item.attrs.filter((item, index, arr) => {
+                        return item.enName ? item.enName.toLowerCase().indexOf(this.attrKw.toLowerCase()) >= 0 : (item.cnName ? item.cnName.toLowerCase().indexOf(this.attrKw.toLowerCase()) >= 0 : false)
+                    })
+                } else this.attrs = this.item.attrs;
             }
         }
     };

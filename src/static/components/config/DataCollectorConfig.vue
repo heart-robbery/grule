@@ -206,13 +206,13 @@
             },
             showAddPop() {
                 this.$Modal({
-                    title: '添加数据收集器', middle: true, draggable: true,
+                    title: '添加数据收集器', draggable: true,
                     component: {
                         vue: addEditPop,
                         datas: {}
                     },
                     width: 850,
-                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false,
+                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false, closeOnMask: false,
                     events: {
                         reload: () => {
                             this.load()
@@ -222,13 +222,13 @@
             },
             showUpdatePop(collector) {
                 this.$Modal({
-                    title: `更新: ${collector.cnName}`, middle: true, draggable: true,
+                    title: `更新: ${collector.cnName}`, draggable: true,
                     component: {
                         vue: addEditPop,
                         datas: {collector: collector}
                     },
                     width: 850,
-                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false
+                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false, closeOnMask: false,
                 })
             },
             enableSwitch(item) {

@@ -74,7 +74,7 @@ class AttrManager extends ServerTpl {
     def dataCollect(String aName, DecisionContext ctx) {
         def field = fieldMap.get(aName)
         if (field == null) {
-            log.warn("未找到属性'$aName'对应的配置".toString())
+            log.debug("未找到属性'$aName'对应的配置".toString())
             return
         }
         String collectorName = field.dataCollector // 属性对应的 值 收集器名
@@ -484,6 +484,9 @@ if (idNumber && idNumber.length() > 17) {
                     null
                 }
             }).toString() : ''
+            // NOTE: 如果是json 并且是,} 结尾, 则删除 最后的,(因为spring解析入参数会认为json格式错误)
+            // if (bodyStr.endsWith(',}')) bodyStr = bodyStr.substring(0, bodyStr.length() - 3) + '}'
+
             String result // 接口返回结果字符串
             Object resolveResult // 解析接口返回结果
 

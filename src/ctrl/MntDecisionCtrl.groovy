@@ -69,10 +69,10 @@ class MntDecisionCtrl extends ServerTpl {
                 )
             }
         }, { Utils.toMapper(it).ignore("metaClass").build()})
-        def collectorNames = fieldPage.list.collect {it.dataCollector}.findAll{it}
+        def collectorNames = fieldPage.list.collect {it.dataCollector}.findAll{it}.toSet()
         if (collectorNames) {
             repo.findList(DataCollector) {root, query, cb -> root.get('enName').in(collectorNames)}.each {dc ->
-                fieldPage.list.find {it.dataCollector == dc.enName}?.dataCollectorName = dc.cnName
+                fieldPage.list.findAll {it.dataCollector == dc.enName}?.each {it.dataCollectorName = dc.cnName}
             }
         }
         ApiResp.ok(fieldPage)

@@ -123,8 +123,8 @@ class HttpSrv extends ServerTpl {
                 @Override
                 Set<Map.Entry<String, Object>> entrySet() { cache.iterator().collect {it}.toSet() }
             }
+            sData.put('accessTime', System.currentTimeMillis())
         }
-        // sData.put('accessTime', System.currentTimeMillis())
         sData.put("id", sId)
         hCtx.response.cookie(sessionCookieName, sId, expire.seconds as Integer, null, "/", false, false)
         return sData
