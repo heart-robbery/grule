@@ -6,7 +6,7 @@
 <template>
     <div class="h-panel">
         <div class="h-panel-bar">
-            <h-button v-if="sUser.permissions.find((e) => e == 'user-add') == 'user-add'" @click="showAddPop"><i class="h-icon-plus"></i></h-button>
+            <h-button v-if="sUser.permissionIds.find((e) => e == 'user-add') == 'user-add'" @click="showAddPop"><i class="h-icon-plus"></i></h-button>
             <input type="text" placeholder="关键词" v-model="kw" @keyup.enter="load"/>
             <div class="h-panel-right">
                                 <i class="h-split"></i>
@@ -18,9 +18,9 @@
             <div style="padding: 5px 0; margin: 0 10px;" v-for="item in list" :key="item.id">
                 <p style="font-size: 15px; font-weight: bold;">{{item.name}}
                     &nbsp; <span v-if="item.login">上次登录时间: <date-item :time="item.login" /></span>
-                    &nbsp; &nbsp; <span v-if="sUser.permissions.find((e) => e == 'grant') == 'grant'" class="h-icon-edit text-hover" @click="showUpdatePop(item)"></span>
-                    &nbsp; <span v-if="sUser.permissions.find((e) => e == 'grant') == 'grant'" class="h-icon-lock text-hover" @click="showResetPass(item)"></span>
-                    &nbsp; <span v-if="sUser.permissions.find((e) => e == 'user-del') == 'user-del'" class="h-icon-trash text-hover" @click="del(item)"></span>
+                    &nbsp; &nbsp; <span v-if="sUser.permissionIds.find((e) => e == 'grant') == 'grant'" class="h-icon-edit text-hover" @click="showUpdatePop(item)"></span>
+                    &nbsp; <span v-if="sUser.permissionIds.find((e) => e == 'grant') == 'grant'" class="h-icon-lock text-hover" @click="showResetPass(item)"></span>
+                    &nbsp; <span v-if="sUser.permissionIds.find((e) => e == 'user-del') == 'user-del'" class="h-icon-trash text-hover" @click="del(item)"></span>
                 </p>
 
                 <p class="tags"><h-taginput v-model="item.permissionNames" readonly></h-taginput></p>
@@ -50,14 +50,14 @@
                             <input type="password" v-model="model.password">
                         </h-formitem>
                         <h-formitem label="权限" icon="h-icon-complete">
-                            <h-autocomplete v-model="model.ps" :option="permissions" :multiple="true" placeholder="权限集"/>
+                            <h-autocomplete v-model="model.permissions" :option="permissionOpt" type="object" :multiple="true" placeholder="权限集"/>
                         </h-formitem>
                         <h-formitem>
                                 <h-button v-if="model.id" color="primary" :loading="isLoading" @click="update">提交</h-button>
                                 <h-button v-else color="primary" :loading="isLoading" @click="add">提交</h-button>
                                 &nbsp;&nbsp;&nbsp;
-                                <h-button v-if="model.id" @click="initModel">清除</h-button>
-                                <h-button v-else @click="initModel">重置</h-button>
+<!--                                <h-button v-if="!model.id" @click="initModel">清除</h-button>-->
+<!--                                <h-button v-else @click="initModel">重置</h-button>-->
                         </h-formitem>
                     </h-form>
                 </div>
@@ -67,20 +67,20 @@
             return {
                 isLoading: false,
                 option: {filterable: true},
-                model: this.initModel(),
+                model: this.user ? {id: this.user.id, name: this.user.name, permissions: this.user.permissions ? this.user.permissions.map(p => {
+                        let o = {enName: Object.keys(p)[0], cnName: Object.values(p)[0]};
+                        return o;
+                    }) : []} : {permissions: []},
                 validationRules: {
                     required: ['name', 'password']
                 },
-                permissions: {
-                    keyName: 'enName',
-                    titleName: 'cnName',
-                    // minWord: 1,
+                permissionOpt: {
+                    keyName: 'enName', titleName: 'cnName', // minWord: 1,
                     loadData: (filter, cb) => {
                         $.ajax({
                             url: 'mnt/user/permissionPage',
                             data: {page: 1, pageSize: 5, kw: filter},
                             success: (res) => {
-                                //this.isLoading = false;
                                 if (res.code == '00') {
                                     cb(res.data.list)
                                 } else this.$Message.error(res.desc)
@@ -95,17 +95,15 @@
             // this.permissionPage()
         },
         methods: {
-            initModel() {
-                return this.user ? $.extend({
-                    ps: this.user.permissions ? this.user.permissions.filter(o => o).flatMap(p => Object.keys(p)) : []
-                }, this.user) : {ps: []}
-            },
             update() {
                 this.isLoading = true;
+                let data = $.extend({}, this.model);
+                delete data.permissions;
+                data.permissionIds = this.model.permissions.map(o => o.enName);
                 $.ajax({
                     url: 'mnt/user/update',
                     type: 'post',
-                    data: this.model,
+                    data: data,
                     success: (res) => {
                         this.isLoading = false;
                         if (res.code == '00') {
@@ -119,10 +117,13 @@
             },
             add() {
                 this.isLoading = true;
+                let data = $.extend({}, this.model);
+                delete data.permissions;
+                data.permissionIds = this.model.permissions.map(o => o.enName);
                 $.ajax({
                     url: 'mnt/user/add',
                     type: 'post',
-                    data: this.model,
+                    data: data,
                     success: (res) => {
                         this.isLoading = false;
                         if (res.code == '00') {
@@ -162,7 +163,7 @@
                 $.ajax({
                     url: 'mnt/user/restPassword',
                     type: 'post',
-                    data: this.model,
+                    data: {id: this.model.id, newPassword: this.model.newPassword},
                     success: (res) => {
                         this.isLoading = false;
                         if (res.code == '00') {
@@ -200,7 +201,7 @@
         },
         methods: {
             del(user) {
-                this.$Confirm('确定删除?', `删除用户: ${user.name}`).then(() => {
+                this.$Confirm(`删除用户: ${user.name}`, '确定删除?').then(() => {
                     this.$Message(`删除用户: ${user.name}`);
                     $.ajax({
                         url: 'mnt/user/del/' + user.id,
@@ -217,7 +218,7 @@
             },
             showAddPop() {
                 this.$Modal({
-                    title: '添加用户', middle: true, draggable: true,
+                    title: '添加用户', draggable: true,
                     component: {
                         vue: addEditPop,
                         datas: {}

@@ -26,6 +26,7 @@ class UserSrv extends ServerTpl {
     protected void initUserPermission() {
         [// 默认静态权限
          new Permission(enName: 'grant', cnName: '权限分配'),
+         new Permission(enName: 'mnt-login', cnName: '用户登陆'),
          new Permission(enName: 'user-add', cnName: '新增用户'),
          new Permission(enName: 'user-del', cnName: '删除用户'),
          new Permission(enName: 'password-reset', cnName: '密码重置'),
@@ -70,12 +71,7 @@ class UserSrv extends ServerTpl {
         [// 初始化默认用户
          new User(name: 'admin', password: 'admin', permissions: repo.findList(Permission, null).collect {it.enName}.join(","))
         ].each {u ->
-            def exist = repo.find(User) {root, query, cb -> cb.equal(root.get("name"), u.name)}
-            if (exist) {
-//                exist.password = u.password
-//                exist.permissions = u.permissions
-//                repo.saveOrUpdate(exist)
-            } else {
+            if (!repo.find(User) {root, query, cb -> cb.equal(root.get("name"), u.name)}) {
                 repo.saveOrUpdate(u)
                 log.info("添加默认用户. " + u.name)
             }

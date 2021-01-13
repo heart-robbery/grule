@@ -56,7 +56,7 @@
                                 this.$Message.success('登录成功');
                                 // $.extend(app.$data.user, res.data);
                                 app.$data.user = res.data;
-                                if (app.$data.user.permissions == undefined || app.$data.user.permissions == null) app.$data.user.permissions = [];
+                                if (app.$data.user.permissionIds == undefined || app.$data.user.permissionIds == null) app.$data.user.permissionIds = [];
                                 localStorage.setItem('rule.login.username', this.model.username);
                                 localStorage.setItem('rule.login.password', this.model.password);
                             } else {
@@ -66,7 +66,7 @@
                         },
                         error: (xhr) => {
                             this.isLoading = false;
-                            this.$Message.error('网络错误')
+                            if (xhr.status != 403 && xhr.status != 401) this.$Message.error('登陆错误. ' + xhr.status)
                         }
                     })
                 } else {

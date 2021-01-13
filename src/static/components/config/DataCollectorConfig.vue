@@ -3,7 +3,7 @@
         <div class="h-panel-bar">
 <!--            <span class="h-panel-title">数据集</span>-->
             <!--            <span v-color:gray v-font="13">说明~~</span>-->
-            <h-button v-if="sUser.permissions.find((e) => e == 'dataCollector-add') == 'dataCollector-add'" @click="showAddPop"><i class="h-icon-plus"></i></h-button>
+            <h-button v-if="sUser.permissionIds.find((e) => e == 'dataCollector-add') == 'dataCollector-add'" @click="showAddPop"><i class="h-icon-plus"></i></h-button>
             <h-select v-model="model.type" :datas="types" placeholder="所有" style="width: 70px; float: left" @change="load"></h-select>
             <input type="text" v-model="model.kw" placeholder="关键词" @keyup.enter="load"/>
             <div class="h-panel-right">
@@ -31,11 +31,11 @@
                         </h-switch>
                     </template>
                 </h-tableitem>
-                <h-tableitem v-if="sUser.permissions.find((e) => e == 'dataCollector-update' || e == 'dataCollector-del')" title="操作" align="center" :width="100">
+                <h-tableitem v-if="sUser.permissionIds.find((e) => e == 'dataCollector-update' || e == 'dataCollector-del')" title="操作" align="center" :width="100">
                     <template slot-scope="{data}">
-                        <span v-if="sUser.permissions.find((e) => e == 'dataCollector-update') == 'dataCollector-update'" class="text-hover" @click="showUpdatePop(data)">编辑</span>
+                        <span v-if="sUser.permissionIds.find((e) => e == 'dataCollector-update') == 'dataCollector-update'" class="text-hover" @click="showUpdatePop(data)">编辑</span>
                         &nbsp;
-                        <span v-if="sUser.permissions.find((e) => e == 'dataCollector-del') == 'dataCollector-del'" class="text-hover" @click="del(data)">删除</span>
+                        <span v-if="sUser.permissionIds.find((e) => e == 'dataCollector-del') == 'dataCollector-del'" class="text-hover" @click="del(data)">删除</span>
                     </template>
                 </h-tableitem>
                 <div slot="empty">暂时无数据</div>
@@ -169,7 +169,7 @@
                             this.$emit('close');
                             this.$Message.success(`添加: ${this.model.cnName} 成功`);
                             this.$emit('reload');
-                        } else this.$Notice.error(res.desc)
+                        } else this.$Message.error(res.desc)
                     },
                     error: () => this.isLoading = false
                 })
@@ -248,13 +248,13 @@
                 })
             },
             del(field) {
-                this.$Confirm('确定删除?', `删除: ${field.cnName}`).then(() => {
-                    this.$Message(`删除: ${field.cnName}`);
+                this.$Confirm(`删除收集器: ${field.cnName}`, '确定删除?').then(() => {
+                    this.$Message(`删除收集器: ${field.cnName}`);
                     $.ajax({
                         url: 'mnt/delDataCollector/' + field.enName,
                         success: (res) => {
                             if (res.code == '00') {
-                                this.$Message.success(`删除: ${field.cnName} 成功`);
+                                this.$Message.success(`删除收集器: ${field.cnName} 成功`);
                                 this.load();
                             } else this.$Notice.error(res.desc)
                         }

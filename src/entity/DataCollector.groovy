@@ -2,9 +2,12 @@ package entity
 
 import cn.xnatural.jpa.LongIdEntity
 import org.hibernate.annotations.DynamicUpdate
+import org.hibernate.annotations.Type
 
+import javax.persistence.Basic
 import javax.persistence.Column
 import javax.persistence.Entity
+import javax.persistence.Lob
 
 /**
  * 数据收集器
@@ -61,7 +64,9 @@ class DataCollector extends LongIdEntity {
     /**
      * 请求body 字符串 模板
      */
-    @Column(length = 1000)
+    @Lob
+    @Basic
+    @Type(type = "text")
     String bodyStr
     /**
      * application/json,multipart/form-data,application/x-www-form-urlencoded
@@ -74,15 +79,27 @@ class DataCollector extends LongIdEntity {
      *
      *  }
      */
-    @Column(length = 5000)
+    @Lob
+    @Basic
+    @Type(type = "text")
     String parseScript
+
+    /**
+     * 是否查得判断函数
+     */
+    @Lob
+    @Basic
+    @Type(type = "text")
+    String successScript
 
 
     // ======================= script ======================
     /**
      * 值计算函数
      */
-    @Column(length = 5000)
+    @Lob
+    @Basic
+    @Type(type = "text")
     String computeScript
 
 
@@ -90,7 +107,9 @@ class DataCollector extends LongIdEntity {
     /**
      * groovy Sql 执行脚本
      */
-    @Column(length = 5000)
+    @Lob
+    @Basic
+    @Type(type = "text")
     String  sqlScript
     /**
      * sql 连接池的最小连接

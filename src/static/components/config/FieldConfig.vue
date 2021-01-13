@@ -4,7 +4,7 @@
 <!--            <span class="h-panel-title">属性集</span>-->
             <!--            <span v-color:gray v-font="13">说明~~</span>-->
             &nbsp;&nbsp;
-            <h-button v-if="sUser.permissions.find((e) => e == 'field-add') == 'field-add'" @click="showAddPop"><i class="h-icon-plus"></i></h-button>
+            <h-button v-if="sUser.permissionIds.find((e) => e == 'field-add') == 'field-add'" @click="showAddPop"><i class="h-icon-plus"></i></h-button>
             <div class="h-panel-right">
                 <h-search placeholder="查询" v-width="200" v-model="kw" show-search-button search-text="搜索" @search="load"></h-search>
                 <!--                <i class="h-split"></i>-->
@@ -30,10 +30,10 @@
                         <span v-else>{{data.dataCollector}}</span>
                     </template>
                 </h-tableitem>
-                <h-tableitem v-if="sUser.permissions.find((e) => e == 'field-update' || e == 'field-del')" title="操作" align="center" :width="100">
+                <h-tableitem v-if="sUser.permissionIds.find((e) => e == 'field-update' || e == 'field-del')" title="操作" align="center" :width="100">
                     <template slot-scope="{data}">
-                        <span v-if="sUser.permissions.find((e) => e == 'field-update') == 'field-update'" class="text-hover" @click="showUpdatePop(data)">编辑</span>
-                        <span v-if="sUser.permissions.find((e) => e == 'field-del') == 'field-del'" class="text-hover" @click="del(data)">删除</span>
+                        <span v-if="sUser.permissionIds.find((e) => e == 'field-update') == 'field-update'" class="text-hover" @click="showUpdatePop(data)">编辑</span>
+                        <span v-if="sUser.permissionIds.find((e) => e == 'field-del') == 'field-del'" class="text-hover" @click="del(data)">删除</span>
                     </template>
                 </h-tableitem>
                 <div slot="empty">暂时无数据</div>
@@ -148,7 +148,7 @@
                                 this.$emit('close');
                                 this.$Message.success(`添加字段: ${this.model.cnName} 成功`);
                                 this.$emit('reload');
-                            } else this.$Notice.error(res.desc)
+                            } else this.$Message.error(res.desc)
                         },
                         error: () => this.isLoading = false
                     })
@@ -185,7 +185,7 @@
             },
             showAddPop() {
                 this.$Modal({
-                    title: '添加字段', middle: true, draggable: true,
+                    title: '添加字段', draggable: true,
                     component: {
                         vue: addEditPop,
                         datas: {}
@@ -201,7 +201,7 @@
             },
             showUpdatePop(field) {
                 this.$Modal({
-                    title: `更新字段: ${field.cnName}`, middle: true, draggable: true,
+                    title: `更新字段: ${field.cnName}`, draggable: true,
                     component: {
                         vue: addEditPop,
                         datas: {field: field}
@@ -211,7 +211,7 @@
                 })
             },
             del(field) {
-                this.$Confirm('确定删除?', `删除字段: ${field.cnName}`).then(() => {
+                this.$Confirm(`删除字段: ${field.cnName}`, '确定删除?').then(() => {
                     this.$Message(`删除字段: ${field.cnName}`);
                     $.ajax({
                         url: 'mnt/delField/' + field.enName,
@@ -219,7 +219,7 @@
                             if (res.code == '00') {
                                 this.$Message.success(`删除字段: ${field.cnName} 成功`);
                                 this.load();
-                            } else this.$Notice.error(res.desc)
+                            } else this.$Message.error(res.desc)
                         }
                     });
                 }).catch(() => {
@@ -243,7 +243,7 @@
                             this.pageSize = res.data.pageSize;
                             this.totalRow = res.data.totalRow;
                             this.list = res.data.list;
-                        } else this.$Notice.error(res.desc)
+                        } else this.$Message.error(res.desc)
                     },
                     error: () => this.loading = false
                 })

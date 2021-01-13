@@ -22,6 +22,7 @@ function ws(cfg) {
             return
         }
         client.onclose = cfg.onClose || function () {
+            console.log('websocket close');
             setTimeout(function () {
                 ws(cfg)
             }, cfg.reconnection || (1000 * 60 * 2)); // 每两分钟重试

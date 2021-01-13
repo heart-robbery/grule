@@ -4,7 +4,7 @@
             <!--            <span class="h-panel-title">属性集</span>-->
             <!--            <span v-color:gray v-font="13">说明~~</span>-->
             &nbsp;&nbsp;
-            <h-button v-if="sUser.permissions.find((e) => e == 'grant' || e == 'grant')" @click="showAddPop"><i class="h-icon-plus"></i></h-button>
+            <h-button v-if="sUser.permissionIds.find((e) => e == 'grant' || e == 'grant')" @click="showAddPop"><i class="h-icon-plus"></i></h-button>
             <div class="h-panel-right">
                 <h-search placeholder="查询" v-width="200" v-model="kw" show-search-button search-text="搜索" @search="load"></h-search>
                 <!--                <i class="h-split"></i>-->
@@ -22,7 +22,7 @@
                 </h-tableitem>
                 <!-- <h-tableitem title="创建时间" prop="createTime" align="center"></h-tableitem> -->
                 <h-tableitem title="描述" prop="comment" align="center"></h-tableitem>
-                <h-tableitem v-if="sUser.permissions.find((e) => e == 'grant' || e == 'grant')" title="操作" align="center" :width="100">
+                <h-tableitem v-if="sUser.permissionIds.find((e) => e == 'grant' || e == 'grant')" title="操作" align="center" :width="100">
                     <template slot-scope="{data}">
                         <span class="text-hover" @click="showUpdatePop(data)">编辑</span>
                         <span class="text-hover" @click="del(data)">删除</span>

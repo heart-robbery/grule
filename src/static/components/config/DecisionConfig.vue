@@ -2,7 +2,7 @@
     <div class="h-panel">
         <div class="h-panel-bar">
             &nbsp;&nbsp;
-            <h-button v-if="sUser.permissions.find((e) => e == 'decision-add') == 'decision-add'" @click="add"><i class="h-icon-plus"></i></h-button>
+            <h-button v-if="sUser.permissionIds.find((e) => e == 'decision-add') == 'decision-add'" @click="add"><i class="h-icon-plus"></i></h-button>
             <input type="text" v-model="model.nameLike" placeholder="决策名" style="width: 250px" @keyup.enter="load"/>
             <div class="h-panel-right">
 <!--                <h-search placeholder="查询" v-width="200" v-model="kw" show-search-button search-text="搜索" @search="load"></h-search>-->
@@ -12,7 +12,7 @@
         <div class="h-panel-body">
             <div>
                 <h-collapse v-model="collapse" accordion>
-                    <h-collapseitem v-for="item in decision.list" :key="item.decisionId" :name="item.decisionId">
+                    <h-collapseitem v-for="item in decision.list" :key="item.decisionId" :name="item.decisionId" :data-id="item.id">
                         <template slot='title'>
                             {{item.name + '(' + item.decisionId + ')' + (item.comment ? ': ' + item.comment : '')}}
                             &nbsp;&nbsp;&nbsp;
@@ -317,7 +317,7 @@
             },
             del(item) {
                 if (item.id) {
-                    this.$Confirm('确定删除?', `删除决策: ${item.name}`).then(() => {
+                    this.$Confirm(`删除决策: ${item.name}`, '确定删除?').then(() => {
                         this.$Message(`删除决策: ${item.name }`);
                         $.ajax({
                             url: 'mnt/delDecision/' + item.id,
