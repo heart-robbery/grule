@@ -26,6 +26,13 @@ class MainCtrl extends ServerTpl {
         Utils.baseDir("static/test.html")
     }
 
+    @Path(path = 'favicon.ico')
+    File favicon(HttpContext hCtx) {
+        hCtx.response.cacheControl(3000)
+        hCtx.response.contentType("image/x-icon")
+        Utils.baseDir("static/favicon.ico")
+    }
+
 
     @Path(path = 'health')
     ApiResp health() {
