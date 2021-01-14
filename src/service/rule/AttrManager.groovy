@@ -182,7 +182,7 @@ class AttrManager extends ServerTpl {
             if (fieldMap.containsKey(field.enName)) isNew = false
             fieldMap.put(field.enName, field)
             fieldMap.put(field.cnName, field)
-            log.info("${isNew ? 'addField' : 'updateField'}: $enName".toString())
+            log.info("${isNew ? 'addedField' : 'updatedField'}: ${field.cnName}, $enName".toString())
         }
         def remoter = bean(Remoter)
         if (remoter && ec?.source() != remoter) { // 不是远程触发的事件
@@ -198,8 +198,8 @@ class AttrManager extends ServerTpl {
             collectors.remove(enName)?.close()
             log.info("del dataCollector: " + enName)
         } else {
+            log.info("dataCollectorChanged: " + collector.cnName + ", " + enName)
             initDataCollector(collector)
-            log.info("dataCollectorChange: " + enName)
         }
         def remoter = bean(Remoter)
         if (remoter && ec?.source() != remoter) { // 不是远程触发的事件
@@ -229,7 +229,7 @@ class AttrManager extends ServerTpl {
                 fieldMap.remove(e.key)
             }
         }
-        log.info("加载属性配置 {}个", fieldMap.size() / 2)
+        log.info("加载字段属性配置 {}个", fieldMap.size() / 2)
     }
 
 
@@ -268,7 +268,7 @@ class AttrManager extends ServerTpl {
                 collectors.remove(e.key)
             }
         }
-        log.info("加载数据集成配置 {}个", collectors.size())
+        log.info("加载数据收集器配置 {}个", collectors.size())
     }
 
 
@@ -277,7 +277,7 @@ class AttrManager extends ServerTpl {
      */
     protected void initDefaultCollector() {
         if (repo.count(DataCollector) == 0) {
-            log.info("初始化默认数据集")
+            log.info("初始化默认数据收集器")
             repo.saveOrUpdate(new DataCollector(type: 'script', enName: 'week', cnName: '星期几', enabled: true, comment: '值: 1,2,3,4,5,6,7', computeScript: """
 Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1
             """.trim()))
@@ -450,6 +450,15 @@ if (idNumber && idNumber.length() > 17) {
             icz.addImports(JSON.class.name, JSONObject.class.name, Utils.class.name)
             parseFn = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("$collector.parseScript")
         }
+        Closure successFn
+        if (collector.dataSuccessScript) { // 是否成功判断函数
+            Binding binding = new Binding()
+            def config = new CompilerConfiguration()
+            def icz = new ImportCustomizer()
+            config.addCompilationCustomizers(icz)
+            icz.addImports(JSON.class.name, JSONObject.class.name, Utils.class.name)
+            successFn = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("$collector.dataSuccessScript")
+        }
         // GString 模板替换
         def tplEngine = new GStringTemplateEngine(Thread.currentThread().contextClassLoader)
         collectors.put(collector.enName, new CollectorHolder(collector: collector, computeFn: { ctx -> // 数据集成中3方接口访问过程
@@ -526,7 +535,7 @@ if (idNumber && idNumber.length() > 17) {
                 log.error(logMsg.toString() + ", 异常: ", ex)
                 dataCollected(new CollectResult(
                     decideId: ctx.id, decisionId: ctx.decisionHolder.decision.decisionId, collector: collector.enName,
-                    status: (ex instanceof ConnectException) ? 'E001': 'EEEE',
+                    status: (ex instanceof ConnectException) ? 'E001': 'EEEE', dataStatus: (ex instanceof ConnectException) ? 'E001': 'EEEE',
                     collectDate: start, collectorType: collector.type,
                     spend: spend, url: url, body: bodyStr, result: result, httpException: ex.message?:ex.class.simpleName
                 ))
@@ -535,7 +544,10 @@ if (idNumber && idNumber.length() > 17) {
                 retryMsg = ''
             }
 
-            if (parseFn) { // 解析接口返回结果
+            // http 返回结果成功判断. 默认成功
+            String httpStatus = successFn ? (successFn.rehydrate(ctx.data, successFn, this)(result) ? '0000' : '0001') : '0000'
+
+            if (parseFn && httpStatus == '0000') { // 解析接口返回结果
                 Exception ex
                 try {
                     resolveResult = parseFn.rehydrate(ctx.data, parseFn, this)(result)
@@ -549,7 +561,8 @@ if (idNumber && idNumber.length() > 17) {
                     }
                     dataCollected(new CollectResult(
                         decideId: ctx.id, decisionId: ctx.decisionHolder.decision.decisionId, collector: collector.enName,
-                        status: ex ? 'E002': '0000', collectDate: start, collectorType: collector.type,
+                        status: ex ? 'E002': '0000', dataStatus: httpStatus,
+                        collectDate: start, collectorType: collector.type,
                         spend: spend, url: url, body: bodyStr, result: result, parseException: ex == null ? null : ex.message?:ex.class.simpleName,
                         resolveResult: resolveResult instanceof Map ? JSON.toJSONString(resolveResult, SerializerFeature.WriteMapNullValue) : resolveResult?.toString()
                     ))
@@ -559,7 +572,7 @@ if (idNumber && idNumber.length() > 17) {
             log.info(logMsg.toString())
             dataCollected(new CollectResult(
                 decideId: ctx.id, decisionId: ctx.decisionHolder.decision.decisionId, collector: collector.enName,
-                status: '0000', collectDate: start, collectorType: collector.type,
+                status: '0000', dataStatus: httpStatus, collectDate: start, collectorType: collector.type,
                 spend: spend, url: url, body: bodyStr, result: result
             ))
             return result

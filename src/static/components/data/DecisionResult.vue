@@ -5,10 +5,12 @@
             <h-autocomplete v-model="model.decisionId" :option="decisions" style="float:left; width: 150px" @change="load" placeholder="决策名"></h-autocomplete>
             <input type="text" v-model="model.id" placeholder="流水id(精确匹配)" style="width: 250px" @keyup.enter="load"/>
 <!--            <input type="text" v-model="model.idNum" placeholder="身份证(精确匹配)" style="width: 155px" @keyup.enter="load"/>-->
-            <input type="number" v-model="model.spend" placeholder=">=耗时(ms)" style="width: 100px" @keyup.enter="load"/>
+            <input type="number" v-model="model.spend" placeholder="耗时(>=ms)" style="width: 100px" @keyup.enter="load"/>
             <input type="text" v-model="model.exception" placeholder="异常信息" @keyup.enter="load"/>
 <!--            <input type="text" v-model="model.attrs" placeholder="属性关键字" @keyup.enter="load"/>-->
 <!--            <input type="text" v-model="model.rules" placeholder="规则关键字" @keyup.enter="load"/>-->
+            <h-datepicker v-model="model.startTime" type="datetime" :has-seconds="true" placeholder="开始时间" style="width: 160px"></h-datepicker>
+            <h-datepicker v-model="model.endTime" type="datetime" :has-seconds="true" placeholder="结束时间" style="width: 160px"></h-datepicker>
             <button class="h-btn h-btn-primary float-right" @click="load"><i class="h-icon-search"></i><span>查询</span></button>
         </div>
         <div class="h-panel-body">
@@ -109,7 +111,10 @@
                     </h-layout>
                     <h-footer v-if="item.dataCollectResult">
                         <h-form readonly>
-                            <h-formitem label="数据收集">{{item.dataCollectResult}}</h-formitem>
+                            <h-formitem label="数据收集">
+                                {{item.dataCollectResult}}
+<!--                                <ace-json v-model="item.dataCollectResult" :readonly="true"></ace-json>-->
+                            </h-formitem>
                         </h-form>
                     </h-footer>
                 </h-layout>
@@ -175,7 +180,12 @@
                         });
                     }
                 },
-                model: {},
+                model: {startTime: (function () {
+                        let d = new Date();
+                        let month = d.getMonth() + 1;
+                        return d.getFullYear() + "-" + (month < 10 ? '0' + month : month) + "-" + (d.getDate() < 10 ? '0' + d.getDate() : d.getDate()) + " 00:00:00"
+                    })()
+                },
                 list: [], totalRow: 0, page: 1, pageSize: 1, loading: false
             }
         },

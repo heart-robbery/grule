@@ -85,9 +85,9 @@ class MntUserCtrl extends ServerTpl {
             user.name = name
         }
         hCtx.auth('grant')
-        user.permissions = permissionIds?.findAll {it?.trim()}.join(',')
+        user.permissions = permissionIds?.findAll {it?.trim()}?.join(',')
         if (hCtx.getSessionAttr('id') == id) { //如果是当前用户
-            hCtx.setSessionAttr('permissions', permissionIds as Set)
+            hCtx.setSessionAttr('permissions', permissionIds)
         }
         repo.saveOrUpdate(user)
         ApiResp.ok().attr('id', user.id).attr('name', user.name)

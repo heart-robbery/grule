@@ -9,8 +9,7 @@ import javax.persistence.*
  * 决策结果保存地
  */
 @Entity
-@Table(indexes = [@Index(name = "idx_collectDate", columnList = "collectDate"), @Index(name = "idx_decideId", columnList = "decideId"),
-    @Index(name = "idx_collector", columnList = "collector")])
+@Table(indexes = [@Index(name = "idx_collectDate", columnList = "collectDate")])
 class CollectResult extends LongIdEntity {
     /**
      * 执行决策id
@@ -33,13 +32,17 @@ class CollectResult extends LongIdEntity {
      */
     String status
     /**
+     * http是否查得(数据是否成功)
+     */
+    String dataStatus
+    /**
      * 收集时间
      */
-    Date collectDate
+    Date   collectDate
     /**
      * 执行时长
      */
-    Long spend
+    Long   spend
     /**
      * http 调用 url
      */

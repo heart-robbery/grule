@@ -24,7 +24,7 @@
                 </h-tableitem>
                 <!--                    <h-tableitem title="创建时间" prop="createTime" align="center"></h-tableitem>-->
                 <h-tableitem title="描述" prop="comment" align="center"></h-tableitem>
-                <h-tableitem title="值函数名" align="center">
+                <h-tableitem title="值函数" align="center">
                     <template slot-scope="{data}">
                         <a v-if="data.dataCollectorName" href="javascript:void(0)" @click="jumpToDataCollector(data)">{{data.dataCollectorName}}</a>
                         <span v-else>{{data.dataCollector}}</span>

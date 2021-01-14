@@ -125,7 +125,7 @@ class MntDecisionCtrl extends ServerTpl {
     @Path(path = 'decisionResultPage')
     ApiResp decisionResultPage(
         HttpContext hCtx, Integer page, Integer pageSize, String id, String decisionId, DecisionEnum decision,
-        String idNum, Long spend, String exception, String input, String attrs, String rules
+        String idNum, Long spend, String exception, String input, String attrs, String rules, String startTime, String endTime
     ) {
         hCtx.auth("decisionResult-read")
         if (pageSize && pageSize > 10) return ApiResp.fail("Param pageSize <=10")
@@ -133,6 +133,8 @@ class MntDecisionCtrl extends ServerTpl {
         if (!ids) return ApiResp.ok()
         ids = repo.findList(Decision) {root, query, cb -> root.get("id").in(ids)}.findResults {it.decisionId}
         if (!ids) return ApiResp.ok()
+        Date start = startTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(startTime) : null
+        Date end = endTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(endTime) : null
         ApiResp.ok(
             Page.of(
                 repo.findPage(DecisionResult, page, pageSize?:10) { root, query, cb ->
@@ -140,6 +142,8 @@ class MntDecisionCtrl extends ServerTpl {
                     def ps = []
                     ps << root.get('decisionId').in(ids)
                     if (id) ps << cb.equal(root.get('id'), id)
+                    if (start) ps << cb.greaterThanOrEqualTo(root.get('occurTime'), start)
+                    if (end) ps << cb.lessThanOrEqualTo(root.get('occurTime'), end)
                     if (decisionId) ps << cb.equal(root.get('decisionId'), decisionId)
                     if (idNum) ps << cb.equal(root.get('idNum'), idNum)
                     if (spend) ps << cb.ge(root.get('spend'), spend)
@@ -180,7 +184,7 @@ class MntDecisionCtrl extends ServerTpl {
     @Path(path = 'collectResultPage')
     ApiResp collectResultPage(
         HttpContext hCtx, Integer page, Integer pageSize, String decideId, String collectorType, String collector, String decisionId,
-        Long spend, Boolean success, String startTime, String endTime
+        Long spend, Boolean success, Boolean dataSuccess, String startTime, String endTime
     ) {
         hCtx.auth("collectResult-read")
         def ids = hCtx.getSessionAttr("permissions").split(",").findResults {String p -> p.replace("decision-read-", "").replace("decision-read", "")}.findAll {it}
@@ -209,15 +213,19 @@ class MntDecisionCtrl extends ServerTpl {
                         ps << cb.notEqual(root.get('status'), '0000')
                     }
                 }
+                if (dataSuccess != null) {
+                    if (dataSuccess) {
+                        ps << cb.equal(root.get('dataStatus'), '0000')
+                    } else {
+                        ps << cb.notEqual(root.get('dataStatus'), '0000')
+                    }
+                }
                 if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
             },
-            {record ->
-                def m = Utils.toMapper(record).ignore("metaClass")
-                    .addConverter('decisionId', 'decisionName', {String dId ->
+            {record -> Utils.toMapper(record).ignore("metaClass")
+                .addConverter('decisionId', 'decisionName', {String dId ->
                     bean(DecisionManager).findDecision(dId).spec.决策名
                 }).build()
-                m.put('success', record.httpException == null && record.parseException == null && record.scriptException == null)
-                m
             }
         )
         repo.findList(DataCollector) {root, query, cb -> root.get('enName').in(result.list.collect {it['collector']})}.each {dc ->
@@ -316,7 +324,7 @@ class MntDecisionCtrl extends ServerTpl {
     @Path(path = 'addDataCollector', method = 'post')
     ApiResp addDataCollector(
         HttpContext hCtx, String enName, String cnName, String type, String url, String bodyStr,
-        String method, String parseScript, String contentType, String comment, String computeScript,
+        String method, String parseScript, String contentType, String comment, String computeScript, String dataSuccessScript,
         String sqlScript, Integer minIdle, Integer maxActive, Integer timeout, Boolean enabled
     ) {
         hCtx.auth('dataCollector-add')
@@ -331,7 +339,11 @@ class MntDecisionCtrl extends ServerTpl {
             if (!url.startsWith("http") && !url.startsWith('${')) return ApiResp.fail('Param url incorrect')
             collector.parseScript = parseScript?.trim()
             if (collector.parseScript && !collector.parseScript.startsWith("{") && !collector.parseScript.endsWith("}")) {
-                return ApiResp.fail('Param parseScript is not a function, must startWith {, endWith }')
+                return ApiResp.fail('Param parseScript a function, must startWith {, endWith }')
+            }
+            collector.dataSuccessScript = dataSuccessScript?.trim()
+            if (collector.dataSuccessScript && !collector.dataSuccessScript.startsWith("{") && !collector.dataSuccessScript.endsWith("}")) {
+                return ApiResp.fail('Param dataSuccessScript a function, must startWith {, endWith }')
             }
             collector.url = url
             collector.method = method
@@ -398,7 +410,7 @@ class MntDecisionCtrl extends ServerTpl {
     @Path(path = 'updateDataCollector', method = 'post')
     ApiResp updateDataCollector(
         HttpContext hCtx, Long id, String enName, String cnName, String url, String bodyStr,
-        String method, String parseScript, String contentType, String comment, String computeScript,
+        String method, String parseScript, String contentType, String comment, String computeScript, String dataSuccessScript,
         String sqlScript, Integer minIdle, Integer maxActive, Integer timeout, Boolean enabled
     ) {
         hCtx.auth('dataCollector-update', 'dataCollector-update-' + enName)
@@ -414,7 +426,11 @@ class MntDecisionCtrl extends ServerTpl {
             if (!url.startsWith("http") && !url.startsWith('${')) return ApiResp.fail('Param url incorrect')
             collector.parseScript = parseScript?.trim()
             if (collector.parseScript && (!collector.parseScript.startsWith('{') || !collector.parseScript.endsWith('}'))) {
-                return ApiResp.fail('Param parseScript is not a function, must startWith {, endWith }')
+                return ApiResp.fail('Param parseScript is function, must startWith {, endWith }')
+            }
+            collector.dataSuccessScript = dataSuccessScript?.trim()
+            if (collector.dataSuccessScript && !collector.dataSuccessScript.startsWith("{") && !collector.dataSuccessScript.endsWith("}")) {
+                return ApiResp.fail('Param dataSuccessScript is function, must startWith {, endWith }')
             }
             collector.url = url
             collector.method = method

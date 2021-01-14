@@ -103,14 +103,17 @@
                             <h-numberinput v-model="model.maxActive" :min="1" :max="100" useInt></h-numberinput>
                         </h-formitem>
 
-                        <h-formitem v-if="model.type == 'http'" label="解析脚本" icon="h-icon-complete" prop="parseScript" single>
-                            <ace-groovy v-if="model.type == 'http'" v-model="model.parseScript" height="260px" width="670px" />
+                        <h-formitem v-if="model.type == 'http'" label="是否成功" icon="h-icon-complete" prop="dataSuccessScript" single>
+                            <ace-groovy v-if="model.type == 'http'" v-model="model.dataSuccessScript" height="100px" width="670px" />
+                        </h-formitem>
+                        <h-formitem v-if="model.type == 'http'" label="结果解析" icon="h-icon-complete" prop="parseScript" single>
+                            <ace-groovy v-if="model.type == 'http'" v-model="model.parseScript" height="200px" width="670px" />
                         </h-formitem>
                         <h-formitem v-if="model.type == 'script'" label="值计算函数" icon="h-icon-complete" prop="computeScript" single>
-                            <ace-groovy v-if="model.type == 'script'" v-model="model.computeScript" height="380px" width="670px" />
+                            <ace-groovy v-if="model.type == 'script'" v-model="model.computeScript" height="350px" width="670px" />
                         </h-formitem>
                         <h-formitem v-if="model.type == 'sql'" label="sql执行脚本" icon="h-icon-complete" prop="sqlScript" single>
-                            <ace-groovy v-if="model.type == 'sql'" v-model="model.sqlScript" height="260px" width="670px" />
+                            <ace-groovy v-if="model.type == 'sql'" v-model="model.sqlScript" height="250px" width="670px" />
                         </h-formitem>
                         <h-formitem single>
                                 <h-button v-if="model.id" color="primary" :loading="isLoading" @click="update">提交</h-button>
@@ -121,10 +124,14 @@
                 `,
         props: ['collector'],
         data() {
-            let defaultModel = {type: 'http', method: 'GET', timeout: 10000, contentType: 'application/x-www-form-urlencoded', minIdle: 1, maxActive: 8};
+            let defaultModel = {type: 'http', method: 'GET', timeout: 10000, contentType: 'application/x-www-form-urlencoded', minIdle: 1, maxActive: 8, dataSuccessScript:
+`{resultStr ->
+    JSON.parseObject(resultStr)?['code'] == '0000'
+}`
+            };
             return {
                 isLoading: false, defaultModel: defaultModel,
-                model: this.collector ? $.extend({sqlScript: '', computeScript: '', parseScript: ''}, this.collector) : defaultModel,
+                model: this.collector ? $.extend({sqlScript: '', computeScript: '', parseScript: '', dataSuccessScript: ''}, this.collector) : defaultModel,
                 validationRules: {
                     required: ['enName', 'cnName']
                 },

@@ -85,12 +85,12 @@ class DataCollector extends LongIdEntity {
     String parseScript
 
     /**
-     * 是否查得判断函数
+     * 是否查得(数据是否成功)判断函数
      */
     @Lob
     @Basic
     @Type(type = "text")
-    String successScript
+    String dataSuccessScript
 
 
     // ======================= script ======================

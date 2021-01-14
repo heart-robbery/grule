@@ -54,8 +54,8 @@ class DecisionManager extends ServerTpl {
             decisionMap.remove(id)
             log.info("delDecision: " + id)
         } else {
+            log.info("decisionChanged: " + decision.name + ", " + decision.decisionId + ", " + decision.id)
             addDecision(decision)
-            log.info("decisionChange: " + id)
         }
         def remoter = bean(Remoter)
         if (remoter && ec?.source() != remoter) { // 不是远程触发的事件
@@ -65,7 +65,7 @@ class DecisionManager extends ServerTpl {
 
 
     protected void load() {
-        log.info("加载决策")
+        log.debug("加载决策")
         Set<String> ids = (decisionMap ? new HashSet<>() : null)
         def threshold = new AtomicInteger(1)
         def tryCompleteFn = {
@@ -225,7 +225,7 @@ class DecisionManager extends ServerTpl {
                 true
             }
         } : null)))
-        log.debug("添加决策: {}:{}", spec.决策名, spec.决策id)
+        log.info("初始化决策: {}, {}, " + decision.id, spec.决策名, spec.决策id)
     }
 
 

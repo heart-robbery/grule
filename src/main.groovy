@@ -116,7 +116,7 @@ void sysStarted() {
  * 系统心跳 清理
  */
 @EL(name = 'sys.heartbeat', async = true)
-protected void heartbeat() {
+void heartbeat() {
     // 删除 Classloader 中只进不出的 parallelLockMap
     def field = ClassLoader.getDeclaredField('parallelLockMap')
     field.setAccessible(true)
@@ -135,5 +135,6 @@ protected void heartbeat() {
                 log.trace("Removed class parallelLock: {}", entry.key)
             }
         }
+        log.info("Clean parallelLock. left: {}", m.size())
     }
 }

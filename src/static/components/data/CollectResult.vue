@@ -3,12 +3,13 @@
         <div class="h-panel-bar">
             <h-select v-model="model.collectorType" :datas="types" placeholder="类型" style="width: 70px; float: left" @change="load"></h-select>
             <h-select v-model="model.success" :datas="successTypes" placeholder="是否成功" style="width: 90px; float: left" @change="load"></h-select>
+            <h-select v-model="model.dataSuccess" :datas="successTypes" placeholder="是否查得" style="width: 90px; float: left" @change="load"></h-select>
             <h-autocomplete v-model="model.decisionId" :option="decisions" style="float:left; width: 150px" @change="load" placeholder="决策名"></h-autocomplete>
             <h-autocomplete v-model="model.collector" :option="collectors" style="float:left; width: 150px" @change="load" placeholder="收集器"></h-autocomplete>
-            <input type="number" v-model="model.spend" placeholder=">=耗时(ms)" style="width: 100px" @keyup.enter="load"/>
+            <input type="number" v-model="model.spend" placeholder="耗时(>=ms)" style="width: 100px" @keyup.enter="load"/>
             <input type="text" v-model="model.decideId" placeholder="流水id(精确匹配)" style="width: 250px" @keyup.enter="load"/>
-            <h-datepicker v-model="model.startTime" type="datetime" :has-seconds="true" placeholder="开始时间"></h-datepicker>
-            <h-datepicker v-model="model.endTime" type="datetime" :has-seconds="true" placeholder="结束时间"></h-datepicker>
+            <h-datepicker v-model="model.startTime" type="datetime" :has-seconds="true" placeholder="开始时间" style="width: 160px"></h-datepicker>
+            <h-datepicker v-model="model.endTime" type="datetime" :has-seconds="true" placeholder="结束时间" style="width: 160px"></h-datepicker>
             <button class="h-btn h-btn-primary float-right" @click="load"><i class="h-icon-search"></i><span>查询</span></button>
 <!--            <div class="h-panel-right">-->
 <!--                <h-search placeholder="查询" v-width="200" v-model="model.kw" show-search-button search-text="搜索" @search="load"></h-search>-->
@@ -41,7 +42,8 @@
                     </template>
                 </h-tableitem>
                 <h-tableitem title="耗时(ms)" prop="spend" align="center"></h-tableitem>
-                <h-tableitem title="成功" prop="success" align="center" :format="formatSuccessType"></h-tableitem>
+                <h-tableitem title="状态" prop="status" align="center" :format="formatStatusType"></h-tableitem>
+                <h-tableitem title="查得" prop="dataStatus" align="center" :format="formatStatusType"></h-tableitem>
                 <h-tableitem title="操作" align="center" :width="80">
                     <template slot-scope="{data}">
                         <span class="text-hover" @click="open(data)">{{data._expand?'收起':'展开'}}</span>
@@ -84,7 +86,12 @@
             return {
                 types: types,
                 successTypes: successTypes,
-                model: {},
+                model: {startTime: (function () {
+                        let d = new Date();
+                        let month = d.getMonth() + 1;
+                        return d.getFullYear() + "-" + (month < 10 ? '0' + month : month) + "-" + (d.getDate() < 10 ? '0' + d.getDate() : d.getDate()) + " 00:00:00"
+                    })()
+                },
                 loading: false,
                 page: 1, totalRow: 0, pageSize: 10, list: [],
                 decisions: {
@@ -153,6 +160,10 @@
                     if (type.key == v) return type.title
                 }
                 return v
+            },
+            formatStatusType(v) {
+                if ('0000' === v) return '成功';
+                return '失败';
             },
             formatSuccessType(v) {
                 for (let type of successTypes) {
