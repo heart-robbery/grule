@@ -21,11 +21,11 @@ function ws(cfg) {
             }, cfg.reconnection || (1000 * 60 * 2)); // 每两分钟重试
             return
         }
-        client.onclose = cfg.onClose || function () {
-            console.log('websocket close');
-            setTimeout(function () {
-                ws(cfg)
-            }, cfg.reconnection || (1000 * 60 * 2)); // 每两分钟重试
+        client.onclose = cfg.onClose || function (e) {
+            console.log('websocket close', e);
+            // setTimeout(function () {
+            //     ws(cfg)
+            // }, cfg.reconnection || (1000 * 60 * 2)); // 每两分钟重试
         };
         client.onmessage = cfg.onMsg || function (e) { //接收websocket 消息
             let jo = toJSON(e.data);

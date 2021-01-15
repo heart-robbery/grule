@@ -112,6 +112,7 @@ void sysStarted() {
     }
 }
 
+
 /**
  * 系统心跳 清理
  */
@@ -135,6 +136,6 @@ void heartbeat() {
                 log.trace("Removed class parallelLock: {}", entry.key)
             }
         }
-        log.info("Clean parallelLock. left: {}", m.size())
+        log.debug("Clean parallelLock. left: {}", m.size())
     }
 }

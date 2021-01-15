@@ -37,8 +37,8 @@ class MntAnalyseCtrl extends ServerTpl {
         ids = repo.findList(Decision) {root, query, cb -> root.get("id").in(ids)}.findResults {it.decisionId}
         if (!ids) return ApiResp.ok()
         ApiResp.ok(repo.rows(
-                "select decision_id, decision, count(1) total from decision_result where occur_time>=? and decision_id in (${ids.collect {'\'' + it + '\''}.join(',')}) group by decision_id, decision",
-                cal.getTime()
+                "select decision_id, decision, count(1) total from decision_result where occur_time>=:time and decision_id in (:ids) group by decision_id, decision",
+                cal.getTime(), ids
         ).collect {Map<String, Object> record ->
             def data = new HashMap<>(5)
             record.each {e ->
