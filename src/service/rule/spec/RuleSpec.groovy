@@ -8,7 +8,7 @@ import service.rule.DecisionEnum
 class RuleSpec {
     private boolean enabled = true
     String 规则名
-    @Lazy private List<Tuple2<String, Closure>> decisionFn = new LinkedList<>()
+    @Lazy List<Tuple2<String, Closure>> decisionFn = new LinkedList<>()
     // 自定义规则属性. 例: 自定义id, 描述
     @Lazy Map<String, Object> attrs = new HashMap<>()
 

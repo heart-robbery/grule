@@ -5,22 +5,22 @@
             <!--            <span v-color:gray v-font="13">说明~~</span>-->
             &nbsp;&nbsp;
             <h-button v-if="sUser.permissionIds.find((e) => e == 'field-add') == 'field-add'" @click="showAddPop"><i class="h-icon-plus"></i></h-button>
+            <input type="text" v-model="kw" placeholder="关键词" style="width: 250px" @keyup.enter="load"/>
             <div class="h-panel-right">
-                <h-search placeholder="查询" v-width="200" v-model="kw" show-search-button search-text="搜索" @search="load"></h-search>
+<!--                <h-search placeholder="查询" v-width="200" v-model="kw" show-search-button search-text="搜索" @search="load"></h-search>-->
                 <!--                <i class="h-split"></i>-->
                 <!--                <button class="h-btn h-btn-green h-btn-m" @click="load">查询</button>-->
+                <button class="h-btn h-btn-primary float-right" @click="load"><i class="h-icon-search"></i><span>搜索</span></button>
             </div>
         </div>
         <div class="h-panel-body">
-            <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading">
+            <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading" border>
                 <!--                <h-tableitem title="ID" prop="id" align="center"></h-tableitem>-->
                 <h-tableitem title="英文名" prop="enName" align="center"></h-tableitem>
                 <h-tableitem title="中文名" prop="cnName" align="center"></h-tableitem>
-                <h-tableitem title="类型" prop="type" align="center" :format="formatType"></h-tableitem>
+                <h-tableitem title="类型" prop="type" align="center" :format="formatType" :width="70"></h-tableitem>
                 <h-tableitem title="更新时间" align="center">
-                    <template slot-scope="{data}">
-                        <date-item :time="data.updateTime" />
-                    </template>
+                    <template slot-scope="{data}"><date-item :time="data.updateTime" /></template>
                 </h-tableitem>
                 <!--                    <h-tableitem title="创建时间" prop="createTime" align="center"></h-tableitem>-->
                 <h-tableitem title="描述" prop="comment" align="center"></h-tableitem>
@@ -30,7 +30,7 @@
                         <span v-else>{{data.dataCollector}}</span>
                     </template>
                 </h-tableitem>
-                <h-tableitem v-if="sUser.permissionIds.find((e) => e == 'field-update' || e == 'field-del')" title="操作" align="center" :width="100">
+                <h-tableitem v-if="sUser.permissionIds.find((e) => e == 'field-update' || e == 'field-del')" title="操作" align="center" :width="90">
                     <template slot-scope="{data}">
                         <span v-if="sUser.permissionIds.find((e) => e == 'field-update') == 'field-update'" class="text-hover" @click="showUpdatePop(data)">编辑</span>
                         <span v-if="sUser.permissionIds.find((e) => e == 'field-del') == 'field-del'" class="text-hover" @click="del(data)">删除</span>
@@ -40,8 +40,7 @@
             </h-table>
         </div>
         <div v-if="totalRow" class="h-panel-bar">
-            <h-pagination ref="pagination" :cur="page" :total="totalRow" :size="pageSize"
-                          align="right" @change="load" layout="pager,total"></h-pagination>
+            <h-pagination ref="pagination" :cur="page" :total="totalRow" :size="pageSize" align="right" @change="load" layout="pager,total"></h-pagination>
         </div>
     </div>
 </template>
@@ -94,7 +93,7 @@
                     isLoading: false,
                     model: this.field ? $.extend({}, this.field) : {type: 'Str'},
                     validationRules: {
-                        required: ['enName', 'cnName']
+                        required: ['enName', 'cnName', 'type']
                     },
                     types: types,
                     param: {

@@ -1,6 +1,7 @@
 package entity
 
-import cn.xnatural.jpa.BaseEntity
+
+import cn.xnatural.jpa.IEntity
 import org.hibernate.annotations.Type
 import service.rule.DecisionEnum
 
@@ -11,7 +12,7 @@ import javax.persistence.*
  */
 @Entity
 @Table(indexes = [@Index(name = "idx_occurTime", columnList = "occurTime")])
-class DecisionResult extends BaseEntity {
+class DecisionResult implements IEntity {
     @Id
     String       id
     /**

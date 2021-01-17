@@ -98,6 +98,7 @@ class MntUserCtrl extends ServerTpl {
     @Path(path = 'changePwd')
     ApiResp changePwd(HttpContext hCtx, Long id, String newPassword, String oldPassword) {
         if (!id) return ApiResp.fail("Param id required")
+        if (!newPassword) return ApiResp.fail("Param newPassword required")
         if (Utils.to(hCtx.getSessionAttr("id"), Long) != id) {
             return ApiResp.fail('只能改当前用户的密码')
         }
@@ -112,6 +113,8 @@ class MntUserCtrl extends ServerTpl {
 
     @Path(path = 'restPassword')
     ApiResp restPassword(HttpContext hCtx, Long id, String newPassword) {
+        if (!id) return ApiResp.fail("Param id required")
+        if (!newPassword) return ApiResp.fail("Param newPassword required")
         hCtx.auth('password-reset')
         def user = repo.findById(User, id)
         if (!user) return ApiResp.fail("用户不存在")
@@ -136,6 +139,7 @@ class MntUserCtrl extends ServerTpl {
 
     @Path(path = 'updatePermission', method = 'post')
     ApiResp updatePermission(HttpContext hCtx, Long id, String enName, String cnName, String comment) {
+        if (!id) return ApiResp.fail("Param id required")
         hCtx.auth("grant")
         def p = repo.findById(Permission, id)
         if (!p) return ApiResp.fail('未找到权限: ' + id)
@@ -154,6 +158,8 @@ class MntUserCtrl extends ServerTpl {
 
     @Path(path = 'addPermission', method = 'post')
     ApiResp addPermission(HttpContext hCtx, String enName, String cnName, String comment) {
+        if (!enName) return ApiResp.fail("Param enName required")
+        if (!cnName) return ApiResp.fail("Param cnName required")
         hCtx.auth("grant")
         def p = new Permission(enName: enName, cnName: cnName, comment: comment)
         if (repo.find(Permission) {root, query, cb -> cb.equal(root.get('enName'), enName)}) {

@@ -79,7 +79,7 @@
                             { title: '策略中心', key: 'PolicyCenter' },
                             { title: '用户中心', key: 'UserCenter' },
                         ] },
-                    { title: '数据中心', key: 'dataCenter', icon: 'h-icon-setting', children: [
+                    { title: '数据中心', key: 'dataCenter', icon: 'h-icon-search', children: [
                             { title: '决策数据', key: 'DecisionData' },
                             { title: '数据分析', key: 'DataAnalyse' },
                         ] },

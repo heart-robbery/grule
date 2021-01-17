@@ -257,11 +257,17 @@ class MntDecisionCtrl extends ServerTpl {
             log.error("语法错误", ex)
             return ApiResp.fail('语法错误: ' + ex.message)
         }
-        if (!spec.决策id) return ApiResp.fail("decisionId must not be empty")
 
+        //dsl 验证
+        if (!spec.决策id) return ApiResp.fail("决策id 不能为空")
+        if (!spec.决策名) return ApiResp.fail("决策名 不能为空")
+        if (!spec.policies) return ApiResp.fail("${spec.决策名} 是空决策")
         for (def policy : spec.policies) {
+            if (!policy.策略名) return ApiResp.fail('策略名字不能为空')
+            if (!policy.rules) return ApiResp.fail("'${policy.策略名}' 是空策略")
             for (def rule : policy.rules) {
                 if (!rule.规则名) return ApiResp.fail('规则名字不能为空')
+                if (rule.decisionFn.size() < 1) return ApiResp.fail("'${rule.规则名}' 是空规则")
             }
         }
 
@@ -293,6 +299,10 @@ class MntDecisionCtrl extends ServerTpl {
                 params.add(0, new JSONObject().fluentPut("code", "decisionId").fluentPut("type", "Str")
                         .fluentPut("fixValue", decision.decisionId).fluentPut("name", "决策id").fluentPut("require", true)
                 )
+            }
+            for (def it = params.iterator(); it.hasNext(); ) {
+                JSONObject jo = it.next()
+                if (!jo.getString("code") || jo.getString("name")) it.remove()
             }
             apiConfig = params.toString()
         }

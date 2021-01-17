@@ -375,7 +375,7 @@ if (idNumber && idNumber.length() > 17) {
             }
             dataCollected(new CollectResult(
                 decideId: ctx.id, decisionId: ctx.decisionHolder.decision.decisionId, collector: collector.enName,
-                status: (exx ? 'EEEE' : '0000'), collectDate: start, collectorType: collector.type,
+                status: (exx ? 'EEEE' : '0000'), dataStatus: (exx ? 'EEEE' : '0000'), collectDate: start, collectorType: collector.type,
                 spend: System.currentTimeMillis() - start.time,
                 result: result instanceof Map ? JSON.toJSONString(result, SerializerFeature.WriteMapNullValue) : result?.toString(),
                 scriptException: exx == null ? null : exx.message?:exx.class.simpleName
@@ -416,7 +416,7 @@ if (idNumber && idNumber.length() > 17) {
             }
             dataCollected(new CollectResult(
                 decideId: ctx.id, decisionId: ctx.decisionHolder.decision.decisionId, collector: collector.enName,
-                status: (ex ? 'EEEE' : '0000'), collectDate: start, collectorType: collector.type,
+                status: (ex ? 'EEEE' : '0000'), dataStatus: (ex ? 'EEEE' : '0000'), collectDate: start, collectorType: collector.type,
                 spend: System.currentTimeMillis() - start.time,
                 result: result instanceof Map ? JSON.toJSONString(result, SerializerFeature.WriteMapNullValue) : result?.toString(),
                 scriptException: ex == null ? null : ex.message?:ex.class.simpleName
@@ -489,7 +489,7 @@ if (idNumber && idNumber.length() > 17) {
             // http 请求 body字符串
             String bodyStr = collector.bodyStr
             for (int i = 0; i < 2; i++) { // 替换 ${} 变量
-                if (!bodyStr.contains('${')) break
+                if (!bodyStr || !bodyStr.contains('${')) break
                 bodyStr = collector.bodyStr ? tplEngine.createTemplate(bodyStr).make(new HashMap(1) {
                     @Override
                     boolean containsKey(Object key) { return true } // 加这行是为了 防止 MissingPropertyException
@@ -545,9 +545,9 @@ if (idNumber && idNumber.length() > 17) {
             }
 
             // http 返回结果成功判断. 默认成功
-            String httpStatus = successFn ? (successFn.rehydrate(ctx.data, successFn, this)(result) ? '0000' : '0001') : '0000'
+            String dataStatus = successFn ? (successFn.rehydrate(ctx.data, successFn, this)(result) ? '0000' : '0001') : '0000'
 
-            if (parseFn && httpStatus == '0000') { // 解析接口返回结果
+            if (parseFn && dataStatus == '0000') { // 解析接口返回结果
                 Exception ex
                 try {
                     resolveResult = parseFn.rehydrate(ctx.data, parseFn, this)(result)
@@ -561,7 +561,7 @@ if (idNumber && idNumber.length() > 17) {
                     }
                     dataCollected(new CollectResult(
                         decideId: ctx.id, decisionId: ctx.decisionHolder.decision.decisionId, collector: collector.enName,
-                        status: ex ? 'E002': '0000', dataStatus: httpStatus,
+                        status: ex ? 'E002': '0000', dataStatus: dataStatus,
                         collectDate: start, collectorType: collector.type,
                         spend: spend, url: url, body: bodyStr, result: result, parseException: ex == null ? null : ex.message?:ex.class.simpleName,
                         resolveResult: resolveResult instanceof Map ? JSON.toJSONString(resolveResult, SerializerFeature.WriteMapNullValue) : resolveResult?.toString()
@@ -572,10 +572,10 @@ if (idNumber && idNumber.length() > 17) {
             log.info(logMsg.toString())
             dataCollected(new CollectResult(
                 decideId: ctx.id, decisionId: ctx.decisionHolder.decision.decisionId, collector: collector.enName,
-                status: '0000', dataStatus: httpStatus, collectDate: start, collectorType: collector.type,
+                status: '0000', dataStatus: dataStatus, collectDate: start, collectorType: collector.type,
                 spend: spend, url: url, body: bodyStr, result: result
             ))
-            return result
+            return dataStatus == '0000' ? result : null
         }))
     }
 

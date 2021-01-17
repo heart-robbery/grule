@@ -1,6 +1,6 @@
 package entity
 
-import cn.xnatural.jpa.LongIdEntity
+import cn.xnatural.jpa.IEntity
 import org.hibernate.annotations.Type
 
 import javax.persistence.*
@@ -10,7 +10,10 @@ import javax.persistence.*
  */
 @Entity
 @Table(indexes = [@Index(name = "idx_collectDate", columnList = "collectDate")])
-class CollectResult extends LongIdEntity {
+class CollectResult implements IEntity {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    Long id
     /**
      * 执行决策id
      */
@@ -46,12 +49,14 @@ class CollectResult extends LongIdEntity {
     /**
      * http 调用 url
      */
-    @Column(length = 500)
+    @Column(length = 1000)
     String url
     /**
      * http 请求 body
      */
-    @Column(length = 1000)
+    @Lob
+    @Basic
+    @Type(type = "text")
     String body
     /**
      * 收集的结果

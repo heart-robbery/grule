@@ -75,7 +75,8 @@
                 }
             },
             reset() {
-                this.$refs.form.resetValid();
+                this.model = {}
+                //this.$refs.form.resetValid();
             }
         }
     }

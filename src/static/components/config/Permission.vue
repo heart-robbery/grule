@@ -12,10 +12,10 @@
             </div>
         </div>
         <div class="h-panel-body">
-            <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading">
+            <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading" border>
                 <h-tableitem title="权限标识" prop="enName" align="center"></h-tableitem>
                 <h-tableitem title="权限名称" prop="cnName" align="center"></h-tableitem>
-                <h-tableitem title="更新时间" align="center">
+                <h-tableitem title="更新时间" align="center" :width="135">
                     <template slot-scope="{data}">
                         <date-item :time="data.updateTime" />
                     </template>

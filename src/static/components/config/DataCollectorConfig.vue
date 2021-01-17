@@ -9,21 +9,22 @@
             <div class="h-panel-right">
 <!--                <h-search placeholder="查询" v-width="200" v-model="model.kw" show-search-button search-text="搜索" @search="load"></h-search>-->
                 <!--                <i class="h-split"></i>-->
-                <button class="h-btn h-btn-green h-btn-m" @click="load">查询</button>
+<!--                <button class="h-btn h-btn-green h-btn-m" @click="load">查询</button>-->
+                <button class="h-btn h-btn-primary float-right" @click="load"><i class="h-icon-search"></i><span>搜索</span></button>
             </div>
         </div>
         <div class="h-panel-body">
-            <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading">
+            <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading" border>
                 <h-tableitem title="英文名" prop="enName" align="center"></h-tableitem>
                 <h-tableitem title="中文名" prop="cnName" align="center"></h-tableitem>
-                <h-tableitem title="类型" prop="type" align="center" :format="formatType"></h-tableitem>
+                <h-tableitem title="类型" prop="type" align="center" :format="formatType" :width="70"></h-tableitem>
                 <h-tableitem title="更新时间" align="center">
                     <template slot-scope="{data}">
                         <date-item :time="data.updateTime" />
                     </template>
                 </h-tableitem>
                 <h-tableitem title="描述" prop="comment" align="center"></h-tableitem>
-                <h-tableitem title="状态" align="center" :width="80">
+                <h-tableitem title="状态" align="center" :width="70">
                     <template slot-scope="{data}">
                         <h-switch v-model="data.enabled" @change="enableSwitch(data)" small>
                             <span slot="open">可用</span>
@@ -31,7 +32,7 @@
                         </h-switch>
                     </template>
                 </h-tableitem>
-                <h-tableitem v-if="sUser.permissionIds.find((e) => e == 'dataCollector-update' || e == 'dataCollector-del')" title="操作" align="center" :width="100">
+                <h-tableitem v-if="sUser.permissionIds.find((e) => e == 'dataCollector-update' || e == 'dataCollector-del')" title="操作" align="center" :width="90">
                     <template slot-scope="{data}">
                         <span v-if="sUser.permissionIds.find((e) => e == 'dataCollector-update') == 'dataCollector-update'" class="text-hover" @click="showUpdatePop(data)">编辑</span>
                         &nbsp;
@@ -103,17 +104,17 @@
                             <h-numberinput v-model="model.maxActive" :min="1" :max="100" useInt></h-numberinput>
                         </h-formitem>
 
-                        <h-formitem v-if="model.type == 'http'" label="是否成功" icon="h-icon-complete" prop="dataSuccessScript" single>
-                            <ace-groovy v-if="model.type == 'http'" v-model="model.dataSuccessScript" height="100px" width="670px" />
+                        <h-formitem v-show="model.type == 'http'" label="是否成功" icon="h-icon-complete" prop="dataSuccessScript" single>
+                          <ace-groovy v-model="model.dataSuccessScript" height="90px" width="670px" ></ace-groovy>
                         </h-formitem>
-                        <h-formitem v-if="model.type == 'http'" label="结果解析" icon="h-icon-complete" prop="parseScript" single>
-                            <ace-groovy v-if="model.type == 'http'" v-model="model.parseScript" height="200px" width="670px" />
+                        <h-formitem v-show="model.type == 'http'" label="结果解析" icon="h-icon-complete" prop="parseScript" single>
+                          <ace-groovy v-model="model.parseScript" height="190px" width="670px" ></ace-groovy>
                         </h-formitem>
-                        <h-formitem v-if="model.type == 'script'" label="值计算函数" icon="h-icon-complete" prop="computeScript" single>
-                            <ace-groovy v-if="model.type == 'script'" v-model="model.computeScript" height="350px" width="670px" />
+                        <h-formitem v-show="model.type == 'script'" label="值计算脚本" icon="h-icon-complete" prop="computeScript" single>
+                          <ace-groovy v-model="model.computeScript" height="300px" width="670px" ></ace-groovy>
                         </h-formitem>
-                        <h-formitem v-if="model.type == 'sql'" label="sql执行脚本" icon="h-icon-complete" prop="sqlScript" single>
-                            <ace-groovy v-if="model.type == 'sql'" v-model="model.sqlScript" height="250px" width="670px" />
+                        <h-formitem v-show="model.type == 'sql'" label="sql执行脚本" icon="h-icon-complete" prop="sqlScript" single>
+                          <ace-groovy v-model="model.sqlScript" height="250px" width="670px" ></ace-groovy>
                         </h-formitem>
                         <h-formitem single>
                                 <h-button v-if="model.id" color="primary" :loading="isLoading" @click="update">提交</h-button>
@@ -126,14 +127,14 @@
         data() {
             let defaultModel = {type: 'http', method: 'GET', timeout: 10000, contentType: 'application/x-www-form-urlencoded', minIdle: 1, maxActive: 8, dataSuccessScript:
 `{resultStr ->
-    JSON.parseObject(resultStr)?['code'] == '0000'
+    resultStr ? JSON.parseObject(resultStr)?['code'] == '0000' : false
 }`
             };
             return {
                 isLoading: false, defaultModel: defaultModel,
                 model: this.collector ? $.extend({sqlScript: '', computeScript: '', parseScript: '', dataSuccessScript: ''}, this.collector) : defaultModel,
                 validationRules: {
-                    required: ['enName', 'cnName']
+                    required: ['enName', 'cnName', 'type']
                 },
                 types: types,
                 methods: [
@@ -145,6 +146,17 @@
                     { title: 'form', key: 'application/x-www-form-urlencoded' },
                 ],
             }
+        },
+        watch: {
+            'model.computeScript'(v) {
+              console.log('computeScript')
+            },
+            'model.parseScript'(v) {
+              console.log('parseScript')
+            },
+            'model.type'(v) {
+              console.log(v)
+            },
         },
         methods: {
             update() {

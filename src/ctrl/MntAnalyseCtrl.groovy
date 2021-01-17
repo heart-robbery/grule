@@ -31,7 +31,7 @@ class MntAnalyseCtrl extends ServerTpl {
             cal.add(Calendar.HOUR_OF_DAY, -2)
         } else if (type == 'lastFiveHour') {
             cal.add(Calendar.HOUR_OF_DAY, -5)
-        } else return ApiResp.fail("type: '$type' not supprot")
+        } else return ApiResp.fail("type: '$type' unkonwn")
         def ids = hCtx.getSessionAttr("permissions").split(",").findResults {String p -> p.replace("decision-read-", "").replace("decision-read", "")}.findAll {it}
         if (!ids) return ApiResp.ok()
         ids = repo.findList(Decision) {root, query, cb -> root.get("id").in(ids)}.findResults {it.decisionId}

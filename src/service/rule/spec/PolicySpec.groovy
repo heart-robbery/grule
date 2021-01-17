@@ -8,7 +8,7 @@ import org.codehaus.groovy.control.customizers.ImportCustomizer
  */
 class PolicySpec {
     String                         策略名
-    protected final List<RuleSpec> rules = new LinkedList<>()
+    final List<RuleSpec> rules = new LinkedList<>()
     @Lazy Map<String, Object> attrs = new HashMap<>()
     // 进入条件函数
     protected Closure condition

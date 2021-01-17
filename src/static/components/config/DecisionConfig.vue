@@ -6,7 +6,7 @@
             <input type="text" v-model="model.nameLike" placeholder="决策名" style="width: 250px" @keyup.enter="load"/>
             <div class="h-panel-right">
 <!--                <h-search placeholder="查询" v-width="200" v-model="kw" show-search-button search-text="搜索" @search="load"></h-search>-->
-                <button class="h-btn h-btn-primary float-right" @click="load"><i class="h-icon-search"></i><span>查询</span></button>
+                <button class="h-btn h-btn-primary float-right" @click="load"><i class="h-icon-search"></i><span>搜索</span></button>
             </div>
         </div>
         <div class="h-panel-body">
@@ -17,6 +17,11 @@
                             {{item.name + '(' + item.decisionId + ')' + (item.comment ? ': ' + item.comment : '')}}
                             &nbsp;&nbsp;&nbsp;
                             <date-item :time="item.updateTime"></date-item>
+                            &nbsp;&nbsp;&nbsp;
+                            <span>{{item.creator}}</span>
+                            &nbsp;&nbsp;
+                            <span>{{item.updater}}</span>
+
                             <span class="float-right">
                                 <h-button text-color="yellow" :circle="true" @click.stop="showApiPop(item)">API配置</h-button>
                                 <h-button text-color="yellow" :circle="true" @click.stop="showTestPop(item)">测试</h-button>
@@ -324,8 +329,8 @@
                             success: (res) => {
                                 if (res.code == '00') {
                                     this.$Message.success(`删除决策: ${item.name}成功`);
-                                    this.load();
-                                    localStorage.removeItem('rule.test.' + item.decisionId)
+                                  this.load();
+                                  localStorage.removeItem('rule.test.' + item.decisionId)
                                 } else this.$Notice.error(res.desc)
                             }
                         });
@@ -348,10 +353,10 @@
                             if (decision.id) {
                                 $.extend(decision, res.data);
                                 decision.apiConfigO = this.decision.apiConfig ? JSON.parse(decision.apiConfig) : null;
-                                this.$Message.success('更新成功: ' + decision.decisionId);
+                                this.$Message.success('更新成功: ' + decision.name);
                             } else {
-                                this.load();
                                 this.$Message.success('新增成功: ' + res.data.name);
+                                //this.load();
                             }
                         } else this.$Notice.error(res.desc)
                     }
@@ -394,9 +399,8 @@
 策略定义 {
     策略名 = 'P_预处理'
 
-    条件 { // 执行此策略的条件, false: 不执行, true 或者 不配置默认 执行此策略
-        true
-    }
+    // 执行此策略的条件, false: 不执行, true 或者 不配置默认 执行此策略
+    // 条件 { true }
 
     规则定义 {
         规则名 = 'R_参数验证'
@@ -404,14 +408,6 @@
 
         拒绝 {
             !身份证号码 || !手机号码 || !姓名
-        }
-    }
-
-    规则定义 {
-        规则名 = 'R_属性设值'
-
-        操作 {
-            测试变量 = true
         }
     }
 }
@@ -424,7 +420,7 @@
                 this.decision = {};
                 $.ajax({
                     url: 'mnt/decisionPage',
-                    data: $.extend({page: page.page || 1, decisionId: this.tabs.showId}, this.model),
+                    data: $.extend({page: page.page || 1, pageSize: 5, decisionId: this.tabs.showId}, this.model),
                     success: (res) => {
                         this.decisionLoading = false;
                         if (res.code == '00') {

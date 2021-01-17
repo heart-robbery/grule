@@ -191,6 +191,9 @@ Vue.component('ace-groovy', (resolve, reject) => {
                         editor: null
                     }
                 },
+                beforeDestroy() {
+                    if (this.editor) {this.editor.destroy()}
+                },
                 mounted: function () {
                     this.$nextTick(this.initEditor)
                 },

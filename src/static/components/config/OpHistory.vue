@@ -1,18 +1,22 @@
 <template>
     <div class="h-panel">
         <div class="h-panel-bar">
-            <!--            <span class="h-panel-title">数据集</span>-->
-            <!--            <span v-color:gray v-font="13">说明~~</span>-->
-            <h-select v-model="model.type" :datas="types" placeholder="所有" style="width: 150px" @change="load"></h-select>
+            <h-select v-model="model.type" :datas="types" placeholder="所有" style="width: 100px" @change="load"></h-select>
+<!--            <input type="text" v-model="model.kw" placeholder="关键词" @keyup.enter="load"/>-->
             <div class="h-panel-right">
-                <h-search placeholder="查询" v-width="200" v-model="model.kw" show-search-button search-text="搜索" @search="load"></h-search>
+                <h-search placeholder="关键词" v-width="200" v-model="model.kw" show-search-button search-text="搜索" @search="load"><i class="h-icon-search"></i><span>搜索</span></h-search>
+<!--                <button class="h-btn h-btn-primary float-right" @click="load"><i class="h-icon-search"></i><span>搜索</span></button>-->
             </div>
         </div>
         <div class="h-panel-body">
-            <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading">
-                <h-tableitem title="类型" prop="tbName" align="center" :width="120" :format="formatType"></h-tableitem>
-                <h-tableitem title="操作员" prop="operator" align="center" :width="120"></h-tableitem>
-                <h-tableitem title="操作时间" prop="createTime" align="center" :width="130" :format="formatDate"></h-tableitem>
+            <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading" border>
+                <h-tableitem title="类型" prop="tbName" align="center" :width="70" :format="formatType"></h-tableitem>
+                <h-tableitem title="操作员" prop="operator" align="center" :width="100"></h-tableitem>
+                <h-tableitem title="操作时间" align="center" :width="135">
+                  <template slot-scope="{data}">
+                    <date-item :time="data.createTime" />
+                  </template>
+                </h-tableitem>
                 <h-tableitem title="内容" prop="content" align="center"></h-tableitem>
                 <div slot="empty">暂时无数据</div>
             </h-table>
@@ -47,9 +51,6 @@
                     else if (type.key == 'DataCollector' && v == 'data_collector') return type.title;
                 }
                 return v
-            },
-            formatDate(v) {
-                return moment(v).format('YYYY-MM-DD HH:mm:ss')
             },
             load(page) {
                 if (page == undefined || page == null) page = {page: 1};

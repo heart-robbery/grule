@@ -11,11 +11,11 @@
 <!--            <input type="text" v-model="model.rules" placeholder="规则关键字" @keyup.enter="load"/>-->
             <h-datepicker v-model="model.startTime" type="datetime" :has-seconds="true" placeholder="开始时间" style="width: 160px"></h-datepicker>
             <h-datepicker v-model="model.endTime" type="datetime" :has-seconds="true" placeholder="结束时间" style="width: 160px"></h-datepicker>
-            <button class="h-btn h-btn-primary float-right" @click="load"><i class="h-icon-search"></i><span>查询</span></button>
+            <button class="h-btn h-btn-primary float-right" @click="load"><span>搜索</span></button>
         </div>
         <div class="h-panel-body">
-            <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading" @trdblclick="trdblclick">
-                <h-tableitem title="决策" align="center" :width="150">
+            <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading" @trdblclick="trdblclick" border>
+                <h-tableitem title="决策" align="center">
                     <template slot-scope="{data}">
                         <a v-if="data.decisionName" href="javascript:void(0)" @click="jumpToDecision(data)">{{data.decisionName}}</a>
                         <span v-else>{{data.decisionId}}</span>
@@ -23,8 +23,8 @@
                 </h-tableitem>
                 <h-tableitem title="流水id" prop="id" align="center"></h-tableitem>
 <!--                <h-tableitem title="身份证" prop="idNum" align="center" :width="140"></h-tableitem>-->
-                <h-tableitem title="决策" prop="decision" align="center" :format="formatType" :width="70"></h-tableitem>
-                <h-tableitem title="决策时间" align="center" :width="140">
+                <h-tableitem title="结果" prop="decision" align="center" :format="formatType" :width="70"></h-tableitem>
+                <h-tableitem title="决策时间" align="center" :width="135">
                     <template slot-scope="{data}">
                         <date-item :time="data.occurTime" />
                     </template>
@@ -112,7 +112,7 @@
                     <h-footer v-if="item.dataCollectResult">
                         <h-form readonly>
                             <h-formitem label="数据收集">
-                                {{item.dataCollectResult}}
+                              <code>{{item.dataCollectResult}}</code>
 <!--                                <ace-json v-model="item.dataCollectResult" :readonly="true"></ace-json>-->
                             </h-formitem>
                         </h-form>

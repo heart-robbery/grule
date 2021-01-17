@@ -4,19 +4,19 @@
             <h-select v-model="model.collectorType" :datas="types" placeholder="类型" style="width: 70px; float: left" @change="load"></h-select>
             <h-select v-model="model.success" :datas="successTypes" placeholder="是否成功" style="width: 90px; float: left" @change="load"></h-select>
             <h-select v-model="model.dataSuccess" :datas="successTypes" placeholder="是否查得" style="width: 90px; float: left" @change="load"></h-select>
-            <h-autocomplete v-model="model.decisionId" :option="decisions" style="float:left; width: 150px" @change="load" placeholder="决策名"></h-autocomplete>
-            <h-autocomplete v-model="model.collector" :option="collectors" style="float:left; width: 150px" @change="load" placeholder="收集器"></h-autocomplete>
+            <h-autocomplete v-model="model.decisionId" :option="decisions" style="float:left; width: 180px" @change="load" placeholder="决策名"></h-autocomplete>
+            <h-autocomplete v-model="model.collector" :option="collectors" style="float:left; width: 180px" @change="load" placeholder="收集器"></h-autocomplete>
             <input type="number" v-model="model.spend" placeholder="耗时(>=ms)" style="width: 100px" @keyup.enter="load"/>
             <input type="text" v-model="model.decideId" placeholder="流水id(精确匹配)" style="width: 250px" @keyup.enter="load"/>
             <h-datepicker v-model="model.startTime" type="datetime" :has-seconds="true" placeholder="开始时间" style="width: 160px"></h-datepicker>
             <h-datepicker v-model="model.endTime" type="datetime" :has-seconds="true" placeholder="结束时间" style="width: 160px"></h-datepicker>
-            <button class="h-btn h-btn-primary float-right" @click="load"><i class="h-icon-search"></i><span>查询</span></button>
+            <button class="h-btn h-btn-primary float-right" @click="load"><span>搜索</span></button>
 <!--            <div class="h-panel-right">-->
 <!--                <h-search placeholder="查询" v-width="200" v-model="model.kw" show-search-button search-text="搜索" @search="load"></h-search>-->
 <!--            </div>-->
         </div>
         <div class="h-panel-body">
-            <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading">
+            <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading" border>
                 <!--                <h-tableitem title="ID" prop="id" align="center"></h-tableitem>-->
                 <h-tableitem title="决策" align="center">
                     <template slot-scope="{data}">
@@ -30,21 +30,21 @@
                         <span v-else>{{data.collector}}</span>
                     </template>
                 </h-tableitem>
-                <h-tableitem title="类型" prop="collectorType" align="center" :format="formatType"></h-tableitem>
+                <h-tableitem title="类型" prop="collectorType" align="center" :format="formatType" :width="70"></h-tableitem>
                 <h-tableitem title="决策流水" align="center" :width="250">
                     <template slot-scope="{data}">
                         <a href="javascript:void(0)" @click="model.decideId = data.decideId; load()">{{data.decideId}}</a>
                     </template>
                 </h-tableitem>
-                <h-tableitem title="收集时间" align="center" >
+                <h-tableitem title="收集时间" align="center" :width="135">
                     <template slot-scope="{data}">
                         <date-item :time="data.collectDate" />
                     </template>
                 </h-tableitem>
-                <h-tableitem title="耗时(ms)" prop="spend" align="center"></h-tableitem>
-                <h-tableitem title="状态" prop="status" align="center" :format="formatStatusType"></h-tableitem>
-                <h-tableitem title="查得" prop="dataStatus" align="center" :format="formatStatusType"></h-tableitem>
-                <h-tableitem title="操作" align="center" :width="80">
+                <h-tableitem title="耗时(ms)" prop="spend" align="center" :width="70"></h-tableitem>
+                <h-tableitem title="状态" prop="status" align="center" :format="formatStatusType" :width="70"></h-tableitem>
+                <h-tableitem title="查得" prop="dataStatus" align="center" :format="formatStatusType" :width="70"></h-tableitem>
+                <h-tableitem title="操作" align="center" :width="70">
                     <template slot-scope="{data}">
                         <span class="text-hover" @click="open(data)">{{data._expand?'收起':'展开'}}</span>
                     </template>
