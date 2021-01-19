@@ -83,7 +83,7 @@ class MainCtrl extends ServerTpl {
     }
     @Path(path = 'js/lib/:fName')
     File js_lib(String fName, HttpContext hCtx) {
-        hCtx.response.cacheControl(1800)
+        hCtx.response.cacheControl(3600)
         Utils.baseDir("static/js/lib/$fName")
     }
 
@@ -119,7 +119,7 @@ class MainCtrl extends ServerTpl {
     }
     @Path(path = 'css/lib/:fName')
     File css_lib(String fName, HttpContext hCtx) {
-        hCtx.response.cacheControl(1800)
+        hCtx.response.cacheControl(3600)
         Utils.baseDir("static/css/lib/$fName")
     }
 }

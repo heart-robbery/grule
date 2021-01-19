@@ -39,15 +39,16 @@ class MntUserCtrl extends ServerTpl {
                 },
                 {
                     Utils.toMapper(it).ignore("metaClass", "password")
-                        .addConverter("permissions", {String name ->
+                        .addConverter("permissions", {String pIds ->
                             def ps = repo.findList(Permission, null)
-                            name.split(",").collect {n ->
+                            pIds.split(",").collect {pId ->
+                                if (!pId) return null
                                 for (def p : ps ) {
-                                    if (p.enName == n) {
-                                        return [(n): p.cnName]
+                                    if (p.enName == pId) {
+                                        return [(pId): p.cnName]
                                     }
                                 }
-                            }
+                            }.findAll {it}
                         })
                         .build()
                 }
