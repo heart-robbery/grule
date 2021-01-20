@@ -10,6 +10,7 @@ import cn.xnatural.http.Path
 import cn.xnatural.jpa.Page
 import cn.xnatural.jpa.Repo
 import com.alibaba.fastjson.JSON
+import com.alibaba.fastjson.JSONArray
 import com.alibaba.fastjson.JSONObject
 import entity.*
 import service.rule.AttrManager
@@ -302,9 +303,14 @@ class MntDecisionCtrl extends ServerTpl {
             }
             for (def it = params.iterator(); it.hasNext(); ) {
                 JSONObject jo = it.next()
-                if (!jo.getString("code") || jo.getString("name")) it.remove()
+                if (!jo.getString("code") || !jo.getString("name")) it.remove()
             }
             apiConfig = params.toString()
+        } else {
+            apiConfig = new JSONArray().add(
+                new JSONObject().fluentPut("code", "decisionId").fluentPut("type", "Str")
+                    .fluentPut("fixValue", decision.decisionId).fluentPut("name", "决策id").fluentPut("require", true)
+            ).toString()
         }
         decision.apiConfig = apiConfig
 

@@ -352,7 +352,7 @@
                         if (res.code == '00') {
                             if (decision.id) {
                                 $.extend(decision, res.data);
-                                decision.apiConfigO = this.decision.apiConfig ? JSON.parse(decision.apiConfig) : null;
+                                decision.apiConfigO = decision.apiConfig ? JSON.parse(decision.apiConfig) : null;
                                 this.$Message.success('更新成功: ' + decision.name);
                             } else {
                                 this.$Message.success('新增成功: ' + res.data.name);
