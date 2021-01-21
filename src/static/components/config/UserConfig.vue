@@ -16,11 +16,12 @@
         </div>
         <div class="h-panel-body">
             <div style="padding: 5px 0; margin: 0 10px;" v-for="item in list" :key="item.id">
-                <p style="font-size: 15px; font-weight: bold;">{{item.name}}
-                    &nbsp; <span v-if="item.login">上次登录时间: <date-item :time="item.login" /></span>
-                    &nbsp; &nbsp; <span v-if="sUser.permissionIds.find((e) => e == 'grant') == 'grant'" class="h-icon-edit text-hover" @click="showUpdatePop(item)"></span>
-                    &nbsp; <span v-if="sUser.permissionIds.find((e) => e == 'grant') == 'grant'" class="h-icon-lock text-hover" @click="showResetPass(item)"></span>
-                    &nbsp; <span v-if="sUser.permissionIds.find((e) => e == 'user-del') == 'user-del'" class="h-icon-trash text-hover" @click="del(item)"></span>
+                <p style="font-size: 15px; font-weight: bold;">
+                    <span>{{item.name}}</span>&nbsp;&nbsp;&nbsp;<span v-if="item.group">{{item.group}}(组)</span>
+                    &nbsp;&nbsp;&nbsp;<span v-if="item.login">上次登录时间: <date-item :time="item.login" /></span>
+                    &nbsp; &nbsp; <span v-if="sUser.permissionIds.find((e) => e == 'grant' || e == 'grant-user')" class="h-icon-edit text-hover" @click="showUpdatePop(item)"></span>
+                    &nbsp; <span v-if="sUser.permissionIds.find((e) => e == 'grant' || e == 'grant-user')" class="h-icon-lock text-hover" @click="showResetPass(item)"></span>
+                    &nbsp; <span v-if="sUser.permissionIds.find((e) => e == 'user-del')" class="h-icon-trash text-hover" @click="del(item)"></span>
                 </p>
 
                 <p class="tags"><h-taginput v-model="item.permissionNames" readonly></h-taginput></p>
@@ -46,6 +47,9 @@
                         <h-formitem label="用户名" icon="h-icon-user">
                             <input type="text" v-model="model.name" :readonly="user">
                         </h-formitem>
+                        <h-formitem v-if="user == null && !sUser.permissionIds.find((e) => e == 'grant-user')" label="组名" icon="h-icon-user">
+                            <input type="text" v-model="model.group">
+                        </h-formitem>
                         <h-formitem v-if="!user" label="密码" icon="h-icon-user">
                             <input type="password" v-model="model.password">
                         </h-formitem>
@@ -65,6 +69,7 @@
         props: ['user'],
         data() {
             return {
+                sUser: app.$data.user,
                 isLoading: false,
                 option: {filterable: true},
                 model: this.user ? {id: this.user.id, name: this.user.name, permissions: this.user.permissions ? this.user.permissions.map(p => {
@@ -79,7 +84,7 @@
                     loadData: (filter, cb) => {
                         $.ajax({
                             url: 'mnt/user/permissionPage',
-                            data: {page: 1, pageSize: 5, kw: filter},
+                            data: {page: 1, pageSize: 5, kw: filter, notPermissionIds: this.model.permissions.map(o => o.enName)},
                             success: (res) => {
                                 if (res.code == '00') {
                                     cb(res.data.list)

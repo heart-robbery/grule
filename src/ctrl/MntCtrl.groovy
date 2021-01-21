@@ -66,6 +66,7 @@ class MntCtrl extends ServerTpl {
 
         hCtx.setSessionAttr('uId', user.id)
         hCtx.setSessionAttr('uName', username)
+        hCtx.setSessionAttr('uGroup', user.group)
         user.login = new Date()
         repo.saveOrUpdate(user)
         ApiResp.ok().attr('id', user.id).attr('name', username)

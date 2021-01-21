@@ -42,8 +42,8 @@
                     </template>
                 </h-tableitem>
                 <h-tableitem title="耗时(ms)" prop="spend" align="center" :width="70"></h-tableitem>
-                <h-tableitem title="状态" prop="status" align="center" :format="formatStatusType" :width="70"></h-tableitem>
-                <h-tableitem title="查得" prop="dataStatus" align="center" :format="formatStatusType" :width="70"></h-tableitem>
+                <h-tableitem title="状态" prop="status" align="center" :format="formatStatusType" :width="60"></h-tableitem>
+                <h-tableitem title="查得" prop="dataStatus" align="center" :format="formatStatusType" :width="60"></h-tableitem>
                 <h-tableitem title="操作" align="center" :width="70">
                     <template slot-scope="{data}">
                         <span class="text-hover" @click="open(data)">{{data._expand?'收起':'展开'}}</span>

@@ -23,7 +23,7 @@
                 <!-- <h-tableitem title="创建时间" prop="createTime" align="center"></h-tableitem> -->
                 <h-tableitem title="描述" prop="comment" align="center"></h-tableitem>
                 <h-tableitem v-if="sUser.permissionIds.find((e) => e == 'grant' || e == 'grant')" title="操作" align="center" :width="100">
-                    <template slot-scope="{data}">
+                    <template v-if="!data.mark" slot-scope="{data}">
                         <span class="text-hover" @click="showUpdatePop(data)">编辑</span>
                         <span class="text-hover" @click="del(data)">删除</span>
                     </template>
@@ -48,10 +48,10 @@
                             :rules="validationRules"
                             :model="model">
                         <h-formitem label="权限标识" icon="h-icon-complete" prop="enName">
-                            <input type="text" v-model="model.enName"/>
+                            <input type="text" v-model="model.enName" :readonly="permission.mark"/>
                         </h-formitem>
                         <h-formitem label="权限名称" icon="h-icon-complete" prop="cnName">
-                            <input type="text" v-model="model.cnName" />
+                            <input type="text" v-model="model.cnName"/>
                         </h-formitem>
                         <h-formitem label="权限描述" icon="h-icon-complete" prop="comment">
                             <textarea type="text" v-model="model.comment" />

@@ -12,6 +12,32 @@ import entity.User
 class UserSrv extends ServerTpl {
 
     @Lazy def repo = bean(Repo, 'jpa_rule_repo')
+    /**
+     * 默认静态权限
+     */
+    @Lazy def staticPermission = [
+          new Permission(enName: 'grant', cnName: '权限管理'),
+          new Permission(enName: 'grant-user', cnName: '权限管理-用户'),
+          new Permission(enName: 'mnt-login', cnName: '用户登陆'),
+          new Permission(enName: 'user-add', cnName: '新增用户'),
+          new Permission(enName: 'user-del', cnName: '删除用户'),
+          // new Permission(enName: 'password-reset', cnName: '密码重置'),
+          new Permission(enName: 'decision-read', cnName: '查看决策'),
+          new Permission(enName: 'decision-add', cnName: '创建决策'),
+          // new Permission(enName: 'decision-del', cnName: '删除决策'),
+          // new Permission(enName: 'decision-update', cnName: '更新决策'),
+          new Permission(enName: 'field-read', cnName: '查看字段'),
+          new Permission(enName: 'field-add', cnName: '新增字段'),
+          new Permission(enName: 'field-update', cnName: '更新字段'),
+          new Permission(enName: 'field-del', cnName: '删除字段'),
+          new Permission(enName: 'dataCollector-read', cnName: '查看收集器'),
+          new Permission(enName: 'dataCollector-add', cnName: '新增收集器'),
+          new Permission(enName: 'dataCollector-update', cnName: '更新收集器'),
+          new Permission(enName: 'dataCollector-del', cnName: '删除收集器'),
+          new Permission(enName: 'opHistory-read', cnName: '查看操作历史'),
+          new Permission(enName: 'decisionResult-read', cnName: '查看决策结果'),
+          new Permission(enName: 'collectResult-read', cnName: '查看收集记录')
+    ]
 
 
     @EL(name = "jpa_rule.started", async = true)
@@ -24,28 +50,7 @@ class UserSrv extends ServerTpl {
      * 初始化 权限数据
      */
     protected void initUserPermission() {
-        [// 默认静态权限
-         new Permission(enName: 'grant', cnName: '权限分配'),
-         new Permission(enName: 'mnt-login', cnName: '用户登陆'),
-         new Permission(enName: 'user-add', cnName: '新增用户'),
-         new Permission(enName: 'user-del', cnName: '删除用户'),
-         new Permission(enName: 'password-reset', cnName: '密码重置'),
-         new Permission(enName: 'decision-read', cnName: '查看决策'),
-         new Permission(enName: 'decision-add', cnName: '创建决策'),
-         // new Permission(enName: 'decision-del', cnName: '删除决策'),
-         // new Permission(enName: 'decision-update', cnName: '更新决策'),
-         new Permission(enName: 'field-read', cnName: '查看字段'),
-         new Permission(enName: 'field-add', cnName: '新增字段'),
-         new Permission(enName: 'field-update', cnName: '更新字段'),
-         new Permission(enName: 'field-del', cnName: '删除字段'),
-         new Permission(enName: 'dataCollector-read', cnName: '查看收集器'),
-         new Permission(enName: 'dataCollector-add', cnName: '新增收集器'),
-         new Permission(enName: 'dataCollector-update', cnName: '更新收集器'),
-         new Permission(enName: 'dataCollector-del', cnName: '删除收集器'),
-         new Permission(enName: 'opHistory-read', cnName: '查看操作历史'),
-         new Permission(enName: 'decisionResult-read', cnName: '查看决策结果'),
-         new Permission(enName: 'collectResult-read', cnName: '查看收集记录')
-        ].each { p ->
+        staticPermission.each { p ->
             // ConstraintViolationException
             if (!repo.find(Permission) { root, query, cb -> cb.equal(root.get("enName"), p.enName) }) {
                 repo.saveOrUpdate(p)
@@ -60,16 +65,16 @@ class UserSrv extends ServerTpl {
             ls.each { decision ->
                 if (!repo.count(Permission) {root, query, cb -> cb.equal(root.get("mark"), decision.id)}) { // 决策权限不存在,则创建
                     [ // 一个决策对应的所有权限
-                       new Permission(enName:  "decision-update-" + decision.id, cnName: "更新决策:" + decision.name, mark: decision.id),
-                       new Permission(enName:  "decision-del-" + decision.id, cnName: "删除决策:" + decision.name, mark: decision.id),
-                       new Permission(enName:  "decision-read-" + decision.id, cnName: "查看决策:" + decision.name, mark: decision.id)
+                       new Permission(enName:  "decision-update-" + decision.id, cnName: "更新决策:" + decision.name, mark: decision.id, comment: "动态权限"),
+                       new Permission(enName:  "decision-del-" + decision.id, cnName: "删除决策:" + decision.name, mark: decision.id, comment: "动态权限"),
+                       new Permission(enName:  "decision-read-" + decision.id, cnName: "查看决策:" + decision.name, mark: decision.id, comment: "动态权限")
                     ].each {repo.saveOrUpdate(it)}
                 }
             }
         }
 
         [// 初始化默认用户
-         new User(name: 'admin', password: 'admin', permissions: repo.findList(Permission, null).collect {it.enName}.join(","))
+         new User(name: 'admin', password: 'admin', group: 'admin', permissions: repo.findList(Permission, null).collect {it.enName}.join(","))
         ].each {u ->
             if (!repo.find(User) {root, query, cb -> cb.equal(root.get("name"), u.name)}) {
                 repo.saveOrUpdate(u)
@@ -105,9 +110,9 @@ class UserSrv extends ServerTpl {
                     }
         } else {
             def ps = [ // 一个决策对应的所有权限
-                       new Permission(enName:  "decision-update-" + decision.id, cnName: "更新决策:" + decision.name, mark: decision.id),
-                       new Permission(enName:  "decision-del-" + decision.id, cnName: "删除决策:" + decision.name, mark: decision.id),
-                       new Permission(enName:  "decision-read-" + decision.id, cnName: "查看决策:" + decision.name, mark: decision.id)
+                   new Permission(enName:  "decision-update-" + decision.id, cnName: "更新决策:" + decision.name, mark: decision.id, comment: "动态权限"),
+                   new Permission(enName:  "decision-del-" + decision.id, cnName: "删除决策:" + decision.name, mark: decision.id, comment: "动态权限"),
+                   new Permission(enName:  "decision-read-" + decision.id, cnName: "查看决策:" + decision.name, mark: decision.id, comment: "动态权限")
             ]
             def u = decision.creator ? repo.find(User) {root, query, cb -> cb.equal(root.get("name"), decision.creator)} : null
             if (u) { // 更新创建者的权限

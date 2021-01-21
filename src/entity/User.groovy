@@ -18,6 +18,11 @@ class User extends LongIdEntity  {
     @Column(unique = true)
     String name
     /**
+     * 用户组
+     */
+    @Column(name = "")
+    String group
+    /**
      * 登录的密码
      */
     String password
