@@ -47,7 +47,7 @@
             getCurrentUser() {
                 $.ajax({
                     url: 'mnt/getCurrentUser',
-                    async: false,
+                    // async: false,
                     success: (res) => {
                         if (res.code == '00') {
                             this.user = res.data;

@@ -8,7 +8,6 @@ import cn.xnatural.http.HttpContext
 import cn.xnatural.http.Path
 import cn.xnatural.jpa.Page
 import cn.xnatural.jpa.Repo
-import entity.Decision
 import entity.Permission
 import entity.User
 import service.rule.UserSrv
@@ -102,14 +101,14 @@ class MntUserCtrl extends ServerTpl {
         def user = repo.findById(User, id)
         if (!user) return ApiResp.fail("用户不存在")
         String originGroup //原来的group
-        if (!hCtx.hasAuth("grant") && hCtx.hasAuth("grant-user")) {
+        if (!hCtx.hasAuth("grant") && hCtx.hasAuth("grant-user")) { //组管理员
             if (user.group != hCtx.getSessionAttr("uGroup")) {
                 return ApiResp.fail("Not permission")
             }
-            if (permissionIds && permissionIds.contains("grant-user")) {
+            if (!user.permissions?.contains("grant") && permissionIds?.contains("grant")) { // grant-user 低权限不能分配高权限 grant
                 return ApiResp.fail("Not permission")
             }
-            if (group) { // grant-user 并且非 grant, 则不能修改用户组名
+            if (group && group != hCtx.getSessionAttr("uGroup")) { // grant-user 并且非 grant, 则不能修改用户组名
                 return ApiResp.fail("Param group unnecessary")
             }
         } else {
@@ -230,38 +229,64 @@ class MntUserCtrl extends ServerTpl {
 
     @Path(path = 'permissionPage')
     ApiResp permissionPage(HttpContext hCtx, Integer page, Integer pageSize, String kw, String[] notPermissionIds) {
-        // hCtx.auth("grant", "grant-user")
         if (page != null && page < 1) return ApiResp.fail("Param page >=1")
         if (pageSize != null && pageSize > 20) return ApiResp.fail("Param pageSize <=20 and >=1")
-        List pIds // 能查看的权限id
-        if (!hCtx.hasAuth("grant") && !hCtx.hasAuth("grant-user")) { //普通用户只能看到 自己创建的动态权限
-            pIds = repo.findList(Decision) {root, query, cb ->
-                cb.equal(root.get("creator"), hCtx.getSessionAttr("uName"))
-            }.findResults {it.id}
-            if (!pIds) return ApiResp.ok()
-        } else if (hCtx.hasAuth("grant-user")) { // grant-user 只能看到同一组所有用户创建的动态权限, 和公用静态权限
-            pIds = repo.findList(Decision) {root, query, cb ->
-                root.get("creator").in(repo.findList(User) {root1, query1, cb1 -> cb1.equal(root1.get("group"), hCtx.getSessionAttr("uGroup"))})
-            }.findResults {it.id}
-            pIds.addAll(bean(UserSrv).staticPermission)
-            pIds.remove("grant-user") //去掉 grant-user
-        }
-        ApiResp.ok(
-            repo.findPage(Permission, page?:1, pageSize?:10) {root, query, cb ->
-                query.orderBy(cb.desc(root.get('updateTime')))
-                def ps = []
-                if (notPermissionIds) {
-                    ps << root.get("enName").in(notPermissionIds).not()
+        if (hCtx.hasAuth("grant")) { // 管理员
+            return ApiResp.ok(
+                repo.findPage(Permission, page?:1, pageSize?:10) {root, query, cb ->
+                    query.orderBy(cb.desc(root.get('updateTime')))
+                    def ps = []
+                    if (notPermissionIds) {
+                        ps << root.get("enName").in(notPermissionIds).not()
+                    }
+                    if (kw) {
+                        ps << cb.or(cb.like(root.get("enName"), "%" + kw + "%"), cb.like(root.get("cnName"), "%" + kw + "%"))
+                    }
+                    cb.and(ps.toArray(new Predicate[ps.size()]))
                 }
-                if (kw) {
-                    ps << cb.or(cb.like(root.get("enName"), "%" + kw + "%"), cb.like(root.get("cnName"), "%" + kw + "%"))
-                }
-                if (pIds) {
-                    ps << root.get("mark").in(pIds)
-                }
-                cb.and(ps.toArray(new Predicate[ps.size()]))
+            )
+        } else if (hCtx.hasAuth("grant-user")) { // 组管理员 grant-user 只能看到同一组所有用户创建的动态权限, 和公用静态权限
+            List uNames = [hCtx.getSessionAttr("uName")]
+            if (hCtx.getSessionAttr("uGroup")) { // 组名存在, 则把组内所有用户名找出来
+                uNames = repo.trans{se -> se.createQuery("select name from User where group=:gp").setParameterList("gp", hCtx.getSessionAttr("uGroup")).list()}
             }
-        )
+            def marks = repo.trans{se -> se.createQuery("select id from Decision where creator in (:creator)").setParameterList("creator", uNames).list()}
+            return ApiResp.ok(
+                repo.findPage(Permission, page?:1, pageSize?:10) {root, query, cb ->
+                    query.orderBy(cb.desc(root.get('updateTime')))
+                    def ps = []
+                    if (marks) {
+                        ps << cb.or(root.get("mark").in(marks), (cb.and(root.get("mark").isNull(), root.get("enName").in("grant-user", "grant").not())))
+                    } else {
+                        ps << cb.and(root.get("mark").isNull(), root.get("enName").in("grant-user", "grant").not())
+                    }
+                    if (notPermissionIds) {
+                        ps << root.get("enName").in(notPermissionIds).not()
+                    }
+                    if (kw) {
+                        ps << cb.or(cb.like(root.get("enName"), "%" + kw + "%"), cb.like(root.get("cnName"), "%" + kw + "%"))
+                    }
+                    cb.and(ps.toArray(new Predicate[ps.size()]))
+                }
+            )
+        } else { //普通用户只能看到 自己创建的动态权限
+            def marks = repo.trans{se -> se.createQuery("select id from Decision where creator=:creator").setParameter("creator", hCtx.getSessionAttr("uName")).list()}
+            if (!marks) return ApiResp.ok(Page.empty())
+            return ApiResp.ok(
+                repo.findPage(Permission, page?:1, pageSize?:10) {root, query, cb ->
+                    query.orderBy(cb.desc(root.get('updateTime')))
+                    def ps = []
+                    ps << root.get("mark").in(marks)
+                    if (notPermissionIds) {
+                        ps << root.get("enName").in(notPermissionIds).not()
+                    }
+                    if (kw) {
+                        ps << cb.or(cb.like(root.get("enName"), "%" + kw + "%"), cb.like(root.get("cnName"), "%" + kw + "%"))
+                    }
+                    cb.and(ps.toArray(new Predicate[ps.size()]))
+                }
+            )
+        }
     }
 
 

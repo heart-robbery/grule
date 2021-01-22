@@ -22,8 +22,8 @@ class UserSrv extends ServerTpl {
           new Permission(enName: 'user-add', cnName: '新增用户'),
           new Permission(enName: 'user-del', cnName: '删除用户'),
           // new Permission(enName: 'password-reset', cnName: '密码重置'),
-          new Permission(enName: 'decision-read', cnName: '查看决策'),
-          new Permission(enName: 'decision-add', cnName: '创建决策'),
+          new Permission(enName: 'decision-read', cnName: '决策查看'),
+          new Permission(enName: 'decision-add', cnName: '决策创建'),
           // new Permission(enName: 'decision-del', cnName: '删除决策'),
           // new Permission(enName: 'decision-update', cnName: '更新决策'),
           new Permission(enName: 'field-read', cnName: '查看字段'),
@@ -65,9 +65,9 @@ class UserSrv extends ServerTpl {
             ls.each { decision ->
                 if (!repo.count(Permission) {root, query, cb -> cb.equal(root.get("mark"), decision.id)}) { // 决策权限不存在,则创建
                     [ // 一个决策对应的所有权限
-                       new Permission(enName:  "decision-update-" + decision.id, cnName: "更新决策:" + decision.name, mark: decision.id, comment: "动态权限"),
-                       new Permission(enName:  "decision-del-" + decision.id, cnName: "删除决策:" + decision.name, mark: decision.id, comment: "动态权限"),
-                       new Permission(enName:  "decision-read-" + decision.id, cnName: "查看决策:" + decision.name, mark: decision.id, comment: "动态权限")
+                       new Permission(enName:  "decision-update-" + decision.id, cnName: "更新决策:" + decision.name, mark: decision.id, comment: "动态权限-决策"),
+                       new Permission(enName:  "decision-del-" + decision.id, cnName: "删除决策:" + decision.name, mark: decision.id, comment: "动态权限-决策"),
+                       new Permission(enName:  "decision-read-" + decision.id, cnName: "查看决策:" + decision.name, mark: decision.id, comment: "动态权限-决策")
                     ].each {repo.saveOrUpdate(it)}
                 }
             }
@@ -110,9 +110,9 @@ class UserSrv extends ServerTpl {
                     }
         } else {
             def ps = [ // 一个决策对应的所有权限
-                   new Permission(enName:  "decision-update-" + decision.id, cnName: "更新决策:" + decision.name, mark: decision.id, comment: "动态权限"),
-                   new Permission(enName:  "decision-del-" + decision.id, cnName: "删除决策:" + decision.name, mark: decision.id, comment: "动态权限"),
-                   new Permission(enName:  "decision-read-" + decision.id, cnName: "查看决策:" + decision.name, mark: decision.id, comment: "动态权限")
+                   new Permission(enName:  "decision-update-" + decision.id, cnName: "更新决策:" + decision.name, mark: decision.id, comment: "动态权限-决策"),
+                   new Permission(enName:  "decision-del-" + decision.id, cnName: "删除决策:" + decision.name, mark: decision.id, comment: "动态权限-决策"),
+                   new Permission(enName:  "decision-read-" + decision.id, cnName: "查看决策:" + decision.name, mark: decision.id, comment: "动态权限-决策")
             ]
             def u = decision.creator ? repo.find(User) {root, query, cb -> cb.equal(root.get("name"), decision.creator)} : null
             if (u) { // 更新创建者的权限
@@ -134,7 +134,18 @@ class UserSrv extends ServerTpl {
                         ps.removeIf {it.enName == p.enName}
                     }
             // 创建新决策权限
-            ps?.each {repo.saveOrUpdate(it)}
+            ps?.each {p ->
+                if (p.enName.startsWith("decision-read-") && u.group) { //新创建的决策读权限, 自己为创建者的组管理员(grant-user)添加这个权限
+                    def gUser = repo.find(User) {root, query, cb -> cb.and(cb.equal(root.get("group"), u.group), cb.like(root.get("permissions"), "%grant-user%"))}
+                    if (gUser) { //存在组管理员
+                        LinkedHashSet ls = new LinkedHashSet(gUser.permissions?.split(",")?.toList()?:Collections.emptyList())
+                        ls.add(p.enName)
+                        gUser.permissions = ls.join(",")
+                        repo.saveOrUpdate(gUser)
+                    }
+                }
+                repo.saveOrUpdate(p)
+            }
         }
     }
 }

@@ -155,10 +155,10 @@
                     data: this.model,
                     success: (res) => {
                         if (res.code == '00') {
-                            // let arr = Array.from(new Set(res.data.map((o) => o.decisionId)));
+                            let cate = Array.from(new Set(res.data.map((o) => o.decisionName)));
                             this.option.yAxis = {
                                 type: 'category',
-                                data: Array.from(new Set(res.data.map((o) => o.decisionName)))
+                                data: cate
                             };
                             this.option.series = [
                                 {
@@ -167,9 +167,26 @@
                                     stack: '总量',
                                     label: {
                                         show: true,
-                                        position: 'insideRight'
+                                        position: 'insideRight',
+                                        normal: {
+                                            show: true,
+                                            formatter: function (params) {
+                                                if (params.value > 0) {
+                                                    return params.value;
+                                                } else {
+                                                    return '';
+                                                }
+                                            }
+                                        }
                                     },
-                                    data: res.data.filter(o => o.decision == 'Reject').map((o) => o.total)
+                                    data: (function () {
+                                        let arr = [];
+                                        cate.forEach(function(value, index, array){
+                                            let item = res.data.find(o => o.decision == 'Reject' && o.decisionName == value);
+                                            arr.push(item ? item.total : 0);
+                                        });
+                                        return arr;
+                                    })()
                                 },
                                 {
                                     name: '人工',
@@ -177,9 +194,26 @@
                                     stack: '总量',
                                     label: {
                                         show: true,
-                                        position: 'insideRight'
+                                        position: 'insideRight',
+                                        normal: {
+                                            show: true,
+                                            formatter: function (params) {
+                                                if (params.value > 0) {
+                                                    return params.value;
+                                                } else {
+                                                    return '';
+                                                }
+                                            }
+                                        }
                                     },
-                                    data: res.data.filter(o => o.decision == 'Review').map((o) => o.total)
+                                    data: (function () {
+                                        let arr = [];
+                                        cate.forEach(function(value, index, array){
+                                            let item = res.data.find(o => o.decision == 'Review' && o.decisionName == value);
+                                            arr.push(item ? item.total : 0);
+                                        });
+                                        return arr;
+                                    })()
                                 },
                                 {
                                     name: '通过',
@@ -187,10 +221,27 @@
                                     stack: '总量',
                                     label: {
                                         show: true,
-                                        position: 'insideRight'
+                                        position: 'insideRight',
+                                        normal: {
+                                            show: true,
+                                            formatter: function (params) {
+                                                if (params.value > 0) {
+                                                    return params.value;
+                                                } else {
+                                                    return '';
+                                                }
+                                            }
+                                        }
                                     },
-                                    data: res.data.filter(o => o.decision == 'Accept').map((o) => o.total)
-                                },
+                                    data: (function () {
+                                        let arr = [];
+                                        cate.forEach(function(value, index, array){
+                                            let item = res.data.find(o => o.decision == 'Accept' && o.decisionName == value);
+                                            arr.push(item ? item.total : 0);
+                                        });
+                                        return arr;
+                                    })()
+                                }
                             ];
                             if (cb) cb()
                         } else this.$Notice.error(res.desc)

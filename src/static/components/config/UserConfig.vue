@@ -6,7 +6,7 @@
 <template>
     <div class="h-panel">
         <div class="h-panel-bar">
-            <h-button v-if="sUser.permissionIds.find((e) => e == 'user-add') == 'user-add'" @click="showAddPop"><i class="h-icon-plus"></i></h-button>
+            <h-button v-if="sUser.permissionIds.find((e) => e == 'user-add')" @click="showAddPop"><i class="h-icon-plus"></i></h-button>
             <input type="text" placeholder="关键词" v-model="kw" @keyup.enter="load"/>
             <div class="h-panel-right">
                                 <i class="h-split"></i>
@@ -17,7 +17,11 @@
         <div class="h-panel-body">
             <div style="padding: 5px 0; margin: 0 10px;" v-for="item in list" :key="item.id">
                 <p style="font-size: 15px; font-weight: bold;">
-                    <span>{{item.name}}</span>&nbsp;&nbsp;&nbsp;<span v-if="item.group">{{item.group}}(组)</span>
+                    <span>{{item.name}}</span>
+                    <span v-if="item.permissionIds.find((e) => e == 'grant')">(超级管理员)</span>
+                    <span v-if="item.permissionIds.find((e) => e == 'grant-user')">(组管理员)</span>
+                    &nbsp;&nbsp;&nbsp;
+                    <span v-if="item.group">{{item.group}}(组)</span>
                     &nbsp;&nbsp;&nbsp;<span v-if="item.login">上次登录时间: <date-item :time="item.login" /></span>
                     &nbsp; &nbsp; <span v-if="sUser.permissionIds.find((e) => e == 'grant' || e == 'grant-user')" class="h-icon-edit text-hover" @click="showUpdatePop(item)"></span>
                     &nbsp; <span v-if="sUser.permissionIds.find((e) => e == 'grant' || e == 'grant-user')" class="h-icon-lock text-hover" @click="showResetPass(item)"></span>
@@ -47,8 +51,8 @@
                         <h-formitem label="用户名" icon="h-icon-user">
                             <input type="text" v-model="model.name" :readonly="user">
                         </h-formitem>
-                        <h-formitem v-if="user == null && !sUser.permissionIds.find((e) => e == 'grant-user')" label="组名" icon="h-icon-user">
-                            <input type="text" v-model="model.group">
+                        <h-formitem v-if="!(user == null && sUser.permissionIds.find((e) => e == 'grant-user'))" label="组名" icon="h-icon-user">
+                            <input type="text" v-model="model.group" :readonly="user && !sUser.permissionIds.find((e) => e == 'grant')">
                         </h-formitem>
                         <h-formitem v-if="!user" label="密码" icon="h-icon-user">
                             <input type="password" v-model="model.password">
@@ -72,7 +76,7 @@
                 sUser: app.$data.user,
                 isLoading: false,
                 option: {filterable: true},
-                model: this.user ? {id: this.user.id, name: this.user.name, permissions: this.user.permissions ? this.user.permissions.map(p => {
+                model: this.user ? {id: this.user.id, name: this.user.name, group: this.user.group, permissions: this.user.permissions ? this.user.permissions.map(p => {
                         let o = {enName: Object.keys(p)[0], cnName: Object.values(p)[0]};
                         return o;
                     }) : []} : {permissions: []},
@@ -84,6 +88,7 @@
                     loadData: (filter, cb) => {
                         $.ajax({
                             url: 'mnt/user/permissionPage',
+                            type: 'port',
                             data: {page: 1, pageSize: 5, kw: filter, notPermissionIds: this.model.permissions.map(o => o.enName)},
                             success: (res) => {
                                 if (res.code == '00') {
@@ -115,7 +120,7 @@
                             this.$emit('close');
                             this.$Message.success(`更新用户: ${this.model.name} 成功`);
                             this.$emit('reload');
-                        } else this.$Notice.error(res.desc)
+                        } else this.$Message.error(res.desc)
                     },
                     error: () => this.isLoading = false
                 })
@@ -199,6 +204,7 @@
                     this.list.map(o => {
                         if (o.permissions) {
                             o.permissionNames = o.permissions.filter(o => o).flatMap(p => Object.values(p))
+                            o.permissionIds = o.permissions.filter(o => o).flatMap(p => Object.keys(p))
                         }
                     })
                 }
