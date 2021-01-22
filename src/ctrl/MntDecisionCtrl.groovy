@@ -115,7 +115,7 @@ class MntDecisionCtrl extends ServerTpl {
                     ps << cb.like(root.get('content'), '%' + kw + '%')
                 }
                 if (type) {
-                    ps << cb.equal(root.get('tbName'), repo.tbName(Class.forName(Decision.package.name + "." + type)))
+                    ps << cb.equal(root.get('tbName'), repo.tbName(Class.forName(Decision.package.name + "." + type)).replace("`", ""))
                 }
                 cb.and(ps.toArray(new Predicate[ps.size()]))
             }
