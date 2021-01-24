@@ -7,6 +7,7 @@ import cn.xnatural.http.HttpContext
 import cn.xnatural.http.Path
 import cn.xnatural.jpa.Repo
 import entity.Decision
+import entity.DecisionResult
 import service.rule.DecisionManager
 
 import java.text.SimpleDateFormat
@@ -35,9 +36,9 @@ class MntAnalyseCtrl extends ServerTpl {
         def ids = hCtx.getSessionAttr("permissions").split(",").findResults {String p -> p.replace("decision-read-", "").replace("decision-read", "")}.findAll {it}
         if (!ids) return ApiResp.ok()
         ids = repo.findList(Decision) {root, query, cb -> root.get("id").in(ids)}.findResults {it.decisionId}
-        if (!ids) return ApiResp.ok()
+        if (!ids) return ApiResp.ok([])
         ApiResp.ok(repo.rows(
-                "select decision_id, decision, count(1) total from decision_result where occur_time>=:time and decision_id in (:ids) group by decision_id, decision",
+                "select decision_id, decision, count(1) total from " +repo.tbName(DecisionResult).replace("`", '')+ " where occur_time>=:time and decision_id in (:ids) group by decision_id, decision",
                 cal.getTime(), ids
         ).collect {Map<String, Object> record ->
             def data = new HashMap<>(5)

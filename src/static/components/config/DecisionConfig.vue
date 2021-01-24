@@ -356,6 +356,7 @@
                                 this.$Message.success('更新成功: ' + decision.name);
                             } else {
                                 $.extend(decision, res.data);
+                                decision.apiConfigO = decision.apiConfig ? JSON.parse(decision.apiConfig) : null;
                                 this.$Message.success('新增成功: ' + res.data.name);
                                 //this.load();
                             }

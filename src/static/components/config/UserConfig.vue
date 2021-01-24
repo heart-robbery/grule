@@ -23,9 +23,9 @@
                     &nbsp;&nbsp;&nbsp;
                     <span v-if="item.group">{{item.group}}(组)</span>
                     &nbsp;&nbsp;&nbsp;<span v-if="item.login">上次登录时间: <date-item :time="item.login" /></span>
-                    &nbsp; &nbsp; <span v-if="sUser.permissionIds.find((e) => e == 'grant' || e == 'grant-user')" class="h-icon-edit text-hover" @click="showUpdatePop(item)"></span>
-                    &nbsp; <span v-if="sUser.permissionIds.find((e) => e == 'grant' || e == 'grant-user')" class="h-icon-lock text-hover" @click="showResetPass(item)"></span>
-                    &nbsp; <span v-if="sUser.permissionIds.find((e) => e == 'user-del')" class="h-icon-trash text-hover" @click="del(item)"></span>
+                    &nbsp; &nbsp; <span v-if="!item._readonly" class="h-icon-edit text-hover" @click="showUpdatePop(item)"></span>
+                    &nbsp; <span v-if="item._restPassword" class="h-icon-lock text-hover" @click="showResetPass(item)"></span>
+                    &nbsp; <span v-if="item._deletable" class="h-icon-trash text-hover" @click="del(item)"></span>
                 </p>
 
                 <p class="tags"><h-taginput v-model="item.permissionNames" readonly></h-taginput></p>
@@ -49,13 +49,14 @@
                             :rules="validationRules"
                             :model="model">
                         <h-formitem label="用户名" icon="h-icon-user">
-                            <input type="text" v-model="model.name" :readonly="user">
+                            <input type="text" v-model="model.name" :readonly="user"/>
                         </h-formitem>
-                        <h-formitem v-if="!(user == null && sUser.permissionIds.find((e) => e == 'grant-user'))" label="组名" icon="h-icon-user">
-                            <input type="text" v-model="model.group" :readonly="user && !sUser.permissionIds.find((e) => e == 'grant')">
+                        <h-formitem v-if="!(user == null && sUser.permissionIds.find((e) => e == 'grant-user') && !sUser.permissionIds.find((e) => e == 'grant'))" label="组名" icon="h-icon-user">
+                            <input v-if="user && !sUser.permissionIds.find((e) => e == 'grant')" type="text" v-model="model.group" :readonly="true"/>
+                            <h-autocomplete v-else v-model="model.group" :option="groupOpt" placeholder="组名" type="title"/>
                         </h-formitem>
-                        <h-formitem v-if="!user" label="密码" icon="h-icon-user">
-                            <input type="password" v-model="model.password">
+                        <h-formitem v-if="!user" label="密码" icon="h-icon-lock">
+                            <input type="password" v-model="model.password"/>
                         </h-formitem>
                         <h-formitem label="权限" icon="h-icon-complete">
                             <h-autocomplete v-model="model.permissions" :option="permissionOpt" type="object" :multiple="true" placeholder="权限集"/>
@@ -63,9 +64,6 @@
                         <h-formitem>
                                 <h-button v-if="model.id" color="primary" :loading="isLoading" @click="update">提交</h-button>
                                 <h-button v-else color="primary" :loading="isLoading" @click="add">提交</h-button>
-                                &nbsp;&nbsp;&nbsp;
-<!--                                <h-button v-if="!model.id" @click="initModel">清除</h-button>-->
-<!--                                <h-button v-else @click="initModel">重置</h-button>-->
                         </h-formitem>
                     </h-form>
                 </div>
@@ -82,6 +80,21 @@
                     }) : []} : {permissions: []},
                 validationRules: {
                     required: ['name', 'password']
+                },
+                groupOpt: {
+                    loadData: (filter, cb) => {
+                      $.ajax({
+                        url: 'mnt/user/groupPage',
+                        data: {page: 1, pageSize: 5, kw: filter},
+                        success: (res) => {
+                          if (res.code == '00') {
+                            let ls = res.data.list;
+                            if (!ls || !ls.filter(e => e == filter)) ls.unshift(filter)
+                            cb(ls)
+                          } else this.$Message.error(res.desc)
+                        },
+                      });
+                    }
                 },
                 permissionOpt: {
                     keyName: 'enName', titleName: 'cnName', // minWord: 1,

@@ -2,7 +2,6 @@ package ctrl
 
 import cn.xnatural.app.ServerTpl
 import cn.xnatural.app.Utils
-import cn.xnatural.enet.event.EC
 import cn.xnatural.http.ApiResp
 import cn.xnatural.http.Ctrl
 import cn.xnatural.http.HttpContext
@@ -38,7 +37,6 @@ class MntDecisionCtrl extends ServerTpl {
         def delIds = hCtx.getSessionAttr("permissions").split(",").findResults {String p -> p.replace("decision-del-", "").replace("decision-del", "")}.findAll {it}
         def updateIds = hCtx.getSessionAttr("permissions").split(",").findResults {String p -> p.replace("decision-update-", "").replace("decision-update", "")}.findAll {it}
         ApiResp.ok(
-            Page.of(
                 repo.findPage(Decision, page, pageSize?:10) {root, query, cb ->
                     query.orderBy(cb.desc(root.get('updateTime')))
                     def ps = []
@@ -47,11 +45,9 @@ class MntDecisionCtrl extends ServerTpl {
                     if (nameLike) ps << cb.like(root.get('name'), '%' + nameLike + '%')
                     if (kw) ps << cb.like(root.get('dsl'), '%' + kw + '%')
                     cb.and(ps.toArray(new Predicate[ps.size()]))
-                },
-                {decision ->
+                }.to{decision ->
                     Utils.toMapper(decision).add("_deletable", delIds?.contains(decision.id)).add("_readonly", !updateIds?.contains(decision.id)).build()
                 }
-            )
         )
     }
 
@@ -60,16 +56,16 @@ class MntDecisionCtrl extends ServerTpl {
     ApiResp fieldPage(HttpContext hCtx, Integer page, Integer pageSize, String kw) {
         if (pageSize && pageSize > 50) return ApiResp.fail("Param pageSize <=50")
         hCtx.auth("field-read")
-        def fieldPage = Page.of(repo.findPage(RuleField, page, (pageSize?:10)) { root, query, cb ->
+        def fieldPage = repo.findPage(RuleField, page, (pageSize?:10)) { root, query, cb ->
             query.orderBy(cb.desc(root.get('updateTime')))
             if (kw) {
                 cb.or(
-                    cb.like(root.get('enName'), '%' + kw + '%'),
-                    cb.like(root.get('cnName'), '%' + kw + '%'),
-                    cb.like(root.get('comment'), '%' + kw + '%')
+                        cb.like(root.get('enName'), '%' + kw + '%'),
+                        cb.like(root.get('cnName'), '%' + kw + '%'),
+                        cb.like(root.get('comment'), '%' + kw + '%')
                 )
             }
-        }, { Utils.toMapper(it).ignore("metaClass").build()})
+        }.to{ Utils.toMapper(it).ignore("metaClass").build()}
         def collectorNames = fieldPage.list.collect {it.dataCollector}.findAll{it}.toSet()
         if (collectorNames) {
             repo.findList(DataCollector) {root, query, cb -> root.get('enName').in(collectorNames)}.each {dc ->
@@ -137,7 +133,6 @@ class MntDecisionCtrl extends ServerTpl {
         Date start = startTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(startTime) : null
         Date end = endTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(endTime) : null
         ApiResp.ok(
-            Page.of(
                 repo.findPage(DecisionResult, page, pageSize?:10) { root, query, cb ->
                     query.orderBy(cb.desc(root.get('occurTime')))
                     def ps = []
@@ -154,30 +149,28 @@ class MntDecisionCtrl extends ServerTpl {
                     if (attrs) ps << cb.like(root.get('attrs'), '%' + attrs + '%')
                     if (rules) ps << cb.like(root.get('rules'), '%' + rules + '%')
                     if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
-                },
-                {
+                }.to{
                     def am = bean(AttrManager)
                     Utils.toMapper(it).ignore("metaClass")
-                        .addConverter('decisionId', 'decisionName', { String dId ->
-                            bean(DecisionManager).findDecision(dId).spec.决策名
-                        }).addConverter('attrs', {
+                            .addConverter('decisionId', 'decisionName', { String dId ->
+                                bean(DecisionManager).findDecision(dId).spec.决策名
+                            }).addConverter('attrs', {
                         it == null ? null : JSON.parseObject(it).collect { e ->
                             [enName: e.key, cnName: am.fieldMap.get(e.key)?.cnName, value: e.value]
                         }}).addConverter('input', {
-                            it == null ? null : JSON.parseObject(it)
-                        }).addConverter('dataCollectResult', {
-                            it == null ? null : JSON.parseObject(it)
-                        }).addConverter('rules', {
-                            def arr = it == null ? null : JSON.parseArray(it)
-                            arr?.each { JSONObject jo ->
-                                jo.put('data', jo.getJSONObject('data').collect { Entry<String, Object> e ->
-                                    [enName: e.key, cnName: am.fieldMap.get(e.key)?.cnName, value: e.value]
-                                })
-                            }
-                            arr
-                        }).build()
+                        it == null ? null : JSON.parseObject(it)
+                    }).addConverter('dataCollectResult', {
+                        it == null ? null : JSON.parseObject(it)
+                    }).addConverter('rules', {
+                        def arr = it == null ? null : JSON.parseArray(it)
+                        arr?.each { JSONObject jo ->
+                            jo.put('data', jo.getJSONObject('data').collect { Entry<String, Object> e ->
+                                [enName: e.key, cnName: am.fieldMap.get(e.key)?.cnName, value: e.value]
+                            })
+                        }
+                        arr
+                    }).build()
                 }
-            )
         )
     }
 
@@ -195,40 +188,37 @@ class MntDecisionCtrl extends ServerTpl {
         Date start = startTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(startTime) : null
         Date end = endTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(endTime) : null
         if (pageSize && pageSize > 50) return ApiResp.fail("Param pageSize <=50")
-        def result = Page.of(
-            repo.findPage(CollectResult, page, pageSize?:10) { root, query, cb ->
-                query.orderBy(cb.desc(root.get('collectDate')))
-                def ps = []
-                ps << root.get('decisionId').in(ids)
-                if (decideId) ps << cb.equal(root.get('decideId'), decideId)
-                if (decisionId) ps << cb.equal(root.get('decisionId'), decisionId)
-                if (collectorType) ps << cb.equal(root.get('collectorType'), collectorType)
-                if (collector) ps << cb.equal(root.get('collector'), collector)
-                if (spend) ps << cb.ge(root.get('spend'), spend)
-                if (start) ps << cb.greaterThanOrEqualTo(root.get('collectDate'), start)
-                if (end) ps << cb.lessThanOrEqualTo(root.get('collectDate'), end)
-                if (success != null) {
-                    if (success) {
-                        ps << cb.equal(root.get('status'), '0000')
-                    } else {
-                        ps << cb.notEqual(root.get('status'), '0000')
-                    }
+        def result = repo.findPage(CollectResult, page, pageSize?:10) { root, query, cb ->
+            query.orderBy(cb.desc(root.get('collectDate')))
+            def ps = []
+            ps << root.get('decisionId').in(ids)
+            if (decideId) ps << cb.equal(root.get('decideId'), decideId)
+            if (decisionId) ps << cb.equal(root.get('decisionId'), decisionId)
+            if (collectorType) ps << cb.equal(root.get('collectorType'), collectorType)
+            if (collector) ps << cb.equal(root.get('collector'), collector)
+            if (spend) ps << cb.ge(root.get('spend'), spend)
+            if (start) ps << cb.greaterThanOrEqualTo(root.get('collectDate'), start)
+            if (end) ps << cb.lessThanOrEqualTo(root.get('collectDate'), end)
+            if (success != null) {
+                if (success) {
+                    ps << cb.equal(root.get('status'), '0000')
+                } else {
+                    ps << cb.notEqual(root.get('status'), '0000')
                 }
-                if (dataSuccess != null) {
-                    if (dataSuccess) {
-                        ps << cb.equal(root.get('dataStatus'), '0000')
-                    } else {
-                        ps << cb.notEqual(root.get('dataStatus'), '0000')
-                    }
+            }
+            if (dataSuccess != null) {
+                if (dataSuccess) {
+                    ps << cb.equal(root.get('dataStatus'), '0000')
+                } else {
+                    ps << cb.notEqual(root.get('dataStatus'), '0000')
                 }
-                if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
-            },
-            {record -> Utils.toMapper(record).ignore("metaClass")
+            }
+            if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
+        }.to{record -> Utils.toMapper(record).ignore("metaClass")
                 .addConverter('decisionId', 'decisionName', {String dId ->
                     bean(DecisionManager).findDecision(dId).spec.决策名
                 }).build()
-            }
-        )
+        }
         repo.findList(DataCollector) {root, query, cb -> root.get('enName').in(result.list.collect {it['collector']})}.each {dc ->
             for (def m : result.list) {
                 if (m['collector'] == dc.enName) {

@@ -60,9 +60,9 @@ class MntCtrl extends ServerTpl {
         if (!password) return ApiResp.fail('Param password not empty')
         def user = repo.find(User) {root, query, cb -> cb.equal(root.get('name'), username)}
         if (!user) return ApiResp.fail("用户不存在")
-        if (password != user.password) return ApiResp.fail('密码错误')
         hCtx.setSessionAttr('permissions', user.permissions)
         hCtx.auth("mnt-login")
+        if (password != user.password) return ApiResp.fail('密码错误')
 
         hCtx.setSessionAttr('uId', user.id)
         hCtx.setSessionAttr('uName', username)
@@ -74,6 +74,11 @@ class MntCtrl extends ServerTpl {
     }
 
 
+    /**
+     * 退出会话
+     * @param ctx
+     * @return
+     */
     @Path(path = 'logout')
     ApiResp logout(HttpContext ctx) {
         ctx.setSessionAttr('uId', null)
@@ -94,11 +99,11 @@ class MntCtrl extends ServerTpl {
             def uId = hCtx.getSessionAttr('uId')
             def permissions = repo.findById(User, Utils.to(uId, Long)).permissions
             hCtx.setSessionAttr('permissions', permissions)
-            ApiResp.ok().attr('id', uId).attr('name', name)
-                .attr('permissionIds', permissions.split(",")?:[])
+            return ApiResp.ok().attr('id', uId).attr('name', name)
+                    .attr('permissionIds', permissions.split(",")?:[])
         } else {
             hCtx.response.status(401)
-            ApiResp.fail('用户会话已失效, 请重新登录')
+            return ApiResp.fail('用户会话已失效, 请重新登录')
         }
     }
 }

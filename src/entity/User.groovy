@@ -20,7 +20,7 @@ class User extends LongIdEntity  {
     /**
      * 用户组
      */
-    @Column(name = "")
+    @Column(name = "gp")
     String group
     /**
      * 登录的密码
