@@ -16,26 +16,26 @@ class DecisionContext {
     // 决策执行标识(id)
                            String                         id
     // 开始时间
-    final                  Date                           startup = new Date()
-                           DecisionManager.DecisionHolder decisionHolder
-    protected              RuleSpec                       curRuleSpec
+    final                  Date                    startup = new Date()
+                    DecisionManager.DecisionHolder decisionHolder
+    protected       RuleSpec                       curRuleSpec
     // 当前正在执行的规则
-    protected              PassedRule                     curPassedRule
-    protected              PolicySpec                     curPolicySpec
+    protected       PassedRule                     curPassedRule
+    protected       PolicySpec                     curPolicySpec
     // 执行过的规则记录
-    protected final        List<PassedRule>               rules   = new LinkedList<>()
+    protected final List<PassedRule>               rules   = new LinkedList<>()
     // 最终决策结果
-                           DecisionEnum                   decisionResult
-                           AttrManager                    attrManager
-                           EP                             ep
+                    DecisionEnum                   decisionResult
+                    FieldManager                   fieldManager
+                    EP                             ep
     // 运行状态. TODO 以后做暂停时 running == false
-    protected final def                                   running           = new AtomicBoolean(false)
+    protected final def                            running           = new AtomicBoolean(false)
     // 是否已启动
-    protected final def                                   started           = new AtomicBoolean(false)
+    protected final def                            started           = new AtomicBoolean(false)
     // 是否执行结束
-    protected final def                                   end               = new AtomicBoolean(false)
+    protected final def                            end               = new AtomicBoolean(false)
     // 输入参数
-                           Map<String, Object> input
+                           Map<String, Object>     input
     // 最终数据属性值
     @Lazy protected Map<String, Object> data              = new Data(this)
     // 数据收集器名 -> 数据收集结果集. 不用 ConcurrentHashMap 因为不能放null值
@@ -223,7 +223,7 @@ class DecisionContext {
             def value = super.get(aName)
             if (value == null && !super.containsKey(aName) && !ctx.end.get()) {// 属性值未找到,则从属性管理器获取
                 safeSet(aName.toString(), null) // 代表属性已从外部获取过,后面就不再去获取了(防止重复获取)
-                safeSet((String) aName, ctx.getAttrManager().dataCollect(aName.toString(), ctx))
+                safeSet((String) aName, ctx.getFieldManager().dataCollect(aName.toString(), ctx))
                 value = super.get(aName)
             }
             if (value instanceof Optional) {
@@ -242,13 +242,13 @@ class DecisionContext {
          */
         protected Object safeSet(String key, Object value) {
             if (value instanceof Optional) {
-                value = value.present ? Optional.ofNullable(ctx.getAttrManager().convert(key, value.get())) : value
+                value = value.present ? Optional.ofNullable(ctx.getFieldManager().convert(key, value.get())) : value
             } else {
-                value = ctx.getAttrManager().convert(key, value) // 属性值类型转换
+                value = ctx.getFieldManager().convert(key, value) // 属性值类型转换
             }
             super.put(key, value)
 
-            def n = ctx.getAttrManager().alias(key)
+            def n = ctx.getFieldManager().alias(key)
             if (n && n != key) super.put(n, value)
             value
         }
@@ -262,7 +262,7 @@ class DecisionContext {
         @Override
         Object remove(Object key) { // 删除缓存
             def r = super.remove(key)
-            def field = ctx.getAttrManager().fieldMap.get(key)
+            def field = ctx.getFieldManager().fieldMap.get(key)
             if (field) ctx.dataCollectResult.remove(field.dataCollector)
             return r
         }
@@ -305,7 +305,7 @@ class DecisionContext {
             decision         : decisionResult, decisionId: decisionHolder.decision.decisionId, input: input,
             status           : status, exception: this.exception?.toString(),
             attrs            : data.collect {e ->
-                 if (!e.key.matches("[a-zA-Z0-9]+") && attrManager.alias(e.key)) {
+                 if (!e.key.matches("[a-zA-Z0-9]+") && fieldManager.alias(e.key)) {
                      return null
                  }
                  if (e.value instanceof Optional) {
@@ -319,7 +319,7 @@ class DecisionContext {
                     def v = e.value
                     if (v instanceof Optional) {v = v.orElseGet({null})}
                     if (!k.matches("[a-zA-Z0-9]+")) {
-                        k = getAttrManager().alias(k)?:k
+                        k = getFieldManager().alias(k)?:k
                     }
                     return [k, v]
             }]},
@@ -343,7 +343,7 @@ class DecisionContext {
                 if (v instanceof Optional) {v = v.orElseGet({null})}
                 if (n.matches("[a-zA-Z0-9]+")) return [n, v] // 取英文属性名
                 else {
-                    [attrManager.alias(n)?:n, v]
+                    [fieldManager.alias(n)?:n, v]
                 }
             }
          ]

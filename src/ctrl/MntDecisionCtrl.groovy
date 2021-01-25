@@ -12,9 +12,9 @@ import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONArray
 import com.alibaba.fastjson.JSONObject
 import entity.*
-import service.rule.AttrManager
 import service.rule.DecisionEnum
 import service.rule.DecisionManager
+import service.rule.FieldManager
 import service.rule.spec.DecisionSpec
 
 import javax.persistence.criteria.Predicate
@@ -150,7 +150,7 @@ class MntDecisionCtrl extends ServerTpl {
                     if (rules) ps << cb.like(root.get('rules'), '%' + rules + '%')
                     if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
                 }.to{
-                    def am = bean(AttrManager)
+                    def am = bean(FieldManager)
                     Utils.toMapper(it).ignore("metaClass")
                             .addConverter('decisionId', 'decisionName', { String dId ->
                                 bean(DecisionManager).findDecision(dId).spec.决策名
@@ -535,5 +535,11 @@ class MntDecisionCtrl extends ServerTpl {
         ep.fire('dataCollectorChange', enName)
         ep.fire('enHistory', collector, hCtx.getSessionAttr('uName'))
         ApiResp.ok()
+    }
+
+
+    @Path(path = 'testCollector/:collector')
+    ApiResp testCollector(String collector, HttpContext hCtx) {
+        ApiResp.ok(bean(FieldManager)?.testCollector(collector, hCtx.params()))
     }
 }

@@ -32,19 +32,20 @@
                         </h-switch>
                     </template>
                 </h-tableitem>
-                <h-tableitem v-if="sUser.permissionIds.find((e) => e == 'dataCollector-update' || e == 'dataCollector-del')" title="操作" align="center" :width="90">
+                <h-tableitem v-if="sUser.permissionIds.find((e) => e == 'dataCollector-update' || e == 'dataCollector-del')" title="操作" align="center" :width="110">
                     <template slot-scope="{data}">
                         <span v-if="sUser.permissionIds.find((e) => e == 'dataCollector-update') == 'dataCollector-update'" class="text-hover" @click="showUpdatePop(data)">编辑</span>
                         &nbsp;
                         <span v-if="sUser.permissionIds.find((e) => e == 'dataCollector-del') == 'dataCollector-del'" class="text-hover" @click="del(data)">删除</span>
+                        &nbsp;
+                        <span class="text-hover" @click="showTestPop(data)">测试</span>
                     </template>
                 </h-tableitem>
                 <div slot="empty">暂时无数据</div>
             </h-table>
         </div>
         <div v-if="totalRow" class="h-panel-bar">
-            <h-pagination ref="pagination" :cur="page" :total="totalRow" :size="pageSize"
-                          align="right" @change="load" layout="pager,total"></h-pagination>
+            <h-pagination ref="pagination" :cur="page" :total="totalRow" :size="pageSize" align="right" @change="load" layout="pager,total"></h-pagination>
         </div>
     </div>
 </template>
@@ -147,17 +148,6 @@
                 ],
             }
         },
-        watch: {
-            'model.computeScript'(v) {
-              console.log('computeScript')
-            },
-            'model.parseScript'(v) {
-              console.log('parseScript')
-            },
-            'model.type'(v) {
-              console.log(v)
-            },
-        },
         methods: {
             update() {
                 this.isLoading = true;
@@ -193,6 +183,76 @@
                     error: () => this.isLoading = false
                 })
             },
+        }
+    };
+    const testPop = { //测试弹框
+        props: ['collector'],
+        template: `
+            <div>
+            <h-row :space="10">
+                <h-cell>
+                    <input type="text" :value="url" placeholder="请求地址" style="width: 100%"/>
+                </h-cell>
+            </h-row>
+            <h-row :space="10" v-for="(param,index) in items">
+                <h-cell width="8"><input type="text" v-model="param.code" placeholder="参数名" style="float: left; width: 100%"/></h-cell>
+                <h-cell width="12">
+                    <input type="text" v-model="param.value" :placeholder="param.name" style="float: left; width: 100%"/>
+                </h-cell>
+                <h-cell width="2">
+                    <i v-if="items.length == (index + 1)" class="h-icon-plus" @click="add"></i>
+                    <i class="h-icon-minus" @click="del(param)"></i>
+                </h-cell>
+            </h-row>
+            <h-row>
+                <h-cell width="24">
+                    <h-button @click="test">测试</h-button>
+                </h-cell>
+            </h-row>
+            <h-row>
+                <ace-json v-model="result" height="200px" width="99%" :readonly="true"></ace-json>
+            </h-row>
+            </div>
+        `,
+        data() {
+            let cacheKey = 'rule.test.' + this.collector.enName;
+            return {
+                url: location.protocol + '//' + location.host + '/mnt/testCollector/' + this.collector.enName,
+                cacheKey: cacheKey,
+                items: (() => {
+                    let itemsStr = localStorage.getItem(cacheKey);
+                    if (itemsStr) return JSON.parse(itemsStr);
+                    return [{name: "参数", value: null}]
+                })(),
+                result: ''
+            }
+        },
+        methods: {
+            test() {
+                let items = this.items.filter(item => item.code);
+                if (items && items.length > 0) {
+                    items = items.map((param) => {let o={}; o[param.code] = param.value; return o}).reduce((o1, o2) => {let o = {...o1, ...o2}; return o})
+                } else items = null;
+                this.result = '';
+                $.ajax({
+                    url: this.url,
+                    data: items,
+                    success: (res) => {
+                        if (res.code == '00') {
+                            this.result = JSON.stringify(res.data, null, 4).trim();
+                            this.$Message.success(`测试调用: ${this.collector.cnName} 成功`);
+                            localStorage.setItem(this.cacheKey, JSON.stringify(this.items.map(o => {return {code: o.code, value: o.value}})));
+                        } else this.$Message.error(res.desc);
+                    }
+                })
+            },
+            add() {
+                this.items.push({name: `参数${this.items.length + 1}`, value: null})
+            },
+            del(param) {
+                let index = this.items.indexOf(param);
+                this.items.splice(index, 1)
+            }
         }
     };
     module.exports = {
@@ -248,6 +308,17 @@
                     },
                     width: 850,
                     hasCloseIcon: true, fullScreen: false, middle: false, transparent: false, closeOnMask: false,
+                })
+            },
+            showTestPop(item) {
+                this.$Modal({
+                    title: `测试: ${item.cnName}`, draggable: true,
+                    component: {
+                        vue: testPop,
+                        datas: {collector: item}
+                    },
+                    width: 750, closeOnMask: false,
+                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false,
                 })
             },
             enableSwitch(item) {

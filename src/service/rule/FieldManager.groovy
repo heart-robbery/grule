@@ -28,7 +28,7 @@ import java.util.function.Function
  * 属性别名
  * 属性值函数
  */
-class AttrManager extends ServerTpl {
+class FieldManager extends ServerTpl {
     static final String                          DATA_COLLECTED = "data_collected"
     @Lazy def                                    repo           = bean(Repo, 'jpa_rule_repo')
     /**
@@ -131,6 +131,16 @@ class AttrManager extends ServerTpl {
 
 
     /**
+     * 测试 收集器
+     * @param collector 收集器名
+     * @param param 参数
+     */
+    def testCollector(String collector, Map param) {
+        collectors.get(collector)?.testComputeFn?.apply(param)
+    }
+
+
+    /**
      * 决策产生的数据接口调用
      * @param collectResult CollectResult
      */
@@ -189,7 +199,6 @@ class AttrManager extends ServerTpl {
             remoter.dataVersion('field').update(enName, field ? field.updateTime.time : System.currentTimeMillis(), null)
         }
     }
-
 
     @EL(name = ['dataCollectorChange', 'dataCollector.dataVersion'], async = true)
     void listenDataCollectorChange(EC ec, String enName) {
@@ -381,6 +390,8 @@ if (idNumber && idNumber.length() > 17) {
                 scriptException: exx == null ? null : exx.message?:exx.class.simpleName
             ))
             return result
+        }, testComputeFn: {param ->
+            sqlScript.rehydrate(param, sqlScript, this)()
         }))
     }
 
@@ -422,6 +433,8 @@ if (idNumber && idNumber.length() > 17) {
                 scriptException: ex == null ? null : ex.message?:ex.class.simpleName
             ))
             return result
+        }, testComputeFn: {param ->
+            script.rehydrate(param, script, this)()
         }))
     }
 
@@ -459,6 +472,7 @@ if (idNumber && idNumber.length() > 17) {
             icz.addImports(JSON.class.name, JSONObject.class.name, Utils.class.name)
             successFn = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("$collector.dataSuccessScript")
         }
+
         // GString 模板替换
         def tplEngine = new GStringTemplateEngine(Thread.currentThread().contextClassLoader)
         collectors.put(collector.enName, new CollectorHolder(collector: collector, computeFn: { ctx -> // 数据集成中3方接口访问过程
@@ -576,6 +590,66 @@ if (idNumber && idNumber.length() > 17) {
                 spend: spend, url: url, body: bodyStr, result: result
             ))
             return dataStatus == '0000' ? result : null
+        }, testComputeFn: {param ->
+            // http请求 url
+            String url = collector.url
+            for (int i = 0; i < 2; i++) { // 替换 ${} 变量
+                if (!url.contains('${')) break
+                url = tplEngine.createTemplate(url).make(new HashMap(1) {
+                    int paramIndex
+                    @Override
+                    boolean containsKey(Object key) { return true } // 加这行是为了 防止 MissingPropertyException
+                    @Override
+                    Object get(Object key) {
+                        paramIndex++ // 获取个数记录
+                        def v = param.get(key)
+                        // url前缀不必编码, 其它参数需要编码
+                        return v == null ? '' : (paramIndex==1 && v.toString().startsWith("http") && collector.url.startsWith('${') ? v : URLEncoder.encode(v.toString(), 'utf-8'))
+                    }
+
+                    @Override
+                    Object put(Object key, Object value) {
+                        log.error("$collector.enName url config error, not allow set property '$key'".toString())
+                        null
+                    }
+                }).toString()
+            }
+
+            // http 请求 body字符串
+            String bodyStr = collector.bodyStr
+            for (int i = 0; i < 2; i++) { // 替换 ${} 变量
+                if (!bodyStr || !bodyStr.contains('${')) break
+                bodyStr = collector.bodyStr ? tplEngine.createTemplate(bodyStr).make(new HashMap(1) {
+                    @Override
+                    boolean containsKey(Object key) { return true } // 加这行是为了 防止 MissingPropertyException
+                    @Override
+                    Object get(Object key) { param.get(key)?:"" }
+                    @Override
+                    Object put(Object key, Object value) {
+                        log.error("$collector.enName bodyStr config error, not allow set property '$key'".toString())
+                        null
+                    }
+                }).toString() : ''
+            }
+            // NOTE: 如果是json 并且是,} 结尾, 则删除 最后的,(因为spring解析入参数会认为json格式错误)
+            // if (bodyStr.endsWith(',}')) bodyStr = bodyStr.substring(0, bodyStr.length() - 3) + '}'
+
+            String result // 接口返回结果字符串
+            Object resolveResult // 解析接口返回结果
+
+            if ('get'.equalsIgnoreCase(collector.method)) {
+                result = http.get(url).execute()
+            } else if ('post'.equalsIgnoreCase(collector.method)) {
+                result = http.post(url).textBody(bodyStr).contentType(collector.contentType).execute()
+            } else throw new Exception("Not support http method $collector.method")
+
+            // http 返回结果成功判断. 默认成功
+            String dataStatus = successFn ? (successFn.rehydrate(param, successFn, this)(result) ? '0000' : '0001') : '0000'
+
+            if (parseFn && dataStatus == '0000') { // 解析接口返回结果
+                return parseFn.rehydrate(param, parseFn, this)(result)
+            }
+            return result
         }))
     }
 
@@ -588,6 +662,8 @@ if (idNumber && idNumber.length() > 17) {
         DataCollector collector
         // 把收集器转换的执行函数
         Function<DecisionContext, Object> computeFn
+        // 单元测试函数
+        Function<Map, Object> testComputeFn
         // DB
         Sql sql
 

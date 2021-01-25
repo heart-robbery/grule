@@ -7,18 +7,15 @@ import cn.xnatural.http.HttpContext
 import cn.xnatural.http.Path
 import cn.xnatural.jpa.Repo
 import entity.DecisionResult
-import service.rule.AttrManager
-import service.rule.DecisionContext
-import service.rule.DecisionManager
-import service.rule.DecisionSrv
+import service.rule.*
 
 @Ctrl
 class RuleCtrl extends ServerTpl {
 
-    @Lazy def decisionSrv = bean(DecisionSrv)
-    @Lazy def dm          = bean(DecisionManager)
-    @Lazy def am = bean(AttrManager)
-    @Lazy def repo        = bean(Repo, 'jpa_rule_repo')
+    @Lazy def decisionSrv  = bean(DecisionSrv)
+    @Lazy def dm           = bean(DecisionManager)
+    @Lazy def fieldManager = bean(FieldManager)
+    @Lazy def repo         = bean(Repo, 'jpa_rule_repo')
 
 
     /**
@@ -45,7 +42,7 @@ class RuleCtrl extends ServerTpl {
         DecisionContext dCtx = new DecisionContext()
         dCtx.setDecisionHolder(decision)
         dCtx.setId(ctx.request.id)
-        dCtx.setAttrManager(am)
+        dCtx.setFieldManager(fieldManager)
         dCtx.setEp(ep)
         dCtx.setInput(params)
         repo.saveOrUpdate(new DecisionResult(id: dCtx.id, decisionId: decisionId, occurTime: dCtx.startup))

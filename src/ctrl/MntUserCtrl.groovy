@@ -236,8 +236,8 @@ class MntUserCtrl extends ServerTpl {
             }
             // 验证是否都是可以分配的权限
             for (def pId : permissionIds) {
-                // 自己修改自己, 则自己已有的权限不必验证
-                if (targetUserIsMe && targetUserPIds?.contains(pId)) continue
+                // 自己已有的权限不必验证
+                if (targetUserPIds?.contains(pId)) continue
 
                 if (!(permissionPage(hCtx, 1, 1, null, pId, null).data?.list?.find {it.enName == pId})) {
                     return ApiResp.fail("Not permission, " + pId)

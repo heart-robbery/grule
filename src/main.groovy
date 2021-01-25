@@ -87,7 +87,7 @@ app.addSource(new HttpSrv().ctrls(
 ))
 app.addSource(new FileUploader())
 app.addSource(new TestService())
-app.addSource(new AttrManager())
+app.addSource(new FieldManager())
 app.addSource(new DecisionSrv())
 app.addSource(new DecisionManager())
 app.addSource(new OpHistorySrv())

@@ -88,8 +88,8 @@
                         data: {page: 1, pageSize: 5, kw: filter},
                         success: (res) => {
                           if (res.code == '00') {
-                            let ls = res.data.list;
-                            if (!ls || !ls.filter(e => e == filter)) ls.unshift(filter)
+                            let ls = res.data.list || [];
+                            if (ls.length < 1 || !ls.filter(e => e == filter)) ls.unshift(filter);
                             cb(ls)
                           } else this.$Message.error(res.desc)
                         },
