@@ -31,6 +31,7 @@ class DecisionSrv extends ServerTpl {
                     log.error("保存决策结果到数据库错误", ex)
                     ep.fire("globalMsg", "保存决策结果到数据库错误: " + (ex.message?:ex.class.simpleName))
                 }
+                Thread.sleep(500 + new Random().nextInt(1000))
             }
     }
 

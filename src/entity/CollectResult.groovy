@@ -75,16 +75,22 @@ class CollectResult implements IEntity {
     /**
      * http 请求异常
      */
-    @Column(length = 1000)
+    @Lob
+    @Basic
+    @Type(type = "text")
     String httpException
     /**
      * 解析http返回异常
      */
-    @Column(length = 1000)
+    @Lob
+    @Basic
+    @Type(type = "text")
     String parseException
     /**
      * 脚本执行异常
      */
-    @Column(length = 1000)
+    @Lob
+    @Basic
+    @Type(type = "text")
     String scriptException
 }

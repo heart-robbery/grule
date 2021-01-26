@@ -128,7 +128,7 @@
         data() {
             let defaultModel = {type: 'http', method: 'GET', timeout: 10000, contentType: 'application/x-www-form-urlencoded', minIdle: 1, maxActive: 8, dataSuccessScript:
 `{resultStr ->
-    resultStr ? JSON.parseObject(resultStr)?['code'] == '0000' : false
+    return resultStr ? JSON.parseObject(resultStr)?['code'] == '0000' : false
 }`
             };
             return {

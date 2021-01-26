@@ -297,35 +297,35 @@ class DecisionContext {
      * 整条决策 所有信息
      * @return
      */
-    private Map<String, Object> summary
+    private Map<String, Object> _summary
     Map<String, Object> summary() {
-        if (this.summary && end.get()) return this.summary
-        this.summary = [
+        if (this._summary && end.get()) return this._summary
+        this._summary = [
             id               : id, occurTime: startup, spend: System.currentTimeMillis() - startup.time,
             decision         : decisionResult, decisionId: decisionHolder.decision.decisionId, input: input,
             status           : status, exception: this.exception?.toString(),
-            attrs            : data.collect {e ->
-                 if (!e.key.matches("[a-zA-Z0-9]+") && fieldManager.alias(e.key)) {
-                     return null
-                 }
-                 if (e.value instanceof Optional) {
-                     return [e.key, e.value.orElseGet({null})]
-                 }
-                 return e
-            }.findAll {it} .collectEntries(),
+            attrs            : data.collect { e ->
+                def field = fieldManager.fieldMap.get(e.key)
+                if (field && field.cnName == e.key) return null //去重复记录(去对应的中文, 保留对应的英文)
+                if (e.value instanceof Optional) {
+                    return [e.key, e.value.orElseGet({ null })]
+                }
+                return e
+            }.findAll { it }.collectEntries(),
             rules            : rules.collect { r ->
                 [attrs: r.attrs, decision: r.decision, data: r.data.collectEntries { e ->
                     String k = e.key
-                    def v = e.value
-                    if (v instanceof Optional) {v = v.orElseGet({null})}
-                    if (!k.matches("[a-zA-Z0-9]+")) {
-                        k = getFieldManager().alias(k)?:k
+                    def v = e.value instanceof Optional ? e.value.orElseGet({ null }) : e.value
+                    def field = fieldManager.fieldMap.get(e.key)
+                    if (field && field.cnName == e.key) { //如果key是中文, 则翻译成对应的英文名
+                        k = field.enName
                     }
                     return [k, v]
-            }]},
+                }]
+            },
             dataCollectResult: dataCollectResult
         ]
-        this.summary
+        this._summary
     }
 
 
@@ -338,13 +338,13 @@ class DecisionContext {
             id    : id, decision: decisionResult, decisionId: decisionHolder.decision.decisionId,
             status: status,
             desc  : exception?.toString(),
-            attrs : decisionHolder.spec.returnAttrs.collectEntries { n ->
-                def v = data.get(n)
+            attrs : decisionHolder.spec.returnAttrs.collectEntries { name ->
+                def v = data.get(name)
                 if (v instanceof Optional) {v = v.orElseGet({null})}
-                if (n.matches("[a-zA-Z0-9]+")) return [n, v] // 取英文属性名
-                else {
-                    [fieldManager.alias(n)?:n, v]
-                }
+                def field = fieldManager.fieldMap.get(name)
+                //如果key是中文, 则翻译成对应的英文名
+                if (field && field.cnName == name) return [field.enName, v]
+                else return [name, v]
             }
          ]
     }

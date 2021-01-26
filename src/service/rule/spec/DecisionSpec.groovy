@@ -3,6 +3,8 @@ package service.rule.spec
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.ImportCustomizer
 
+import java.lang.reflect.Array
+
 /**
  * 决策 DSL
  */
@@ -15,6 +17,10 @@ class DecisionSpec {
     @Lazy List<PolicySpec> policies    = new LinkedList<>()
     @Lazy Set<String>      returnAttrs = new LinkedHashSet<>()
     @Lazy Map<String, Object> attrs = new HashMap<>()
+    /**
+     * 自定义函数
+     */
+    @Lazy Map<String, Closure> functions = new HashMap<>()
     // 预操作函数
     protected Closure operateFn
 
@@ -26,6 +32,14 @@ class DecisionSpec {
             cl()
             null
         }
+    }
+
+
+    DecisionSpec 函数定义(String 函数名, Closure 函数) {
+        if (!函数名) throw new IllegalArgumentException("函数名 不能为空")
+        if (!函数) throw new IllegalArgumentException("函数 不能为空")
+        functions.put(函数名, 函数)
+        this
     }
 
 
@@ -42,6 +56,27 @@ class DecisionSpec {
         code.resolveStrategy = Closure.DELEGATE_FIRST
         code()
         this
+    }
+
+
+    /**
+     * 函数拦截 调用
+     * @param name 函数名
+     * @param args 参数
+     * @return
+     */
+    def methodMissing(String name, def args) {
+        def fn = functions.get(name)
+        if (fn) {
+            int length = Array.getLength(args)
+            if (length == 0) return fn()
+            else if (length == 1) return fn(Array.get(args, 0))
+            else if (length == 2) return fn(Array.get(args, 0), Array.get(args, 1))
+            else if (length == 3) return fn(Array.get(args, 0), Array.get(args, 1), Array.get(args, 2))
+            else if (length == 4) return fn(Array.get(args, 0), Array.get(args, 1), Array.get(args, 2), Array.get(args, 3))
+            else throw new Exception("args too much")
+        }
+        else throw new MissingMethodException(name, DecisionSpec, args)
     }
 
 

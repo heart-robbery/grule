@@ -55,6 +55,7 @@ class FieldManager extends ServerTpl {
                     log.error("保存数据收集结果到数据库错误", ex)
                     ep.fire("globalMsg", "保存数据收集结果到数据库错误: " + (ex.message?:ex.class.simpleName))
                 }
+                Thread.sleep(500 + new Random().nextInt(1000))
             }
 
         ep.fire("${name}.started")
@@ -638,9 +639,9 @@ if (idNumber && idNumber.length() > 17) {
             Object resolveResult // 解析接口返回结果
 
             if ('get'.equalsIgnoreCase(collector.method)) {
-                result = http.get(url).execute()
+                result = http.get(url).debug().execute()
             } else if ('post'.equalsIgnoreCase(collector.method)) {
-                result = http.post(url).textBody(bodyStr).contentType(collector.contentType).execute()
+                result = http.post(url).textBody(bodyStr).contentType(collector.contentType).debug().execute()
             } else throw new Exception("Not support http method $collector.method")
 
             // http 返回结果成功判断. 默认成功
@@ -649,7 +650,7 @@ if (idNumber && idNumber.length() > 17) {
             if (parseFn && dataStatus == '0000') { // 解析接口返回结果
                 return parseFn.rehydrate(param, parseFn, this)(result)
             }
-            return result
+            return dataStatus == '0000' ? result : null
         }))
     }
 
