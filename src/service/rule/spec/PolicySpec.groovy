@@ -8,11 +8,21 @@ import org.codehaus.groovy.control.customizers.ImportCustomizer
  */
 class PolicySpec {
     String                         策略名
+    /**
+     * 规则集
+     */
     final List<RuleSpec> rules = new LinkedList<>()
+    /**
+     * 自定义属性集
+     */
     @Lazy Map<String, Object> attrs = new HashMap<>()
-    // 进入条件函数
+    /**
+     * 进入条件函数
+     */
     protected Closure condition
-    // 预操作函数
+    /**
+     * 预操作函数
+     */
     protected Closure operateFn
 
 

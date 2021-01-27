@@ -397,9 +397,9 @@ class MntDecisionCtrl extends ServerTpl {
 //        if (enName != field.enName && repo.count(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}) {
 //            return ApiResp.fail("$enName aleady exist")
 //        }
-//        if (cnName != field.cnName && repo.count(RuleField) {root, query, cb -> cb.equal(root.get('cnName'), cnName)}) {
-//            return ApiResp.fail("$cnName aleady exist")
-//        }
+        if (cnName != field.cnName && repo.count(RuleField) {root, query, cb -> cb.equal(root.get('cnName'), cnName)}) {
+            return ApiResp.fail("$cnName aleady exist")
+        }
         field.enName = enName
         field.cnName = cnName
         field.type = type

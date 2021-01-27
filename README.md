@@ -14,10 +14,10 @@
 ### 使用说明
 jdk8, gradle6.5+
 
-1. git clone https://gitee.com/xnat/gy.git
-2. git checkout rule
- * linux: nohup sh start.sh -Xmx512m -Xms512m -Dprofile=rule > /dev/null 2>&1 &
- * windows: ./start -Dprofile=rule
+1. git clone https://gitee.com/xnat/rule.git
+2. 
+ * linux: nohup sh start.sh -Xmx512m -Xms512m > /dev/null 2>&1 &
+ * windows: ./start
 
 
 #### 参与贡献

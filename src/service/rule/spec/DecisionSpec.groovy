@@ -1,5 +1,8 @@
 package service.rule.spec
 
+import cn.xnatural.app.Utils
+import com.alibaba.fastjson.JSON
+import com.alibaba.fastjson.JSONObject
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.ImportCustomizer
 
@@ -13,9 +16,17 @@ class DecisionSpec {
     String 决策名
     String 决策描述
 
-    // 策略集: 顺序执行
+    /**
+     * 策略集: 顺序执行
+     */
     @Lazy List<PolicySpec> policies    = new LinkedList<>()
+    /**
+     * 接口返回属性集
+     */
     @Lazy Set<String>      returnAttrs = new LinkedHashSet<>()
+    /**
+     * 自定义属性
+     */
     @Lazy Map<String, Object> attrs = new HashMap<>()
     /**
      * 自定义函数
@@ -74,7 +85,7 @@ class DecisionSpec {
             else if (length == 2) return fn(Array.get(args, 0), Array.get(args, 1))
             else if (length == 3) return fn(Array.get(args, 0), Array.get(args, 1), Array.get(args, 2))
             else if (length == 4) return fn(Array.get(args, 0), Array.get(args, 1), Array.get(args, 2), Array.get(args, 3))
-            else throw new Exception("args too much")
+            else throw new Exception("Custom function args length: " + length)
         }
         else throw new MissingMethodException(name, DecisionSpec, args)
     }
@@ -102,7 +113,7 @@ class DecisionSpec {
         def config = new CompilerConfiguration()
         def icz = new ImportCustomizer()
         config.addCompilationCustomizers(icz)
-        icz.addImports(DecisionSpec.class.name)
+        icz.addImports(DecisionSpec.class.name, JSON.class.name, JSONObject.class.name, Utils.class.name)
         def shell = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config)
         shell.evaluate("service.rule.spec.DecisionSpec.of{$dsl}")
     }

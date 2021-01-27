@@ -505,7 +505,7 @@ if (idNumber && idNumber.length() > 17) {
             String bodyStr = collector.bodyStr
             for (int i = 0; i < 2; i++) { // 替换 ${} 变量
                 if (!bodyStr || !bodyStr.contains('${')) break
-                bodyStr = collector.bodyStr ? tplEngine.createTemplate(bodyStr).make(new HashMap(1) {
+                bodyStr = tplEngine.createTemplate(bodyStr).make(new HashMap(1) {
                     @Override
                     boolean containsKey(Object key) { return true } // 加这行是为了 防止 MissingPropertyException
                     @Override
@@ -515,7 +515,7 @@ if (idNumber && idNumber.length() > 17) {
                         log.error("$collector.enName bodyStr config error, not allow set property '$key'".toString())
                         null
                     }
-                }).toString() : ''
+                }).toString()
             }
             // NOTE: 如果是json 并且是,} 结尾, 则删除 最后的,(因为spring解析入参数会认为json格式错误)
             // if (bodyStr.endsWith(',}')) bodyStr = bodyStr.substring(0, bodyStr.length() - 3) + '}'
@@ -620,7 +620,7 @@ if (idNumber && idNumber.length() > 17) {
             String bodyStr = collector.bodyStr
             for (int i = 0; i < 2; i++) { // 替换 ${} 变量
                 if (!bodyStr || !bodyStr.contains('${')) break
-                bodyStr = collector.bodyStr ? tplEngine.createTemplate(bodyStr).make(new HashMap(1) {
+                bodyStr = tplEngine.createTemplate(bodyStr).make(new HashMap(1) {
                     @Override
                     boolean containsKey(Object key) { return true } // 加这行是为了 防止 MissingPropertyException
                     @Override
@@ -630,7 +630,7 @@ if (idNumber && idNumber.length() > 17) {
                         log.error("$collector.enName bodyStr config error, not allow set property '$key'".toString())
                         null
                     }
-                }).toString() : ''
+                }).toString()
             }
             // NOTE: 如果是json 并且是,} 结尾, 则删除 最后的,(因为spring解析入参数会认为json格式错误)
             // if (bodyStr.endsWith(',}')) bodyStr = bodyStr.substring(0, bodyStr.length() - 3) + '}'
