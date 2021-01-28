@@ -47,6 +47,10 @@ class CollectResult implements IEntity {
      */
     Long   spend
     /**
+     * 是否取的缓存
+     */
+    Boolean cache
+    /**
      * http 调用 url
      */
     @Column(length = 1000)

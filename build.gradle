@@ -67,6 +67,7 @@ dependencies {
     // compile('org.apache.httpcomponents:httpclient:4.5.12')
     compile ('org.ehcache:ehcache:3.8.1') {exclude group:'org.slf4j'}
     compile 'redis.clients:jedis:3.3.0'
+    compile 'org.jsoup:jsoup:1.13.1'
 
     // 分布式数据一致框架
     // compile 'io.atomix:atomix:3.1.8'

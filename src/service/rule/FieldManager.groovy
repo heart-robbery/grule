@@ -9,7 +9,9 @@ import cn.xnatural.remoter.Remoter
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
 import com.alibaba.fastjson.serializer.SerializerFeature
+import core.EhcacheSrv
 import core.OkHttpSrv
+import core.RedisClient
 import entity.CollectResult
 import entity.DataCollector
 import entity.FieldType
@@ -31,6 +33,8 @@ import java.util.function.Function
 class FieldManager extends ServerTpl {
     static final String                          DATA_COLLECTED = "data_collected"
     @Lazy def                                    repo           = bean(Repo, 'jpa_rule_repo')
+    @Lazy def                                    redis          = bean(RedisClient)
+    @Lazy def                                    ehcache        = bean(EhcacheSrv)
     /**
      * RuleField(enName, cnName), RuleField
      */
@@ -356,6 +360,7 @@ if (idNumber && idNumber.length() > 17) {
         if (collector.maxActive < 1 || collector.maxActive > 100) {
             log.warn('1 <= minIdle <= 100'); return
         }
+        collectors.remove(collector.enName)?.close()
 
         def db = new Sql(Repo.createDataSource([ //创建一个DB. 用于界面配置sql脚本
             url: collector.url, jdbcUrl: collector.url,
@@ -371,22 +376,76 @@ if (idNumber && idNumber.length() > 17) {
         icz.addImports(JSON.class.name, JSONObject.class.name, Utils.class.name)
         Closure sqlScript = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("{ -> $collector.sqlScript }")
 
-        collectors.remove(collector.enName)?.close()
+        // GString 模板替换
+        def tplEngine = new GStringTemplateEngine(Thread.currentThread().contextClassLoader)
         collectors.put(collector.enName, new CollectorHolder(collector: collector, sql: db, computeFn: { ctx ->
-            def start = new Date()
-            Object result
-            Exception exx
-            try {
-                result = sqlScript.rehydrate(ctx.data, sqlScript, this)()
-                log.info(ctx.logPrefix() + "Sql脚本函数'$collector.enName'执行结果: $result".toString())
-            } catch (ex) {
-                exx = ex
-                log.error(ctx.logPrefix() + "Sql脚本函数'$collector.enName'执行失败".toString(), ex)
+            Object result // 结果
+            Exception exx //异常
+            String cacheKey //缓存key
+            Boolean cache = false //结果是否取自缓存
+            def start = new Date() //取数据开始时间
+            long spend
+
+            //1. 先从缓存中取
+            if (collector.cacheTimeout && collector.cacheKey) {
+                cacheKey = collector.cacheKey
+                for (int i = 0; i < 2; i++) { // 替换 ${} 变量
+                    if (!cacheKey.contains('${')) break
+                    cacheKey = tplEngine.createTemplate(cacheKey).make(new HashMap(1) {
+                        int paramIndex
+                        @Override
+                        boolean containsKey(Object key) { return true } // 加这行是为了 防止 MissingPropertyException
+                        @Override
+                        Object get(Object key) { return ctx.data.get(key) }
+
+                        @Override
+                        Object put(Object key, Object value) {
+                            log.error("$collector.enName cacheKey config error, not allow set property '$key'".toString())
+                            null
+                        }
+                    }).toString()
+                }
+                if (cacheKey) {
+                    if (redis) {
+                        start = new Date() // 调用时间
+                        result = redis.get(getStr("collectorCacheKeyPrefix", "collector") + ":" + cacheKey)
+                        spend = System.currentTimeMillis() - start.time
+                    }
+                    else if (ehcache) {
+                        start = new Date() // 调用时间
+                        result = ehcache.get(getStr("collectorCacheKeyPrefix", "collector") + ":" + cacheKey, cacheKey)?.toString()
+                        spend = System.currentTimeMillis() - start.time
+                    }
+                }
+            }
+            if (!result) {
+                try {
+                    result = sqlScript.rehydrate(ctx.data, sqlScript, this)()
+                    spend = System.currentTimeMillis() - start.time
+                    log.info(ctx.logPrefix() + "Sql脚本函数'$collector.enName'执行结果: $result".toString())
+                    if (result != null && !result.toString().isEmpty() && cacheKey) { //缓存结果
+                        if (redis) {
+                            String key = getStr("collectorCacheKeyPrefix", "collector") +":"+ cacheKey
+                            redis.set(key, result.toString())
+                            redis.expire(key, collector.cacheTimeout * 60)
+                        }
+                        else if (ehcache) {
+                            ehcache.getOrCreateCache(getStr("collectorCacheKeyPrefix", "collector") +":"+ cacheKey, Duration.ofMinutes(collector.cacheTimeout) , null, null)
+                                .put(cacheKey, result)
+                        }
+                    }
+                } catch (ex) {
+                    exx = ex
+                    log.error(ctx.logPrefix() + "Sql脚本函数'$collector.enName'执行失败".toString(), ex)
+                }
+            } else {
+                cache = true
+                log.info(ctx.logPrefix() + "Sql脚本函数'$collector.enName'缓存结果: $result".toString())
             }
             dataCollected(new CollectResult(
                 decideId: ctx.id, decisionId: ctx.decisionHolder.decision.decisionId, collector: collector.enName,
                 status: (exx ? 'EEEE' : '0000'), dataStatus: (exx ? 'EEEE' : '0000'), collectDate: start, collectorType: collector.type,
-                spend: System.currentTimeMillis() - start.time,
+                spend: spend, cache: cache,
                 result: result instanceof Map ? JSON.toJSONString(result, SerializerFeature.WriteMapNullValue) : result?.toString(),
                 scriptException: exx == null ? null : exx.message?:exx.class.simpleName
             ))
@@ -429,7 +488,7 @@ if (idNumber && idNumber.length() > 17) {
             dataCollected(new CollectResult(
                 decideId: ctx.id, decisionId: ctx.decisionHolder.decision.decisionId, collector: collector.enName,
                 status: (ex ? 'EEEE' : '0000'), dataStatus: (ex ? 'EEEE' : '0000'), collectDate: start, collectorType: collector.type,
-                spend: System.currentTimeMillis() - start.time,
+                spend: System.currentTimeMillis() - start.time, cache: false,
                 result: result instanceof Map ? JSON.toJSONString(result, SerializerFeature.WriteMapNullValue) : result?.toString(),
                 scriptException: ex == null ? null : ex.message?:ex.class.simpleName
             ))
@@ -477,92 +536,147 @@ if (idNumber && idNumber.length() > 17) {
         // GString 模板替换
         def tplEngine = new GStringTemplateEngine(Thread.currentThread().contextClassLoader)
         collectors.put(collector.enName, new CollectorHolder(collector: collector, computeFn: { ctx -> // 数据集成中3方接口访问过程
-            // http请求 url
-            String url = collector.url
-            for (int i = 0; i < 2; i++) { // 替换 ${} 变量
-                if (!url.contains('${')) break
-                url = tplEngine.createTemplate(url).make(new HashMap(1) {
-                    int paramIndex
-                    @Override
-                    boolean containsKey(Object key) { return true } // 加这行是为了 防止 MissingPropertyException
-                    @Override
-                    Object get(Object key) {
-                        paramIndex++ // 获取个数记录
-                        def v = ctx.data.get(key)
-                        // url前缀不必编码, 其它参数需要编码
-                        return v == null ? '' : (paramIndex==1 && v.toString().startsWith("http") && collector.url.startsWith('${') ? v : URLEncoder.encode(v.toString(), 'utf-8'))
-                    }
-
-                    @Override
-                    Object put(Object key, Object value) {
-                        log.error("$collector.enName url config error, not allow set property '$key'".toString())
-                        null
-                    }
-                }).toString()
-            }
-
-            // http 请求 body字符串
-            String bodyStr = collector.bodyStr
-            for (int i = 0; i < 2; i++) { // 替换 ${} 变量
-                if (!bodyStr || !bodyStr.contains('${')) break
-                bodyStr = tplEngine.createTemplate(bodyStr).make(new HashMap(1) {
-                    @Override
-                    boolean containsKey(Object key) { return true } // 加这行是为了 防止 MissingPropertyException
-                    @Override
-                    Object get(Object key) { ctx.data.get(key)?:"" }
-                    @Override
-                    Object put(Object key, Object value) {
-                        log.error("$collector.enName bodyStr config error, not allow set property '$key'".toString())
-                        null
-                    }
-                }).toString()
-            }
-            // NOTE: 如果是json 并且是,} 结尾, 则删除 最后的,(因为spring解析入参数会认为json格式错误)
-            // if (bodyStr.endsWith(',}')) bodyStr = bodyStr.substring(0, bodyStr.length() - 3) + '}'
-
             String result // 接口返回结果字符串
             Object resolveResult // 解析接口返回结果
+            long spend = 0 // 取数据,(网络)耗时时长
+            Date start //取数据开始时间
+            String url = collector.url // http请求 url
+            String bodyStr = collector.bodyStr // http 请求 body字符串
+            String cacheKey // 缓存key
+            Boolean cache = false //结果是否取自缓存
 
-            final Date start = new Date() // 调用时间
-            long spend = 0 // 耗时时长
-            String retryMsg = ''
-            def logMsg = "${ctx.logPrefix()}接口调用${ -> retryMsg}: name: $collector.enName, url: $url, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}"
-            try {
-                for (int i = 0, times = getInteger('http.retry', 2) + 1; i < times; i++) { // 接口一般遇网络错重试2次
-                    try {
-                        retryMsg = i > 0 ? "(重试第${i}次)" : ''
-                        if ('get'.equalsIgnoreCase(collector.method)) {
-                            result = http.get(url).execute()
-                        } else if ('post'.equalsIgnoreCase(collector.method)) {
-                            result = http.post(url).textBody(bodyStr).contentType(collector.contentType).execute()
-                        } else throw new Exception("Not support http method $collector.method")
-                        break
-                    } catch (ex) {
-                        if ((ex instanceof ConnectException) && (i + 1) < times) {
-                            log.error(logMsg.toString() + ", 异常: " + (ex.class.simpleName + ': ' + ex.message))
-                            continue
-                        } else throw ex
-                    } finally {
+            //1. 先从缓存中取
+            if (collector.cacheTimeout && collector.cacheKey) {
+                cacheKey = collector.cacheKey
+                for (int i = 0; i < 2; i++) { // 替换 ${} 变量
+                    if (!cacheKey.contains('${')) break
+                    cacheKey = tplEngine.createTemplate(cacheKey).make(new HashMap(1) {
+                        int paramIndex
+                        @Override
+                        boolean containsKey(Object key) { return true } // 加这行是为了 防止 MissingPropertyException
+                        @Override
+                        Object get(Object key) { return ctx.data.get(key) }
+
+                        @Override
+                        Object put(Object key, Object value) {
+                            log.error("$collector.enName cacheKey config error, not allow set property '$key'".toString())
+                            null
+                        }
+                    }).toString()
+                }
+                if (cacheKey) {
+                    if (redis) {
+                        start = new Date() // 调用时间
+                        result = redis.get(getStr("collectorCacheKeyPrefix", "collector") + ":" +cacheKey)
+                        spend = System.currentTimeMillis() - start.time
+                    }
+                    else if (ehcache) {
+                        start = new Date() // 调用时间
+                        result = ehcache.get(getStr("collectorCacheKeyPrefix", "collector") + ":" + cacheKey, cacheKey)?.toString()
                         spend = System.currentTimeMillis() - start.time
                     }
                 }
-            } catch (ex) {
-                log.error(logMsg.toString() + ", 异常: ", ex)
-                dataCollected(new CollectResult(
-                    decideId: ctx.id, decisionId: ctx.decisionHolder.decision.decisionId, collector: collector.enName,
-                    status: (ex instanceof ConnectException) ? 'E001': 'EEEE', dataStatus: (ex instanceof ConnectException) ? 'E001': 'EEEE',
-                    collectDate: start, collectorType: collector.type,
-                    spend: spend, url: url, body: bodyStr, result: result, httpException: ex.message?:ex.class.simpleName
-                ))
-                return result
-            } finally {
-                retryMsg = ''
             }
 
-            // http 返回结果成功判断. 默认成功
+            //2. 未从缓存中取到结果, 则调接口, 网络连接错误,主动重试3次
+            if (!result) {
+                for (int i = 0; i < 2; i++) { // 替换 ${} 变量
+                    if (!url.contains('${')) break
+                    url = tplEngine.createTemplate(url).make(new HashMap(1) {
+                        int paramIndex
+                        @Override
+                        boolean containsKey(Object key) { return true } // 加这行是为了 防止 MissingPropertyException
+                        @Override
+                        Object get(Object key) {
+                            paramIndex++ // 获取个数记录
+                            def v = ctx.data.get(key)
+                            // url前缀不必编码, 其它参数需要编码
+                            return v == null ? '' : (paramIndex==1 && v.toString().startsWith("http") && collector.url.startsWith('${') ? v : URLEncoder.encode(v.toString(), 'utf-8'))
+                        }
+
+                        @Override
+                        Object put(Object key, Object value) {
+                            log.error("$collector.enName url config error, not allow set property '$key'".toString())
+                            null
+                        }
+                    }).toString()
+                }
+
+                for (int i = 0; i < 2; i++) { // 替换 ${} 变量
+                    if (!bodyStr || !bodyStr.contains('${')) break
+                    bodyStr = tplEngine.createTemplate(bodyStr).make(new HashMap(1) {
+                        @Override
+                        boolean containsKey(Object key) { return true } // 加这行是为了 防止 MissingPropertyException
+                        @Override
+                        Object get(Object key) { ctx.data.get(key)?:"" }
+                        @Override
+                        Object put(Object key, Object value) {
+                            log.error("$collector.enName bodyStr config error, not allow set property '$key'".toString())
+                            null
+                        }
+                    }).toString()
+                }
+                // NOTE: 如果是json 并且是,} 结尾, 则删除 最后的,(因为spring解析入参数会认为json格式错误)
+                // if (bodyStr.endsWith(',}')) bodyStr = bodyStr.substring(0, bodyStr.length() - 3) + '}'
+                start = new Date() // 调用时间
+                String retryMsg = ''
+                // 日志消息
+                def logMsg = "${ctx.logPrefix()}接口调用${ -> retryMsg}: name: $collector.enName, url: ${ -> url}, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}"
+                try {
+                    for (int i = 0, times = getInteger('http.retry', 2) + 1; i < times; i++) { // 接口一般遇网络错重试2次
+                        try {
+                            retryMsg = i > 0 ? "(重试第${i}次)" : ''
+                            if ('get'.equalsIgnoreCase(collector.method)) {
+                                result = http.get(url).execute()
+                            } else if ('post'.equalsIgnoreCase(collector.method)) {
+                                result = http.post(url).textBody(bodyStr).contentType(collector.contentType).execute()
+                            } else throw new Exception("Not support http method $collector.method")
+                            break
+                        } catch (ex) {
+                            if ((ex instanceof ConnectException) && (i + 1) < times) {
+                                log.error(logMsg.toString() + ", 异常: " + (ex.class.simpleName + ': ' + ex.message))
+                                continue
+                            } else throw ex
+                        } finally {
+                            spend = System.currentTimeMillis() - start.time
+                        }
+                    }
+                } catch (ex) {
+                    log.error(logMsg.toString() + ", 异常: ", ex)
+                    dataCollected(new CollectResult(
+                        decideId: ctx.id, decisionId: ctx.decisionHolder.decision.decisionId, collector: collector.enName,
+                        status: (ex instanceof ConnectException) ? 'E001': 'EEEE', dataStatus: (ex instanceof ConnectException) ? 'E001': 'EEEE',
+                        collectDate: start, collectorType: collector.type, cache: cache,
+                        spend: spend, url: url, body: bodyStr, result: result, httpException: ex.message?:ex.class.simpleName
+                    ))
+                    return null
+                } finally {
+                    retryMsg = ''
+                }
+            }
+            else {
+                cache = true
+                log.info("${ctx.logPrefix()}接口调用(缓存): name: $collector.enName, url: ${ -> url}, bodyStr: $bodyStr${ -> ', result: ' + result}".toString())
+            }
+
+            //3. 判断http返回结果是否为有效数据. 默认有效(0000)
             String dataStatus = successFn ? (successFn.rehydrate(ctx.data, successFn, this)(result) ? '0000' : '0001') : '0000'
 
-            if (parseFn && dataStatus == '0000') { // 解析接口返回结果
+            //4. 如果接口返回的是有效数据, 则缓存
+            if ('0000' == dataStatus && cacheKey) {
+                if (redis) {
+                    String key = getStr("collectorCacheKeyPrefix", "collector") +":"+ cacheKey
+                    redis.set(key, result)
+                    redis.expire(key, collector.cacheTimeout * 60)
+                }
+                else if (ehcache) {
+                    ehcache.getOrCreateCache(getStr("collectorCacheKeyPrefix", "collector") +":"+ cacheKey, Duration.ofMinutes(collector.cacheTimeout) , null, null)
+                        .put(cacheKey, result)
+                }
+            }
+
+            //5. 解析接口返回结果
+            if (parseFn && dataStatus == '0000') {
                 Exception ex
                 try {
                     resolveResult = parseFn.rehydrate(ctx.data, parseFn, this)(result)
@@ -570,13 +684,13 @@ if (idNumber && idNumber.length() > 17) {
                     ex = e
                 } finally {
                     if (ex) {
-                        log.error(logMsg.toString() + ", 解析函数执行失败", ex)
+                        log.error("${ctx.logPrefix()}接口调用: name: $collector.enName, url: ${ -> url}, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}".toString() + ", 解析函数执行失败", ex)
                     } else {
-                        log.info(logMsg.toString())
+                        log.info("${ctx.logPrefix()}接口调用: name: $collector.enName, url: ${ -> url}, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}".toString())
                     }
                     dataCollected(new CollectResult(
                         decideId: ctx.id, decisionId: ctx.decisionHolder.decision.decisionId, collector: collector.enName,
-                        status: ex ? 'E002': '0000', dataStatus: dataStatus,
+                        status: ex ? 'E002': '0000', dataStatus: dataStatus, cache: cache,
                         collectDate: start, collectorType: collector.type,
                         spend: spend, url: url, body: bodyStr, result: result, parseException: ex == null ? null : ex.message?:ex.class.simpleName,
                         resolveResult: resolveResult instanceof Map ? JSON.toJSONString(resolveResult, SerializerFeature.WriteMapNullValue) : resolveResult?.toString()
@@ -584,11 +698,12 @@ if (idNumber && idNumber.length() > 17) {
                 }
                 return resolveResult
             }
-            log.info(logMsg.toString())
+
+            log.info("${ctx.logPrefix()}接口调用: name: $collector.enName, url: ${ -> url}, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}".toString())
             dataCollected(new CollectResult(
                 decideId: ctx.id, decisionId: ctx.decisionHolder.decision.decisionId, collector: collector.enName,
                 status: '0000', dataStatus: dataStatus, collectDate: start, collectorType: collector.type,
-                spend: spend, url: url, body: bodyStr, result: result
+                spend: spend, url: url, body: bodyStr, result: result, cache: cache
             ))
             return dataStatus == '0000' ? result : null
         }, testComputeFn: {param ->

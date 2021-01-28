@@ -63,7 +63,7 @@
                             :rules="validationRules"
                             :model="model">
                         <h-formitem label="英文名" prop="enName" icon="h-icon-user">
-                            <input type="text" v-model="model.enName" :readonly="field">
+                            <input type="text" v-model="model.enName">
                         </h-formitem>
                         <h-formitem label="中文名" icon="h-icon-user" prop="cnName">
                             <input type="text" v-model="model.cnName">

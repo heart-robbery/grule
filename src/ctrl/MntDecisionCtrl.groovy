@@ -178,7 +178,7 @@ class MntDecisionCtrl extends ServerTpl {
     @Path(path = 'collectResultPage')
     ApiResp collectResultPage(
         HttpContext hCtx, Integer page, Integer pageSize, String decideId, String collectorType, String collector, String decisionId,
-        Long spend, Boolean success, Boolean dataSuccess, String startTime, String endTime
+        Long spend, Boolean success, Boolean dataSuccess, Boolean cache, String startTime, String endTime
     ) {
         hCtx.auth("collectResult-read")
         def ids = hCtx.getSessionAttr("permissions").split(",").findResults {String p -> p.replace("decision-read-", "").replace("decision-read", "")}.findAll {it}
@@ -211,6 +211,13 @@ class MntDecisionCtrl extends ServerTpl {
                     ps << cb.equal(root.get('dataStatus'), '0000')
                 } else {
                     ps << cb.notEqual(root.get('dataStatus'), '0000')
+                }
+            }
+            if (cache != null) {
+                if (cache) {
+                    ps << cb.equal(root.get('cache'), true)
+                } else {
+                    ps << cb.notEqual(root.get('cache'), true)
                 }
             }
             if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
@@ -331,7 +338,7 @@ class MntDecisionCtrl extends ServerTpl {
     ApiResp addDataCollector(
         HttpContext hCtx, String enName, String cnName, String type, String url, String bodyStr,
         String method, String parseScript, String contentType, String comment, String computeScript, String dataSuccessScript,
-        String sqlScript, Integer minIdle, Integer maxActive, Integer timeout, Boolean enabled
+        String sqlScript, Integer minIdle, Integer maxActive, Integer timeout, Boolean enabled, String cacheKey, Integer cacheTimeout
     ) {
         hCtx.auth('dataCollector-add')
         DataCollector collector = new DataCollector(enName: enName, cnName: cnName, type: type, comment: comment, enabled: (enabled == null ? true : enabled))
@@ -377,6 +384,9 @@ class MntDecisionCtrl extends ServerTpl {
             return ApiResp.fail("$collector.cnName 已存在")
         }
         collector.creator = hCtx.getSessionAttr("uName")
+        collector.cacheKey = cacheKey
+        collector.cacheTimeout = cacheTimeout
+
         repo.saveOrUpdate(collector)
         ep.fire('dataCollectorChange', collector.enName)
         ep.fire('enHistory', collector, hCtx.getSessionAttr('uName'))
@@ -394,9 +404,9 @@ class MntDecisionCtrl extends ServerTpl {
         def field = repo.findById(RuleField, id)
         if (field == null) return ApiResp.fail("Param id: $id not found")
         if (enName != field.enName) return ApiResp.fail('enName can not change')
-//        if (enName != field.enName && repo.count(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}) {
-//            return ApiResp.fail("$enName aleady exist")
-//        }
+        if (enName != field.enName && repo.count(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}) {
+            return ApiResp.fail("$enName aleady exist")
+        }
         if (cnName != field.cnName && repo.count(RuleField) {root, query, cb -> cb.equal(root.get('cnName'), cnName)}) {
             return ApiResp.fail("$cnName aleady exist")
         }
@@ -417,7 +427,7 @@ class MntDecisionCtrl extends ServerTpl {
     ApiResp updateDataCollector(
         HttpContext hCtx, Long id, String enName, String cnName, String url, String bodyStr,
         String method, String parseScript, String contentType, String comment, String computeScript, String dataSuccessScript,
-        String sqlScript, Integer minIdle, Integer maxActive, Integer timeout, Boolean enabled
+        String sqlScript, Integer minIdle, Integer maxActive, Integer timeout, Boolean enabled, String cacheKey, Integer cacheTimeout
     ) {
         hCtx.auth('dataCollector-update', 'dataCollector-update-' + enName)
         if (!id) return ApiResp.fail("Param id not legal")
@@ -486,6 +496,8 @@ class MntDecisionCtrl extends ServerTpl {
         collector.comment = comment
         collector.enabled = enabled
         collector.updater = hCtx.getSessionAttr("uName")
+        collector.cacheKey = cacheKey
+        collector.cacheTimeout = cacheTimeout
 
         if (updateRelateField) {
             repo.trans {

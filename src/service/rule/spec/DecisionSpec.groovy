@@ -85,7 +85,8 @@ class DecisionSpec {
             else if (length == 2) return fn(Array.get(args, 0), Array.get(args, 1))
             else if (length == 3) return fn(Array.get(args, 0), Array.get(args, 1), Array.get(args, 2))
             else if (length == 4) return fn(Array.get(args, 0), Array.get(args, 1), Array.get(args, 2), Array.get(args, 3))
-            else throw new Exception("Custom function args length: " + length)
+            else if (length == 5) return fn(Array.get(args, 0), Array.get(args, 1), Array.get(args, 2), Array.get(args, 3), Array.get(args, 4))
+            else throw new Exception("Custom function '$name' args length: " + length)
         }
         else throw new MissingMethodException(name, DecisionSpec, args)
     }

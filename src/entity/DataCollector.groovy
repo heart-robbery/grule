@@ -48,6 +48,14 @@ class DataCollector extends LongIdEntity {
      * 超时(ms)
      */
     Integer timeout
+    /**
+     * 缓存key
+     */
+    String cacheKey
+    /**
+     * 缓存时间,单位分钟
+     */
+    Integer cacheTimeout
 
 
     /**

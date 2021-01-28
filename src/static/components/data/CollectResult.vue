@@ -3,7 +3,8 @@
         <div class="h-panel-bar">
             <h-select v-model="model.collectorType" :datas="types" placeholder="类型" style="width: 70px; float: left" @change="load"></h-select>
             <h-select v-model="model.success" :datas="successTypes" placeholder="是否成功" style="width: 90px; float: left" @change="load"></h-select>
-            <h-select v-model="model.dataSuccess" :datas="successTypes" placeholder="是否查得" style="width: 90px; float: left" @change="load"></h-select>
+            <h-select v-model="model.dataSuccess" :datas="boolTypes" placeholder="是否查得" style="width: 90px; float: left" @change="load"></h-select>
+            <h-select v-model="model.cache" :datas="boolTypes" placeholder="是否缓存" style="width: 90px; float: left" @change="load"></h-select>
             <h-autocomplete v-model="model.decisionId" :option="decisions" style="float:left; width: 180px" @change="load" placeholder="决策名"></h-autocomplete>
             <h-autocomplete v-model="model.collector" :option="collectors" style="float:left; width: 180px" @change="load" placeholder="收集器"></h-autocomplete>
             <input type="number" v-model="model.spend" placeholder="耗时(>=ms)" style="width: 100px" @keyup.enter="load"/>
@@ -43,7 +44,8 @@
                 </h-tableitem>
                 <h-tableitem title="耗时(ms)" prop="spend" align="center" :width="70"></h-tableitem>
                 <h-tableitem title="状态" prop="status" align="center" :format="formatStatusType" :width="60"></h-tableitem>
-                <h-tableitem title="查得" prop="dataStatus" align="center" :format="formatStatusType" :width="60"></h-tableitem>
+                <h-tableitem title="查得" prop="dataStatus" align="center" :format="formatDataStatusType" :width="40"></h-tableitem>
+                <h-tableitem title="缓存" prop="cache" align="center" :format="formatBoolType" :width="40"></h-tableitem>
                 <h-tableitem title="操作" align="center" :width="70">
                     <template slot-scope="{data}">
                         <span class="text-hover" @click="open(data)">{{data._expand?'收起':'展开'}}</span>
@@ -80,12 +82,17 @@
         { title: '成功', key: 'true'},
         { title: '失败', key: 'false'},
     ];
+    const boolTypes = [
+        { title: '是', key: 'true'},
+        { title: '否', key: 'false'},
+    ];
     module.exports = {
         props: ['tabs', 'menu'],
         data() {
             return {
                 types: types,
                 successTypes: successTypes,
+                boolTypes: boolTypes,
                 model: {startTime: (function () {
                         let d = new Date();
                         let month = d.getMonth() + 1;
@@ -164,6 +171,14 @@
             formatStatusType(v) {
                 if ('0000' === v) return '成功';
                 return '失败';
+            },
+            formatDataStatusType(v) {
+                if ('0000' === v) return '是';
+                return '否';
+            },
+            formatBoolType(v) {
+                if (v === true) return '是';
+                return '否';
             },
             formatSuccessType(v) {
                 for (let type of successTypes) {
