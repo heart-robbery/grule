@@ -5,7 +5,8 @@
             <!--            <span v-color:gray v-font="13">说明~~</span>-->
             &nbsp;&nbsp;
             <h-button v-if="sUser.permissionIds.find((e) => e == 'field-add') == 'field-add'" @click="showAddPop"><i class="h-icon-plus"></i></h-button>
-            <input type="text" v-model="kw" placeholder="关键词" style="width: 250px" @keyup.enter="load"/>
+            <input type="text" v-model="model.kw" placeholder="关键词" style="width: 250px" @keyup.enter="load"/>
+            <h-autocomplete v-model="model.collector" :option="collectorOpt" style="float:left; width: 180px" @change="load" placeholder="收集器"></h-autocomplete>
             <div class="h-panel-right">
 <!--                <h-search placeholder="查询" v-width="200" v-model="kw" show-search-button search-text="搜索" @search="load"></h-search>-->
                 <!--                <i class="h-split"></i>-->
@@ -160,6 +161,26 @@
         data() {
             return {
                 sUser: app.$data.user,
+                model: {kw: null, collector: null},
+                collectorOpt: {
+                    keyName: 'enName',
+                    titleName: 'cnName',
+                    minWord: 1,
+                    loadData: (filter, cb) => {
+                        $.ajax({
+                            url: 'mnt/dataCollectorPage',
+                            data: {page: 1, pageSize: 5, kw: filter},
+                            success: (res) => {
+                                this.isLoading = false;
+                                if (res.code == '00') {
+                                    cb(res.data.list.map((r) => {
+                                        return {enName: r.enName, cnName: r.cnName}
+                                    }))
+                                } else this.$Notice.error(res.desc)
+                            },
+                        });
+                    }
+                },
                 kw: '',
                 loading: false,
                 page: 1, totalRow: 0, pageSize: 10, list: []
@@ -234,7 +255,7 @@
                 this.list = [];
                 $.ajax({
                     url: 'mnt/fieldPage',
-                    data: {page: page.page || 1, kw: this.kw},
+                    data: $.extend({page: page.page || 1}, this.model),
                     success: (res) => {
                         this.loading = false;
                         if (res.code == '00') {

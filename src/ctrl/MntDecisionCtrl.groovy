@@ -53,18 +53,23 @@ class MntDecisionCtrl extends ServerTpl {
 
 
     @Path(path = 'fieldPage')
-    ApiResp fieldPage(HttpContext hCtx, Integer page, Integer pageSize, String kw) {
+    ApiResp fieldPage(HttpContext hCtx, Integer page, Integer pageSize, String collector, String kw) {
         if (pageSize && pageSize > 50) return ApiResp.fail("Param pageSize <=50")
         hCtx.auth("field-read")
         def fieldPage = repo.findPage(RuleField, page, (pageSize?:10)) { root, query, cb ->
             query.orderBy(cb.desc(root.get('updateTime')))
+            def ps = []
             if (kw) {
-                cb.or(
+                ps << cb.or(
                         cb.like(root.get('enName'), '%' + kw + '%'),
                         cb.like(root.get('cnName'), '%' + kw + '%'),
                         cb.like(root.get('comment'), '%' + kw + '%')
                 )
             }
+            if (collector) {
+                ps << cb.equal(root.get("dataCollector"), collector)
+            }
+            cb.and(ps.toArray(new Predicate[ps.size()]))
         }.to{ Utils.toMapper(it).ignore("metaClass").build()}
         def collectorNames = fieldPage.list.collect {it.dataCollector}.findAll{it}.toSet()
         if (collectorNames) {
