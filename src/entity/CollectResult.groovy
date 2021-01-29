@@ -15,7 +15,7 @@ class CollectResult implements IEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long id
     /**
-     * 执行决策id
+     * 执行决策流水id
      */
     String decideId
     /**

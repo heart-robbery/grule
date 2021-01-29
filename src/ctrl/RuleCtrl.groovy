@@ -26,26 +26,26 @@ class RuleCtrl extends ServerTpl {
         if (!decisionId) {
             return ApiResp.fail('Param decisionId not empty')
         }
-        def decision = dm.findDecision(decisionId)
-        if (decision == null) {
+        def decisionHolder = dm.findDecision(decisionId)
+        if (decisionHolder == null) {
             return ApiResp.fail("未找到决策: $decisionId")
         }
         Map<String, Object> params = ctx.params()
         log.info("Run decision. decisionId: " + decisionId + ", id: " + ctx.request.id + ", params: " + params)
         try {
-            decision.paramValidator?.apply(params) // 参数验证
+            decisionHolder.paramValidator?.apply(params) // 参数验证
         } catch (IllegalArgumentException ex) {
             log.error("参数验证失败: id: " + ctx.request.id + ", decisionId: " + decisionId + ", errMsg: " + ex.message)
             return ApiResp.fail(ex.message)
         }
 
         DecisionContext dCtx = new DecisionContext()
-        dCtx.setDecisionHolder(decision)
+        dCtx.setDecisionHolder(decisionHolder)
         dCtx.setId(ctx.request.id)
         dCtx.setFieldManager(fieldManager)
         dCtx.setEp(ep)
         dCtx.setInput(params)
-        repo.saveOrUpdate(new DecisionResult(id: dCtx.id, decisionId: decisionId, occurTime: dCtx.startup))
+        repo.saveOrUpdate(new DecisionResult(id: dCtx.id, decisionId: decisionHolder.decision.id, occurTime: dCtx.startup))
 
         boolean isAsync = Boolean.valueOf(params.getOrDefault('async', false).toString())
         if (isAsync) async { dCtx.start() }

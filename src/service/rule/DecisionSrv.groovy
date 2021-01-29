@@ -77,7 +77,6 @@ class DecisionSrv extends ServerTpl {
                     idNum = ctx.summary().get('attrs')['idNumber']?:ctx.input['idNumber']
                     status = ctx.status
                     exception = ctx.summary().get('exception')
-                    decisionId = ctx.summary().get('decisionId')
                     decision = ctx.summary().get('decision')
                     spend = ctx.summary().get('spend')
                     input = JSON.toJSONString(ctx.input, SerializerFeature.WriteMapNullValue)

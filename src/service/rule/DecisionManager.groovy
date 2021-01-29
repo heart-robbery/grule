@@ -22,7 +22,7 @@ import java.util.function.Function
 class DecisionManager extends ServerTpl {
     @Lazy def repo = bean(Repo, 'jpa_rule_repo')
 
-    protected final Map<String, DecisionHolder> decisionMap = new ConcurrentHashMap<>()
+    final Map<String, DecisionHolder> decisionMap = new ConcurrentHashMap<>()
 
 
     @EL(name = 'jpa_rule.started', async = true)

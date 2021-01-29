@@ -128,8 +128,6 @@ class MntDecisionCtrl extends ServerTpl {
         if (pageSize && pageSize > 10) return ApiResp.fail("Param pageSize <=10")
         def ids = hCtx.getSessionAttr("permissions").split(",").findResults {String p -> p.replace("decision-read-", "").replace("decision-read", "")}.findAll {it}
         if (!ids) return ApiResp.ok()
-        ids = repo.findList(Decision) {root, query, cb -> root.get("id").in(ids)}.findResults {it.decisionId}
-        if (!ids) return ApiResp.ok()
         Date start = startTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(startTime) : null
         Date end = endTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(endTime) : null
         ApiResp.ok(
@@ -153,7 +151,7 @@ class MntDecisionCtrl extends ServerTpl {
                     def am = bean(FieldManager)
                     Utils.toMapper(it).ignore("metaClass")
                             .addConverter('decisionId', 'decisionName', { String dId ->
-                                bean(DecisionManager).findDecision(dId).spec.决策名
+                                bean(DecisionManager).decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name
                             }).addConverter('attrs', {
                         it == null ? null : JSON.parseObject(it).collect { e ->
                             [enName: e.key, cnName: am.fieldMap.get(e.key)?.cnName, value: e.value]
@@ -182,8 +180,6 @@ class MntDecisionCtrl extends ServerTpl {
     ) {
         hCtx.auth("collectResult-read")
         def ids = hCtx.getSessionAttr("permissions").split(",").findResults {String p -> p.replace("decision-read-", "").replace("decision-read", "")}.findAll {it}
-        if (!ids) return ApiResp.ok()
-        ids = repo.findList(Decision) {root, query, cb -> root.get("id").in(ids)}.findResults {it.decisionId}
         if (!ids) return ApiResp.ok()
         Date start = startTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(startTime) : null
         Date end = endTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(endTime) : null
@@ -223,7 +219,7 @@ class MntDecisionCtrl extends ServerTpl {
             if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
         }.to{record -> Utils.toMapper(record).ignore("metaClass")
                 .addConverter('decisionId', 'decisionName', {String dId ->
-                    bean(DecisionManager).findDecision(dId).spec.决策名
+                    bean(DecisionManager).decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name
                 }).build()
         }
         repo.findList(DataCollector) {root, query, cb -> root.get('enName').in(result.list.collect {it['collector']})}.each {dc ->
