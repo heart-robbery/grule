@@ -5,6 +5,8 @@ import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.ImportCustomizer
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 import java.lang.reflect.Array
 
@@ -31,10 +33,14 @@ class DecisionSpec {
     /**
      * 自定义函数
      */
-    @Lazy Map<String, Closure> functions = new HashMap<>()
+    final Map<String, Closure> functions = new HashMap<>()
     // 预操作函数
     protected Closure operateFn
 
+    DecisionSpec() {
+        Logger log = LoggerFactory.getLogger("ROOT")
+        functions.put("INFO", {String msg -> if (msg) log.info(msg.toString()) })
+    }
 
     void 操作(Closure 操作) {
         operateFn = { Map ctx ->
