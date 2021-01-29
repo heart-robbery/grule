@@ -35,8 +35,6 @@ class MntAnalyseCtrl extends ServerTpl {
         } else return ApiResp.fail("type: '$type' unkonwn")
         def ids = hCtx.getSessionAttr("permissions").split(",").findResults {String p -> p.replace("decision-read-", "").replace("decision-read", "")}.findAll {it}
         if (!ids) return ApiResp.ok()
-        ids = repo.findList(Decision) {root, query, cb -> root.get("id").in(ids)}.findResults {it.decisionId}
-        if (!ids) return ApiResp.ok([])
         ApiResp.ok(repo.rows(
                 "select decision_id, decision, count(1) total from " +repo.tbName(DecisionResult).replace("`", '')+ " where occur_time>=:time and decision_id in (:ids) group by decision_id, decision",
                 cal.getTime(), ids
@@ -45,7 +43,7 @@ class MntAnalyseCtrl extends ServerTpl {
             record.each {e ->
                 data.put(e.key.toLowerCase(), e.value)
             }
-            data['decisionName'] = bean(DecisionManager).findDecision(data['decision_id']).spec.决策名
+            data['decisionName'] = bean(DecisionManager).decisionMap.find {it.value.decision.id == data['decision_id']}?.value?.decision?.name
             data
         })
     }
