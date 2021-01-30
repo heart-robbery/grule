@@ -48,7 +48,7 @@
     const detail = {
         props: ['item'],
         template:`
-            <div style="max-height: 800px">
+            <div style="max-height: 800px;overflow-y: auto;">
                 <header class="h-modal-header text-center">{{title}}</header>
                 <h-layout>
                     <h-header>
@@ -113,7 +113,6 @@
                         <h-form readonly>
                             <h-formitem label="数据收集">
                               <code>{{item.dataCollectResult}}</code>
-<!--                                <ace-json v-model="item.dataCollectResult" :readonly="true"></ace-json>-->
                             </h-formitem>
                         </h-form>
                     </h-footer>
