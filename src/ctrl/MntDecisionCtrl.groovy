@@ -41,7 +41,7 @@ class MntDecisionCtrl extends ServerTpl {
                     query.orderBy(cb.desc(root.get('updateTime')))
                     def ps = []
                     ps << root.get("id").in(ids)
-                    if (decisionId) ps << cb.equal(root.get('decisionId'), decisionId)
+                    if (decisionId) ps << cb.equal(root.get('id'), decisionId)
                     if (nameLike) ps << cb.like(root.get('name'), '%' + nameLike + '%')
                     if (kw) ps << cb.like(root.get('dsl'), '%' + kw + '%')
                     cb.and(ps.toArray(new Predicate[ps.size()]))
@@ -158,21 +158,21 @@ class MntDecisionCtrl extends ServerTpl {
                             .addConverter('decisionId', 'decisionName', { String dId ->
                                 bean(DecisionManager).decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name
                             }).addConverter('attrs', {
-                        it == null ? null : JSON.parseObject(it).collect { e ->
-                            [enName: e.key, cnName: am.fieldMap.get(e.key)?.cnName, value: e.value]
-                        }}).addConverter('input', {
-                        it == null ? null : JSON.parseObject(it)
-                    }).addConverter('dataCollectResult', {
-                        it == null ? null : JSON.parseObject(it)
-                    }).addConverter('rules', {
-                        def arr = it == null ? null : JSON.parseArray(it)
-                        arr?.each { JSONObject jo ->
-                            jo.put('data', jo.getJSONObject('data').collect { Entry<String, Object> e ->
-                                [enName: e.key, cnName: am.fieldMap.get(e.key)?.cnName, value: e.value]
-                            })
-                        }
-                        arr
-                    }).build()
+                                it == null ? [:] : JSON.parseObject(it).collect { e ->
+                                    [enName: e.key, cnName: am.fieldMap.get(e.key)?.cnName, value: e.value]
+                                }}).addConverter('input', {
+                                    it == null ? [:] : JSON.parseObject(it)
+                                }).addConverter('dataCollectResult', {
+                                    it == null ? [:] : JSON.parseObject(it)
+                                }).addConverter('rules', {
+                                    def arr = it == null ? [] : JSON.parseArray(it)
+                                    arr.each { JSONObject jo ->
+                                        jo.put('data', jo.getJSONObject('data').collect { Entry<String, Object> e ->
+                                            [enName: e.key, cnName: am.fieldMap.get(e.key)?.cnName, value: e.value]
+                                        })
+                                    }
+                                    arr
+                                }).build()
                 }
         )
     }

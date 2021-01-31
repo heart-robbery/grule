@@ -74,7 +74,7 @@ class DecisionSrv extends ServerTpl {
         queue(SAVE_RESULT) { // 保存决策结果到数据库
             repo.saveOrUpdate(
                 repo.findById(DecisionResult, ctx.id).tap {
-                    idNum = ctx.summary().get('attrs')['idNumber']?:ctx.input['idNumber']
+                    //idNum = ctx.summary().get('attrs')['idNumber']?:ctx.input['idNumber']
                     status = ctx.status
                     exception = ctx.summary().get('exception')
                     decision = ctx.summary().get('decision')

@@ -46,7 +46,7 @@ class DecisionResult implements IEntity {
     /**
      * 身份证
      */
-    String       idNum
+    //String       idNum
     /**
      * 输入参数 json 字符串
      */

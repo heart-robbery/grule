@@ -140,14 +140,14 @@
                 return v
             },
             ruleFilter() {
-                if (this.ruleKw) {
+                if (this.ruleKw && this.item.rules) {
                     this.rules = this.item.rules.filter((item, index, arr) => {
                         return item.attrs.规则名 ? item.attrs.规则名.indexOf(this.ruleKw) >= 0 : false
                     });
                 } else this.rules = this.item.rules;
             },
             attrFilter() {
-                if (this.attrKw) {
+                if (this.attrKw && this.item.attrs) {
                     this.attrs = this.item.attrs.filter((item, index, arr) => {
                         return item.enName ? item.enName.toLowerCase().indexOf(this.attrKw.toLowerCase()) >= 0 : (item.cnName ? item.cnName.toLowerCase().indexOf(this.attrKw.toLowerCase()) >= 0 : false)
                     })
