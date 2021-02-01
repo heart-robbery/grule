@@ -6,8 +6,13 @@ import cn.xnatural.http.Ctrl
 import cn.xnatural.http.HttpContext
 import cn.xnatural.http.Path
 import cn.xnatural.jpa.Repo
+import com.alibaba.fastjson.JSON
+import com.alibaba.fastjson.serializer.SerializerFeature
 import entity.DecisionResult
-import service.rule.*
+import service.rule.DecisionContext
+import service.rule.DecisionManager
+import service.rule.DecisionSrv
+import service.rule.FieldManager
 
 @Ctrl
 class RuleCtrl extends ServerTpl {
@@ -45,7 +50,12 @@ class RuleCtrl extends ServerTpl {
         dCtx.setFieldManager(fieldManager)
         dCtx.setEp(ep)
         dCtx.setInput(params)
-        repo.saveOrUpdate(new DecisionResult(id: dCtx.id, decisionId: decisionHolder.decision.id, occurTime: dCtx.startup))
+
+        // 初始化status: 0001, 结束status: 0000, 错误status: EEEE
+        repo.saveOrUpdate(new DecisionResult(
+            id: dCtx.id, decisionId: decisionHolder.decision.id, occurTime: dCtx.startup, status: '0001',
+            input: JSON.toJSONString(dCtx.input, SerializerFeature.WriteMapNullValue)
+        ))
 
         boolean isAsync = Boolean.valueOf(params.getOrDefault('async', false).toString())
         if (isAsync) async { dCtx.start() }
@@ -57,27 +67,30 @@ class RuleCtrl extends ServerTpl {
     /**
      * 查询决策结果
      */
-    @Path(path = 'findDecisionResult')
-    ApiResp findDecisionResult(String id) {
-        if (!id) return ApiResp.fail("id must not be empty")
-        def dr = repo.findById(DecisionResult, id)
-        if (!dr) return ApiResp.fail("未找到记录: " + id)
+    @Path(path = 'findDecideResult')
+    ApiResp findDecisionResult(String decideId) {
+        if (!decideId) return ApiResp.fail("decideId must not be empty")
+        def dr = repo.findById(DecisionResult, decideId)
+        if (!dr) return ApiResp.fail("未找到记录: " + decideId)
+        def dm = bean(DecisionManager)
+        def decisionHolder = dm.decisionMap.find {it.value.decision.id == dr.decisionId}.value
+        def attrs = dr.attrs ? JSON.parseObject(dr.attrs) : [:]
         ApiResp.ok(
-
+            [
+                decideId: decideId, decision: dr.decision, decisionId: decisionHolder.decision.decisionId,
+                status  : dr.status,
+                desc    : dr.exception,
+                attrs   : decisionHolder.spec.returnAttrs.collectEntries { name ->
+                    def v = attrs.get(name)
+                    if (v instanceof Optional) {
+                        v = v.orElseGet({ null })
+                    }
+                    def field = fieldManager.fieldMap.get(name)
+                    //如果key是中文, 则翻译成对应的英文名
+                    if (field && field.cnName == name) return [field.enName, v]
+                    else return [name, v]
+                }
+            ]
         )
-    }
-
-
-    /**
-     * 加载属性配置
-     */
-    @Path(path = 'loadAttrCfg')
-    ApiResp loadAttrCfg() {
-        async {
-            bean(AttrManager).loadField()
-            bean(AttrManager).loadDataCollector()
-            ep.fire("wsMsg_rule", '加载完成')
-        }
-        ApiResp.ok('加载中...')
     }
 }

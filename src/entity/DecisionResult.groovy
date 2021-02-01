@@ -44,13 +44,15 @@ class DecisionResult implements IEntity {
      */
     String       exception
     /**
-     * 身份证
+     * 关键属性
      */
-    //String       idNum
+    String       keyProp
     /**
      * 输入参数 json 字符串
      */
-    @Column(length = 800)
+    @Lob
+    @Basic
+    @Type(type = "text")
     String       input
     /**
      * 属性集 json 字符串

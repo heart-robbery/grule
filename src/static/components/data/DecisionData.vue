@@ -1,6 +1,11 @@
 <template>
     <div>
-        <h-tabs v-model="tabs.type" :datas="types"></h-tabs>
+        <div>
+            <h-tabs v-model="tabs.type" :datas="types"></h-tabs>
+            <button class="h-btn h-btn-text-red" @click="cleanExpire">
+                <i class="h-icon-trash"></i><span>数据清理</span>
+            </button>
+        </div>
         <keep-alive>
             <component v-bind:is="tabs.type" :tabs="tabs" :menu="menu"></component>
         </keep-alive>
@@ -30,6 +35,20 @@
         watch: {
             'tabs.type': function (v) {
                 localStorage.setItem("rule.dataCenter.tab", v);
+            }
+        },
+        methods: {
+            cleanExpire() {
+                $.ajax({
+                    url: 'mnt/cleanExpire',
+                    success: (res) => {
+                        if (res.code == '00') {
+                            this.$Message.success(res.desc);
+                        } else {
+                            this.$Message.error(res.desc);
+                        }
+                    }
+                })
             }
         }
     }

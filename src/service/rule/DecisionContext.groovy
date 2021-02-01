@@ -164,8 +164,8 @@ class DecisionContext {
 
     /**
      * 设置为规则用到的属性
-     * @param key
-     * @param value
+     * @param key 属性key
+     * @param value 属性值
      */
     protected void ruleAttr(String key, Object value) {
         if (curPassedRule && !end.get()) curPassedRule.data.put(key, value)
@@ -301,7 +301,7 @@ class DecisionContext {
     Map<String, Object> summary() {
         if (this._summary && end.get()) return this._summary
         this._summary = [
-            id               : id, occurTime: startup, spend: System.currentTimeMillis() - startup.time,
+            decideId         : id, occurTime: startup, spend: System.currentTimeMillis() - startup.time,
             decision         : decisionResult, decisionId: decisionHolder.decision.decisionId, input: input,
             status           : status, exception: this.exception?.toString(),
             attrs            : data.collect { e ->
@@ -335,18 +335,20 @@ class DecisionContext {
      */
     Map<String, Object> result() {
         [
-            id    : id, decision: decisionResult, decisionId: decisionHolder.decision.decisionId,
-            status: status,
-            desc  : exception?.toString(),
-            attrs : decisionHolder.spec.returnAttrs.collectEntries { name ->
+            decideId: id, decision: decisionResult, decisionId: decisionHolder.decision.decisionId,
+            status  : status,
+            desc    : exception?.toString(),
+            attrs   : decisionHolder.spec.returnAttrs.collectEntries { name ->
                 def v = data.get(name)
-                if (v instanceof Optional) {v = v.orElseGet({null})}
+                if (v instanceof Optional) {
+                    v = v.orElseGet({ null })
+                }
                 def field = fieldManager.fieldMap.get(name)
                 //如果key是中文, 则翻译成对应的英文名
                 if (field && field.cnName == name) return [field.enName, v]
                 else return [name, v]
             }
-         ]
+        ]
     }
 
 

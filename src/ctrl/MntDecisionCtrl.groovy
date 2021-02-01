@@ -14,6 +14,7 @@ import com.alibaba.fastjson.JSONObject
 import entity.*
 import service.rule.DecisionEnum
 import service.rule.DecisionManager
+import service.rule.DecisionSrv
 import service.rule.FieldManager
 import service.rule.spec.DecisionSpec
 
@@ -127,7 +128,7 @@ class MntDecisionCtrl extends ServerTpl {
     @Path(path = 'decisionResultPage')
     ApiResp decisionResultPage(
         HttpContext hCtx, Integer page, Integer pageSize, String id, String decisionId, DecisionEnum decision,
-        String idNum, Long spend, String exception, String input, String attrs, String rules, String startTime, String endTime
+        String keyProp, Long spend, String exception, String input, String attrs, String rules, String startTime, String endTime
     ) {
         hCtx.auth("decisionResult-read")
         if (pageSize && pageSize > 10) return ApiResp.fail("Param pageSize <=10")
@@ -144,7 +145,7 @@ class MntDecisionCtrl extends ServerTpl {
                     if (start) ps << cb.greaterThanOrEqualTo(root.get('occurTime'), start)
                     if (end) ps << cb.lessThanOrEqualTo(root.get('occurTime'), end)
                     if (decisionId) ps << cb.equal(root.get('decisionId'), decisionId)
-                    if (idNum) ps << cb.equal(root.get('idNum'), idNum)
+                    if (keyProp) ps << cb.equal(root.get('keyProp'), keyProp)
                     if (spend) ps << cb.ge(root.get('spend'), spend)
                     if (decision) ps << cb.equal(root.get('decision'), decision)
                     if (exception) ps << cb.like(root.get('exception'), '%' + exception + '%')
@@ -554,5 +555,25 @@ class MntDecisionCtrl extends ServerTpl {
     @Path(path = 'testCollector/:collector')
     ApiResp testCollector(String collector, HttpContext hCtx) {
         ApiResp.ok(bean(FieldManager)?.testCollector(collector, hCtx.params()))
+    }
+
+
+    @Path(path = 'cleanExpire')
+    ApiResp cleanExpire(HttpContext hCtx) {
+        hCtx.auth("grant")
+        def srv = bean(DecisionSrv)
+        if (srv) {
+            queue("cleanCollectResult") {
+                def total = srv.cleanCollectResult()
+                ep.fire("globalMsg", "清理过期收集数据结束. 共计: " + total)
+            }
+            queue("cleanDecisionResult") {
+                def total = srv.cleanDecisionResult()
+                ep.fire("globalMsg", "清理过期决策数据结束. 共计: " + total)
+            }
+            return ApiResp.ok("等待后台清理...")
+        } else {
+            return ApiResp.fail("清理失败")
+        }
     }
 }

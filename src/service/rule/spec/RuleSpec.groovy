@@ -6,7 +6,7 @@ import service.rule.DecisionEnum
  * 规则定义 spec
  */
 class RuleSpec {
-    private boolean enabled = true
+    protected boolean enabled = true
     String 规则名
     @Lazy List<Tuple2<String, Closure>> decisionFn = new LinkedList<>()
     /**

@@ -54,9 +54,9 @@
                 <template slot="expand" slot-scope="{index, data}">
                     <h-form readonly>
                         <h-formitem v-if="data.collectorType == 'http'" label="接口地址">{{data.url}}</h-formitem>
-                        <h-formitem v-if="data.collectorType == 'http'" label="接口返回">{{data.result}}</h-formitem>
+                        <h-formitem v-if="data.collectorType == 'http'" label="接口返回"><code>{{data.result}}</code></h-formitem>
                         <h-formitem v-if="data.collectorType == 'sql'" label="SQL返回">{{data.result}}</h-formitem>
-                        <h-formitem v-if="data.collectorType == 'http'" label="解析结果">{{data.resolveResult}}</h-formitem>
+                        <h-formitem v-if="data.collectorType == 'http'" label="解析结果"><code>{{data.resolveResult}}</code></h-formitem>
                         <h-formitem v-if="data.collectorType == 'http'" label="请求异常">{{data.httpException}}</h-formitem>
                         <h-formitem v-if="data.collectorType == 'http'" label="解析异常">{{data.parseException}}</h-formitem>
                         <h-formitem v-if="data.collectorType == 'script'" label="脚本结果">{{data.result}}</h-formitem>
