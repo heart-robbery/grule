@@ -113,7 +113,7 @@
                                 this.isLoading = false;
                                 if (res.code == '00') {
                                     cb(res.data.list.map((r) => {
-                                        return {decisionId: r.decisionId, name: r.name}
+                                        return {decisionId: r.id, name: r.name}
                                     }))
                                 } else this.$Notice.error(res.desc)
                             },
