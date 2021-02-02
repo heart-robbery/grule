@@ -108,7 +108,7 @@
                             <h-numberinput v-model="model.minIdle" :min="0" :max="50" useInt></h-numberinput>
                         </h-formitem>
                         <h-formitem v-if="model.type == 'sql'" label="最大连接数" prop="maxActive" icon="h-icon-user" >
-                            <h-numberinput v-model="model.maxActive" :min="1" :max="100" useInt></h-numberinput>
+                            <h-numberinput v-model="model.maxActive" :min="1" :max="50" useInt></h-numberinput>
                         </h-formitem>
 
                         <h-formitem v-show="model.type == 'http'" label="是否成功" icon="h-icon-complete" prop="dataSuccessScript" single>
@@ -132,7 +132,7 @@
                 `,
         props: ['collector'],
         data() {
-            let defaultModel = {type: 'http', method: 'GET', timeout: 10000, contentType: 'application/x-www-form-urlencoded', minIdle: 1, maxActive: 8, dataSuccessScript:
+            let defaultModel = {type: 'http', method: 'GET', timeout: 10000, contentType: 'application/x-www-form-urlencoded', minIdle: 1, maxActive: 5, dataSuccessScript:
 `{resultStr ->
     return resultStr ? JSON.parseObject(resultStr)?['code'] == '0000' : false
 }`

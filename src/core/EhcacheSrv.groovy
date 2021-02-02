@@ -51,7 +51,7 @@ class EhcacheSrv extends ServerTpl {
                 cache = cm.getCache(cName, Object.class, Object.class) // 不同线程同时进来, cache为null
                 if (cache == null) {
                     if (heapOfEntries != null && heapOfMB != null) throw new IllegalArgumentException("heapOfEntries 和 heapOfMB 不能同时设置")
-                    if (heapOfEntries == null && heapOfMB == null) {heapOfEntries = Integer.valueOf(attrs().heapOfEntries?.(cName)?:getInteger("defaultHeapOfEntries", 10000))}
+                    if (heapOfEntries == null && heapOfMB == null) {heapOfEntries = Integer.valueOf(getInteger("heapOfEntries." + cName, getInteger("defaultHeapOfEntries", 10000)))}
                     if (expire == null) expire = getExpire(cName)
                     ResourcePoolsBuilder b = newResourcePoolsBuilder()
                     if (heapOfEntries != null) b = b.heap(heapOfEntries, ENTRIES)

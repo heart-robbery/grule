@@ -136,6 +136,6 @@ void heartbeat() {
                 log.trace("Removed class parallelLock: {}", entry.key)
             }
         }
-        log.info("Clean parallelLock. left: {}", m.size())
+        log.debug("Clean parallelLock. left: {}", m.size())
     }
 }

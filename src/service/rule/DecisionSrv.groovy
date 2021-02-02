@@ -26,6 +26,7 @@ class DecisionSrv extends ServerTpl {
         Long lastWarn // 上次告警时间
         queue(SAVE_RESULT)
             .failMaxKeep(getInteger(SAVE_RESULT + ".failMaxKeep", 10000))
+            .parallel(getInteger("saveResult.parallel", 2))
             .errorHandle {ex, devourer ->
                 if (lastWarn == null || (System.currentTimeMillis() - lastWarn >= Duration.ofSeconds(getLong(SAVE_RESULT + ".warnInterval", 60 * 5L)).toMillis())) {
                     lastWarn = System.currentTimeMillis()

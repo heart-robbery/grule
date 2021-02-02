@@ -96,7 +96,7 @@ class HttpSrv extends ServerTpl {
                 log.info("New session '{}'", sId)
             }
 
-            def cache = ehcache.getOrCreateCache(cKey, expire, getInteger('session.maxLimit', 100000), null)
+            def cache = ehcache.getOrCreateCache(cKey, expire, getInteger('session.maxLimit', 10000), null)
             sData = new Map<String, Object>() {
                 @Override
                 int size() { cache.size() }

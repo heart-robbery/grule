@@ -53,6 +53,7 @@ class FieldManager extends ServerTpl {
         Long lastWarn // 上次告警时间
         queue(DATA_COLLECTED)
             .failMaxKeep(getInteger(DATA_COLLECTED + ".failMaxKeep", 10000))
+            .parallel(getInteger("saveResult.parallel", 2))
             .errorHandle {ex, devourer ->
                 if (lastWarn == null || (System.currentTimeMillis() - lastWarn >= Duration.ofSeconds(getLong(DATA_COLLECTED + ".warnInterval", 60 * 5L)).toMillis())) {
                     lastWarn = System.currentTimeMillis()
@@ -430,7 +431,7 @@ if (idNumber && idNumber.length() > 17) {
                             redis.expire(key, collector.cacheTimeout * 60)
                         }
                         else if (ehcache) {
-                            ehcache.getOrCreateCache(getStr("collectorCacheKeyPrefix", "collector") +":"+ cacheKey, Duration.ofMinutes(collector.cacheTimeout) , null, null)
+                            ehcache.getOrCreateCache(getStr("collectorCacheKeyPrefix", "collector") +":"+ cacheKey, Duration.ofMinutes(collector.cacheTimeout), getInteger("collectorCache.limit", 1000), null)
                                 .put(cacheKey, result)
                         }
                     }
@@ -670,7 +671,7 @@ if (idNumber && idNumber.length() > 17) {
                     redis.expire(key, collector.cacheTimeout * 60)
                 }
                 else if (ehcache) {
-                    ehcache.getOrCreateCache(getStr("collectorCacheKeyPrefix", "collector") +":"+ cacheKey, Duration.ofMinutes(collector.cacheTimeout) , null, null)
+                    ehcache.getOrCreateCache(getStr("collectorCacheKeyPrefix", "collector") +":"+ cacheKey, Duration.ofMinutes(collector.cacheTimeout), getInteger("collectorCache.limit", 1000), null)
                         .put(cacheKey, result)
                 }
             }

@@ -37,7 +37,7 @@ class RedisClient extends ServerTpl {
             getInteger("soTimeout", 7000),
             getStr("password", null),
             getInteger("database", Protocol.DEFAULT_DATABASE),
-            getStr("clientName", null)
+            getStr("clientName", app().id())
         )
 
         exposeBean(pool)
