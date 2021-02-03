@@ -220,6 +220,9 @@ class DecisionContext {
         @Override
         Object get(Object aName) {
             if (aName == null) return null
+            //函数名
+            if (ctx.decisionHolder.spec.functions.containsKey(aName)) return null
+
             def value = super.get(aName)
             if (value == null && !super.containsKey(aName) && !ctx.end.get()) {// 属性值未找到,则从属性管理器获取
                 safeSet(aName.toString(), null) // 代表属性已从外部获取过,后面就不再去获取了(防止重复获取)
@@ -230,6 +233,7 @@ class DecisionContext {
                 if (value.present) value = value.get()
                 else value = null
             }
+
             ctx.ruleAttr(aName.toString(), value)
             return value
         }

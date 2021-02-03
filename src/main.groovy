@@ -5,7 +5,7 @@ import cn.xnatural.enet.event.EP
 import cn.xnatural.jpa.Repo
 import cn.xnatural.remoter.Remoter
 import cn.xnatural.sched.Sched
-import core.EhcacheSrv
+import core.CacheSrv
 import core.HttpSrv
 import core.OkHttpSrv
 import core.RedisClient
@@ -29,7 +29,8 @@ System.setProperty("configdir", "../conf")
 
 // 系统功能添加区
 app.addSource(new OkHttpSrv()) // http 客户端
-app.addSource(new EhcacheSrv()) // ehcache 封装
+//app.addSource(new EhcacheSrv()) // ehcache 封装
+app.addSource(new CacheSrv()) // 对象缓存
 app.addSource(new ServerTpl("sched") { // 定时任务
     Sched sched
     @EL(name = "sys.starting", async = true)
@@ -126,6 +127,8 @@ void heartbeat() {
         for (def itt = m.iterator(); itt.hasNext(); ) {
             def entry = itt.next()
             if ((entry.key.startsWith("script") && entry.key.endsWith(".groovy")) ||
+                entry.key.startsWith("groovy.runtime.metaclass") ||
+                entry.key.startsWith("Script") ||
                 entry.key.contains("GStringTemplateScript") ||
                 entry.key.contains("SimpleTemplateScript") ||
                 entry.key.contains("XmlTemplateScript") ||
@@ -136,6 +139,6 @@ void heartbeat() {
                 log.trace("Removed class parallelLock: {}", entry.key)
             }
         }
-        log.debug("Clean parallelLock. left: {}", m.size())
+        log.info("Clean parallelLock. left: {}", m.size())
     }
 }

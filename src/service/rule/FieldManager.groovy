@@ -9,7 +9,7 @@ import cn.xnatural.remoter.Remoter
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
 import com.alibaba.fastjson.serializer.SerializerFeature
-import core.EhcacheSrv
+import core.CacheSrv
 import core.OkHttpSrv
 import core.RedisClient
 import entity.CollectResult
@@ -34,7 +34,7 @@ class FieldManager extends ServerTpl {
     static final String                          DATA_COLLECTED = "data_collected"
     @Lazy def                                    repo           = bean(Repo, 'jpa_rule_repo')
     @Lazy def                                    redis          = bean(RedisClient)
-    @Lazy def                                    ehcache        = bean(EhcacheSrv)
+    @Lazy def                                    cacheSrv       = bean(CacheSrv)
     /**
      * RuleField(enName, cnName), RuleField
      */
@@ -412,9 +412,9 @@ if (idNumber && idNumber.length() > 17) {
                         result = redis.get(getStr("collectorCacheKeyPrefix", "collector") + ":" + cacheKey)
                         spend = System.currentTimeMillis() - start.time
                     }
-                    else if (ehcache) {
+                    else if (cacheSrv) {
                         start = new Date() // 调用时间
-                        result = ehcache.get(getStr("collectorCacheKeyPrefix", "collector") + ":" + cacheKey, cacheKey)?.toString()
+                        result = cacheSrv.get(getStr("collectorCacheKeyPrefix", "collector") +":"+ cacheKey)?.toString()
                         spend = System.currentTimeMillis() - start.time
                     }
                 }
@@ -430,9 +430,8 @@ if (idNumber && idNumber.length() > 17) {
                             redis.set(key, result.toString())
                             redis.expire(key, collector.cacheTimeout * 60)
                         }
-                        else if (ehcache) {
-                            ehcache.getOrCreateCache(getStr("collectorCacheKeyPrefix", "collector") +":"+ cacheKey, Duration.ofMinutes(collector.cacheTimeout), getInteger("collectorCache.limit", 1000), null)
-                                .put(cacheKey, result)
+                        else if (cacheSrv) {
+                            cacheSrv.set(getStr("collectorCacheKeyPrefix", "collector") +":"+ cacheKey, result, Duration.ofMinutes(collector.cacheTimeout))
                         }
                     }
                 } catch (ex) {
@@ -441,8 +440,8 @@ if (idNumber && idNumber.length() > 17) {
                 }
             } else {
                 cache = true
-                log.info(ctx.logPrefix() + "Sql脚本函数'$collector.enName'缓存结果: $result".toString())
             }
+            log.info(ctx.logPrefix() + "${ -> cache ? '(缓存)' : ''}Sql脚本函数'$collector.enName', 结果: $result".toString())
             dataCollected(new CollectResult(
                 decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.enName,
                 status: (exx ? 'EEEE' : '0000'), dataStatus: (exx ? 'EEEE' : '0000'), collectDate: start, collectorType: collector.type,
@@ -544,7 +543,7 @@ if (idNumber && idNumber.length() > 17) {
             String url = collector.url // http请求 url
             String bodyStr = collector.bodyStr // http 请求 body字符串
             String cacheKey // 缓存key
-            Boolean cache = false //结果是否取自缓存
+            boolean cache = false //结果是否取自缓存
 
             //1. 先从缓存中取
             if (collector.cacheTimeout && collector.cacheKey) {
@@ -571,9 +570,9 @@ if (idNumber && idNumber.length() > 17) {
                         result = redis.get(getStr("collectorCacheKeyPrefix", "collector") + ":" +cacheKey)
                         spend = System.currentTimeMillis() - start.time
                     }
-                    else if (ehcache) {
+                    else if (cacheSrv) {
                         start = new Date() // 调用时间
-                        result = ehcache.get(getStr("collectorCacheKeyPrefix", "collector") + ":" + cacheKey, cacheKey)?.toString()
+                        result = cacheSrv.get(getStr("collectorCacheKeyPrefix", "collector") + ":" +cacheKey)?.toString()
                         spend = System.currentTimeMillis() - start.time
                     }
                 }
@@ -657,7 +656,6 @@ if (idNumber && idNumber.length() > 17) {
             }
             else {
                 cache = true
-                log.info("${ctx.logPrefix()}接口调用(缓存): name: $collector.enName, url: ${ -> url}, bodyStr: $bodyStr${ -> ', result: ' + result}".toString())
             }
 
             //3. 判断http返回结果是否为有效数据. 默认有效(0000)
@@ -670,9 +668,8 @@ if (idNumber && idNumber.length() > 17) {
                     redis.set(key, result)
                     redis.expire(key, collector.cacheTimeout * 60)
                 }
-                else if (ehcache) {
-                    ehcache.getOrCreateCache(getStr("collectorCacheKeyPrefix", "collector") +":"+ cacheKey, Duration.ofMinutes(collector.cacheTimeout), getInteger("collectorCache.limit", 1000), null)
-                        .put(cacheKey, result)
+                else if (cacheSrv) {
+                    cacheSrv.set(getStr("collectorCacheKeyPrefix", "collector") +":"+ cacheKey, result, Duration.ofMinutes(collector.cacheTimeout))
                 }
             }
 
@@ -685,9 +682,9 @@ if (idNumber && idNumber.length() > 17) {
                     ex = e
                 } finally {
                     if (ex) {
-                        log.error("${ctx.logPrefix()}接口调用: name: $collector.enName, url: ${ -> url}, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}".toString() + ", 解析函数执行失败", ex)
+                        log.error("${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}接口调用: name: $collector.enName, url: ${ -> url}, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}".toString() + ", 解析函数执行失败", ex)
                     } else {
-                        log.info("${ctx.logPrefix()}接口调用: name: $collector.enName, url: ${ -> url}, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}".toString())
+                        log.info("${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}接口调用: name: $collector.enName, url: ${ -> url}, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}".toString())
                     }
                     dataCollected(new CollectResult(
                         decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.enName,
@@ -700,7 +697,7 @@ if (idNumber && idNumber.length() > 17) {
                 return resolveResult
             }
 
-            log.info("${ctx.logPrefix()}接口调用: name: $collector.enName, url: ${ -> url}, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}".toString())
+            log.info("${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}接口调用: name: $collector.enName, url: ${ -> url}, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}".toString())
             dataCollected(new CollectResult(
                 decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.enName,
                 status: '0000', dataStatus: dataStatus, collectDate: start, collectorType: collector.type,
