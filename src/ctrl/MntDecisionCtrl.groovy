@@ -314,6 +314,8 @@ class MntDecisionCtrl extends ServerTpl {
         decision.apiConfig = apiConfig
 
         repo.saveOrUpdate(decision)
+        ep.fire("decisionChange", decision.id)
+        ep.fire('enHistory', decision, hCtx.getSessionAttr('uName'))
         ApiResp.ok(decision)
     }
 
