@@ -29,7 +29,6 @@ System.setProperty("configdir", "../conf")
 
 // 系统功能添加区
 app.addSource(new OkHttpSrv()) // http 客户端
-//app.addSource(new EhcacheSrv()) // ehcache 封装
 app.addSource(new CacheSrv()) // 对象缓存
 app.addSource(new ServerTpl("sched") { // 定时任务
     Sched sched

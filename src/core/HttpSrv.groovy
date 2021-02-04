@@ -104,7 +104,6 @@ class HttpSrv extends ServerTpl {
                 cacheSrv.expire(cKey, expire)
             }
         }
-        // sData.put('accessTime', System.currentTimeMillis())
         sData.put("id", sId)
         hCtx.response.cookie(sessionCookieName, sId, expire.seconds as Integer, null, "/", false, false)
         return sData

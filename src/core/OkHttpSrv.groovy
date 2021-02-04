@@ -4,6 +4,7 @@ import cn.xnatural.app.ServerTpl
 import cn.xnatural.app.Utils
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
+import cn.xnatural.sched.Sched
 import com.alibaba.fastjson.JSON
 import okhttp3.*
 
@@ -132,7 +133,7 @@ class OkHttpSrv extends ServerTpl {
             void onFailure(WebSocket ws, Throwable t, Response resp) {
                 log.error("WS Error. url: " + urlStr + ", res: " + resp?.body()?.toString(), t)
                 if (tryInterval) {
-                    def sched = bean(SchedSrv)
+                    def sched = bean(Sched)
                     if (sched) {
                         sched.after(Duration.ofSeconds(tryInterval), { client.newWebSocket(req, this) })
                     } else {

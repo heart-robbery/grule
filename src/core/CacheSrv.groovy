@@ -13,7 +13,14 @@ class CacheSrv extends ServerTpl {
     /**
      * 数据存放
      */
-    final Map<String, Record> data = new ConcurrentHashMap<>()
+    @Lazy protected Map<String, Record> data = new ConcurrentHashMap(getInteger("itemLimit", 1000) + 5) {
+        @Override
+        Object remove(Object key) {
+            def v = super.remove(key)
+            log.info("Removed cache: {}", key)
+            return v
+        }
+    }
 
 
     /**
@@ -51,11 +58,15 @@ class CacheSrv extends ServerTpl {
      * @param expire 过期时间
      * @return
      */
-    CacheSrv expire(String key, Duration expire) {
+    CacheSrv expire(String key, Duration expire = null) {
         def record = data.get(key)
         if (record) {
-            record.expire = expire
-            record.updateTime = System.currentTimeMillis()
+            if (expire == null) {
+                record.expire = expire
+                record.updateTime = System.currentTimeMillis()
+            } else {
+                data.remove(key)
+            }
         }
         this
     }
