@@ -113,6 +113,7 @@ void sysStarted() {
 }
 
 
+@Field Map<String, Object> old = [:]
 /**
  * 系统心跳 清理
  */
@@ -122,6 +123,8 @@ void heartbeat() {
     def field = ClassLoader.getDeclaredField('parallelLockMap')
     field.setAccessible(true)
     Map<String, Object> m = field.get(Thread.currentThread().contextClassLoader.parent.parent)
+    m.clear()
+    return
     if (m != null) {
         for (def itt = m.iterator(); itt.hasNext(); ) {
             def entry = itt.next()
@@ -137,6 +140,19 @@ void heartbeat() {
                 itt.remove()
                 log.trace("Removed class parallelLock: {}", entry.key)
             }
+        }
+        if (old.isEmpty()) {
+            old.putAll(m)
+        } else {
+            def unnecessary = ""
+            m.each {e ->
+                if (!old.containsKey(e.key)) {
+                    unnecessary += e.key + ', '
+                }
+            }
+            if (unnecessary) log.info("多余: " + unnecessary)
+            old.clear()
+            old.putAll(m)
         }
         log.info("Clean parallelLock. left: {}", m.size())
     }
