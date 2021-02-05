@@ -17,7 +17,7 @@ class CacheSrv extends ServerTpl {
         @Override
         Object remove(Object key) {
             def v = super.remove(key)
-            log.info("Removed cache: {}", key)
+            CacheSrv.this.log.info("Removed cache: {}", key)
             return v
         }
     }
@@ -61,7 +61,7 @@ class CacheSrv extends ServerTpl {
     CacheSrv expire(String key, Duration expire = null) {
         def record = data.get(key)
         if (record) {
-            if (expire == null) {
+            if (expire != null) {
                 record.expire = expire
                 record.updateTime = System.currentTimeMillis()
             } else {
