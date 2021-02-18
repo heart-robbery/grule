@@ -571,7 +571,7 @@ class MntDecisionCtrl extends ServerTpl {
                 def total = srv.cleanDecisionResult()
                 ep.fire("globalMsg", "清理过期决策数据结束. 共计: " + total)
             }
-            return ApiResp.ok("等待后台清理...")
+            return ApiResp.ok().desc("等待后台清理完成...")
         } else {
             return ApiResp.fail("清理失败")
         }

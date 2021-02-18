@@ -2,7 +2,7 @@
     <div>
         <div>
             <h-tabs v-model="tabs.type" :datas="types"></h-tabs>
-            <button v-if="sUser.permissionIds.find((p) => p == 'grant')" class="h-btn h-btn-text-red" @click="cleanExpire">
+            <button v-if="sUser.permissionIds.find((p) => p == 'grant')" style="position: absolute;right: 30px;top:2px;" class="h-btn h-btn-text-red" @click="cleanExpire">
                 <i class="h-icon-trash"></i><span>数据清理</span>
             </button>
         </div>
