@@ -33,10 +33,19 @@ class MntDecisionCtrl extends ServerTpl {
         if (pageSize && pageSize > 20) return ApiResp.fail("Param pageSize <=20")
         hCtx.auth("decision-read")
         // 允许访问的决策id
-        def ids = hCtx.getSessionAttr("permissions").split(",").findResults {String p -> p.replace("decision-read-", "").replace("decision-read", "")}.findAll {it}
+        def ids = hCtx.getSessionAttr("permissions").split(",")
+            .findAll {String p -> p.startsWith("decision-read-")}
+            .findResults {String p -> p.replace("decision-read-", "").replace("decision-read", "")}
+            .findAll {it}
         if (!ids) return ApiResp.ok(Page.empty())
-        def delIds = hCtx.getSessionAttr("permissions").split(",").findResults {String p -> p.replace("decision-del-", "").replace("decision-del", "")}.findAll {it}
-        def updateIds = hCtx.getSessionAttr("permissions").split(",").findResults {String p -> p.replace("decision-update-", "").replace("decision-update", "")}.findAll {it}
+        def delIds = hCtx.getSessionAttr("permissions").split(",")
+            .findAll {String p -> p.startsWith("decision-del-")}
+            .findResults {String p -> p.replace("decision-del-", "").replace("decision-del", "")}
+            .findAll {it}
+        def updateIds = hCtx.getSessionAttr("permissions").split(",")
+            .findAll {String p -> p.startsWith("decision-update-")}
+            .findResults {String p -> p.replace("decision-update-", "").replace("decision-update", "")}
+            .findAll {it}
         ApiResp.ok(
                 repo.findPage(Decision, page, pageSize?:10) {root, query, cb ->
                     query.orderBy(cb.desc(root.get('updateTime')))
@@ -132,7 +141,10 @@ class MntDecisionCtrl extends ServerTpl {
     ) {
         hCtx.auth("decisionResult-read")
         if (pageSize && pageSize > 10) return ApiResp.fail("Param pageSize <=10")
-        def ids = hCtx.getSessionAttr("permissions").split(",").findResults {String p -> p.replace("decision-read-", "").replace("decision-read", "")}.findAll {it}
+        def ids = hCtx.getSessionAttr("permissions").split(",")
+            .findAll {String p -> p.startsWith("decision-read-")}
+            .findResults {String p -> p.replace("decision-read-", "").replace("decision-read", "")}
+            .findAll {it}
         if (!ids) return ApiResp.ok()
         Date start = startTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(startTime) : null
         Date end = endTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(endTime) : null
@@ -145,7 +157,7 @@ class MntDecisionCtrl extends ServerTpl {
                     if (start) ps << cb.greaterThanOrEqualTo(root.get('occurTime'), start)
                     if (end) ps << cb.lessThanOrEqualTo(root.get('occurTime'), end)
                     if (decisionId) ps << cb.equal(root.get('decisionId'), decisionId)
-                    if (keyProp) ps << cb.equal(root.get('keyProp'), keyProp)
+                    if (keyProp) ps << cb.like(root.get('keyProp'), '%' + keyProp + '%')
                     if (spend) ps << cb.ge(root.get('spend'), spend)
                     if (decision) ps << cb.equal(root.get('decision'), decision)
                     if (exception) ps << cb.like(root.get('exception'), '%' + exception + '%')
@@ -185,7 +197,10 @@ class MntDecisionCtrl extends ServerTpl {
         Long spend, Boolean success, Boolean dataSuccess, Boolean cache, String startTime, String endTime
     ) {
         hCtx.auth("collectResult-read")
-        def ids = hCtx.getSessionAttr("permissions").split(",").findResults {String p -> p.replace("decision-read-", "").replace("decision-read", "")}.findAll {it}
+        def ids = hCtx.getSessionAttr("permissions").split(",")
+            .findAll {String p -> p.startsWith("decision-read-")}
+            .findResults {String p -> p.replace("decision-read-", "").replace("decision-read", "")}
+            .findAll {it}
         if (!ids) return ApiResp.ok()
         Date start = startTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(startTime) : null
         Date end = endTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(endTime) : null
@@ -294,15 +309,18 @@ class MntDecisionCtrl extends ServerTpl {
             def params = JSON.parseArray(apiConfig)
             JSONObject param = params.find {JSONObject jo -> "decisionId" == jo.getString("code")}
             if (param) {
-                param.put("fixValue", decision.decisionId)
+                param.fluentPut("fixValue", decision.decisionId).fluentPut("type", "Str").fluentPut("require", true)
             } else {
                 params.add(0, new JSONObject().fluentPut("code", "decisionId").fluentPut("type", "Str")
                         .fluentPut("fixValue", decision.decisionId).fluentPut("name", "决策id").fluentPut("require", true)
                 )
             }
-            for (def it = params.iterator(); it.hasNext(); ) {
-                JSONObject jo = it.next()
-                if (!jo.getString("code") || !jo.getString("name")) it.remove()
+            for (def itt = params.iterator(); itt.hasNext(); ) {
+                JSONObject jo = itt.next()
+                if (!jo.getString("code") || !jo.getString("name")) itt.remove()
+                for (def ittt = jo.iterator(); ittt.hasNext(); ) {
+                    if (ittt.next().key.startsWith('_')) ittt.remove()
+                }
             }
             apiConfig = params.toString()
         } else {

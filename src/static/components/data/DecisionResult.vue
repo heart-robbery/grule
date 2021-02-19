@@ -4,7 +4,7 @@
             <h-select v-model="model.decision" :datas="types" placeholder="所有" style="width: 70px; float: left" @change="load"></h-select>
             <h-autocomplete v-model="model.decisionId" :option="decisions" style="float:left; width: 150px" @change="load" placeholder="决策名"></h-autocomplete>
             <input type="text" v-model="model.id" placeholder="流水id(精确匹配)" style="width: 250px" @keyup.enter="load"/>
-            <input type="text" v-model="model.keyProp" placeholder="关键属性(精确匹配)" style="width: 155px" @keyup.enter="load"/>
+            <input type="text" v-model="model.keyProp" placeholder="关键属性" style="width: 155px" @keyup.enter="load"/>
             <input type="number" v-model="model.spend" placeholder="耗时(>=ms)" style="width: 100px" @keyup.enter="load"/>
             <input type="text" v-model="model.exception" placeholder="异常信息" @keyup.enter="load"/>
 <!--            <input type="text" v-model="model.attrs" placeholder="属性关键字" @keyup.enter="load"/>-->

@@ -85,8 +85,7 @@ dependencies {
 //    compile('com.alibaba:QLExpress:3.2.4')
 
     // jvm 脚本语言
-//    compile('com.googlecode.aviator:aviator:5.0.0')
-
+    // compile('com.googlecode.aviator:aviator:5.2.3')
 }
 
 

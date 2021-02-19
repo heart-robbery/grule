@@ -142,7 +142,7 @@ class DecisionSrv extends ServerTpl {
         queue(SAVE_RESULT) { // 保存决策结果到数据库
             repo.saveOrUpdate(
                 repo.findById(DecisionResult, ctx.id).tap {
-                    def keyPropName = getStr("keyPropName", null)
+                    def keyPropName = getStr("keyPropName.$ctx.decisionHolder.decision.decisionId", getStr("defaultKeyPropName", null))
                     if (keyPropName) {
                         keyProp = ctx.summary().get('attrs')[(keyPropName)]
                     }
