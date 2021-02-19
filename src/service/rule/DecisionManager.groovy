@@ -1,6 +1,7 @@
 package service.rule
 
 import cn.xnatural.app.ServerTpl
+import cn.xnatural.app.Utils
 import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
 import cn.xnatural.jpa.Repo
@@ -9,12 +10,15 @@ import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
 import entity.Decision
 import entity.FieldType
+import org.codehaus.groovy.control.CompilerConfiguration
+import org.codehaus.groovy.control.customizers.ImportCustomizer
 import service.rule.spec.DecisionSpec
 
 import java.text.SimpleDateFormat
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Function
+import java.util.regex.Pattern
 
 /**
  * 决策管理器
@@ -108,15 +112,19 @@ class DecisionManager extends ServerTpl {
         if (!decision || !decision.dsl) return
         def spec = DecisionSpec.of(decision.dsl)
         def apiConfig = decision.apiConfig ? JSON.parseArray(decision.apiConfig) : null
+        Map<String, Function<Object, Boolean>> validFunMap = [:]
+        Map<String, Pattern> patternMap = [:]
         decisionMap.put(spec.决策id, new DecisionHolder(decision: decision, spec: spec, paramValidator: (apiConfig ? { Map<String, Object> params ->
             apiConfig.each { JSONObject paramCfg ->
-                def code = paramCfg.getString('code') // 参数code
+                String code = paramCfg.getString('code') // 参数code
                 def value = params.get(code)
                 if (paramCfg.getBoolean('require') && value == null) { // 必传验证
                     throw new IllegalArgumentException("Param '$code' require")
                 }
                 def fixValue // 固定值
                 def enumValues // 枚举值
+                Pattern pattern // 正则验证
+                Function<Object, Boolean> validFun // 函数验证
                 def type = FieldType.valueOf(paramCfg.getString('type')) // 参数类型. FieldType
                 if (type == null || !FieldType.enumConstants.find {it == type}) throw new Exception("参数验证类型配置错误. type: $type")
 
@@ -184,6 +192,25 @@ class DecisionManager extends ServerTpl {
                     }
                     fixValue = paramCfg.getString('fixValue')
                     enumValues = paramCfg.getJSONArray('enumValues')?.findAll{it}
+                    if (paramCfg.getString('regex')) {
+                        pattern = patternMap.get(code)
+                        if (pattern == null) {
+                            pattern = Pattern.compile(paramCfg.getString('regex'))
+                            patternMap.put(code, pattern)
+                        }
+                    }
+                    if (paramCfg.getString('validFun')) {
+                        validFun = validFunMap.get(code)
+                        if (validFun == null) {
+                            Binding binding = new Binding()
+                            def config = new CompilerConfiguration()
+                            def icz = new ImportCustomizer()
+                            config.addCompilationCustomizers(icz)
+                            icz.addImports(Utils.class.name)
+                            validFun = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("${paramCfg.getString('validFun')}") as Function
+                            validFunMap.put(code, validFun)
+                        }
+                    }
                 }
                 if (FieldType.Time == type) { // 时间验证
                     if (value == null) value = paramCfg.getString('defaultValue')
@@ -215,9 +242,19 @@ class DecisionManager extends ServerTpl {
                             throw new IllegalArgumentException("Param '$code' value fixed be '$fixValue'")
                         }
                     }
-                    else if (enumValues) { // 枚举值验证
+                    if (enumValues) { // 枚举值验证
                         if (!enumValues.find {it == value}) {
                             throw new IllegalArgumentException("Param '$code' enum values: '${enumValues.join(",")}'")
+                        }
+                    }
+                    if (pattern) { // 正则验证
+                        if (!pattern.matcher(value.toString()).find()) {
+                            throw new IllegalArgumentException("Param '$code' regex not match: '$value'")
+                        }
+                    }
+                    if (validFun) {
+                        if (!validFun.apply(value)) {
+                            throw new IllegalArgumentException("Param '$code' function valid fail: '$value'")
                         }
                     }
                 }

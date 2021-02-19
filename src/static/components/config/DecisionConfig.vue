@@ -46,7 +46,6 @@
 <script>
     const apiConfig = {
         props: ['decision'],
-        // language=HTML
         template: `
             <div class="h-panel">
                 <div class="h-panel-bar">
@@ -69,7 +68,7 @@
                         </h-tableitem>
                         <h-tableitem title="类型" align="center" :width="90">
                             <template slot-scope="{data}">
-                                <h-select v-model="data.type" :datas="types" :deletable="false" style="width: 88px"></h-select>
+                                <h-select v-model="data.type" :datas="types" :deletable="false" style="width: 88px" :disabled="data._readonly"></h-select>
                             </template>
                         </h-tableitem>
                         <h-tableitem title="是否必须" align="center" :width="80">
@@ -116,7 +115,7 @@
                                 </h-form>
                             </template>
                         </h-tableitem>
-                        <h-tableitem title="验证" align="center" :width="200">
+                        <h-tableitem title="验证" align="center" :width="220">
                             <template slot-scope="{data}">
                                 <h-form>
                                     <h-formitem v-if="data.type == 'Time'" label="格式">
@@ -128,6 +127,12 @@
                                     </h-formitem>
                                     <h-formitem v-if="data.type == 'Str'" label="固定长度">
                                         <h-numberinput v-model="data.fixLength"></h-numberinput>
+                                    </h-formitem>
+                                    <h-formitem v-if="data.type == 'Str'" label="正则验证">
+                                        <input type="text" v-model="data.regex" />
+                                    </h-formitem>
+                                    <h-formitem v-if="data.type == 'Str'" label="验证函数">
+                                        <ace-groovy v-model="data.validFun" height="80px"></ace-groovy>
                                     </h-formitem>
 
                                     <h-formitem v-if="data.type == 'Int'" label="最小值">
@@ -147,7 +152,7 @@
                             </template>
                         </h-tableitem>
                         <h-tableitem title="操作" align="center" :width="60" fixed="right">
-                            <template slot-scope="{data}">
+                            <template v-if="!data._readonly" slot-scope="{data}">
                                 <h-button class="h-btn h-btn-s h-btn-red" @click="del(data)"><i class="h-icon-trash"></i></h-button>
                             </template>
                         </h-tableitem>
@@ -157,13 +162,7 @@
             </div>
         `,
         data() {
-            this.decision.apiConfigO = this.decision.apiConfigO ? this.decision.apiConfigO : (this.decision.apiConfig ? JSON.parse(this.decision.apiConfig) : null);
-            // if (this.decision.apiConfigO) {
-            //     for (let item of this.decision.apiConfigO) {
-            //         if (item.code == 'decisionId' || item.code == 'async') item._readonly = true
-            //     }
-            // }
-            if (this.decision.apiConfigO == null) this.decision.apiConfigO = [];
+            this.parseApiConfig();
             return {
                 apiConfig: this.decision.apiConfigO,
                 types: [
@@ -175,7 +174,23 @@
                 ]
             }
         },
+        watch: {
+            'decision.apiConfig': function (v) {
+                this.parseApiConfig()
+            }
+        },
         methods: {
+            parseApiConfig() {
+                this.decision.apiConfigO = JSON.parse(this.decision.apiConfig);
+                if (this.decision.apiConfigO == null) this.decision.apiConfigO = [];
+                for (let item of this.decision.apiConfigO) { //固定值: 只读
+                    if (item.fixValue != undefined && item.fixValue != null && item.fixValue != "") item._readonly = true;
+                    else item._readonly = false;
+                }
+                if (this.apiConfig) {
+                    this.apiConfig = this.decision.apiConfigO;
+                }
+            },
             add() {
                 this.decision.apiConfigO.push({name: `参数${this.decision.apiConfigO.length + 1}`, code: null, type: 'Str'})
             },
@@ -352,11 +367,11 @@
                         if (res.code == '00') {
                             if (decision.id) {
                                 $.extend(decision, res.data);
-                                decision.apiConfigO = decision.apiConfig ? JSON.parse(decision.apiConfig) : null;
+                                //decision.apiConfigO = decision.apiConfig ? JSON.parse(decision.apiConfig) : null;
                                 this.$Message.success('更新成功: ' + decision.name);
                             } else {
                                 $.extend(decision, res.data);
-                                decision.apiConfigO = decision.apiConfig ? JSON.parse(decision.apiConfig) : null;
+                                //decision.apiConfigO = decision.apiConfig ? JSON.parse(decision.apiConfig) : null;
                                 this.$Message.success('新增成功: ' + res.data.name);
                                 //this.load();
                             }

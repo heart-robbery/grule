@@ -102,7 +102,7 @@
                         </h-formitem>
 
                         <h-formitem v-if="model.type == 'sql'" label="数据库连接url" prop="url" icon="h-icon-user" single>
-                            <input type="text" v-model="model.url">
+                            <input type="text" v-model="model.url"/>
                         </h-formitem>
                         <h-formitem v-if="model.type == 'sql'" label="最少闲连接数" prop="minIdle" icon="h-icon-user" >
                             <h-numberinput v-model="model.minIdle" :min="0" :max="50" useInt></h-numberinput>
