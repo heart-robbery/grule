@@ -25,6 +25,7 @@ class Permission extends LongIdEntity {
     /**
      * 权限说明
      */
+    @Column(length = 500)
     String comment
     /**
      * 动态创建权限时, 此字段标识

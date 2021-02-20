@@ -113,7 +113,6 @@ void sysStarted() {
 }
 
 
-@Field Map<String, Object> old = [:]
 /**
  * 系统心跳 清理
  */
@@ -140,19 +139,6 @@ void heartbeat() {
                 itt.remove()
                 log.trace("Removed class parallelLock: {}", entry.key)
             }
-        }
-        if (old.isEmpty()) {
-            old.putAll(m)
-        } else {
-            def unnecessary = ""
-            m.each {e ->
-                if (!old.containsKey(e.key)) {
-                    unnecessary += e.key + ', '
-                }
-            }
-            if (unnecessary) log.info("多余: " + unnecessary)
-            old.clear()
-            old.putAll(m)
         }
         log.info("Clean parallelLock. left: {}", m.size())
     }

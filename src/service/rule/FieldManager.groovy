@@ -580,7 +580,8 @@ if (idNumber && idNumber.length() > 17) {
 
             //2. 未从缓存中取到结果, 则调接口, 网络连接错误,主动重试3次
             if (!result) {
-                for (int i = 0; i < 2; i++) { // 替换 ${} 变量
+                // url 替换 ${} 变量
+                for (int i = 0; i < 2; i++) {
                     if (!url.contains('${')) break
                     url = tplEngine.createTemplate(url).make(new HashMap(1) {
                         int paramIndex
@@ -602,7 +603,8 @@ if (idNumber && idNumber.length() > 17) {
                     }).toString()
                 }
 
-                for (int i = 0; i < 2; i++) { // 替换 ${} 变量
+                // body 替换 ${} 变量
+                for (int i = 0; i < 2; i++) {
                     if (!bodyStr || !bodyStr.contains('${')) break
                     bodyStr = tplEngine.createTemplate(bodyStr).make(new HashMap(1) {
                         @Override
@@ -618,11 +620,11 @@ if (idNumber && idNumber.length() > 17) {
                 }
                 // NOTE: 如果是json 并且是,} 结尾, 则删除 最后的,(因为spring解析入参数会认为json格式错误)
                 // if (bodyStr.endsWith(',}')) bodyStr = bodyStr.substring(0, bodyStr.length() - 3) + '}'
-                start = new Date() // 调用时间
                 String retryMsg = ''
                 // 日志消息
                 def logMsg = "${ctx.logPrefix()}接口调用${ -> retryMsg}: name: $collector.enName, url: ${ -> url}, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}"
                 try {
+                    start = new Date() // 调用时间
                     for (int i = 0, times = getInteger('http.retry', 2) + 1; i < times; i++) { // 接口一般遇网络错重试2次
                         try {
                             retryMsg = i > 0 ? "(重试第${i}次)" : ''
