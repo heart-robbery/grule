@@ -45,7 +45,7 @@ dependencies {
     compile 'javax.inject:javax.inject:1'
     compile 'ch.qos.logback:logback-classic:1.2.3'
 
-    compile 'cn.xnatural.app:app:1.0.1'
+    compile 'cn.xnatural.app:app:1.0.2'
     //compile 'cn.xnatural.enet:enet-event:0.0.17'
     compile 'cn.xnatural.http:http:1.0.7'
     //compile 'cn.xnatural.aio:aio:1.0.6'

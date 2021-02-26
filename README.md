@@ -27,6 +27,7 @@
     }
 }
 ```
+#### 决策定义
 ![Image text](https://gitee.com/xnat/tmp/raw/master/img/decisions.png)
 
 #### 图表展示 
@@ -34,6 +35,7 @@
 
 #### 决策执行记录
 ![Image text](https://gitee.com/xnat/tmp/raw/master/img/decision_records.png)
+
 #### 决策执行详情
 ![Image text](https://gitee.com/xnat/tmp/raw/master/img/decision_result_detail.png)
 

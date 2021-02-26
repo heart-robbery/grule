@@ -4,9 +4,10 @@
 <!--            <span class="h-panel-title">属性集</span>-->
             <!--            <span v-color:gray v-font="13">说明~~</span>-->
             &nbsp;&nbsp;
-            <h-button v-if="sUser.permissionIds.find((e) => e == 'field-add') == 'field-add'" @click="showAddPop"><i class="h-icon-plus"></i></h-button>
+            <h-button v-if="sUser.permissionIds.find((e) => e == 'field-add')" @click="showAddPop"><i class="h-icon-plus"></i></h-button>
             <input type="text" v-model="model.kw" placeholder="关键词" style="width: 250px" @keyup.enter="load"/>
             <h-autocomplete v-model="model.collector" :option="collectorOpt" style="float:left; width: 180px" @change="load" placeholder="收集器"></h-autocomplete>
+            <h-autocomplete v-model="model.decision" :option="decisionOpt" style="float:left; width: 180px" @change="load" placeholder="决策"></h-autocomplete>
             <div class="h-panel-right">
 <!--                <h-search placeholder="查询" v-width="200" v-model="kw" show-search-button search-text="搜索" @search="load"></h-search>-->
                 <!--                <i class="h-split"></i>-->
@@ -29,6 +30,12 @@
                     <template slot-scope="{data}">
                         <a v-if="data.dataCollectorName" href="javascript:void(0)" @click="jumpToDataCollector(data)">{{data.dataCollectorName}}</a>
                         <span v-else>{{data.dataCollector}}</span>
+                    </template>
+                </h-tableitem>
+                <h-tableitem title="决策" align="center">
+                    <template slot-scope="{data}">
+                        <a v-if="data.decisionName" href="javascript:void(0)" @click="jumpToDecision(data)">{{data.decisionName}}</a>
+                        <span v-else>{{data.decisionId}}</span>
                     </template>
                 </h-tableitem>
                 <h-tableitem v-if="sUser.permissionIds.find((e) => e == 'field-update' || e == 'field-del')" title="操作" align="center" :width="90">
@@ -76,14 +83,14 @@
                             <textarea v-model="model.comment" />
                         </h-formitem>
                         <h-formitem label="值函数" icon="h-icon-complete" prop="dataCollector">
-                            <h-autocomplete ref="ac" v-model="model.dataCollector" :show="model.dataCollectorName" :option="param"></h-autocomplete>
+                            <h-autocomplete v-model="model.dataCollector" :show="model.dataCollectorName" :option="param"></h-autocomplete>
+                        </h-formitem>
+                        <h-formitem label="决策" icon="h-icon-complete" prop="decision">
+                            <h-autocomplete v-model="model.decision" :show="model.decisionName" :option="decisionAc"></h-autocomplete>
                         </h-formitem>
                         <h-formitem>
                                 <h-button v-if="model.id" color="primary" :loading="isLoading" @click="update">提交</h-button>
                                 <h-button v-else color="primary" :loading="isLoading" @click="add">提交</h-button>
-                                &nbsp;&nbsp;&nbsp;
-                                <h-button v-if="model.id" @click="model = {type: 'Str'}">清除</h-button>
-                                <h-button v-else @click="model = {type: 'Str'}">重置</h-button>
                             </h-formitem>
                     </h-form>
                 </div>
@@ -110,6 +117,25 @@
                                     if (res.code == '00') {
                                         cb(res.data.list.map((r) => {
                                             return {cnName: r.cnName, enName: r.enName}
+                                        }))
+                                    } else this.$Notice.error(res.desc)
+                                },
+                            });
+                        }
+                    },
+                    decisionAc: {
+                        keyName: 'id',
+                        titleName: 'name',
+                        minWord: 1,
+                        loadData: (filter, cb) => {
+                            $.ajax({
+                                url: 'mnt/decisionPage',
+                                data: {page: 1, pageSize: 5, nameLike: filter},
+                                success: (res) => {
+                                    this.isLoading = false;
+                                    if (res.code == '00') {
+                                        cb(res.data.list.map((r) => {
+                                            return {id: r.id, name: r.name}
                                         }))
                                     } else this.$Notice.error(res.desc)
                                 },
@@ -181,6 +207,25 @@
                         });
                     }
                 },
+                decisionOpt: {
+                    keyName: 'id',
+                    titleName: 'name',
+                    minWord: 1,
+                    loadData: (filter, cb) => {
+                        $.ajax({
+                            url: 'mnt/decisionPage',
+                            data: {page: 1, pageSize: 5, nameLike: filter},
+                            success: (res) => {
+                                this.isLoading = false;
+                                if (res.code == '00') {
+                                    cb(res.data.list.map((r) => {
+                                        return {id: r.id, name: r.name}
+                                    }))
+                                } else this.$Notice.error(res.desc)
+                            },
+                        });
+                    }
+                },
                 kw: '',
                 loading: false,
                 page: 1, totalRow: 0, pageSize: 10, list: []
@@ -196,6 +241,10 @@
             jumpToDataCollector(item) {
                 this.tabs.showId = item.dataCollector;
                 this.tabs.type = 'DataCollectorConfig';
+            },
+            jumpToDecision(item) {
+                this.tabs.showId = item.decision;
+                this.tabs.type = 'DecisionConfig';
             },
             formatType(v) {
                 for (let type of types) {

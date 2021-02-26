@@ -26,6 +26,8 @@ import java.util.Map.Entry
 class MntDecisionCtrl extends ServerTpl {
 
     @Lazy def repo = bean(Repo, 'jpa_rule_repo')
+    @Lazy def decisionManager = bean(DecisionManager)
+    @Lazy def fieldManager = bean(FieldManager)
 
 
     @Path(path = 'decisionPage')
@@ -35,16 +37,16 @@ class MntDecisionCtrl extends ServerTpl {
         // 允许访问的决策id
         def ids = hCtx.getSessionAttr("permissions").split(",")
             .findAll {String p -> p.startsWith("decision-read-")}
-            .findResults {String p -> p.replace("decision-read-", "").replace("decision-read", "")}
+            .findResults {String p -> p.replace("decision-read-", "")}
             .findAll {it}
         if (!ids) return ApiResp.ok(Page.empty())
         def delIds = hCtx.getSessionAttr("permissions").split(",")
             .findAll {String p -> p.startsWith("decision-del-")}
-            .findResults {String p -> p.replace("decision-del-", "").replace("decision-del", "")}
+            .findResults {String p -> p.replace("decision-del-", "")}
             .findAll {it}
         def updateIds = hCtx.getSessionAttr("permissions").split(",")
             .findAll {String p -> p.startsWith("decision-update-")}
-            .findResults {String p -> p.replace("decision-update-", "").replace("decision-update", "")}
+            .findResults {String p -> p.replace("decision-update-", "")}
             .findAll {it}
         ApiResp.ok(
                 repo.findPage(Decision, page, pageSize?:10) {root, query, cb ->
@@ -63,10 +65,10 @@ class MntDecisionCtrl extends ServerTpl {
 
 
     @Path(path = 'fieldPage')
-    ApiResp fieldPage(HttpContext hCtx, Integer page, Integer pageSize, String collector, String kw) {
+    ApiResp fieldPage(HttpContext hCtx, Integer page, Integer pageSize, String collector, String decision, String kw) {
         if (pageSize && pageSize > 50) return ApiResp.fail("Param pageSize <=50")
         hCtx.auth("field-read")
-        def fieldPage = repo.findPage(RuleField, page, (pageSize?:10)) { root, query, cb ->
+        ApiResp.ok(repo.findPage(RuleField, page, (pageSize?:10)) { root, query, cb ->
             query.orderBy(cb.desc(root.get('updateTime')))
             def ps = []
             if (kw) {
@@ -79,15 +81,16 @@ class MntDecisionCtrl extends ServerTpl {
             if (collector) {
                 ps << cb.equal(root.get("dataCollector"), collector)
             }
-            cb.and(ps.toArray(new Predicate[ps.size()]))
-        }.to{ Utils.toMapper(it).ignore("metaClass").build()}
-        def collectorNames = fieldPage.list.collect {it.dataCollector}.findAll{it}.toSet()
-        if (collectorNames) {
-            repo.findList(DataCollector) {root, query, cb -> root.get('enName').in(collectorNames)}.each {dc ->
-                fieldPage.list.findAll {it.dataCollector == dc.enName}?.each {it.dataCollectorName = dc.cnName}
+            if (decision) {
+                ps << cb.equal(root.get("decision"), decision)
             }
-        }
-        ApiResp.ok(fieldPage)
+            cb.and(ps.toArray(new Predicate[ps.size()]))
+        }.to{ Utils.toMapper(it).ignore("metaClass")
+            .addConverter("decision", "decisionName") {dId -> dId ? decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name : null}
+            .addConverter("decision", "decisionId") {dId -> dId ? decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.decisionId : null}
+            .addConverter("dataCollector", "dataCollectorName") {collectorEnName -> collectorEnName ? fieldManager.collectors.find {it.key == collectorEnName}?.value?.collector?.cnName : null}
+            .build()
+        })
     }
 
 
@@ -119,7 +122,7 @@ class MntDecisionCtrl extends ServerTpl {
         if (pageSize && pageSize > 20) return ApiResp.fail("Param pageSize <=20")
         hCtx.auth("opHistory-read")
         ApiResp.ok(
-            repo.findPage(OpHistory, page, pageSize?:10) { root, query, cb ->
+            repo.findPage(OpHistory, page, pageSize?:5) { root, query, cb ->
                 query.orderBy(cb.desc(root.get('createTime')))
                 def ps = []
                 if (kw) {
@@ -166,13 +169,12 @@ class MntDecisionCtrl extends ServerTpl {
                     if (rules) ps << cb.like(root.get('rules'), '%' + rules + '%')
                     if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
                 }.to{
-                    def am = bean(FieldManager)
                     Utils.toMapper(it).ignore("metaClass")
                             .addConverter('decisionId', 'decisionName', { String dId ->
-                                bean(DecisionManager).decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name
+                                decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name
                             }).addConverter('attrs', {
                                 it == null ? [:] : JSON.parseObject(it).collect { e ->
-                                    [enName: e.key, cnName: am.fieldMap.get(e.key)?.cnName, value: e.value]
+                                    [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
                                 }}).addConverter('input', {
                                     it == null ? [:] : JSON.parseObject(it)
                                 }).addConverter('dataCollectResult', {
@@ -181,7 +183,7 @@ class MntDecisionCtrl extends ServerTpl {
                                     def arr = it == null ? [] : JSON.parseArray(it)
                                     arr.each { JSONObject jo ->
                                         jo.put('data', jo.getJSONObject('data').collect { Entry<String, Object> e ->
-                                            [enName: e.key, cnName: am.fieldMap.get(e.key)?.cnName, value: e.value]
+                                            [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
                                         })
                                     }
                                     arr
@@ -240,7 +242,7 @@ class MntDecisionCtrl extends ServerTpl {
             if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
         }.to{record -> Utils.toMapper(record).ignore("metaClass")
                 .addConverter('decisionId', 'decisionName', {String dId ->
-                    bean(DecisionManager).decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name
+                    decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name
                 }).build()
         }
         repo.findList(DataCollector) {root, query, cb -> root.get('enName').in(result.list.collect {it['collector']})}.each {dc ->
@@ -339,14 +341,20 @@ class MntDecisionCtrl extends ServerTpl {
 
 
     @Path(path = 'addField', method = 'post')
-    ApiResp addField(HttpContext hCtx, String enName, String cnName, FieldType type, String comment, String dataCollector) {
+    ApiResp addField(HttpContext hCtx, String enName, String cnName, FieldType type, String comment, String dataCollector, String decision) {
         hCtx.auth('field-add')
         if (!enName) return ApiResp.fail("Param enName not empty")
         if (!cnName) return ApiResp.fail("Param cnName not empty")
         if (!type) return ApiResp.fail("Param type not empty")
         if (repo.count(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}) return ApiResp.fail("$enName aleady exist")
         if (repo.count(RuleField) {root, query, cb -> cb.equal(root.get('cnName'), cnName)}) return ApiResp.fail("$cnName aleady exist")
-        def field = new RuleField(enName: enName, cnName: cnName, type: type, comment: comment, dataCollector: dataCollector, creator: hCtx.getSessionAttr('uName'))
+        if (decision && !repo.findById(Decision, decision)) {
+            return ApiResp.fail("Param decision not exist")
+        }
+        def field = new RuleField(
+            enName: enName, cnName: cnName, type: type, comment: comment, decision: decision,
+            dataCollector: dataCollector, creator: hCtx.getSessionAttr('uName')
+        )
         repo.saveOrUpdate(field)
         ep.fire('fieldChange', field.enName)
         ep.fire('enHistory', field, hCtx.getSessionAttr('uName'))
@@ -415,8 +423,8 @@ class MntDecisionCtrl extends ServerTpl {
 
 
     @Path(path = 'updateField', method = 'post')
-    ApiResp updateField(HttpContext hCtx, Long id, String enName, String cnName, FieldType type, String comment, String dataCollector) {
-        hCtx.auth('field-update', 'field-update-' + enName)
+    ApiResp updateField(HttpContext hCtx, Long id, String enName, String cnName, FieldType type, String comment, String dataCollector, String decision) {
+        hCtx.auth('field-update')
         if (!id) return ApiResp.fail("Param id not legal")
         if (!enName) return ApiResp.fail("Param enName not empty")
         if (!cnName) return ApiResp.fail("Param cnName not empty")
@@ -430,11 +438,15 @@ class MntDecisionCtrl extends ServerTpl {
         if (cnName != field.cnName && repo.count(RuleField) {root, query, cb -> cb.equal(root.get('cnName'), cnName)}) {
             return ApiResp.fail("$cnName aleady exist")
         }
+        if (decision && !repo.findById(Decision, decision)) {
+            return ApiResp.fail("Param decision not exist")
+        }
         field.enName = enName
         field.cnName = cnName
         field.type = type
         field.comment = comment
         field.dataCollector = dataCollector
+        field.decision = decision
         field.updater = hCtx.getSessionAttr("uName")
         repo.saveOrUpdate(field)
         ep.fire('fieldChange', field.enName)
@@ -449,7 +461,7 @@ class MntDecisionCtrl extends ServerTpl {
         String method, String parseScript, String contentType, String comment, String computeScript, String dataSuccessScript,
         String sqlScript, Integer minIdle, Integer maxActive, Integer timeout, Boolean enabled, String cacheKey, Integer cacheTimeout
     ) {
-        hCtx.auth('dataCollector-update', 'dataCollector-update-' + enName)
+        hCtx.auth('dataCollector-update')
         if (!id) return ApiResp.fail("Param id not legal")
         if (!enName) return ApiResp.fail("Param enName not empty")
         if (!cnName) return ApiResp.fail("Param cnName not empty")
@@ -549,7 +561,7 @@ class MntDecisionCtrl extends ServerTpl {
     @Path(path = 'delField/:enName')
     ApiResp delField(HttpContext hCtx, String enName) {
         if (!enName) return ApiResp.fail("Param enName not empty")
-        hCtx.auth('field-del', 'field-del-' + enName)
+        hCtx.auth('field-del')
         def field = repo.find(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}
         repo.delete(field)
         ep.fire('fieldChange', enName)
@@ -561,7 +573,7 @@ class MntDecisionCtrl extends ServerTpl {
     @Path(path = 'delDataCollector/:enName')
     ApiResp delDataCollector(HttpContext hCtx, String enName) {
         if (!enName) return ApiResp.fail("Param enName not empty")
-        hCtx.auth('dataCollector-del', 'dataCollector-del-' + enName)
+        hCtx.auth('dataCollector-del')
         def collector = repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), enName)}
         repo.delete(collector)
         ep.fire('dataCollectorChange', enName)
@@ -572,7 +584,7 @@ class MntDecisionCtrl extends ServerTpl {
 
     @Path(path = 'testCollector/:collector')
     ApiResp testCollector(String collector, HttpContext hCtx) {
-        ApiResp.ok(bean(FieldManager)?.testCollector(collector, hCtx.params()))
+        ApiResp.ok(fieldManager?.testCollector(collector, hCtx.params()))
     }
 
 

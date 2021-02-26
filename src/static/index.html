@@ -74,6 +74,6 @@
     });
 
     // 提前加载大文件
-    loadJs('echarts', 'ace')
+    loadJs('echarts', 'ace', () => loadJs('ace-tools', 'ace-lang-groovy'))
 </script>
 </html>

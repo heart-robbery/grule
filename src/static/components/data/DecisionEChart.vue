@@ -46,14 +46,14 @@
             // setTimeout(() => {
             //     this.taskId = setInterval(() => {
             //         this.load(() => this.chart.setOption(this.option));
-            //     }, 1000 * 60 * 3)
+            //     }, 1000 * 60 * 5)
             // })
         },
         activated() {
             if (this.chart) this.load(() => this.chart.setOption(this.option));
             // this.taskId = setInterval(() => {
             //     this.load(() => this.chart.setOption(this.option));
-            // }, 1000 * 60 * 3)
+            // }, 1000 * 60 * 5)
         },
         deactivated() {
             if (this.taskId) clearInterval(this.taskId)
@@ -244,7 +244,7 @@
                                 }
                             ];
                             if (cb) cb()
-                        } else this.$Notice.error(res.desc)
+                        } else this.$Message.error(res.desc)
                     }
                 })
             }

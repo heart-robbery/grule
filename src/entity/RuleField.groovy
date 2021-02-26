@@ -3,23 +3,22 @@ package entity
 import cn.xnatural.jpa.LongIdEntity
 import org.hibernate.annotations.DynamicUpdate
 
-import javax.persistence.Column
-import javax.persistence.Entity
-import javax.persistence.EnumType
-import javax.persistence.Enumerated
+import javax.persistence.*
 
+@Table(indexes = [
+    @Index(name = "idx_enName_decision", columnList = "enName,decision", unique = true),
+    @Index(name = "idx_cnName_decision", columnList = "cnName,decision", unique = true)
+])
 @Entity
 @DynamicUpdate
 class RuleField extends LongIdEntity {
     /**
      * 英文名 唯一
      */
-    @Column(unique = true)
     String    enName
     /**
      * 中文名 唯一
      */
-    @Column(unique = true)
     String    cnName
     /**
      * 备注说明
@@ -32,12 +31,16 @@ class RuleField extends LongIdEntity {
      */
     String    dataCollector
     /**
+     * 关联到哪个decision#id
+     * 如果为空 则是公用字段
+     */
+    String    decision
+    /**
      * 创建者
      */
-    String creator
+    String    creator
     /**
      * 更新人
      */
-    String updater
-
+    String    updater
 }

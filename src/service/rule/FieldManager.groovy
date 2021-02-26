@@ -31,18 +31,18 @@ import java.util.function.Function
  * 属性值函数
  */
 class FieldManager extends ServerTpl {
-    static final String                          DATA_COLLECTED = "data_collected"
-    @Lazy def                                    repo           = bean(Repo, 'jpa_rule_repo')
-    @Lazy def                                    redis          = bean(RedisClient)
-    @Lazy def                                    cacheSrv       = bean(CacheSrv)
+    static final String                DATA_COLLECTED = "data_collected"
+    @Lazy def                          repo           = bean(Repo, 'jpa_rule_repo')
+    @Lazy def                          redis          = bean(RedisClient)
+    @Lazy def                          cacheSrv       = bean(CacheSrv)
     /**
      * RuleField(enName, cnName), RuleField
      */
-    final Map<String, RuleField>                 fieldMap       = new ConcurrentHashMap<>(1000)
+    final Map<String, RuleField>       fieldMap       = new ConcurrentHashMap<>(1000)
     /**
      * 数据获取函数. 收集器名 -> 收集器
      */
-    protected final Map<String, CollectorHolder> collectors     = new ConcurrentHashMap(100)
+    final Map<String, CollectorHolder> collectors     = new ConcurrentHashMap(100)
 
 
     @EL(name = 'jpa_rule.started', async = true)
@@ -87,6 +87,9 @@ class FieldManager extends ServerTpl {
         if (!collectorName) {
             log.warn(ctx.logPrefix() + "属性'" + aName + "'没有对应的取值配置")
             return null
+        }
+        if (field.decision && field.decision != ctx.decisionHolder.decision.id) {
+            throw new RuntimeException("Field '$aName' not belong to '${ctx.decisionHolder.decision.name}'")
         }
         if (ctx.dataCollectResult.containsKey(collectorName)) { // 已查询过
             def value = ctx.dataCollectResult.get(collectorName)
