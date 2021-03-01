@@ -156,8 +156,9 @@
                             if (res.code == '00') {
                                 this.$emit('close');
                                 this.$Message.success(`更新字段: ${this.model.cnName} 成功`);
-                                $.extend(this.field, this.model);
-                            } else this.$Notice.error(res.desc)
+                                //$.extend(this.field, this.model);
+                                this.$emit('reload');
+                            } else this.$Message.error(res.desc)
                         },
                         error: () => this.isLoading = false
                     })
@@ -221,7 +222,7 @@
                                     cb(res.data.list.map((r) => {
                                         return {id: r.id, name: r.name}
                                     }))
-                                } else this.$Notice.error(res.desc)
+                                } else this.$Message.error(res.desc)
                             },
                         });
                     }
@@ -276,7 +277,12 @@
                         datas: {field: field}
                     },
                     width: 500,
-                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false
+                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false,
+                    events: {
+                        reload: () => {
+                            this.load()
+                        }
+                    }
                 })
             },
             del(field) {

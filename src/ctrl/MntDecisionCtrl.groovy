@@ -346,16 +346,35 @@ class MntDecisionCtrl extends ServerTpl {
         if (!enName) return ApiResp.fail("Param enName not empty")
         if (!cnName) return ApiResp.fail("Param cnName not empty")
         if (!type) return ApiResp.fail("Param type not empty")
-        if (repo.count(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}) return ApiResp.fail("$enName aleady exist")
-        if (repo.count(RuleField) {root, query, cb -> cb.equal(root.get('cnName'), cnName)}) return ApiResp.fail("$cnName aleady exist")
-        if (decision && !repo.findById(Decision, decision)) {
-            return ApiResp.fail("Param decision not exist")
+        String decisionName
+        if (decision) {
+            def d = repo.findById(Decision, decision)
+            if (!d) {
+                return ApiResp.fail("Param decision not exist")
+            }
+            decisionName = d.name
         }
         def field = new RuleField(
-            enName: enName, cnName: cnName, type: type, comment: comment, decision: decision,
+            enName: enName, cnName: cnName, type: type, comment: comment, decision: decision == null ? '' : decision,
             dataCollector: dataCollector, creator: hCtx.getSessionAttr('uName')
         )
-        repo.saveOrUpdate(field)
+        try {
+            repo.saveOrUpdate(field)
+        } catch(ex) {
+            def cause = ex
+            while (cause != null) {
+                if (cause.message.contains("Duplicate entry")) {
+                    if (cause.message.contains(RuleField.idx_cnName_decision)) {
+                        return ApiResp.fail("$cnName${decision ? ', ' + decisionName + ' ' : ''} aleady exist")
+                    }
+                    if (cause.message.contains(RuleField.idx_enName_decision)) {
+                        return ApiResp.fail("$enName${decision ? ', ' + decisionName + ' ' : ''} aleady exist")
+                    }
+                }
+                cause = cause.cause
+            }
+            throw ex
+        }
         ep.fire('fieldChange', field.enName)
         ep.fire('enHistory', field, hCtx.getSessionAttr('uName'))
         ApiResp.ok(field)
@@ -432,23 +451,38 @@ class MntDecisionCtrl extends ServerTpl {
         def field = repo.findById(RuleField, id)
         if (field == null) return ApiResp.fail("Param id: $id not found")
         if (enName != field.enName) return ApiResp.fail('enName can not change')
-        if (enName != field.enName && repo.count(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}) {
-            return ApiResp.fail("$enName aleady exist")
-        }
-        if (cnName != field.cnName && repo.count(RuleField) {root, query, cb -> cb.equal(root.get('cnName'), cnName)}) {
-            return ApiResp.fail("$cnName aleady exist")
-        }
-        if (decision && !repo.findById(Decision, decision)) {
-            return ApiResp.fail("Param decision not exist")
+        String decisionName
+        if (decision) {
+            def d = repo.findById(Decision, decision)
+            if (!d) {
+                return ApiResp.fail("Param decision not exist")
+            }
+            decisionName = d.name
         }
         field.enName = enName
         field.cnName = cnName
         field.type = type
         field.comment = comment
         field.dataCollector = dataCollector
-        field.decision = decision
+        field.decision = decision == null ? '' : decision
         field.updater = hCtx.getSessionAttr("uName")
-        repo.saveOrUpdate(field)
+        try {
+            repo.saveOrUpdate(field)
+        } catch (ex) {
+            def cause = ex
+            while (cause != null) {
+                if (cause.message.contains("Duplicate entry")) {
+                    if (cause.message.contains(RuleField.idx_cnName_decision)) {
+                        return ApiResp.fail("$cnName${decision ? ', ' + decisionName + ' ' : ''} aleady exist")
+                    }
+                    if (cause.message.contains(RuleField.idx_enName_decision)) {
+                        return ApiResp.fail("$enName${decision ? ', ' + decisionName + ' ' : ''} aleady exist")
+                    }
+                }
+                cause = cause.cause
+            }
+            throw ex
+        }
         ep.fire('fieldChange', field.enName)
         ep.fire('enHistory', field, hCtx.getSessionAttr('uName'))
         ApiResp.ok(field)
