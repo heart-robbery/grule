@@ -94,15 +94,6 @@ class TestCtrl extends ServerTpl {
         }
         return
 
-        // 转换成map
-        repo.trans{s ->
-            s.createNativeQuery("SELECT * from test")
-                .unwrap(NativeQueryImpl).setResultTransformer(Transformers.ALIAS_TO_ENTITY_MAP).list()
-        }.collect {
-            Utils.toMapper(it).ignore("update_time")
-                .addConverter("create_time", {Date d -> d?.getTime()}).build()
-        }
-
         // 非数字比较大小(时间大小比较)
         repo.find(Test, { root, query, cb -> cb.greaterThanOrEqualTo(root.get("createTime"), new Date())})
     }
@@ -166,7 +157,7 @@ class TestCtrl extends ServerTpl {
 
         ApiResp<Map<String, Object>> resp = ok().attr("uploadId", uploadId).attr("currentPiece", currentPiece);
         if (currentPiece == 1) { // 第一个分片: 保存文件
-            tmpFiles.put(uploadId, filePiece.getFile());
+            tmpFiles.put(uploadId, filePiece.getFile())
             // TODO 过一段时间还没上传完 则主动删除 server.getInteger("pieceUpload.maxKeep", 120)
         } else if (totalPiece > currentPiece) { // 后面的分片: 追加到第一个分片的文件里面去
             File file = tmpFiles.get(uploadId);

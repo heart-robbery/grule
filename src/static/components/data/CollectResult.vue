@@ -121,8 +121,8 @@
                     }
                 },
                 collectors: {
-                    keyName: 'enName',
-                    titleName: 'cnName',
+                    keyName: 'id',
+                    titleName: 'name',
                     minWord: 1,
                     loadData: (filter, cb) => {
                         $.ajax({
@@ -132,9 +132,9 @@
                                 this.isLoading = false;
                                 if (res.code == '00') {
                                     cb(res.data.list.map((r) => {
-                                        return {enName: r.enName, cnName: r.cnName}
+                                        return {id: r.id, name: r.name}
                                     }))
-                                } else this.$Notice.error(res.desc)
+                                } else this.$Message.error(res.desc)
                             },
                         });
                     }

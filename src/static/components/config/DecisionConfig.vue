@@ -2,7 +2,7 @@
     <div class="h-panel">
         <div class="h-panel-bar">
             &nbsp;&nbsp;
-            <h-button v-if="sUser.permissionIds.find((e) => e == 'decision-add') == 'decision-add'" @click="add"><i class="h-icon-plus"></i></h-button>
+            <h-button v-if="sUser.permissionIds.find((e) => e == 'decision-add')" @click="add"><i class="h-icon-plus"></i></h-button>
             <input type="text" v-model="model.nameLike" placeholder="决策名" style="width: 250px" @keyup.enter="load"/>
             <div class="h-panel-right">
 <!--                <h-search placeholder="查询" v-width="200" v-model="kw" show-search-button search-text="搜索" @search="load"></h-search>-->

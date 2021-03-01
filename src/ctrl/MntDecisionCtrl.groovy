@@ -88,14 +88,14 @@ class MntDecisionCtrl extends ServerTpl {
         }.to{ Utils.toMapper(it).ignore("metaClass")
             .addConverter("decision", "decisionName") {dId -> dId ? decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name : null}
             .addConverter("decision", "decisionId") {dId -> dId ? decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.decisionId : null}
-            .addConverter("dataCollector", "dataCollectorName") {collectorEnName -> collectorEnName ? fieldManager.collectors.find {it.key == collectorEnName}?.value?.collector?.cnName : null}
+            .addConverter("dataCollector", "dataCollectorName") {collectorId -> collectorId ? fieldManager.collectors.get(collectorId)?.collector?.name : null}
             .build()
         })
     }
 
 
     @Path(path = 'dataCollectorPage')
-    ApiResp dataCollectorPage(HttpContext hCtx, Integer page, Integer pageSize, String kw, String enName, String type) {
+    ApiResp dataCollectorPage(HttpContext hCtx, Integer page, Integer pageSize, String kw, String id, String type) {
         if (pageSize && pageSize > 50) return ApiResp.fail("Param pageSize <=50")
         hCtx.auth("dataCollector-read")
         ApiResp.ok(
@@ -104,12 +104,11 @@ class MntDecisionCtrl extends ServerTpl {
                 def ps = []
                 if (kw) {
                     ps << cb.or(
-                        cb.like(root.get('enName'), '%' + kw + '%'),
-                        cb.like(root.get('cnName'), '%' + kw + '%'),
+                        cb.like(root.get('id'), '%' + kw + '%'),
                         cb.like(root.get('comment'), '%' + kw + '%')
                     )
                 }
-                if (enName) ps << cb.equal(root.get('enName'), enName)
+                if (id) ps << cb.equal(root.get("id"), id)
                 if (type) ps << cb.equal(root.get('type'), type)
                 cb.and(ps.toArray(new Predicate[ps.size()]))
             }
@@ -201,58 +200,54 @@ class MntDecisionCtrl extends ServerTpl {
         hCtx.auth("collectResult-read")
         def ids = hCtx.getSessionAttr("permissions").split(",")
             .findAll {String p -> p.startsWith("decision-read-")}
-            .findResults {String p -> p.replace("decision-read-", "").replace("decision-read", "")}
+            .findResults {String p -> p.replace("decision-read-", "")}
             .findAll {it}
         if (!ids) return ApiResp.ok()
         Date start = startTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(startTime) : null
         Date end = endTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(endTime) : null
         if (pageSize && pageSize > 50) return ApiResp.fail("Param pageSize <=50")
-        def result = repo.findPage(CollectResult, page, pageSize?:10) { root, query, cb ->
-            query.orderBy(cb.desc(root.get('collectDate')))
-            def ps = []
-            ps << root.get('decisionId').in(ids)
-            if (decideId) ps << cb.equal(root.get('decideId'), decideId)
-            if (decisionId) ps << cb.equal(root.get('decisionId'), decisionId)
-            if (collectorType) ps << cb.equal(root.get('collectorType'), collectorType)
-            if (collector) ps << cb.equal(root.get('collector'), collector)
-            if (spend) ps << cb.ge(root.get('spend'), spend)
-            if (start) ps << cb.greaterThanOrEqualTo(root.get('collectDate'), start)
-            if (end) ps << cb.lessThanOrEqualTo(root.get('collectDate'), end)
-            if (success != null) {
-                if (success) {
-                    ps << cb.equal(root.get('status'), '0000')
-                } else {
-                    ps << cb.notEqual(root.get('status'), '0000')
+        ApiResp.ok(
+            repo.findPage(CollectResult, page, pageSize?:10) { root, query, cb ->
+                query.orderBy(cb.desc(root.get('collectDate')))
+                def ps = []
+                ps << root.get('decisionId').in(ids)
+                if (decideId) ps << cb.equal(root.get('decideId'), decideId)
+                if (decisionId) ps << cb.equal(root.get('decisionId'), decisionId)
+                if (collectorType) ps << cb.equal(root.get('collectorType'), collectorType)
+                if (collector) ps << cb.equal(root.get('collector'), collector)
+                if (spend) ps << cb.ge(root.get('spend'), spend)
+                if (start) ps << cb.greaterThanOrEqualTo(root.get('collectDate'), start)
+                if (end) ps << cb.lessThanOrEqualTo(root.get('collectDate'), end)
+                if (success != null) {
+                    if (success) {
+                        ps << cb.equal(root.get('status'), '0000')
+                    } else {
+                        ps << cb.notEqual(root.get('status'), '0000')
+                    }
                 }
-            }
-            if (dataSuccess != null) {
-                if (dataSuccess) {
-                    ps << cb.equal(root.get('dataStatus'), '0000')
-                } else {
-                    ps << cb.notEqual(root.get('dataStatus'), '0000')
+                if (dataSuccess != null) {
+                    if (dataSuccess) {
+                        ps << cb.equal(root.get('dataStatus'), '0000')
+                    } else {
+                        ps << cb.notEqual(root.get('dataStatus'), '0000')
+                    }
                 }
-            }
-            if (cache != null) {
-                if (cache) {
-                    ps << cb.equal(root.get('cache'), true)
-                } else {
-                    ps << cb.notEqual(root.get('cache'), true)
+                if (cache != null) {
+                    if (cache) {
+                        ps << cb.equal(root.get('cache'), true)
+                    } else {
+                        ps << cb.notEqual(root.get('cache'), true)
+                    }
                 }
-            }
-            if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
-        }.to{record -> Utils.toMapper(record).ignore("metaClass")
+                if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
+            }.to{record -> Utils.toMapper(record).ignore("metaClass")
                 .addConverter('decisionId', 'decisionName', {String dId ->
                     decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name
+                }).addConverter('collector', 'collectorName', {String cId ->
+                    fieldManager.collectors.get(cId)?.collector?.name
                 }).build()
-        }
-        repo.findList(DataCollector) {root, query, cb -> root.get('enName').in(result.list.collect {it['collector']})}.each {dc ->
-            for (def m : result.list) {
-                if (m['collector'] == dc.enName) {
-                    m['collectorName'] = dc.cnName
-                }
             }
-        }
-        ApiResp.ok(result)
+        )
     }
 
 
@@ -383,14 +378,13 @@ class MntDecisionCtrl extends ServerTpl {
 
     @Path(path = 'addDataCollector', method = 'post')
     ApiResp addDataCollector(
-        HttpContext hCtx, String enName, String cnName, String type, String url, String bodyStr,
+        HttpContext hCtx, String name, String type, String url, String bodyStr,
         String method, String parseScript, String contentType, String comment, String computeScript, String dataSuccessScript,
         String sqlScript, Integer minIdle, Integer maxActive, Integer timeout, Boolean enabled, String cacheKey, Integer cacheTimeout
     ) {
         hCtx.auth('dataCollector-add')
-        DataCollector collector = new DataCollector(enName: enName, cnName: cnName, type: type, comment: comment, enabled: (enabled == null ? true : enabled))
-        if (!collector.enName) return ApiResp.fail('Param enName not empty')
-        if (!collector.cnName) return ApiResp.fail('Param cnName not empty')
+        DataCollector collector = new DataCollector(name: name, type: type, comment: comment, enabled: (enabled == null ? true : enabled))
+        if (!collector.name) return ApiResp.fail('Param name not empty')
         if (!collector.type) return ApiResp.fail('Param type not empty')
         if ('http' == collector.type) {
             if (!url) return ApiResp.fail('Param url not empty')
@@ -424,18 +418,22 @@ class MntDecisionCtrl extends ServerTpl {
             collector.minIdle = minIdle
             collector.maxActive = maxActive
         } else return ApiResp.fail('Not support type: ' + collector.type)
-        if (repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), collector.enName)}) {
-            return ApiResp.fail("$collector.enName 已存在")
-        }
-        if (repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('cnName'), collector.cnName)}) {
-            return ApiResp.fail("$collector.cnName 已存在")
-        }
         collector.creator = hCtx.getSessionAttr("uName")
         collector.cacheKey = cacheKey
         collector.cacheTimeout = cacheTimeout
-
-        repo.saveOrUpdate(collector)
-        ep.fire('dataCollectorChange', collector.enName)
+        try {
+            repo.saveOrUpdate(collector)
+        } catch (ex) {
+            def cause = ex
+            while (cause != null) {
+                if (cause.message.contains("Duplicate entry")) {
+                    return ApiResp.fail("$name aleady exist")
+                }
+                cause = cause.cause
+            }
+            throw ex
+        }
+        ep.fire('dataCollectorChange', collector.id)
         ep.fire('enHistory', collector, hCtx.getSessionAttr('uName'))
         ApiResp.ok(collector)
     }
@@ -450,7 +448,7 @@ class MntDecisionCtrl extends ServerTpl {
         if (!type) return ApiResp.fail("Param type not empty")
         def field = repo.findById(RuleField, id)
         if (field == null) return ApiResp.fail("Param id: $id not found")
-        if (enName != field.enName) return ApiResp.fail('enName can not change')
+        // if (enName != field.enName) return ApiResp.fail('enName can not change')
         String decisionName
         if (decision) {
             def d = repo.findById(Decision, decision)
@@ -491,20 +489,21 @@ class MntDecisionCtrl extends ServerTpl {
 
     @Path(path = 'updateDataCollector', method = 'post')
     ApiResp updateDataCollector(
-        HttpContext hCtx, Long id, String enName, String cnName, String url, String bodyStr,
+        HttpContext hCtx, String id, String name, String url, String bodyStr,
         String method, String parseScript, String contentType, String comment, String computeScript, String dataSuccessScript,
         String sqlScript, Integer minIdle, Integer maxActive, Integer timeout, Boolean enabled, String cacheKey, Integer cacheTimeout
     ) {
         hCtx.auth('dataCollector-update')
         if (!id) return ApiResp.fail("Param id not legal")
-        if (!enName) return ApiResp.fail("Param enName not empty")
-        if (!cnName) return ApiResp.fail("Param cnName not empty")
+        if (!name) return ApiResp.fail("Param name not empty")
         def collector = repo.findById(DataCollector, id)
         if (collector == null) return ApiResp.fail("Param id: $id not found")
         if ('http' == collector.type) {
             if (!url) return ApiResp.fail('Param url not empty')
             if (!method) return ApiResp.fail('Param method not empty')
-            if (!contentType) return ApiResp.fail('Param contentType not empty')
+            if ('post'.equalsIgnoreCase(method) && !contentType) {
+                return ApiResp.fail('Param contentType not empty')
+            }
             if (!url.startsWith("http") && !url.startsWith('${')) return ApiResp.fail('Param url incorrect')
             collector.parseScript = parseScript?.trim()
             if (collector.parseScript && (!collector.parseScript.startsWith('{') || !collector.parseScript.endsWith('}'))) {
@@ -536,44 +535,26 @@ class MntDecisionCtrl extends ServerTpl {
             collector.maxActive = maxActive
             collector.sqlScript = sqlScript
         }
-        def updateRelateField
-        if (enName != collector.enName) {
-            return ApiResp.fail('enName can not change') // 不让修改名字
-            if (repo.count(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), enName)}) {
-                return ApiResp.fail("$enName aleady exist")
-            }
-            collector.enName = enName
-            updateRelateField = { // 修改RuleField相关联
-                repo.find(RuleField) {root, query, cb -> cb.equal(root.get('dataCollector'), collector.cnName)}.each {field ->
-                    field.dataCollector = enName
-
-                    repo.saveOrUpdate(field)
-                    ep.fire('fieldChange', field.enName)
-                    ep.fire('enHistory', field, hCtx.getSessionAttr('uName'))
-                }
-            }
-        }
-        if (cnName != collector.cnName) {
-            if (repo.count(DataCollector) {root, query, cb -> cb.equal(root.get('cnName'), cnName)}) {
-                return ApiResp.fail("$cnName aleady exist")
-            }
-            collector.cnName = cnName
-        }
+        collector.name = name
         collector.comment = comment
-        collector.enabled = enabled
-        collector.updater = hCtx.getSessionAttr("uName")
+        collector.enabled = enabled == null ? true : enabled
         collector.cacheKey = cacheKey
         collector.cacheTimeout = cacheTimeout
+        collector.updater = hCtx.getSessionAttr("uName")
 
-        if (updateRelateField) {
-            repo.trans {
-                repo.saveOrUpdate(collector)
-                updateRelateField()
-            }
-        } else {
+        try {
             repo.saveOrUpdate(collector)
+        } catch (ex) {
+            def cause = ex
+            while (cause != null) {
+                if (cause.message.contains("Duplicate entry")) {
+                    return ApiResp.fail("$name aleady exist")
+                }
+                cause = cause.cause
+            }
+            throw ex
         }
-        ep.fire('dataCollectorChange', collector.enName)
+        ep.fire('dataCollectorChange', collector.id)
         ep.fire('enHistory', collector, hCtx.getSessionAttr('uName'))
         ApiResp.ok(collector)
     }
@@ -604,21 +585,21 @@ class MntDecisionCtrl extends ServerTpl {
     }
 
 
-    @Path(path = 'delDataCollector/:enName')
-    ApiResp delDataCollector(HttpContext hCtx, String enName) {
-        if (!enName) return ApiResp.fail("Param enName not empty")
+    @Path(path = 'delDataCollector/:id')
+    ApiResp delDataCollector(HttpContext hCtx, String id) {
+        if (!id) return ApiResp.fail("Param id not empty")
         hCtx.auth('dataCollector-del')
-        def collector = repo.find(DataCollector) {root, query, cb -> cb.equal(root.get('enName'), enName)}
+        def collector = repo.findById(DataCollector, id)
         repo.delete(collector)
-        ep.fire('dataCollectorChange', enName)
+        ep.fire('dataCollectorChange', id)
         ep.fire('enHistory', collector, hCtx.getSessionAttr('uName'))
         ApiResp.ok()
     }
 
 
-    @Path(path = 'testCollector/:collector')
-    ApiResp testCollector(String collector, HttpContext hCtx) {
-        ApiResp.ok(fieldManager?.testCollector(collector, hCtx.params()))
+    @Path(path = 'testCollector/:id')
+    ApiResp testCollector(String id, HttpContext hCtx) {
+        ApiResp.ok(fieldManager?.testCollector(id, hCtx.params()))
     }
 
 

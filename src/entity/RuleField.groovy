@@ -32,7 +32,7 @@ class RuleField extends LongIdEntity {
     @Enumerated(EnumType.STRING)
     FieldType type
     /**
-     * 值函数名 对应 {@link DataCollector#enName}
+     * 值函数名 对应 {@link DataCollector#id}
      */
     String    dataCollector
     /**

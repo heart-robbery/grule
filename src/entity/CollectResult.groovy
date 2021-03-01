@@ -23,7 +23,7 @@ class CollectResult implements IEntity {
      */
     String decisionId
     /**
-     * 收集器
+     * 收集器id
      */
     String collector
     /**
