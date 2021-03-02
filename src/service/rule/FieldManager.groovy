@@ -266,6 +266,8 @@ class FieldManager extends ServerTpl {
                 dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "性别")}?.id, comment: '值: F,M'))
             repo.saveOrUpdate(new RuleField(enName: 'week', cnName: '星期几', type: FieldType.Int, decision: '',
                 dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "星期几")}?.id, comment: '值: 1,2,3,4,5,6,7'))
+            repo.saveOrUpdate(new RuleField(enName: 'currentTime', cnName: '当前时间', type: FieldType.Int, decision: '',
+                dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "当前时间")}?.id, comment: '值: yyyy-MM-dd HH:mm:ss'))
         }
     }
 
@@ -301,6 +303,9 @@ class FieldManager extends ServerTpl {
             log.info("初始化默认数据收集器")
             repo.saveOrUpdate(new DataCollector(type: 'script', name: '星期几', enabled: true, comment: '值: 1,2,3,4,5,6,7', computeScript: """
 Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1
+            """.trim()))
+            repo.saveOrUpdate(new DataCollector(type: 'script', name: '当前时间', enabled: true, comment: '值: yyyy-MM-dd HH:mm:ss', computeScript: """
+new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())
             """.trim()))
             repo.saveOrUpdate(new DataCollector(type: 'script', name: '性别', enabled: true, comment: '根据身份证计算. 值: F,M', computeScript: """
 if (idNumber && idNumber.length() > 17) {

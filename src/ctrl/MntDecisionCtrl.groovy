@@ -33,7 +33,7 @@ class MntDecisionCtrl extends ServerTpl {
     @Path(path = 'decisionPage')
     ApiResp decisionPage(HttpContext hCtx, Integer page, Integer pageSize, String kw, String nameLike, String decisionId) {
         if (pageSize && pageSize > 20) return ApiResp.fail("Param pageSize <=20")
-        hCtx.auth("decision-read")
+        // hCtx.auth("decision-read")
         // 允许访问的决策id
         def ids = hCtx.getSessionAttr("permissions").split(",")
             .findAll {String p -> p.startsWith("decision-read-")}
@@ -104,7 +104,7 @@ class MntDecisionCtrl extends ServerTpl {
                 def ps = []
                 if (kw) {
                     ps << cb.or(
-                        cb.like(root.get('id'), '%' + kw + '%'),
+                        cb.like(root.get('name'), '%' + kw + '%'),
                         cb.like(root.get('comment'), '%' + kw + '%')
                     )
                 }
@@ -145,7 +145,7 @@ class MntDecisionCtrl extends ServerTpl {
         if (pageSize && pageSize > 10) return ApiResp.fail("Param pageSize <=10")
         def ids = hCtx.getSessionAttr("permissions").split(",")
             .findAll {String p -> p.startsWith("decision-read-")}
-            .findResults {String p -> p.replace("decision-read-", "").replace("decision-read", "")}
+            .findResults {String p -> p.replace("decision-read-", "")}
             .findAll {it}
         if (!ids) return ApiResp.ok()
         Date start = startTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(startTime) : null
