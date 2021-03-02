@@ -22,7 +22,7 @@ class UserSrv extends ServerTpl {
           new Permission(enName: 'user-add', cnName: '新增用户'),
           new Permission(enName: 'user-del', cnName: '删除用户'),
           // new Permission(enName: 'password-reset', cnName: '密码重置'),
-          new Permission(enName: 'decision-read', cnName: '决策查看'),
+          // new Permission(enName: 'decision-read', cnName: '决策查看'),
           new Permission(enName: 'decision-add', cnName: '决策创建'),
           // new Permission(enName: 'decision-del', cnName: '删除决策'),
           // new Permission(enName: 'decision-update', cnName: '更新决策'),

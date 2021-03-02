@@ -47,9 +47,9 @@ class MainCtrl extends ServerTpl {
 
 
     @Path(path = 'file/:fName')
-    File file(String fName, HttpContext ctx) {
+    File file(String fName, HttpContext hCtx) {
         if (app().profile == 'pro') {
-            ctx.response.cacheControl(1800)
+            hCtx.response.cacheControl(1800)
         }
         fu.findFile(fName)
     }
@@ -83,7 +83,7 @@ class MainCtrl extends ServerTpl {
     }
     @Path(path = 'js/lib/:fName')
     File js_lib(String fName, HttpContext hCtx) {
-        hCtx.response.cacheControl(3600)
+        hCtx.response.cacheControl(86400) // 一天
         Utils.baseDir("static/js/lib/$fName")
     }
 
@@ -95,7 +95,7 @@ class MainCtrl extends ServerTpl {
         if (fName.contains("OpHistory.vue")) hCtx.auth("opHistory-read")
         if (fName.contains("FieldConfig.vue")) hCtx.auth("field-read")
         if (fName.contains("DataCollectorConfig.vue")) hCtx.auth("dataCollector-read")
-        if (fName.contains("DecisionConfig.vue")) hCtx.auth("decision-read")
+        // if (fName.contains("DecisionConfig.vue")) hCtx.auth("decision-read")
         if (fName.contains("Permission.vue")) hCtx.auth("grant")
         if (fName.contains("DecisionResult.vue")) hCtx.auth("decisionResult-read")
         if (fName.contains("CollectResult.vue")) hCtx.auth("collectResult-read")
@@ -114,12 +114,12 @@ class MainCtrl extends ServerTpl {
     }
     @Path(path = 'css/fonts/:fName')
     File css_fonts(String fName, HttpContext hCtx) {
-        hCtx.response.cacheControl(1800)
+        hCtx.response.cacheControl(86400) // 一天
         Utils.baseDir("static/css/fonts/$fName")
     }
     @Path(path = 'css/lib/:fName')
     File css_lib(String fName, HttpContext hCtx) {
-        hCtx.response.cacheControl(3600)
+        hCtx.response.cacheControl(86400) // 一天
         Utils.baseDir("static/css/lib/$fName")
     }
 }
