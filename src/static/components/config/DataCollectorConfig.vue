@@ -25,13 +25,13 @@
                 <h-tableitem title="描述" prop="comment" align="center"></h-tableitem>
                 <h-tableitem title="状态" align="center" :width="70">
                     <template slot-scope="{data}">
-                        <h-switch v-model="data.enabled" @change="enableSwitch(data)" small>
+                        <h-switch v-model="data.enabled" @change="enableSwitch(data)" small :disabled="!sUser.permissionIds.find((e) => e == 'dataCollector-update')">
                             <span slot="open">可用</span>
                             <span slot="close">禁用</span>
                         </h-switch>
                     </template>
                 </h-tableitem>
-                <h-tableitem v-if="sUser.permissionIds.find((e) => e == 'dataCollector-update' || e == 'dataCollector-del')" title="操作" align="center" :width="110">
+                <h-tableitem title="操作" align="center" :width="110">
                     <template slot-scope="{data}">
                         <span v-if="sUser.permissionIds.find((e) => e == 'dataCollector-update')" class="text-hover" @click="showUpdatePop(data)">编辑</span>
                         &nbsp;
