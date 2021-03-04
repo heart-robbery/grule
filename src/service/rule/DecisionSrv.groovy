@@ -102,8 +102,6 @@ class DecisionSrv extends ServerTpl {
     }
 
 
-
-
     /**
      * 系统全局消息
      * @param msg
@@ -112,9 +110,13 @@ class DecisionSrv extends ServerTpl {
     void globalMsg(String msg) {
         log.info("系统消息: " + msg)
         ep.fire("wsMsg_rule", msg)
-        String url = getStr('msgNotifyUrl', null)
+        String url = getStr('ddMsgNotifyUrl', null)
         if (url) {
-            //bean(OkHttpSrv)?.
+            bean(OkHttpSrv).post(url).jsonBody(JSON.toJSONString([
+                msgtype: "text",
+                text: ["content": "RULE(${app().profile}): $msg".toString()],
+                at: ["isAtAll": false]
+            ])).debug().execute()
         }
     }
 
@@ -128,9 +130,10 @@ class DecisionSrv extends ServerTpl {
             if (Boolean.valueOf(ctx.input.getOrDefault('async', false).toString())) {
                 String cbUrl = ctx.input['callback'] // 回调Url
                 if (cbUrl && cbUrl.startsWith('http')) {
+                    def result = ctx.result()
                     (1..2).each {
                         try {
-                            http.post(cbUrl).jsonBody(JSON.toJSONString(ctx.result(), SerializerFeature.WriteMapNullValue)).execute()
+                            http.post(cbUrl).jsonBody(JSON.toJSONString(result, SerializerFeature.WriteMapNullValue)).debug().execute()
                         } catch (ex) {
                             log.error("回调失败. id: " + ctx.id + ", url: " + cbUrl, ex)
                         }

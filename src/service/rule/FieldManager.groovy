@@ -68,7 +68,7 @@ class FieldManager extends ServerTpl {
     }
 
 
-    @EL(name = 'sys.stop', async = true)
+    @EL(name = 'sys.stopping', async = true)
     void stop() { collectors.each {it.value.close()} }
 
 

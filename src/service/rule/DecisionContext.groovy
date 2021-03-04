@@ -45,7 +45,7 @@ class DecisionContext {
     // 执行结果 异常
     protected              Exception                      exception
     // 执行状态
-    protected              String                         status            = '0000'
+    protected              String                         status            = '0001'
 
 
     /**
@@ -83,15 +83,16 @@ class DecisionContext {
                 if (DecisionEnum.Reject == decisionResult) break
             }
             if (DecisionEnum.Reject == decisionResult || !ruleIterator.hasNext()) {
-                end.set(true); decisionResult = decisionResult?:DecisionEnum.Accept
-                running.set(false); curPolicySpec = null; curPassedRule = null; curRuleSpec = null
+                decisionResult = decisionResult?:DecisionEnum.Accept; status = '0000'
+                end.set(true);  running.set(false)
+                curPolicySpec = null; curPassedRule = null; curRuleSpec = null
                 log.info(logPrefix() + "结束成功. 共执行: " + (System.currentTimeMillis() - startup.time) + "ms "  + result())
                 ep?.fire("decision.end", this)
             }
         } catch (ex) {
-            end.set(true); decisionResult = DecisionEnum.Reject
-            running.set(false); curPolicySpec = null; curPassedRule = null; curRuleSpec = null
-            status = 'EEEE'; this.exception = ex
+            decisionResult = DecisionEnum.Reject; status = 'EEEE'; this.exception = ex
+            end.set(true); running.set(false)
+            curPolicySpec = null; curPassedRule = null; curRuleSpec = null
             log.error(logPrefix() + "结束错误. 共执行: " + (System.currentTimeMillis() - startup.getTime()) + "ms " + result(), ex)
             ep?.fire("decision.end", this)
         }
@@ -106,7 +107,7 @@ class DecisionContext {
     protected DecisionEnum decide(RuleSpec r) {
         if (!r.enabled) return null
         curRuleSpec = r
-        curPassedRule = new PassedRule(attrs: [*:r.attrs, 规则名: r.规则名]); rules.add(curPassedRule)
+        curPassedRule = new PassedRule(attrs: [规则名: r.规则名, *:r.attrs]); rules.add(curPassedRule)
         log.trace(logPrefix() + "开始执行规则")
 
         DecisionEnum decision
@@ -342,7 +343,7 @@ class DecisionContext {
             decideId: id, decision: decisionResult, decisionId: decisionHolder.decision.decisionId,
             status  : status,
             desc    : exception?.toString(),
-            attrs   : decisionHolder.spec.returnAttrs.collectEntries { name ->
+            attrs   : end.get() ? decisionHolder.spec.returnAttrs.collectEntries { name ->
                 def v = data.get(name)
                 if (v instanceof Optional) {
                     v = v.orElseGet({ null })
@@ -351,7 +352,7 @@ class DecisionContext {
                 //如果key是中文, 则翻译成对应的英文名
                 if (field && field.cnName == name) return [field.enName, v]
                 else return [name, v]
-            }
+            } : null
         ]
     }
 

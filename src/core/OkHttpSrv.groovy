@@ -319,12 +319,12 @@ class OkHttpSrv extends ServerTpl {
             }
             if (debug && !okFn) {
                 if (ex) {
-                    log.error('Send http: {}, params: {}' + (fileStreams ? ", fileStreams: " + fileStreams.join(",") : ''), urlStr, params?:bodyStr)
+                    log.error('Send http: ' + urlStr + ', params: ' + (params?:bodyStr) + (fileStreams ? ", fileStreams: " + fileStreams.join(",") : ''), ex)
                 } else {
                     log.info('Send http: {}, params: {}, ' + (fileStreams ? "fileStreams: " + fileStreams.join(";") : '') + ' result: ' + Objects.toString(result, ''), urlStr, params?:bodyStr)
                 }
             }
-            if (ex) throw ex
+            // if (ex) throw ex
             return result
         }
     }
