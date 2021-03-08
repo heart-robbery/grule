@@ -27,7 +27,7 @@ class User extends LongIdEntity  {
      */
     String password
     /**
-     * 权限列表, 用豆号分割
+     * 权限标识列表, 用豆号分割
      */
     @Lob
     @Basic
