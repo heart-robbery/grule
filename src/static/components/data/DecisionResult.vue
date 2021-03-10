@@ -1,19 +1,49 @@
 <template>
     <div class="h-panel">
         <div class="h-panel-bar">
-            <h-select v-model="model.decision" :datas="types" placeholder="所有" style="width: 70px; float: left" @change="load"></h-select>
-            <h-autocomplete v-model="model.decisionId" :option="decisions" style="float:left; width: 150px" @change="load" placeholder="决策名"></h-autocomplete>
-            <input type="text" v-model="model.id" placeholder="流水id(精确匹配)" style="width: 250px" @keyup.enter="load"/>
-            <input type="text" v-model="model.keyProp" placeholder="关键属性" style="width: 155px" @keyup.enter="load"/>
-            <input type="number" v-model="model.spend" placeholder="耗时(>=ms)" style="width: 100px" @keyup.enter="load"/>
-            <input type="text" v-model="model.exception" placeholder="异常信息" @keyup.enter="load"/>
-<!--            <input type="text" v-model="model.attrs" placeholder="属性关键字" @keyup.enter="load"/>-->
-<!--            <input type="text" v-model="model.rules" placeholder="规则关键字" @keyup.enter="load"/>-->
-            <h-datepicker v-model="model.startTime" type="datetime" :has-seconds="true" placeholder="开始时间" style="width: 160px"></h-datepicker>
-            <h-datepicker v-model="model.endTime" type="datetime" :has-seconds="true" placeholder="结束时间" style="width: 160px"></h-datepicker>
-            <button class="h-btn h-btn-primary float-right" @click="load"><span>搜索</span></button>
-    </div>
-        <div class="h-panel-body">
+            <h-form mode="threecolumn">
+                <h-formitem>
+                    <h-select v-model="model.decision" :datas="types" placeholder="决策结果" @change="load"></h-select>
+                </h-formitem>
+                <h-formitem>
+                    <h-autocomplete v-model="model.decisionId" :option="decisions" @change="load" placeholder="决策"></h-autocomplete>
+                </h-formitem>
+                <h-formitem>
+                    <input type="text" v-model="model.id" placeholder="流水id(精确匹配)" style="width: 250px" @keyup.enter="load"/>
+                </h-formitem>
+                <h-formitem>
+                    <input type="text" v-model="model.keyProp" placeholder="关键属性" @keyup.enter="load"/>
+                </h-formitem>
+                <h-formitem>
+                    <input type="number" v-model="model.spend" placeholder="耗时(>=ms)" @keyup.enter="load"/>
+                </h-formitem>
+                <h-formitem>
+                    <input type="text" v-model="model.exception" placeholder="异常信息" @keyup.enter="load"/>
+                </h-formitem>
+                <h-formitem>
+                    <h-datepicker v-model="model.startTime" type="datetime" :has-seconds="true" placeholder="开始时间"></h-datepicker>
+                </h-formitem>
+                <h-formitem>
+                    <h-datepicker v-model="model.endTime" type="datetime" :has-seconds="true" placeholder="结束时间"></h-datepicker>
+                </h-formitem>
+                <h-formitem>
+                    <button class="h-btn h-btn-primary" @click="load"><span>搜索</span></button>
+                </h-formitem>
+
+                <h-formitem single v-for="(item, index) of model.attrFilters" :key="index">
+                    <div class="h-input-group">
+                        <h-autocomplete v-model="item.fieldId" :option="item.fieldAc" placeholder="字段属性名"></h-autocomplete>
+<!--                        <input type="text" v-model="item.name" placeholder="属性名"/>-->
+                        <h-select v-model="item.op" :datas="ops" placeholder="比较符" :deletable="false"></h-select>
+                        <input type="text" v-model="item.value" placeholder="属性值"/>
+                        <div style="width: 70px; margin-left: 15px">
+                            <span class="h-icon-minus" @click="delAttrFilter(item)"></span>&nbsp;
+                            <span v-if="model.attrFilters.length == (index + 1)" class="h-icon-plus" @click="addAttrFilter"></span>
+                        </div>
+                    </div>
+                </h-formitem>
+            </h-form>
+    <div class="h-panel-body">
             <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading" @trdblclick="trdblclick" border>
                 <h-tableitem title="决策" align="center">
                     <template slot-scope="{data}">
@@ -44,6 +74,14 @@
         { title: '拒绝', key: 'Reject'},
         { title: '通过', key: 'Accept'},
         { title: '人工', key: 'Review'},
+    ];
+    const ops = [
+        { title: '等于', key: '='},
+        { title: '大于', key: '>'},
+        { title: '大于等于', key: '>='},
+        { title: '小于', key: '<'},
+        { title: '小于等于', key: '<='},
+        { title: '包含', key: 'contains'},
     ];
     const detail = {
         props: ['item'],
@@ -159,7 +197,7 @@
         props: ['tabs', 'menu'],
         data() {
             return {
-                types: types,
+                types: types, ops: ops,
                 decisions: {
                     keyName: 'decisionId',
                     titleName: 'name',
@@ -183,7 +221,7 @@
                         let d = new Date();
                         let month = d.getMonth() + 1;
                         return d.getFullYear() + "-" + (month < 10 ? '0' + month : month) + "-" + (d.getDate() < 10 ? '0' + d.getDate() : d.getDate()) + " 00:00:00"
-                    })()
+                    })(), attrFilters: [{fieldId: null, fieldAc: this.fieldAc(), op: '=', value: null}]
                 },
                 list: [], totalRow: 0, page: 1, pageSize: 1, loading: false
             }
@@ -201,6 +239,33 @@
             }
         },
         methods: {
+            fieldAc() {
+                return {
+                    keyName: 'id',
+                        titleName: 'cnName',
+                    minWord: 1,
+                    loadData: (filter, cb) => {
+                    $.ajax({
+                        url: 'mnt/fieldPage',
+                        data: {page: 1, pageSize: 5, kw: filter},
+                        success: (res) => {
+                            this.isLoading = false;
+                            if (res.code == '00') {
+                                cb(res.data.list.map((r) => {
+                                    return {id: r.id, cnName: r.cnName}
+                                }))
+                            } else this.$Notice.error(res.desc)
+                        },
+                    });
+                }
+                }
+            },
+            addAttrFilter() {
+                this.model.attrFilters.push({fieldId: null, fieldAc: this.fieldAc(), op: '=', value: null})
+            },
+            delAttrFilter(item) {
+                this.model.attrFilters.splice(this.model.attrFilters.indexOf(item), 1);
+            },
             jumpToDecision(item) {
                 this.tabs.showId = item.decisionId;
                 this.tabs.type = 'DecisionConfig';
@@ -235,9 +300,15 @@
                 this.pageSize = 10;
                 this.totalRow = 0;
                 this.list = [];
+                let data = $.extend(true, {page: page.page || 1}, this.model);
+                if (data.attrFilters) {
+                    data.attrFilters.forEach((item, index) => delete item.fieldAc);
+                }
+                data.attrConditions = JSON.stringify(data.attrFilters);
+                delete data.attrFilters;
                 $.ajax({
                     url: 'mnt/decisionResultPage',
-                    data: $.extend({page: page.page || 1}, this.model),
+                    data: data,
                     success: (res) => {
                         this.loading = false;
                         if (res.code == '00') {

@@ -34,6 +34,7 @@ class DecisionResult implements IEntity {
     /**
      * 决策时间
      */
+    @Column(nullable = false)
     Date         occurTime
     /**
      * 执行花费时间

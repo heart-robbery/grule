@@ -139,7 +139,7 @@ class MntDecisionCtrl extends ServerTpl {
     @Path(path = 'decisionResultPage')
     ApiResp decisionResultPage(
         HttpContext hCtx, Integer page, Integer pageSize, String id, String decisionId, DecisionEnum decision,
-        String keyProp, Long spend, String exception, String input, String attrs, String rules, String startTime, String endTime
+        String keyProp, Long spend, String exception, String attrConditions, String rules, String startTime, String endTime
     ) {
         hCtx.auth("decisionResult-read")
         if (pageSize && pageSize > 10) return ApiResp.fail("Param pageSize <=10")
@@ -163,9 +163,37 @@ class MntDecisionCtrl extends ServerTpl {
                     if (spend) ps << cb.ge(root.get('spend'), spend)
                     if (decision) ps << cb.equal(root.get('decision'), decision)
                     if (exception) ps << cb.like(root.get('exception'), '%' + exception + '%')
-                    if (input) ps << cb.like(root.get('input'), '%' + input + '%')
-                    if (attrs) ps << cb.like(root.get('attrs'), '%' + attrs + '%')
-                    if (rules) ps << cb.like(root.get('rules'), '%' + rules + '%')
+                    // if (input) ps << cb.like(root.get('input'), '%' + input + '%')
+                    if (attrConditions) { // json查询 暂时只支持mysql5.7+,MariaDB 10.2.3+
+                        JSON.parseArray(attrConditions).each {JSONObject jo ->
+                            def fieldId = jo.getLong('fieldId')
+                            if (!fieldId) return
+                            def field = fieldManager.fieldMap.find {it.value.id == fieldId}?.value
+                            if (field == null) return
+                            def op = jo['op']
+                            String value = jo['value']
+                            if (value == null || value.empty) return
+                            if (field.type == FieldType.Int) value = jo.getInteger('value')
+                            else if (field.type == FieldType.Decimal) value = jo.getBigDecimal('value')
+                            else if (field.type == FieldType.Bool) value = jo.getBoolean('value')
+
+                            if (op == '=') {
+                                ps << cb.equal(cb.function("JSON_EXTRACT", String, root.get('attrs'), cb.literal('$.' + field.enName)), value)
+                            } else if (op == '>') {
+                                ps << cb.gt(cb.function("JSON_EXTRACT", String, root.get('attrs'), cb.literal('$.' + field.enName)), cb.literal(value))
+                            } else if (op == '<') {
+                                ps << cb.lt(cb.function("JSON_EXTRACT", String, root.get('attrs'), cb.literal('$.' + field.enName)), cb.literal(value))
+                            } else if (op == '>=') {
+                                ps << cb.ge(cb.function("JSON_EXTRACT", String, root.get('attrs'), cb.literal('$.' + field.enName)), cb.literal(value))
+                            } else if (op == '<=') {
+                                ps << cb.le(cb.function("JSON_EXTRACT", String, root.get('attrs'), cb.literal('$.' + field.enName)), cb.literal(value))
+                            } else if (op == 'contains') {
+                                // ps << cb.equal(cb.function("JSON_CONTAINS", String, root.get('attrs'), cb.function('json_quote', String, cb.literal(value)), cb.literal('$.' + field.enName)), 1)
+                                ps << cb.like(cb.function("JSON_EXTRACT", String, root.get('attrs'), cb.literal('$.' + field.enName)), '%' + value + '%')
+                            } else throw new IllegalArgumentException("Param attrCondition op('$op') unknown")
+                        }
+                    }
+                    // if (rules) ps << cb.like(root.get('rules'), '%' + rules + '%')
                     if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
                 }.to{
                     Utils.toMapper(it).ignore("metaClass")
