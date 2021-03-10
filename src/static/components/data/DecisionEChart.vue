@@ -1,8 +1,8 @@
 <template>
     <div>
-        <!--            <h-datepicker v-model="model.startTime" type="datetime" :has-seconds="true" placeholder="开始时间"></h-datepicker>-->
-        <!--            <h-datepicker v-model="model.endTime" type="datetime" :has-seconds="true" placeholder="结束时间"></h-datepicker>-->
-        <h-select v-model="model.type" :datas="types" style="width: 90px" @change="load((() => chart.setOption(option)))"></h-select>
+        <h-datepicker v-model="model.startTime" type="datetime" :option="{minuteStep:2}" :has-seconds="true" placeholder="开始时间" style="width: 160px"></h-datepicker>
+        -
+        <h-datepicker v-model="model.endTime" type="datetime" :option="{minuteStep:2}" :has-seconds="true" placeholder="结束时间" style="width: 160px"></h-datepicker>
         <div ref="main" style="width: 100%; height: 400px;"></div>
     </div>
 </template>
@@ -11,13 +11,11 @@
         data() {
             return {
                 taskId: null,
-                model: {type: localStorage.getItem('rule.dashboard.type') || 'today'},
-                types: [
-                    { title: '今天', key: 'today'},
-                    { title: '近1小时', key: 'lastOneHour'},
-                    { title: '近2小时', key: 'lastTwoHour'},
-                    { title: '近5小时', key: 'lastFiveHour'},
-                ],
+                model: {startTime: (function () {
+                        let d = new Date();
+                        let month = d.getMonth() + 1;
+                        return d.getFullYear() + "-" + (month < 10 ? '0' + month : month) + "-" + (d.getDate() < 10 ? '0' + d.getDate() : d.getDate()) + " 00:00:00"
+                    })()},
                 option: {
                     tooltip: {
                         trigger: 'axis',
@@ -62,8 +60,11 @@
             if (this.taskId) clearInterval(this.taskId)
         },
         watch: {
-            'model.type': (v) => {
-                localStorage.setItem('rule.dashboard.type', v);
+            'model.startTime'() {
+                this.load((() => this.chart.setOption(this.option)))
+            },
+            'model.endTime'() {
+                this.load((() => this.chart.setOption(this.option)))
             }
         },
         methods: {
