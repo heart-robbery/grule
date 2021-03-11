@@ -1,10 +1,15 @@
 <template>
     <div class="h-panel">
         <div class="h-panel-bar">
-            <span class="h-panel-title">决策统计</span>
+            <span class="h-panel-title">决策规则统计</span>
+<!--            <span v-color:gray v-font="13">说明~~</span>-->
+            <div style="float: right">
+                <h-autocomplete v-model="model.decisionId" :option="decisionAc" style="float:left; width: 180px" @change="load((() => chart.setOption(option)))" placeholder="决策"></h-autocomplete>
+            </div>
             <h-datepicker v-model="model.startTime" type="datetime" :option="{minuteStep:2}" :has-seconds="true" placeholder="开始时间" style="width: 160px"></h-datepicker>
             -
             <h-datepicker v-model="model.endTime" type="datetime" :option="{minuteStep:2}" :has-seconds="true" placeholder="结束时间" style="width: 160px"></h-datepicker>
+
         </div>
         <div class="h-panel-body bottom-line">
             <div ref="main" style="width: 100%; height: 400px;"></div>
@@ -15,6 +20,25 @@
     module.exports = {
         data() {
             return {
+                decisionAc: {
+                    keyName: 'decisionId',
+                    titleName: 'name',
+                    minWord: 1,
+                    loadData: (filter, cb) => {
+                        $.ajax({
+                            url: 'mnt/decisionPage',
+                            data: {page: 1, pageSize: 5, nameLike: filter},
+                            success: (res) => {
+                                this.isLoading = false;
+                                if (res.code == '00') {
+                                    cb(res.data.list.map((r) => {
+                                        return {decisionId: r.id, name: r.name}
+                                    }))
+                                } else this.$Notice.error(res.desc)
+                            },
+                        });
+                    }
+                },
                 taskId: null,
                 model: {startTime: (function () {
                         let d = new Date();
@@ -46,17 +70,9 @@
         },
         mounted() {
             this.load(() => loadJs('echarts', () => this.$nextTick(this.initEChart)));
-            // setTimeout(() => {
-            //     this.taskId = setInterval(() => {
-            //         this.load(() => this.chart.setOption(this.option));
-            //     }, 1000 * 60 * 5)
-            // })
         },
         activated() {
             if (this.chart) this.load(() => this.chart.setOption(this.option));
-            // this.taskId = setInterval(() => {
-            //     this.load(() => this.chart.setOption(this.option));
-            // }, 1000 * 60 * 5)
         },
         deactivated() {
             if (this.taskId) clearInterval(this.taskId)
@@ -74,82 +90,6 @@
         },
         methods: {
             initEChart() {
-                // this.option = {
-                //     tooltip: {
-                //         trigger: 'axis',
-                //         axisPointer: {            // 坐标轴指示器，坐标轴触发有效
-                //             type: 'shadow'        // 默认为直线，可选为：'line' | 'shadow'
-                //         }
-                //     },
-                //     legend: {
-                //         data: ['直接访问', '邮件营销', '联盟广告', '视频广告', '搜索引擎']
-                //     },
-                //     grid: {
-                //         left: '3%',
-                //         right: '4%',
-                //         bottom: '3%',
-                //         containLabel: true
-                //     },
-                //     xAxis: {
-                //         type: 'value'
-                //     },
-                //     yAxis: {
-                //         type: 'category',
-                //         data: ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-                //     },
-                //     series: [
-                //         {
-                //             name: '直接访问',
-                //             type: 'bar',
-                //             stack: '总量',
-                //             label: {
-                //                 show: true,
-                //                 position: 'insideRight'
-                //             },
-                //             data: [320, 302, 301, 334, 390, 330, 320]
-                //         },
-                //         {
-                //             name: '邮件营销',
-                //             type: 'bar',
-                //             stack: '总量',
-                //             label: {
-                //                 show: true,
-                //                 position: 'insideRight'
-                //             },
-                //             data: [120, 132, 101, 134, 90, 230, 210]
-                //         },
-                //         {
-                //             name: '联盟广告',
-                //             type: 'bar',
-                //             stack: '总量',
-                //             label: {
-                //                 show: true,
-                //                 position: 'insideRight'
-                //             },
-                //             data: [220, 182, 191, 234, 290, 330, 310]
-                //         },
-                //         {
-                //             name: '视频广告',
-                //             type: 'bar',
-                //             stack: '总量',
-                //             label: {
-                //                 show: true,
-                //                 position: 'insideRight'
-                //             },
-                //             data: [150, 212, 201, 154, 190, 330, 410]
-                //         },
-                //         {
-                //             name: '搜索引擎',
-                //             type: 'bar',
-                //             stack: '总量',
-                //             label: {
-                //                 show: true,
-                //                 position: 'insideRight'
-                //             },
-                //             data: [820, 832, 901, 934, 1290, 1330, 1320]
-                //         }
-                //     ]
-                // };
                 this.chart = echarts.init(this.$refs.main);
                 // console.log('chart', this.chart);
                 this.chart.setOption(this.option);
@@ -157,11 +97,11 @@
             },
             load(cb) {
                 $.ajax({
-                    url: 'mnt/countDecide',
+                    url: 'mnt/countRule',
                     data: this.model,
                     success: (res) => {
                         if (res.code == '00') {
-                            let cate = Array.from(new Set(res.data.map((o) => o.decisionName)));
+                            let cate = Array.from(new Set(res.data.map((o) => o.decisionName + ' || ' + o.ruleName)));
                             this.option.yAxis = {
                                 type: 'category',
                                 data: cate
@@ -188,7 +128,7 @@
                                     data: (function () {
                                         let arr = [];
                                         cate.forEach(function(value, index, array){
-                                            let item = res.data.find(o => o.decision == 'Reject' && o.decisionName == value);
+                                            let item = res.data.find(o => o.decision == 'Reject' && (o.decisionName + ' || ' + o.ruleName) == value);
                                             arr.push(item ? item.total : 0);
                                         });
                                         return arr;
@@ -215,7 +155,7 @@
                                     data: (function () {
                                         let arr = [];
                                         cate.forEach(function(value, index, array){
-                                            let item = res.data.find(o => o.decision == 'Review' && o.decisionName == value);
+                                            let item = res.data.find(o => o.decision == 'Review' && (o.decisionName + ' || ' + o.ruleName) == value);
                                             arr.push(item ? item.total : 0);
                                         });
                                         return arr;
@@ -242,7 +182,7 @@
                                     data: (function () {
                                         let arr = [];
                                         cate.forEach(function(value, index, array){
-                                            let item = res.data.find(o => o.decision == 'Accept' && o.decisionName == value);
+                                            let item = res.data.find(o => o.decision == 'Accept' && (o.decisionName + ' || ' + o.ruleName) == value);
                                             arr.push(item ? item.total : 0);
                                         });
                                         return arr;

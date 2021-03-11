@@ -5,7 +5,7 @@
             <h-select v-model="model.success" :datas="successTypes" placeholder="是否成功" style="width: 90px; float: left" @change="load"></h-select>
             <h-select v-model="model.dataSuccess" :datas="boolTypes" placeholder="是否查得" style="width: 90px; float: left" @change="load"></h-select>
             <h-select v-model="model.cache" :datas="boolTypes" placeholder="是否缓存" style="width: 90px; float: left" @change="load"></h-select>
-            <h-autocomplete v-model="model.decisionId" :option="decisions" style="float:left; width: 180px" @change="load" placeholder="决策名"></h-autocomplete>
+            <h-autocomplete v-model="model.decisionId" :option="decisions" style="float:left; width: 180px" @change="load" placeholder="决策"></h-autocomplete>
             <h-autocomplete v-model="model.collector" :option="collectors" style="float:left; width: 180px" @change="load" placeholder="收集器"></h-autocomplete>
             <input type="number" v-model="model.spend" placeholder="耗时(>=ms)" style="width: 100px" @keyup.enter="load"/>
             <input type="text" v-model="model.decideId" placeholder="流水id(精确匹配)" style="width: 250px" @keyup.enter="load"/>

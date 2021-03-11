@@ -286,6 +286,7 @@ new Map([
     ['CollectResult', 'data/CollectResult.vue'],
     ['DataAnalyse', 'data/DataAnalyse.vue'],
     ['DecisionEChart', 'data/DecisionEChart.vue'],
+    ['RuleEChart', 'data/RuleEChart.vue'],
     ['MyInfo', 'MyInfo.vue'],
 ]).forEach((value, key) => {
     Vue.component(key, (resolve, reject) => {

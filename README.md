@@ -102,8 +102,11 @@ DSL: 开发 和 业务 共识的语言. 方便业务表达需求, 方便开发�
 #### 决策定义
 ![Image text](https://gitee.com/xnat/tmp/raw/master/img/decisions.png)
 
-#### 图表展示 
+#### 决策执行统计 
 ![Image text](https://gitee.com/xnat/tmp/raw/master/img/decision_dashbrod.png)
+
+#### 决策规则统计 
+![Image text](https://gitee.com/xnat/tmp/raw/master/img/countRule.png)
 
 #### 决策执行记录
 ![Image text](https://gitee.com/xnat/tmp/raw/master/img/decision_records.png)
@@ -137,7 +140,7 @@ DSL: 开发 和 业务 共识的语言. 方便业务表达需求, 方便开发�
 ### 使用说明
 jdk8, gradle6.5+
 
-1. IntelliJ IDEA 运行 main.groovy, 
+1. IntelliJ IDEA 运行 main.groovy
 2. 
  * linux: nohup sh start.sh -Xmx512m -Xms512m > /dev/null 2>&1 &
  * windows: ./start
