@@ -73,27 +73,25 @@ class DecisionContext {
         if (!running.compareAndSet(false, true)) return
         try {
             while (running.get() && ruleIterator.hasNext()) {
-                def r = ruleIterator.next()
-                if (!r) break
-                if (!r.enabled) continue
-                def decision = decide(r)
-                if (decisionResult == DecisionEnum.Review && decision == DecisionEnum.Accept) {
-                    // 保留decision并继续往下执行
-                } else decisionResult = decision
-                if (DecisionEnum.Reject == decisionResult) break
+                def ruleSpec = ruleIterator.next()
+                if (!ruleSpec) break
+                if (!ruleSpec.enabled) continue
+                def decision = decide(ruleSpec)
+                decisionResult = decision?:decisionResult
+                if (decisionResult?.block) break
             }
-            if (DecisionEnum.Reject == decisionResult || !ruleIterator.hasNext()) {
+            if (decisionResult?.block || !ruleIterator.hasNext()) {
                 decisionResult = decisionResult?:DecisionEnum.Accept; status = '0000'
-                end.set(true);  running.set(false)
+                end.set(true); running.set(false)
                 curPolicySpec = null; curPassedRule = null; curRuleSpec = null
-                log.info(logPrefix() + "结束成功. 共执行: " + (System.currentTimeMillis() - startup.time) + "ms "  + result())
+                log.info(logPrefix() + "结束成功. 共执行: " + (summary()['spend']) + "ms "  + result())
                 ep?.fire("decision.end", this)
             }
         } catch (ex) {
             decisionResult = DecisionEnum.Reject; status = 'EEEE'; this.exception = ex
             end.set(true); running.set(false)
             curPolicySpec = null; curPassedRule = null; curRuleSpec = null
-            log.error(logPrefix() + "结束错误. 共执行: " + (System.currentTimeMillis() - startup.getTime()) + "ms " + result(), ex)
+            log.error(logPrefix() + "结束错误. 共执行: " + (summary()['spend']) + "ms " + result(), ex)
             ep?.fire("decision.end", this)
         }
     }

@@ -9,16 +9,16 @@
                     <h-autocomplete v-model="model.decisionId" :option="decisions" @change="load" placeholder="决策"></h-autocomplete>
                 </h-formitem>
                 <h-formitem>
-                    <input type="text" v-model="model.id" placeholder="流水id(精确匹配)" style="width: 250px" @keyup.enter="load"/>
+                    <input type="text" v-model="model.id" placeholder="流水id(精确)" style="width: 250px" @keyup.enter="load"/>
                 </h-formitem>
                 <h-formitem>
-                    <input type="text" v-model="model.keyProp" placeholder="关键属性" @keyup.enter="load"/>
+                    <input type="text" v-model="model.keyProp" placeholder="关键属性值(模糊)" @keyup.enter="load"/>
                 </h-formitem>
                 <h-formitem>
                     <input type="number" v-model="model.spend" placeholder="耗时(>=ms)" @keyup.enter="load"/>
                 </h-formitem>
                 <h-formitem>
-                    <input type="text" v-model="model.exception" placeholder="异常信息" @keyup.enter="load"/>
+                    <input type="text" v-model="model.exception" placeholder="异常信息(模糊)" @keyup.enter="load"/>
                 </h-formitem>
                 <h-formitem>
                     <h-datepicker v-model="model.startTime" type="datetime" :has-seconds="true" placeholder="开始时间"></h-datepicker>
