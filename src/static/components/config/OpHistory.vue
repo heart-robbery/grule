@@ -1,3 +1,8 @@
+<style scoped>
+    .h-text-ellipsis-limit-text {
+        white-space: pre-wrap;
+    }
+</style>
 <template>
     <div class="h-panel">
         <div class="h-panel-bar">
@@ -17,7 +22,14 @@
                     <date-item :time="data.createTime" />
                   </template>
                 </h-tableitem>
-                <h-tableitem title="内容" prop="content" align="center"></h-tableitem>
+                <h-tableitem title="内容" align="center">
+                    <template slot-scope="{data}">
+                        <h-textellipsis :text="data.content" :height="70" :isLimitHeight="data._isLimitHeight">
+                            <template v-if="data._isLimitHeight" slot="more"><span>...</span><span class="link" @click="$Clipboard({text: data.content})">复制</span></template>
+<!--                            <span v-else slot="after" class="link" @click="data._isLimitHeight=true">收起</span>-->
+                        </h-textellipsis>
+                    </template>
+                </h-tableitem>
                 <div slot="empty">暂时无数据</div>
             </h-table>
         </div>
@@ -68,6 +80,7 @@
                             this.page = res.data.page;
                             this.pageSize = res.data.pageSize;
                             this.totalRow = res.data.totalRow;
+                            res.data.list.forEach((item, index) => item._isLimitHeight = true);
                             this.list = res.data.list;
                         } else this.$Notice.error(res.desc)
                     },
