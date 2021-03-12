@@ -176,6 +176,7 @@ Vue.component('ace-json', (resolve, reject) => {
         });
     });
 });
+
 // groovy 编辑器
 Vue.component('ace-groovy', (resolve, reject) => {
     loadJs('ace', () => {
@@ -287,6 +288,7 @@ new Map([
     ['DataAnalyse', 'data/DataAnalyse.vue'],
     ['DecisionEChart', 'data/DecisionEChart.vue'],
     ['RuleEChart', 'data/RuleEChart.vue'],
+    ['Clock', 'Clock.vue'],
     ['MyInfo', 'MyInfo.vue'],
 ]).forEach((value, key) => {
     Vue.component(key, (resolve, reject) => {

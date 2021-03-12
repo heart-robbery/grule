@@ -20,9 +20,10 @@
     <div>
         <h-layout :sider-fixed="siderFixed" :sider-collapsed="siderCollapsed">
             <h-sider theme="dark">
-                <div class="layout-logo">
+<!--                <div class="layout-logo">-->
 
-                </div>
+<!--                </div>-->
+                <Clock v-show="!siderCollapsed"></Clock>
 <!--                <span>DSL Rule Language</span>-->
 <!--                <div class="text-center">-->
 <!--                    <h-avatar src="https://i1.go2yd.com/image.php?url=0Kvq81cKR1">-->
@@ -53,7 +54,7 @@
                     </keep-alive>
                 </h-content>
                 <h-footer class="text-center">Copyright © {{year}}
-                    <a href="https://gitee.com/xnat/gy/tree/rule/" target="_blank">xxb</a>
+                    <a href="https://gitee.com/xnat/rule/" target="_blank">xxb</a>
                 </h-footer>
             </h-layout>
         </h-layout>

@@ -11,8 +11,8 @@
             <h-datepicker v-model="model.endTime" type="datetime" :option="{minuteStep:2}" :has-seconds="true" placeholder="结束时间" style="width: 160px"></h-datepicker>
 
         </div>
-        <div class="h-panel-body bottom-line">
-            <div ref="main" style="width: 100%; height: 400px;"></div>
+        <div class="h-panel-body">
+            <div ref="main" v-bind:style="{width: widthPx, height: heightPx, minHeight: minHeight}"></div>
         </div>
     </div>
 </template>
@@ -20,6 +20,7 @@
     module.exports = {
         data() {
             return {
+                widthPx: '100%', heightPx: '100%', minHeight: '400px',
                 decisionAc: {
                     keyName: 'decisionId',
                     titleName: 'name',
@@ -102,6 +103,7 @@
                     success: (res) => {
                         if (res.code == '00') {
                             let cate = Array.from(new Set(res.data.map((o) => o.decisionName + ' || ' + o.ruleName)));
+                            this.minHeight = cate.length < 2 ? '250px' : (Math.min(cate.length * 80, 800)) + 'px';
                             this.option.yAxis = {
                                 type: 'category',
                                 data: cate

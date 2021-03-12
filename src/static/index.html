@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <title>Rule DSL Engine</title>
-
 <!--    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/heyui/themes/index.css"></link>-->
 <!--    <script src="https://cdn.jsdelivr.net/npm/vue"></script>-->
 <!--    <script src="https://cdn.jsdelivr.net/npm/heyui"></script>-->
 <!--    <script src="https://cdn.bootcdn.net/ajax/libs/jquery/3.5.1/jquery.min.js"></script>-->
+<!--    <script src="https://cdn.jsdelivr.net/npm/echarts@5.0.2/dist/echarts.min.js" async></script>-->
 
     <link rel="stylesheet" href="css/lib/heyui.css" />
     <script src="js/lib/vue.min.js"></script>
@@ -23,6 +23,8 @@
 </div>
 </body>
 <script>
+    // 提前加载大文件
+    loadJs('echarts', 'ace', () => loadJs('ace-tools', 'ace-lang-groovy'));
     // HeyUI.config({});
     let app = new Vue({
         el: '#app',
@@ -72,8 +74,5 @@
             }
         }
     });
-
-    // 提前加载大文件
-    loadJs('echarts', 'ace', () => loadJs('ace-tools', 'ace-lang-groovy'))
 </script>
 </html>
