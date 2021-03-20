@@ -58,10 +58,10 @@ function toJSON(str) {
 }
 
 
-// 异步加载全局js库
+// 异步加载全局js库: js库名 -> 路径/[路径, 全局变量名]
 let jsMap = new Map([
     ['md5', 'js/lib/md5.min.js'],
-    ['ace', 'js/lib/ace-1.4.12.js'],
+    ['ace', ['js/lib/ace-1.4.12.js', 'ace']],
     ['ace-tools', 'js/lib/ext-language_tools.min.js'],
     ['ace-lang-rule', 'js/lib/mode-rule.js'],
     ['ace-snip-rule', 'js/lib/rule-snippets.js'],
@@ -69,7 +69,7 @@ let jsMap = new Map([
     ['ace-lang-json', 'js/lib/mode-json.js'],
     ['ace-snip-groovy', 'js/lib/groovy-snippets.min.js'],
     ['moment', 'js/lib/moment.min.js'],
-    ['echarts', 'js/lib/echarts.min.js'],
+    ['echarts', ['js/lib/echarts.min.js', 'echarts']],
 ]);
 function loadJs() {
     if (arguments.length < 1) return;
@@ -81,22 +81,35 @@ function loadJs() {
         names.pop()
     }
     let length = names.length;
-    names.forEach(((value, index) => {
-        let path = jsMap.get(value);
-        if (!path) {
-            if (cb) cb();
+    names.forEach(((item, index) => {
+        length--
+        let value = jsMap.get(item);
+        if (!value) {
+            if (length === 0 && cb) cb();
             return;
         }
-        $.ajax({
-            url: path,
-            success: (res) => {
-                let script = document.createElement( "script" );
-                script.text = res;
-                document.head.appendChild(script).parentNode.removeChild(script);
-                length--; jsMap.delete(value); //只加载一次
-                if (length == 0 && cb) cb();
+        let path = value;
+        if (value instanceof Array) {
+            console.log(path, typeof window[(value[1])]);
+            if (typeof window[(value[1])] !== "undefined") {
+                path = null;
+                if (length === 0 && cb) cb();
+            } else {
+                path = value[0]
             }
-        })
+        }
+        if (path) {
+            $.ajax({
+                url: path,
+                success: (res) => {
+                    let script = document.createElement( "script" );
+                    script.text = res;
+                    document.head.appendChild(script).parentNode.removeChild(script);
+                    jsMap.delete(item); //只加载一次
+                    if (length === 0 && cb) cb();
+                }
+            })
+        }
     }));
 }
 
@@ -271,8 +284,8 @@ new Map([
     ['Dashboard', 'Dashboard.vue'],
     ['PolicyCenter', 'config/PolicyCenter.vue'],
     ['DecisionConfig', 'config/DecisionConfig.vue'],
-    ['PolicyConfig', 'config/PolicyConfig.vue'],
-    ['RuleConfig', 'config/RuleConfig.vue'],
+    // ['PolicyConfig', 'config/PolicyConfig.vue'],
+    // ['RuleConfig', 'config/RuleConfig.vue'],
     ['DecisionDetail', 'config/DecisionDetail.vue'],
     ['PolicyDetail', 'config/PolicyDetail.vue'],
     ['RuleDetail', 'config/RuleDetail.vue'],
