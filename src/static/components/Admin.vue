@@ -18,6 +18,7 @@
 </style>
 <template>
     <div>
+        <status-suspension></status-suspension>
         <h-layout :sider-fixed="siderFixed" :sider-collapsed="siderCollapsed">
             <h-sider theme="dark">
 <!--                <div class="layout-logo">-->

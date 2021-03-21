@@ -55,7 +55,7 @@ class FieldManager extends ServerTpl {
         queue(DATA_COLLECTED)
             .failMaxKeep(getInteger(DATA_COLLECTED + ".failMaxKeep", 10000))
             .parallel(getInteger("saveResult.parallel", 2))
-            .errorHandle {ex, devourer ->
+            .errorHandle {ex, me ->
                 if (lastWarn == null || (System.currentTimeMillis() - lastWarn >= Duration.ofSeconds(getLong(DATA_COLLECTED + ".warnInterval", 60 * 5L)).toMillis())) {
                     lastWarn = System.currentTimeMillis()
                     log.error("保存数据收集结果到数据库错误", ex)

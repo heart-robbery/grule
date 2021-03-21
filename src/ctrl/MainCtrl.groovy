@@ -122,4 +122,11 @@ class MainCtrl extends ServerTpl {
         hCtx.response.cacheControl(86400) // 一天
         Utils.baseDir("static/css/lib/$fName")
     }
+
+    // ================= 图片 ======================
+    @Path(path = 'img/:fName')
+    File img(String fName, HttpContext hCtx) {
+        hCtx.response.cacheControl(172800)
+        Utils.baseDir("static/img/$fName")
+    }
 }

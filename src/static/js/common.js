@@ -90,7 +90,6 @@ function loadJs() {
         }
         let path = value;
         if (value instanceof Array) {
-            console.log(path, typeof window[(value[1])]);
             if (typeof window[(value[1])] !== "undefined") {
                 path = null;
                 if (length === 0 && cb) cb();
@@ -284,8 +283,6 @@ new Map([
     ['Dashboard', 'Dashboard.vue'],
     ['PolicyCenter', 'config/PolicyCenter.vue'],
     ['DecisionConfig', 'config/DecisionConfig.vue'],
-    // ['PolicyConfig', 'config/PolicyConfig.vue'],
-    // ['RuleConfig', 'config/RuleConfig.vue'],
     ['DecisionDetail', 'config/DecisionDetail.vue'],
     ['PolicyDetail', 'config/PolicyDetail.vue'],
     ['RuleDetail', 'config/RuleDetail.vue'],
@@ -302,6 +299,7 @@ new Map([
     ['DecisionEChart', 'data/DecisionEChart.vue'],
     ['RuleEChart', 'data/RuleEChart.vue'],
     ['Clock', 'Clock.vue'],
+    ['StatusSuspension', 'StatusSuspension.vue'],
     ['MyInfo', 'MyInfo.vue'],
 ]).forEach((value, key) => {
     Vue.component(key, (resolve, reject) => {

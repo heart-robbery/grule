@@ -27,7 +27,7 @@ class DecisionSrv extends ServerTpl {
         queue(SAVE_RESULT)
             .failMaxKeep(getInteger(SAVE_RESULT + ".failMaxKeep", 10000))
             .parallel(getInteger("saveResult.parallel", 2))
-            .errorHandle {ex, devourer ->
+            .errorHandle {ex, me ->
                 if (lastWarn == null || (System.currentTimeMillis() - lastWarn >= Duration.ofSeconds(getLong(SAVE_RESULT + ".warnInterval", 60 * 5L)).toMillis())) {
                     lastWarn = System.currentTimeMillis()
                     log.error("保存决策结果到数据库错误", ex)
