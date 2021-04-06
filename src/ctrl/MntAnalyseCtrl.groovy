@@ -40,7 +40,8 @@ class MntAnalyseCtrl extends ServerTpl {
         String sql = """
             select t1.decision_id, t2.name decisionName, t1.decision, count(1) total from ${repo.tbName(DecisionResult).replace("`", '')} t1
             left join decision t2 on t1.decision_id = t2.id
-            where t1.decision is not null and t1.occur_time>=:start${end ? " and t1.occur_time<=:end" : ""} and t1.decision_id in (:ids) group by t1.decision_id, t1.decision
+            where t1.decision is not null and t1.occur_time>=:start${end ? " and t1.occur_time<=:end" : ""} and t1.decision_id in (:ids) 
+            group by t1.decision_id, t1.decision
         """.trim()
         ApiResp.ok(end ? repo.rows(sql, start, end, ids) : repo.rows(sql, start, ids))
     }
@@ -85,7 +86,13 @@ class MntAnalyseCtrl extends ServerTpl {
             }.flatten().countBy {it}.findResults {e ->
                 def arr = e.key.split("\\|\\|")
                 return [decisionId: arr[0], decisionName: arr[1], ruleName: arr[2], decision: arr[3], total: e.value]
-            }
+            }.sort {o1, o2 ->
+                // 把拒绝多的排前面
+                if (o1['decision'] == "Reject" && o2['decision'] == "Reject") return o2['total'] - o1['total']
+                else if (o1['decision'] == "Reject") return -1
+                else if (o2['decision'] == "Reject") return 1
+                else return 0
+            }.takeRight(decisionId ? Integer.MAX_VALUE : 400) // 如果是指定某个决策, 则全部显示, 如果是查所有则限制显示(有可能会得多)
         )
     }
 }

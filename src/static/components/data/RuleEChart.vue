@@ -12,7 +12,7 @@
 
         </div>
         <div class="h-panel-body">
-            <div ref="main" v-bind:style="{width: widthPx, height: heightPx, minHeight: minHeight}"></div>
+            <div ref="main" v-bind:style="{width: widthPx, height: heightPx, minHeight: minHeight, maxHeight: '1000px', overflow:'auto'}"></div>
         </div>
     </div>
 </template>
@@ -102,7 +102,10 @@
                     data: this.model,
                     success: (res) => {
                         if (res.code == '00') {
-                            let cate = Array.from(new Set(res.data.map((o) => o.decisionName + ' || ' + o.ruleName)));
+                            let cate = [];
+                            for (const item of res.data.map((o) => o.decisionName + ' || ' + o.ruleName)) { // 保留顺序去重
+                                if (cate.indexOf(item) === -1) cate.push(item);
+                            }
                             this.minHeight = cate.length < 2 ? '250px' : (Math.min(cate.length * 80, 800)) + 'px';
                             this.option.yAxis = {
                                 type: 'category',
