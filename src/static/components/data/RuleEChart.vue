@@ -106,6 +106,7 @@
                             for (const item of res.data.map((o) => o.decisionName + ' || ' + o.ruleName)) { // 保留顺序去重
                                 if (cate.indexOf(item) === -1) cate.push(item);
                             }
+                            cate.reverse();
                             this.minHeight = cate.length < 2 ? '250px' : (Math.min(cate.length * 80, 800)) + 'px';
                             this.option.yAxis = {
                                 type: 'category',
