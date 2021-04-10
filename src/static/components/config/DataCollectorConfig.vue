@@ -291,8 +291,7 @@
                 this.$Modal({
                     title: '添加数据收集器', draggable: true,
                     component: {
-                        vue: addEditPop,
-                        datas: {}
+                        vue: addEditPop, datas: {}
                     },
                     width: 850,
                     hasCloseIcon: true, fullScreen: false, middle: false, transparent: false, closeOnMask: false,
@@ -305,7 +304,7 @@
             },
             showUpdatePop(collector) {
                 this.$Modal({
-                    title: `更新: ${collector.name}`, draggable: true,
+                    title: `更新收集器: ${collector.name}`, draggable: true,
                     component: {
                         vue: addEditPop,
                         datas: {collector: collector}
@@ -316,7 +315,7 @@
             },
             showTestPop(item) {
                 this.$Modal({
-                    title: `测试: ${item.name}`, draggable: true,
+                    title: `测试收集器: ${item.name}`, draggable: true,
                     component: {
                         vue: testPop,
                         datas: {collector: item}

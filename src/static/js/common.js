@@ -63,6 +63,7 @@ let jsMap = new Map([
     ['md5', 'js/lib/md5.min.js'],
     ['ace', ['js/lib/ace-1.4.12.js', 'ace']],
     ['ace-tools', 'js/lib/ext-language_tools.min.js'],
+    ['ace-ext-searchbox', 'js/lib/ext-searchbox.js'],
     ['ace-lang-rule', 'js/lib/mode-rule.js'],
     ['ace-snip-rule', 'js/lib/rule-snippets.js'],
     ['ace-lang-groovy', 'js/lib/mode-groovy.js'],
@@ -233,6 +234,7 @@ Vue.component('ace-groovy', (resolve, reject) => {
                             this.$emit('update', this.editor.session.getValue())
                         });
                         this.editor.session.setMode('ace/mode/groovy');
+                        //this.editor.execCommand('find');
                         this.editor.commands.addCommand({
                             name: 'save',
                             bindKey: {win: 'Ctrl-S', mac: 'Command-S'},
