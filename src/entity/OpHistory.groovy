@@ -3,14 +3,13 @@ package entity
 import cn.xnatural.jpa.LongIdEntity
 import org.hibernate.annotations.Type
 
-import javax.persistence.Basic
-import javax.persistence.Entity
-import javax.persistence.Lob
+import javax.persistence.*
 
 /**
  * 操作历史记录
  */
 @Entity
+@Table(indexes = [@Index(name = "idx_createTime", columnList = "createTime")])
 class OpHistory extends LongIdEntity {
     /**
      * 表名

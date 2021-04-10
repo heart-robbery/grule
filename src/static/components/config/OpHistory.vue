@@ -6,11 +6,12 @@
 <template>
     <div class="h-panel">
         <div class="h-panel-bar">
-            <h-select v-model="model.type" :datas="types" placeholder="所有" style="width: 100px" @change="load"></h-select>
-<!--            <input type="text" v-model="model.kw" placeholder="关键词" @keyup.enter="load"/>-->
+            <h-select v-model="model.type" :datas="types" placeholder="所有" style="width: 100px; float: left" @change="load"></h-select>
+            <input type="text" v-model="model.kw" placeholder="关键词" @keyup.enter="load"/>
+            <h-datepicker v-model="model.startTime" type="datetime" :option="{minuteStep:5}" :has-seconds="true" placeholder="开始时间" style="width: 160px"></h-datepicker>
+            <h-datepicker v-model="model.endTime" type="datetime" :option="{minuteStep:5}" :has-seconds="true" placeholder="结束时间" style="width: 160px"></h-datepicker>
             <div class="h-panel-right">
-                <h-search placeholder="关键词" v-width="200" v-model="model.kw" show-search-button search-text="搜索" @search="load"><i class="h-icon-search"></i><span>搜索</span></h-search>
-<!--                <button class="h-btn h-btn-primary float-right" @click="load"><i class="h-icon-search"></i><span>搜索</span></button>-->
+                <button class="h-btn h-btn-primary float-right" @click="load"><i class="h-icon-search"></i><span>搜索</span></button>
             </div>
         </div>
         <div class="h-panel-body">
@@ -24,7 +25,7 @@
                 </h-tableitem>
                 <h-tableitem title="内容" align="center">
                     <template slot-scope="{data}">
-                        <h-textellipsis :text="data.content" :height="70" :isLimitHeight="data._isLimitHeight">
+                        <h-textellipsis :text="data.content" :height="150" :isLimitHeight="data._isLimitHeight">
                             <template v-if="data._isLimitHeight" slot="more"><span>...</span><span class="link" @click="$Clipboard({text: data.content})">复制</span></template>
 <!--                            <span v-else slot="after" class="link" @click="data._isLimitHeight=true">收起</span>-->
                         </h-textellipsis>
@@ -48,7 +49,11 @@
         data() {
             return {
                 types: types,
-                model: {kw: null, type: null},
+                model: {kw: null, type: null, startTime: (function () {
+                        let d = new Date(new Date().getTime() - 1000 * 60 * 60 * 24 * 30); //默认显示前30天
+                        let month = d.getMonth() + 1;
+                        return d.getFullYear() + "-" + (month < 10 ? '0' + month : month) + "-" + (d.getDate() < 10 ? '0' + d.getDate() : d.getDate()) + " 00:00:00"
+                    })()},
                 list: [], totalRow: 0, page: 1, pageSize: 1, loading: false
             }
         },
@@ -73,7 +78,7 @@
                 this.list = [];
                 $.ajax({
                     url: 'mnt/opHistoryPage',
-                    data: {page: page.page || 1, kw: this.model.kw, type: this.model.type},
+                    data: $.extend({page: page.page || 1, pageSize: 4}, this.model),
                     success: (res) => {
                         this.loading = false;
                         if (res.code == '00') {

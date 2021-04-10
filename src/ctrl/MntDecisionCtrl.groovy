@@ -117,16 +117,18 @@ class MntDecisionCtrl extends ServerTpl {
 
 
     @Path(path = 'opHistoryPage')
-    ApiResp opHistoryPage(HttpContext hCtx, Integer page, Integer pageSize, String kw, String type) {
+    ApiResp opHistoryPage(HttpContext hCtx, Integer page, Integer pageSize, String kw, String type, String startTime, String endTime) {
         if (pageSize && pageSize > 20) return ApiResp.fail("Param pageSize <=20")
         hCtx.auth("opHistory-read")
+        Date start = startTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(startTime) : null
+        Date end = endTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(endTime) : null
         ApiResp.ok(
             repo.findPage(OpHistory, page, pageSize?:5) { root, query, cb ->
                 query.orderBy(cb.desc(root.get('createTime')))
                 def ps = []
-                if (kw) {
-                    ps << cb.like(root.get('content'), '%' + kw + '%')
-                }
+                if (kw) ps << cb.like(root.get('content'), '%' + kw + '%')
+                if (start) ps << cb.greaterThanOrEqualTo(root.get('createTime'), start)
+                if (end) ps << cb.lessThanOrEqualTo(root.get('createTime'), end)
                 if (type) {
                     ps << cb.equal(root.get('tbName'), repo.tbName(Class.forName(Decision.package.name + "." + type)).replace("`", ""))
                 }
