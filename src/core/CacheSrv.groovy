@@ -29,7 +29,6 @@ class CacheSrv extends ServerTpl {
      * @param key 缓存key
      * @param value 缓存值
      * @param expire 过期时间
-     * @return
      */
     CacheSrv set(String key, Object value, Duration expire = Duration.ofMinutes(getInteger("defaultExpire", getInteger("expire." + key, 30)))) {
         log.trace("Set cache. key: " + key + ", value: " + value + ", expire: " + expire)
@@ -58,7 +57,6 @@ class CacheSrv extends ServerTpl {
      * 重新更新过期时间
      * @param key 缓存key
      * @param expire 过期时间
-     * @return
      */
     CacheSrv expire(String key, Duration expire = null) {
         def record = data.get(key)

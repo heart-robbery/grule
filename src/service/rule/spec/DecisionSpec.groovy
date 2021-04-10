@@ -80,7 +80,6 @@ class DecisionSpec {
      * 函数拦截 调用
      * @param name 函数名
      * @param args 参数
-     * @return
      */
     def methodMissing(String name, def args) {
         def fn = functions.get(name)

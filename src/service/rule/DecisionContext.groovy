@@ -191,14 +191,17 @@ class DecisionContext {
         RuleSpec next() {
             if ((ctx.curPolicySpec == null || (itt == null || !itt.hasNext())) && policyItt.hasNext()) {
                 ctx.curPolicySpec = policyItt.next()
-                if (ctx.curPolicySpec.condition) {
-                    if (!ctx.curPolicySpec.condition(ctx.data)) {
-                        ctx.curPolicySpec = null
-                        return next()
-                    }
-                }
                 log.debug(logPrefix() + "开始执行策略")
-                ctx.curPolicySpec.operateFn?.call(ctx.data) //策略预执行操作
+                ctx.curPolicySpec.fns.each {e ->
+                    if (e.v1 == 'Condition') { // 执行策略条件函数. 条件函数返回false, 则跳出, 继续执行下一个策略
+                        if (!e.v2(ctx.data)) {
+                            ctx.curPolicySpec = null
+                            return next()
+                        }
+                    } else if (e.v1 == 'Operate') { // 执行策略操作函数
+                        e.v2(ctx.data)
+                    } else throw new IllegalArgumentException('策略不支持类型函数: ' + e.v1)
+                }
             }
 
             if (itt == null || !itt.hasNext()) itt = ctx.curPolicySpec?.rules?.iterator()
@@ -266,7 +269,11 @@ class DecisionContext {
         Object remove(Object key) { // 删除缓存
             def r = super.remove(key)
             def field = ctx.getFieldManager().fieldMap.get(key)
-            if (field) ctx.dataCollectResult.remove(field.dataCollector)
+            if (field) {
+                super.remove(field.enName)
+                super.remove(field.cnName)
+                ctx.dataCollectResult.remove(field.dataCollector)
+            }
             return r
         }
     }
