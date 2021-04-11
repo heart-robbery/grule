@@ -34,6 +34,7 @@ class DecisionResult implements IEntity {
     /**
      * 决策时间
      */
+    @Column(nullable = false)
     Date         occurTime
     /**
      * 执行花费时间
@@ -42,6 +43,7 @@ class DecisionResult implements IEntity {
     /**
      * 异常信息
      */
+    @Column(length = 1000)
     String       exception
     /**
      * 关键属性

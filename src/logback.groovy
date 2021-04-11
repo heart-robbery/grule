@@ -27,6 +27,7 @@ if (appenders instanceof String) {
 if (appenders.contains('console')) { // 标准输出
     appender('console', ConsoleAppender) {
         encoder(PatternLayoutEncoder) {
+            // 控制台日志格式配置
             delegate.pattern = "%d{yyyy-MM-dd HH:mm:ss.SSS} [%-7thread] [%-5level] [%-40.40C :%-3L] => %m%n"
             delegate.charset = Charset.forName("utf8")
         }
@@ -37,6 +38,7 @@ if (logPath) { // 有日志输出目录配置
     if (appenders.contains('file')) { // 日志文件
         appender('file', RollingFileAppender) {
             encoder(PatternLayoutEncoder) {
+                // 文件日志格式配置
                 delegate.pattern = "%d{yyyy-MM-dd HH:mm:ss.SSS} [%-7thread] [%-5level] [%-40.40C :%-3L] => %m%n"
                 delegate.charset = StandardCharsets.UTF_8
             }
@@ -58,6 +60,7 @@ root(Level.valueOf(System.getProperty('log.level', 'info')), appenders)
 
 // 日志等级设置
 logger('ch.qos.logback', WARN)
+logger('org.hibernate.tool.hbm2ddl.SchemaUpdate', INFO)
 System.properties.each {String k, v->
     if (k.startsWith("log.level.") && v) {
         logger(k.replace('log.level.', ''), Level.valueOf((String) v))

@@ -45,7 +45,7 @@ class DecisionContext {
     // 执行结果 异常
     protected              Exception                      exception
     // 执行状态
-    protected              String                         status            = '0000'
+    protected              String                         status            = '0001'
 
 
     /**
@@ -73,26 +73,25 @@ class DecisionContext {
         if (!running.compareAndSet(false, true)) return
         try {
             while (running.get() && ruleIterator.hasNext()) {
-                def r = ruleIterator.next()
-                if (!r) break
-                if (!r.enabled) continue
-                def decision = decide(r)
-                if (decisionResult == DecisionEnum.Review && decision == DecisionEnum.Accept) {
-                    // 保留decision并继续往下执行
-                } else decisionResult = decision
-                if (DecisionEnum.Reject == decisionResult) break
+                def ruleSpec = ruleIterator.next()
+                if (!ruleSpec) break
+                if (!ruleSpec.enabled) continue
+                def decision = decide(ruleSpec)
+                decisionResult = decision?:decisionResult
+                if (decisionResult?.block) break
             }
-            if (DecisionEnum.Reject == decisionResult || !ruleIterator.hasNext()) {
-                end.set(true); decisionResult = decisionResult?:DecisionEnum.Accept
-                running.set(false); curPolicySpec = null; curPassedRule = null; curRuleSpec = null
-                log.info(logPrefix() + "结束成功. 共执行: " + (System.currentTimeMillis() - startup.time) + "ms "  + result())
+            if (decisionResult?.block || !ruleIterator.hasNext()) {
+                decisionResult = decisionResult?:DecisionEnum.Accept; status = '0000'
+                end.set(true); running.set(false)
+                curPolicySpec = null; curPassedRule = null; curRuleSpec = null
+                log.info(logPrefix() + "结束成功. 共执行: " + (summary()['spend']) + "ms "  + result())
                 ep?.fire("decision.end", this)
             }
         } catch (ex) {
-            end.set(true); decisionResult = DecisionEnum.Reject
-            running.set(false); curPolicySpec = null; curPassedRule = null; curRuleSpec = null
-            status = 'EEEE'; this.exception = ex
-            log.error(logPrefix() + "结束错误. 共执行: " + (System.currentTimeMillis() - startup.getTime()) + "ms " + result(), ex)
+            decisionResult = DecisionEnum.Reject; status = 'EEEE'; this.exception = ex
+            end.set(true); running.set(false)
+            curPolicySpec = null; curPassedRule = null; curRuleSpec = null
+            log.error(logPrefix() + "结束错误. 共执行: " + (summary()['spend']) + "ms " + result(), ex)
             ep?.fire("decision.end", this)
         }
     }
@@ -106,7 +105,7 @@ class DecisionContext {
     protected DecisionEnum decide(RuleSpec r) {
         if (!r.enabled) return null
         curRuleSpec = r
-        curPassedRule = new PassedRule(attrs: [*:r.attrs, 规则名: r.规则名]); rules.add(curPassedRule)
+        curPassedRule = new PassedRule(attrs: [规则名: r.规则名, *:r.attrs]); rules.add(curPassedRule)
         log.trace(logPrefix() + "开始执行规则")
 
         DecisionEnum decision
@@ -192,14 +191,17 @@ class DecisionContext {
         RuleSpec next() {
             if ((ctx.curPolicySpec == null || (itt == null || !itt.hasNext())) && policyItt.hasNext()) {
                 ctx.curPolicySpec = policyItt.next()
-                if (ctx.curPolicySpec.condition) {
-                    if (!ctx.curPolicySpec.condition(ctx.data)) {
-                        ctx.curPolicySpec = null
-                        return next()
-                    }
-                }
                 log.debug(logPrefix() + "开始执行策略")
-                ctx.curPolicySpec.operateFn?.call(ctx.data) //策略预执行操作
+                ctx.curPolicySpec.fns.each {e ->
+                    if (e.v1 == 'Condition') { // 执行策略条件函数. 条件函数返回false, 则跳出, 继续执行下一个策略
+                        if (!e.v2(ctx.data)) {
+                            ctx.curPolicySpec = null
+                            return next()
+                        }
+                    } else if (e.v1 == 'Operate') { // 执行策略操作函数
+                        e.v2(ctx.data)
+                    } else throw new IllegalArgumentException('策略不支持类型函数: ' + e.v1)
+                }
             }
 
             if (itt == null || !itt.hasNext()) itt = ctx.curPolicySpec?.rules?.iterator()
@@ -267,7 +269,11 @@ class DecisionContext {
         Object remove(Object key) { // 删除缓存
             def r = super.remove(key)
             def field = ctx.getFieldManager().fieldMap.get(key)
-            if (field) ctx.dataCollectResult.remove(field.dataCollector)
+            if (field) {
+                super.remove(field.enName)
+                super.remove(field.cnName)
+                ctx.dataCollectResult.remove(field.dataCollector)
+            }
             return r
         }
     }
@@ -342,7 +348,7 @@ class DecisionContext {
             decideId: id, decision: decisionResult, decisionId: decisionHolder.decision.decisionId,
             status  : status,
             desc    : exception?.toString(),
-            attrs   : decisionHolder.spec.returnAttrs.collectEntries { name ->
+            attrs   : end.get() ? decisionHolder.spec.returnAttrs.collectEntries { name ->
                 def v = data.get(name)
                 if (v instanceof Optional) {
                     v = v.orElseGet({ null })
@@ -351,7 +357,7 @@ class DecisionContext {
                 //如果key是中文, 则翻译成对应的英文名
                 if (field && field.cnName == name) return [field.enName, v]
                 else return [name, v]
-            }
+            } : null
         ]
     }
 

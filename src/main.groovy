@@ -51,7 +51,7 @@ app.addSource(new ServerTpl("sched") { // 定时任务
 })
 app.addSource(new ServerTpl("remoter") {
     Remoter remoter
-    @EL(name = "sched.started", async = true)
+    @EL(name = "sched.started")
     void start() {
         remoter = new Remoter(app.name(), app.id(), attrs(), exec(), ep, bean(Sched))
         exposeBean(remoter)

@@ -1,49 +1,48 @@
 package entity
 
-import cn.xnatural.jpa.LongIdEntity
+
+import cn.xnatural.jpa.UUIDEntity
 import org.hibernate.annotations.DynamicUpdate
 import org.hibernate.annotations.Type
 
-import javax.persistence.Basic
-import javax.persistence.Column
-import javax.persistence.Entity
-import javax.persistence.Lob
+import javax.persistence.*
 
 /**
  * 数据收集器
  */
 @Entity
 @DynamicUpdate
-class DataCollector extends LongIdEntity {
+@Table(indexes = [
+    @Index(name = idx_name_type, columnList = "name,type", unique = true),
+])
+class DataCollector extends UUIDEntity {
+    static final String idx_name_type = "idx_name_type"
     /**
      * 是否可用
      */
     Boolean enabled
     /**
-     * 英文名
+     * 收集器名
      */
-    @Column(unique = true)
-    String enName
-    /**
-     * 中文名
-     */
-    String cnName
+    @Column(nullable = false)
+    String  name
     /**
      * http, script, sql
      */
-    String type
+    @Column(nullable = false)
+    String  type
     /**
      * 备注说明
      */
-    String comment
+    String  comment
     /**
      * 创建者
      */
-    String creator
+    String  creator
     /**
      * 更新人
      */
-    String updater
+    String  updater
     /**
      * 超时(ms)
      */
@@ -51,7 +50,7 @@ class DataCollector extends LongIdEntity {
     /**
      * 缓存key
      */
-    String cacheKey
+    String  cacheKey
     /**
      * 缓存时间,单位分钟
      */

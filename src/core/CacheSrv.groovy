@@ -9,15 +9,16 @@ import java.util.concurrent.ConcurrentHashMap
  * 简单缓存服务
  */
 class CacheSrv extends ServerTpl {
+    protected static final String ITEM_LIMIT = "itemLimit"
 
     /**
      * 数据存放
      */
-    @Lazy protected Map<String, Record> data = new ConcurrentHashMap(getInteger("itemLimit", 1000) + 5) {
+    @Lazy protected Map<String, Record> data = new ConcurrentHashMap(getInteger(ITEM_LIMIT, 1000) + 5) {
         @Override
         Object remove(Object key) {
             def v = super.remove(key)
-            CacheSrv.this.log.info("Removed cache: {}", key)
+            CacheSrv.this.log.debug("Removed cache: {}", key)
             return v
         }
     }
@@ -28,11 +29,11 @@ class CacheSrv extends ServerTpl {
      * @param key 缓存key
      * @param value 缓存值
      * @param expire 过期时间
-     * @return
      */
     CacheSrv set(String key, Object value, Duration expire = Duration.ofMinutes(getInteger("defaultExpire", getInteger("expire." + key, 30)))) {
+        log.trace("Set cache. key: " + key + ", value: " + value + ", expire: " + expire)
         data.put(key, new Record(value: value, expire: expire))
-        if (data.size() > getInteger("itemLimit", 1000)) {
+        if (data.size() > getInteger(ITEM_LIMIT, 1000)) {
             Map.Entry<String, Record> oldEntry
             boolean del = false
             for (def itt = data.entrySet().iterator(); itt.hasNext(); ) {
@@ -56,7 +57,6 @@ class CacheSrv extends ServerTpl {
      * 重新更新过期时间
      * @param key 缓存key
      * @param expire 过期时间
-     * @return
      */
     CacheSrv expire(String key, Duration expire = null) {
         def record = data.get(key)
@@ -64,7 +64,9 @@ class CacheSrv extends ServerTpl {
             if (expire != null) {
                 record.expire = expire
                 record.updateTime = System.currentTimeMillis()
+                log.debug("Updated cache: {}, expire: {}", key, expire)
             } else {
+                log.debug("Removed cache: {}", key)
                 data.remove(key)
             }
         }

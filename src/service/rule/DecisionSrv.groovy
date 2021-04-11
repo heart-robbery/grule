@@ -27,7 +27,7 @@ class DecisionSrv extends ServerTpl {
         queue(SAVE_RESULT)
             .failMaxKeep(getInteger(SAVE_RESULT + ".failMaxKeep", 10000))
             .parallel(getInteger("saveResult.parallel", 2))
-            .errorHandle {ex, devourer ->
+            .errorHandle {ex, me ->
                 if (lastWarn == null || (System.currentTimeMillis() - lastWarn >= Duration.ofSeconds(getLong(SAVE_RESULT + ".warnInterval", 60 * 5L)).toMillis())) {
                     lastWarn = System.currentTimeMillis()
                     log.error("保存决策结果到数据库错误", ex)
@@ -102,8 +102,6 @@ class DecisionSrv extends ServerTpl {
     }
 
 
-
-
     /**
      * 系统全局消息
      * @param msg
@@ -112,9 +110,13 @@ class DecisionSrv extends ServerTpl {
     void globalMsg(String msg) {
         log.info("系统消息: " + msg)
         ep.fire("wsMsg_rule", msg)
-        String url = getStr('msgNotifyUrl', null)
+        String url = getStr('ddMsgNotifyUrl', null)
         if (url) {
-            //bean(OkHttpSrv)?.
+            bean(OkHttpSrv).post(url).jsonBody(JSON.toJSONString([
+                msgtype: "text",
+                text: ["content": "RULE(${app().profile}): $msg".toString()],
+                at: ["isAtAll": false]
+            ])).debug().execute()
         }
     }
 
@@ -128,9 +130,10 @@ class DecisionSrv extends ServerTpl {
             if (Boolean.valueOf(ctx.input.getOrDefault('async', false).toString())) {
                 String cbUrl = ctx.input['callback'] // 回调Url
                 if (cbUrl && cbUrl.startsWith('http')) {
+                    def result = ctx.result()
                     (1..2).each {
                         try {
-                            http.post(cbUrl).jsonBody(JSON.toJSONString(ctx.result(), SerializerFeature.WriteMapNullValue)).execute()
+                            http.post(cbUrl).jsonBody(JSON.toJSONString(result, SerializerFeature.WriteMapNullValue)).debug().execute()
                         } catch (ex) {
                             log.error("回调失败. id: " + ctx.id + ", url: " + cbUrl, ex)
                         }

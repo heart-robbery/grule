@@ -30,6 +30,7 @@ class HttpSrv extends ServerTpl {
     void start() {
         ctrlClzs.each {server.ctrls(it)}
         server.start()
+        server.enabled = false
         ep.fire("${name}.started")
     }
 
@@ -37,6 +38,7 @@ class HttpSrv extends ServerTpl {
     @EL(name = 'sys.started', async = true)
     protected void started() {
         server.ctrls.each {exposeBean(it)}
+        server.enabled = true
     }
 
 
@@ -47,7 +49,6 @@ class HttpSrv extends ServerTpl {
     /**
      * 提供session 数据操作
      * @param hCtx
-     * @return
      */
     protected Map<String, Object> getSessionDelegate(HttpContext hCtx) {
         Map<String, Object> sData
@@ -113,7 +114,6 @@ class HttpSrv extends ServerTpl {
     /**
      * 添加
      * @param clzs
-     * @return
      */
     HttpSrv ctrls(Class...clzs) { clzs?.each {ctrlClzs.add(it)}; this }
 

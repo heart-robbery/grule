@@ -2,7 +2,7 @@
     <div class="h-panel">
         <div class="h-panel-bar">
             &nbsp;&nbsp;
-            <h-button v-if="sUser.permissionIds.find((e) => e == 'decision-add') == 'decision-add'" @click="add"><i class="h-icon-plus"></i></h-button>
+            <h-button v-if="sUser.permissionIds.find((e) => e == 'decision-add')" @click="add"><i class="h-icon-plus"></i></h-button>
             <input type="text" v-model="model.nameLike" placeholder="决策名" style="width: 250px" @keyup.enter="load"/>
             <div class="h-panel-right">
 <!--                <h-search placeholder="查询" v-width="200" v-model="kw" show-search-button search-text="搜索" @search="load"></h-search>-->
@@ -405,7 +405,7 @@
                         // }
                     ],
                     dsl:
-`// 决策id: 必须唯一
+`// 保存: Ctrl+s, 查找: Ctrl+f
 决策id = '${decisionId}'
 决策名 = '${decisionId}'
 决策描述 = ''
@@ -418,6 +418,7 @@
 
     // 执行此策略的条件, false: 不执行, true 或者 不配置默认 执行此策略
     // 条件 { true }
+    // 操作 { 策略预操作 }
 
     规则定义 {
         规则名 = 'R_参数验证'

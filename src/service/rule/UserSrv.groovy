@@ -17,12 +17,12 @@ class UserSrv extends ServerTpl {
      */
     @Lazy def staticPermission = [
           new Permission(enName: 'grant', cnName: '权限管理'),
-          new Permission(enName: 'grant-user', cnName: '权限管理-用户'),
+          new Permission(enName: 'grant-user', cnName: '用户管理'),
           new Permission(enName: 'mnt-login', cnName: '用户登陆'),
           new Permission(enName: 'user-add', cnName: '新增用户'),
           new Permission(enName: 'user-del', cnName: '删除用户'),
           // new Permission(enName: 'password-reset', cnName: '密码重置'),
-          new Permission(enName: 'decision-read', cnName: '决策查看'),
+          // new Permission(enName: 'decision-read', cnName: '决策查看'),
           new Permission(enName: 'decision-add', cnName: '决策创建'),
           // new Permission(enName: 'decision-del', cnName: '删除决策'),
           // new Permission(enName: 'decision-update', cnName: '更新决策'),

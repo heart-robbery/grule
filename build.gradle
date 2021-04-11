@@ -1,7 +1,7 @@
 repositories {
     mavenLocal()
-    maven { url 'https://maven.aliyun.com/repository/public' }
     maven { url 'https://maven.aliyun.com/repository/central' }
+    maven { url 'https://maven.aliyun.com/repository/public' }
     mavenCentral()
     jcenter()
 }
@@ -45,11 +45,11 @@ dependencies {
     compile 'javax.inject:javax.inject:1'
     compile 'ch.qos.logback:logback-classic:1.2.3'
 
-    compile 'cn.xnatural.app:app:1.0.1'
+    compile 'cn.xnatural.app:app:1.0.2'
     //compile 'cn.xnatural.enet:enet-event:0.0.17'
     compile 'cn.xnatural.http:http:1.0.7'
     //compile 'cn.xnatural.aio:aio:1.0.6'
-    compile 'cn.xnatural.jpa:jpa:1.0.3'
+    compile 'cn.xnatural.jpa:jpa:1.0.4'
     compile 'cn.xnatural.sched:sched:1.0.1'
     compile 'cn.xnatural.remoter:remoter:1.0.2'
     compile 'cn.xnatural.task:task:1.0.0'
@@ -62,7 +62,7 @@ dependencies {
     compile 'org.mariadb.jdbc:mariadb-java-client:2.1.2'
     compile 'com.h2database:h2:1.4.199'
 
-    // compile 'javax.mail:javax.mail-api:1.6.2'
+    // compile 'org.apache.commons:commons-email:1.5'
     // compile 'io.netty:netty-all:4.1.49.Final'
     compile 'com.squareup.okhttp3:okhttp:3.14.9'
     // compile('org.apache.httpcomponents:httpclient:4.5.12')

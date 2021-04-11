@@ -17,36 +17,32 @@ class PolicySpec {
      */
     @Lazy Map<String, Object> attrs = new HashMap<>()
     /**
-     * 进入条件函数
+     * 顺序函数: 条件, 操作
      */
-    protected Closure condition
-    /**
-     * 预操作函数
-     */
-    protected Closure operateFn
+    @Lazy List<Tuple2<String, Closure>> fns = new LinkedList<>()
 
 
     void 操作(Closure 操作) {
-        operateFn = { Map ctx ->
+        fns << Tuple.tuple('Operate', { Map ctx ->
             def cl = 操作.rehydrate(ctx, 操作, this)
             cl.resolveStrategy = Closure.DELEGATE_FIRST
             cl()
             null
-        }
+        })
     }
 
 
     /**
-     * 条件为 false 则不执行此条策略
-     * @param cl
-     * @return
+     * 执行策略条件函数. 条件函数返回false, 则跳出, 继续执行下一个策略
+     * @param 条件
      */
-    PolicySpec 条件(Closure cl) {
-        condition = {Map ctx ->
-            def fn = cl.rehydrate(ctx, cl, this)
-            if (fn()) return true
-            return false
-        }
+    PolicySpec 条件(Closure 条件) {
+        fns << Tuple.tuple('Condition', { Map ctx ->
+            def cl = 条件.rehydrate(ctx, 条件, this)
+            cl.resolveStrategy = Closure.DELEGATE_FIRST
+            if (cl()) return true
+            else return false
+        })
         this
     }
 

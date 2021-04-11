@@ -15,8 +15,7 @@
         </div>
         <div class="h-panel-body">
             <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading" border>
-                <h-tableitem title="英文名" prop="enName" align="center"></h-tableitem>
-                <h-tableitem title="中文名" prop="cnName" align="center"></h-tableitem>
+                <h-tableitem title="收集器名" prop="name" align="center"></h-tableitem>
                 <h-tableitem title="类型" prop="type" align="center" :format="formatType" :width="70"></h-tableitem>
                 <h-tableitem title="更新时间" align="center">
                     <template slot-scope="{data}">
@@ -26,17 +25,19 @@
                 <h-tableitem title="描述" prop="comment" align="center"></h-tableitem>
                 <h-tableitem title="状态" align="center" :width="70">
                     <template slot-scope="{data}">
-                        <h-switch v-model="data.enabled" @change="enableSwitch(data)" small>
-                            <span slot="open">可用</span>
-                            <span slot="close">禁用</span>
+                        <h-switch v-if="sUser.permissionIds.find((e) => e == 'dataCollector-update')" v-model="data.enabled" @change="enableSwitch(data)" small>
+                            <span slot="open" class="h-icon-check"></span>
+                            <span slot="close" class="h-icon-close"></span>
                         </h-switch>
+                        <span v-else-if="data.enabled" slot="open" class="h-icon-check"></span>
+                        <span v-else slot="open" class="h-icon-close"></span>
                     </template>
                 </h-tableitem>
-                <h-tableitem v-if="sUser.permissionIds.find((e) => e == 'dataCollector-update' || e == 'dataCollector-del')" title="操作" align="center" :width="110">
+                <h-tableitem title="操作" align="center" :width="110">
                     <template slot-scope="{data}">
-                        <span v-if="sUser.permissionIds.find((e) => e == 'dataCollector-update') == 'dataCollector-update'" class="text-hover" @click="showUpdatePop(data)">编辑</span>
+                        <span v-if="sUser.permissionIds.find((e) => e == 'dataCollector-update')" class="text-hover" @click="showUpdatePop(data)">编辑</span>
                         &nbsp;
-                        <span v-if="sUser.permissionIds.find((e) => e == 'dataCollector-del') == 'dataCollector-del'" class="text-hover" @click="del(data)">删除</span>
+                        <span v-if="sUser.permissionIds.find((e) => e == 'dataCollector-del')" class="text-hover" @click="del(data)">删除</span>
                         &nbsp;
                         <span class="text-hover" @click="showTestPop(data)">测试</span>
                     </template>
@@ -66,11 +67,8 @@
                             mode="twocolumn"
                             :rules="validationRules"
                             :model="model">
-                        <h-formitem label="英文名" icon="h-icon-complete" prop="enName">
-                            <input type="text" v-model="model.enName" :readonly="collector"/>
-                        </h-formitem>
-                        <h-formitem label="中文名" icon="h-icon-complete" prop="cnName">
-                            <input type="text" v-model="model.cnName" />
+                        <h-formitem label="收集器名" icon="h-icon-complete" prop="name">
+                            <input type="text" v-model="model.name"/>
                         </h-formitem>
                         <h-formitem label="类型" icon="h-icon-complete" prop="type">
                             <h-select v-if="model.id" v-model="model.type" :datas="types" disabled></h-select>
@@ -79,14 +77,14 @@
                         <h-formitem v-if="model.type == 'http'" label="方法" icon="h-icon-user" prop="method">
                             <h-select v-model="model.method" :datas="methods"></h-select>
                         </h-formitem>
+                        <h-formitem v-if="model.type == 'http'" label="超时(ms)" icon="h-icon-user" prop="timeout">
+                            <h-numberinput v-model="model.timeout" :min="1000" :max="600000"></h-numberinput>
+                        </h-formitem>
                         <h-formitem v-if="model.type == 'http' || model.type == 'sql'" label="缓存key" icon="h-icon-user" prop="cacheKey">
                             <input type="text" v-model="model.cacheKey" />
                         </h-formitem>
                         <h-formitem v-if="model.type == 'http' || model.type == 'sql'" label="缓存超时(m)" icon="h-icon-user" prop="timeout">
                             <h-numberinput v-model="model.cacheTimeout" :min="0" :max="2147483647"></h-numberinput>
-                        </h-formitem>
-                        <h-formitem v-if="model.type == 'http'" label="超时(ms)" icon="h-icon-user" prop="timeout">
-                            <h-numberinput v-model="model.timeout" :min="1000" :max="600000"></h-numberinput>
                         </h-formitem>
                         <h-formitem v-if="model.type == 'http' && model.method == 'POST'" label="ContentType" icon="h-icon-user" prop="contentType">
                             <h-select v-model="model.contentType" :datas="contentTypes"></h-select>
@@ -132,7 +130,7 @@
                 `,
         props: ['collector'],
         data() {
-            let defaultModel = {type: 'http', method: 'GET', timeout: 10000, contentType: 'application/x-www-form-urlencoded', minIdle: 1, maxActive: 5, dataSuccessScript:
+            let defaultModel = {type: 'http', method: 'GET', timeout: 10000, minIdle: 1, maxActive: 5, dataSuccessScript:
 `{resultStr ->
     return resultStr ? JSON.parseObject(resultStr)?['code'] == '0000' : false
 }`
@@ -141,7 +139,7 @@
                 isLoading: false, defaultModel: defaultModel,
                 model: this.collector ? $.extend({sqlScript: '', computeScript: '', parseScript: '', dataSuccessScript: ''}, this.collector) : defaultModel,
                 validationRules: {
-                    required: ['enName', 'cnName', 'type']
+                    required: ['name', 'type']
                 },
                 types: types,
                 methods: [
@@ -165,9 +163,9 @@
                         this.isLoading = false;
                         if (res.code == '00') {
                             this.$emit('close');
-                            this.$Message.success(`更新: ${this.model.cnName} 成功`);
+                            this.$Message.success(`更新: ${this.model.name} 成功`);
                             $.extend(this.collector, this.model);
-                        } else this.$Notice.error(res.desc)
+                        } else this.$Message.error(res.desc)
                     },
                     error: () => this.isLoading = false
                 })
@@ -182,7 +180,7 @@
                         this.isLoading = false;
                         if (res.code == '00') {
                             this.$emit('close');
-                            this.$Message.success(`添加: ${this.model.cnName} 成功`);
+                            this.$Message.success(`添加: ${this.model.name} 成功`);
                             this.$emit('reload');
                         } else this.$Message.error(res.desc)
                     },
@@ -221,9 +219,9 @@
             </div>
         `,
         data() {
-            let cacheKey = 'rule.test.' + this.collector.enName;
+            let cacheKey = 'rule.test.' + this.collector.id;
             return {
-                url: location.protocol + '//' + location.host + '/mnt/testCollector/' + this.collector.enName,
+                url: location.protocol + '//' + location.host + '/mnt/testCollector/' + this.collector.id,
                 cacheKey: cacheKey,
                 items: (() => {
                     let itemsStr = localStorage.getItem(cacheKey);
@@ -246,7 +244,7 @@
                     success: (res) => {
                         if (res.code == '00') {
                             this.result = JSON.stringify(res.data, null, 4).trim();
-                            this.$Message.success(`测试调用: ${this.collector.cnName} 成功`);
+                            this.$Message.success(`测试调用: ${this.collector.name} 成功`);
                             localStorage.setItem(this.cacheKey, JSON.stringify(this.items.map(o => {return {code: o.code, value: o.value}})));
                         } else this.$Message.error(res.desc);
                     }
@@ -293,8 +291,7 @@
                 this.$Modal({
                     title: '添加数据收集器', draggable: true,
                     component: {
-                        vue: addEditPop,
-                        datas: {}
+                        vue: addEditPop, datas: {}
                     },
                     width: 850,
                     hasCloseIcon: true, fullScreen: false, middle: false, transparent: false, closeOnMask: false,
@@ -307,7 +304,7 @@
             },
             showUpdatePop(collector) {
                 this.$Modal({
-                    title: `更新: ${collector.cnName}`, draggable: true,
+                    title: `更新收集器: ${collector.name}`, draggable: true,
                     component: {
                         vue: addEditPop,
                         datas: {collector: collector}
@@ -318,7 +315,7 @@
             },
             showTestPop(item) {
                 this.$Modal({
-                    title: `测试: ${item.cnName}`, draggable: true,
+                    title: `测试收集器: ${item.name}`, draggable: true,
                     component: {
                         vue: testPop,
                         datas: {collector: item}
@@ -334,7 +331,7 @@
                     data: item,
                     success: (res) => {
                         if (res.code == '00') {
-                            this.$Message.success(`${item.enabled ? '启用' : '禁用'}: ${item.cnName} 成功`);
+                            this.$Message.success(`${item.enabled ? '启用' : '禁用'}: ${item.name} 成功`);
                         } else {
                             this.$Notice.error(res.desc);
                             setTimeout(() => item.enabled = !item.enabled, 200)
@@ -343,16 +340,16 @@
                     error: () => this.isLoading = false
                 })
             },
-            del(field) {
-                this.$Confirm(`删除收集器: ${field.cnName}`, '确定删除?').then(() => {
-                    this.$Message(`删除收集器: ${field.cnName}`);
+            del(collector) {
+                this.$Confirm(`删除收集器: ${collector.name}`, '确定删除?').then(() => {
+                    this.$Message(`删除收集器: ${collector.name}`);
                     $.ajax({
-                        url: 'mnt/delDataCollector/' + field.enName,
+                        url: 'mnt/delDataCollector/' + collector.id,
                         success: (res) => {
                             if (res.code == '00') {
-                                this.$Message.success(`删除收集器: ${field.cnName} 成功`);
+                                this.$Message.success(`删除收集器: ${collector.name} 成功`);
                                 this.load();
-                            } else this.$Notice.error(res.desc)
+                            } else this.$Message.error(res.desc)
                         }
                     });
                 }).catch(() => {
@@ -368,7 +365,7 @@
                 this.list = [];
                 $.ajax({
                     url: 'mnt/dataCollectorPage',
-                    data: $.extend({page: page.page || 1, enName: this.tabs.showId}, this.model),
+                    data: $.extend({page: page.page || 1, id: this.tabs.showId}, this.model),
                     success: (res) => {
                         this.tabs.showId = null;
                         this.loading = false;
@@ -377,7 +374,7 @@
                             this.pageSize = res.data.pageSize;
                             this.totalRow = res.data.totalRow;
                             this.list = res.data.list;
-                        } else this.$Notice.error(res.desc)
+                        } else this.$Message.error(res.desc)
                     },
                     error: () => this.loading = false
                 })

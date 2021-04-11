@@ -1,13 +1,18 @@
 <template>
     <div class="h-panel">
         <div class="h-panel-bar">
-            <span class="h-panel-title">决策统计</span>
+            <span class="h-panel-title">决策规则统计</span>
+<!--            <span v-color:gray v-font="13">说明~~</span>-->
+            <div style="float: right">
+                <h-autocomplete v-model="model.decisionId" :option="decisionAc" style="float:left; width: 180px" @change="load((() => chart.setOption(option)))" placeholder="决策"></h-autocomplete>
+            </div>
             <h-datepicker v-model="model.startTime" type="datetime" :option="{minuteStep:2}" :has-seconds="true" placeholder="开始时间" style="width: 160px"></h-datepicker>
             -
             <h-datepicker v-model="model.endTime" type="datetime" :option="{minuteStep:2}" :has-seconds="true" placeholder="结束时间" style="width: 160px"></h-datepicker>
+
         </div>
-        <div class="h-panel-body bottom-line">
-            <div ref="main" v-bind:style="{width: widthPx, height: heightPx, minHeight: minHeight}"></div>
+        <div class="h-panel-body">
+            <div ref="main" v-bind:style="{width: widthPx, height: heightPx, minHeight: minHeight, maxHeight: '1000px', overflow:'auto'}"></div>
         </div>
     </div>
 </template>
@@ -16,6 +21,25 @@
         data() {
             return {
                 widthPx: '100%', heightPx: '100%', minHeight: '400px',
+                decisionAc: {
+                    keyName: 'decisionId',
+                    titleName: 'name',
+                    minWord: 1,
+                    loadData: (filter, cb) => {
+                        $.ajax({
+                            url: 'mnt/decisionPage',
+                            data: {page: 1, pageSize: 5, nameLike: filter},
+                            success: (res) => {
+                                this.isLoading = false;
+                                if (res.code == '00') {
+                                    cb(res.data.list.map((r) => {
+                                        return {decisionId: r.id, name: r.name}
+                                    }))
+                                } else this.$Notice.error(res.desc)
+                            },
+                        });
+                    }
+                },
                 taskId: null,
                 model: {startTime: (function () {
                         let d = new Date();
@@ -47,17 +71,9 @@
         },
         mounted() {
             this.load(() => loadJs('echarts', () => this.$nextTick(this.initEChart)));
-            // setTimeout(() => {
-            //     this.taskId = setInterval(() => {
-            //         this.load(() => this.chart.setOption(this.option));
-            //     }, 1000 * 60 * 5)
-            // })
         },
         activated() {
             if (this.chart) this.load(() => this.chart.setOption(this.option));
-            // this.taskId = setInterval(() => {
-            //     this.load(() => this.chart.setOption(this.option));
-            // }, 1000 * 60 * 5)
         },
         deactivated() {
             if (this.taskId) clearInterval(this.taskId)
@@ -82,12 +98,16 @@
             },
             load(cb) {
                 $.ajax({
-                    url: 'mnt/countDecide',
+                    url: 'mnt/countRule',
                     data: this.model,
                     success: (res) => {
                         if (res.code == '00') {
-                            let cate = Array.from(new Set(res.data.map((o) => o.decisionName)));
-                            this.minHeight = cate.length < 2 ? '200px' : (Math.min(cate.length * 80, 800)) + 'px';
+                            let cate = [];
+                            for (const item of res.data.map((o) => o.decisionName + ' || ' + o.ruleName)) { // 保留顺序去重
+                                if (cate.indexOf(item) === -1) cate.push(item);
+                            }
+                            cate.reverse();
+                            this.minHeight = cate.length < 2 ? '250px' : (Math.min(cate.length * 80, 800)) + 'px';
                             this.option.yAxis = {
                                 type: 'category',
                                 data: cate
@@ -114,7 +134,7 @@
                                     data: (function () {
                                         let arr = [];
                                         cate.forEach(function(value, index, array){
-                                            let item = res.data.find(o => o.decision == 'Reject' && o.decisionName == value);
+                                            let item = res.data.find(o => o.decision == 'Reject' && (o.decisionName + ' || ' + o.ruleName) == value);
                                             arr.push(item ? item.total : 0);
                                         });
                                         return arr;
@@ -141,7 +161,7 @@
                                     data: (function () {
                                         let arr = [];
                                         cate.forEach(function(value, index, array){
-                                            let item = res.data.find(o => o.decision == 'Review' && o.decisionName == value);
+                                            let item = res.data.find(o => o.decision == 'Review' && (o.decisionName + ' || ' + o.ruleName) == value);
                                             arr.push(item ? item.total : 0);
                                         });
                                         return arr;
@@ -168,7 +188,7 @@
                                     data: (function () {
                                         let arr = [];
                                         cate.forEach(function(value, index, array){
-                                            let item = res.data.find(o => o.decision == 'Accept' && o.decisionName == value);
+                                            let item = res.data.find(o => o.decision == 'Accept' && (o.decisionName + ' || ' + o.ruleName) == value);
                                             arr.push(item ? item.total : 0);
                                         });
                                         return arr;

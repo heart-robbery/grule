@@ -12,12 +12,14 @@
 <script>
     module.exports = {
         data() {
+            let types = {UserConfig: '用户列表'};
+            if (app.$data.user.permissionIds.find((e) => e == 'grant')) types.Permission = '权限管理';
             return {
                 tabs: {
                     type: localStorage.getItem('rule.userConfig.tab') || 'UserConfig',
                     showId: null
                 },
-                types: {UserConfig: '用户列表', Permission:'权限管理'},
+                types: types,
 
             }
         },

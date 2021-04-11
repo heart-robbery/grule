@@ -15,3 +15,4 @@ gradlew.bat
 /log
 /lib
 /h2
+*.log
