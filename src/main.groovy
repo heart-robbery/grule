@@ -72,7 +72,7 @@ app.addSource(new ServerTpl("jpa_rule") { //数据库 jpa_rule
     @EL(name = "sys.starting", async = true)
     void start() {
         repo = new Repo(attrs()).entities( // jpa封装
-            Decision, RuleField, DataCollector, OpHistory, DecisionResult, CollectResult,
+            Decision, RuleField, DataCollector, OpHistory, DecideRecord, CollectRecord,
             User, Permission, GlobalConfig
         ).init()
         exposeBean(repo, name + "_repo")

@@ -10,7 +10,7 @@ import javax.persistence.*
  */
 @Entity
 @Table(indexes = [@Index(name = "idx_collectDate", columnList = "collectDate")])
-class CollectResult implements IEntity {
+class CollectRecord implements IEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long id

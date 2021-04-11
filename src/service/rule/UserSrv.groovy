@@ -35,7 +35,7 @@ class UserSrv extends ServerTpl {
           new Permission(enName: 'dataCollector-update', cnName: '更新收集器'),
           new Permission(enName: 'dataCollector-del', cnName: '删除收集器'),
           new Permission(enName: 'opHistory-read', cnName: '查看操作历史'),
-          new Permission(enName: 'decisionResult-read', cnName: '查看决策结果'),
+          new Permission(enName: 'decideResult-read', cnName: '查看决策结果'),
           new Permission(enName: 'collectResult-read', cnName: '查看收集记录')
     ]
 

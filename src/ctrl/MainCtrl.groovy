@@ -97,7 +97,7 @@ class MainCtrl extends ServerTpl {
         if (fName.contains("DataCollectorConfig.vue")) hCtx.auth("dataCollector-read")
         // if (fName.contains("DecisionConfig.vue")) hCtx.auth("decision-read")
         if (fName.contains("Permission.vue")) hCtx.auth("grant")
-        if (fName.contains("DecisionResult.vue")) hCtx.auth("decisionResult-read")
+        if (fName.contains("DecideResult.vue")) hCtx.auth("decideResult-read")
         if (fName.contains("CollectResult.vue")) hCtx.auth("collectResult-read")
         Utils.baseDir("static/components/$fName")
     }

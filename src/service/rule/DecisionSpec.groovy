@@ -1,4 +1,4 @@
-package service.rule.spec
+package service.rule
 
 import cn.xnatural.app.Utils
 import com.alibaba.fastjson.JSON
@@ -21,26 +21,30 @@ class DecisionSpec {
     /**
      * 策略集: 顺序执行
      */
-    @Lazy List<PolicySpec> policies    = new LinkedList<>()
+    protected final List<PolicySpec> policies    = new LinkedList<>()
     /**
      * 接口返回属性集
      */
-    @Lazy Set<String>      returnAttrs = new LinkedHashSet<>()
+    @Lazy protected Set<String>      returnAttrs = new LinkedHashSet<>()
     /**
      * 自定义属性
      */
-    @Lazy Map<String, Object> attrs = new HashMap<>()
+    @Lazy protected Map<String, Object> attrs = new HashMap<>()
     /**
      * 自定义函数
      */
-    final Map<String, Closure> functions = new HashMap<>()
-    // 预操作函数
+    protected final Map<String, Closure> functions = new HashMap<>()
+    /**
+     * 预操作函数
+     */
     protected Closure operateFn
+
 
     DecisionSpec() {
         Logger log = LoggerFactory.getLogger("ROOT")
         functions.put("INFO", {String msg -> if (msg) log.info(msg.toString()) })
     }
+
 
     void 操作(Closure 操作) {
         operateFn = { Map ctx ->
@@ -121,6 +125,6 @@ class DecisionSpec {
         config.addCompilationCustomizers(icz)
         icz.addImports(DecisionSpec.class.name, JSON.class.name, JSONObject.class.name, Utils.class.name)
         def shell = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config)
-        shell.evaluate("service.rule.spec.DecisionSpec.of{$dsl}")
+        shell.evaluate("service.rule.DecisionSpec.of{$dsl}")
     }
 }

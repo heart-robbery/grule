@@ -1,14 +1,14 @@
-package service.rule.spec
-
-import service.rule.DecisionEnum
-
+package service.rule
 /**
  * 规则定义 spec
  */
 class RuleSpec {
     protected boolean enabled = true
     String 规则名
-    @Lazy List<Tuple2<String, Closure>> decisionFn = new LinkedList<>()
+    /**
+     * 规则函数集
+     */
+    @Lazy List<Tuple2<String, Closure>> fns = new LinkedList<>()
     /**
      * 自定义规则属性. 例: 自定义id, 描述
      */
@@ -21,6 +21,11 @@ class RuleSpec {
     void 关闭() {enabled = false}
 
 
+    /**
+     * 自定义属性
+     * @param 属性名
+     * @param 值
+     */
     void 属性定义(String 属性名, Object 值) {
         if (!属性名) throw new IllegalArgumentException("属性名 不能为空")
         attrs.put(属性名, 值)
@@ -33,7 +38,7 @@ class RuleSpec {
      */
     void 清除(String... 属性名) {
         if (!属性名) return
-        decisionFn << Tuple.tuple('Clear', { Map ctx ->
+        fns << Tuple.tuple('Clear', { Map ctx ->
             属性名.each {ctx.remove(it)}
             null
         })
@@ -41,34 +46,34 @@ class RuleSpec {
 
 
     void 拒绝(Closure<Boolean> 条件) {
-        decisionFn << Tuple.tuple('Reject', { Map ctx ->
+        fns << Tuple.tuple('Reject', { Map ctx ->
             def cl = 条件.rehydrate(ctx, 条件, this)
-            if (cl()) return DecisionEnum.Reject
+            if (cl()) return DecideResult.Reject
             null
         })
     }
 
 
     void 通过(Closure<Boolean> 条件) {
-        decisionFn << Tuple.tuple('Accept', { Map ctx ->
+        fns << Tuple.tuple('Accept', { Map ctx ->
             def cl = 条件.rehydrate(ctx, 条件, this)
-            if (cl()) return DecisionEnum.Accept
+            if (cl()) return DecideResult.Accept
             null
         })
     }
 
 
     void 人工审核(Closure<Boolean> 条件) {
-        decisionFn << Tuple.tuple('Review', { Map ctx ->
+        fns << Tuple.tuple('Review', { Map ctx ->
             def cl = 条件.rehydrate(ctx, 条件, this)
-            if (cl()) return DecisionEnum.Review
+            if (cl()) return DecideResult.Review
             null
         })
     }
 
 
     void 操作(Closure 操作) {
-        decisionFn << Tuple.tuple('Operate', { Map ctx ->
+        fns << Tuple.tuple('Operate', { Map ctx ->
             def cl = 操作.rehydrate(ctx, 操作, this)
             cl.resolveStrategy = Closure.DELEGATE_FIRST
             cl()

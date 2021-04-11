@@ -3,7 +3,6 @@ package service.rule
 import cn.xnatural.app.ServerTpl
 import cn.xnatural.app.Utils
 import cn.xnatural.enet.event.EL
-import service.rule.spec.PolicySpec
 
 import java.util.concurrent.ConcurrentHashMap
 

@@ -8,7 +8,7 @@ import cn.xnatural.http.Path
 import cn.xnatural.jpa.Repo
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.serializer.SerializerFeature
-import entity.DecisionResult
+import entity.DecideRecord
 import service.rule.DecisionContext
 import service.rule.DecisionManager
 import service.rule.DecisionSrv
@@ -44,15 +44,10 @@ class RuleCtrl extends ServerTpl {
             return ApiResp.fail(ex.message)
         }
 
-        DecisionContext dCtx = new DecisionContext()
-        dCtx.setDecisionHolder(decisionHolder)
-        dCtx.setId(ctx.request.id)
-        dCtx.setFieldManager(fieldManager)
-        dCtx.setEp(ep)
-        dCtx.setInput(params)
+        DecisionContext dCtx = new DecisionContext(ctx.request.id, decisionHolder, params, fieldManager, ep)
 
         // 初始化status: 0001, 结束status: 0000, 错误status: EEEE
-        repo.saveOrUpdate(new DecisionResult(
+        repo.saveOrUpdate(new DecideRecord(
             id: dCtx.id, decisionId: decisionHolder.decision.id, occurTime: dCtx.startup, status: '0001',
             input: JSON.toJSONString(dCtx.input, SerializerFeature.WriteMapNullValue)
         ))
@@ -70,7 +65,7 @@ class RuleCtrl extends ServerTpl {
     @Path(path = 'findDecideResult')
     ApiResp findDecisionResult(String decideId) {
         if (!decideId) return ApiResp.fail("decideId must not be empty")
-        def dr = repo.findById(DecisionResult, decideId)
+        def dr = repo.findById(DecideRecord, decideId)
         if (!dr) return ApiResp.fail("未找到记录: " + decideId)
         def dm = bean(DecisionManager)
         def decisionHolder = dm.decisionMap.find {it.value.decision.id == dr.decisionId}.value

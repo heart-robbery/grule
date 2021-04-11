@@ -295,7 +295,7 @@ new Map([
     ['UserConfig', 'config/UserConfig.vue'],
     ['Permission', 'config/Permission.vue'],
     ['DecisionData', 'data/DecisionData.vue'],
-    ['DecisionResult', 'data/DecisionResult.vue'],
+    ['DecisionResult', 'data/DecideResult.vue'],
     ['CollectResult', 'data/CollectResult.vue'],
     ['DataAnalyse', 'data/DataAnalyse.vue'],
     ['DecisionEChart', 'data/DecisionEChart.vue'],

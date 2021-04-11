@@ -9,8 +9,8 @@ import cn.xnatural.jpa.Page
 import cn.xnatural.jpa.Repo
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
-import entity.DecisionResult
-import service.rule.DecisionEnum
+import entity.DecideRecord
+import service.rule.DecideResult
 import service.rule.DecisionManager
 
 import java.text.SimpleDateFormat
@@ -38,7 +38,7 @@ class MntAnalyseCtrl extends ServerTpl {
         if (!ids) return ApiResp.ok()
         hCtx.response.cacheControl(2) // 缓存2秒
         String sql = """
-            select t1.decision_id, t2.name decisionName, t1.decision, count(1) total from ${repo.tbName(DecisionResult).replace("`", '')} t1
+            select t1.decision_id, t2.name decisionName, t1.decision, count(1) total from ${repo.tbName(DecideRecord).replace("`", '')} t1
             left join decision t2 on t1.decision_id = t2.id
             where t1.decision is not null and t1.occur_time>=:start${end ? " and t1.occur_time<=:end" : ""} and t1.decision_id in (:ids) 
             group by t1.decision_id, t1.decision
@@ -67,7 +67,7 @@ class MntAnalyseCtrl extends ServerTpl {
         if (!ids) return ApiResp.ok().desc("无可查看的决策")
         hCtx.response.cacheControl(5) // 缓存5秒
         String sql = """
-            select t1.decision_id decisionId, t2.name decisionName, t1.rules from ${repo.tbName(DecisionResult).replace("`", '')} t1
+            select t1.decision_id decisionId, t2.name decisionName, t1.rules from ${repo.tbName(DecideRecord).replace("`", '')} t1
             left join decision t2 on t1.decision_id = t2.id
             where t1.decision is not null and t1.rules is not null and t1.occur_time>=:start${end ? " and t1.occur_time<=:end" : ""} and t1.decision_id in (:ids)
         """.trim()
@@ -81,7 +81,7 @@ class MntAnalyseCtrl extends ServerTpl {
         ApiResp.ok(
             ls.findResults {Map<String, String> e ->
                 JSON.parseArray(e['rules']).findResults { JSONObject jo ->
-                    e['decisionId'] + '||' + e['decisionName'] + '||' + jo['attrs']['规则名'] + '||' + (jo['decision']?:DecisionEnum.Accept)
+                    e['decisionId'] + '||' + e['decisionName'] + '||' + jo['attrs']['规则名'] + '||' + (jo['decision']?:DecideResult.Accept)
                 }
             }.flatten().countBy {it}.findResults {e ->
                 def arr = e.key.split("\\|\\|")

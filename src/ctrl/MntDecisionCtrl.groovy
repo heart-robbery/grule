@@ -12,11 +12,11 @@ import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONArray
 import com.alibaba.fastjson.JSONObject
 import entity.*
-import service.rule.DecisionEnum
+import service.rule.DecideResult
 import service.rule.DecisionManager
 import service.rule.DecisionSrv
 import service.rule.FieldManager
-import service.rule.spec.DecisionSpec
+import service.rule.DecisionSpec
 
 import javax.persistence.criteria.Predicate
 import java.text.SimpleDateFormat
@@ -140,8 +140,8 @@ class MntDecisionCtrl extends ServerTpl {
 
     @Path(path = 'decisionResultPage')
     ApiResp decisionResultPage(
-        HttpContext hCtx, Integer page, Integer pageSize, String id, String decisionId, DecisionEnum decision,
-        String keyProp, Long spend, String exception, String attrConditions, String rules, String startTime, String endTime
+            HttpContext hCtx, Integer page, Integer pageSize, String id, String decisionId, DecideResult decision,
+            String keyProp, Long spend, String exception, String attrConditions, String rules, String startTime, String endTime
     ) {
         hCtx.auth("decisionResult-read")
         if (pageSize && pageSize > 10) return ApiResp.fail("Param pageSize <=10")
@@ -153,7 +153,7 @@ class MntDecisionCtrl extends ServerTpl {
         Date start = startTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(startTime) : null
         Date end = endTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(endTime) : null
         ApiResp.ok(
-                repo.findPage(DecisionResult, page, pageSize?:10) { root, query, cb ->
+                repo.findPage(DecideRecord, page, pageSize?:10) { root, query, cb ->
                     query.orderBy(cb.desc(root.get('occurTime')))
                     def ps = []
                     ps << root.get('decisionId').in(ids)
@@ -201,7 +201,7 @@ class MntDecisionCtrl extends ServerTpl {
                     Utils.toMapper(it).ignore("metaClass")
                             .addConverter('decisionId', 'decisionName', { String dId ->
                                 decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name
-                            }).addConverter('attrs', {
+                            }).addConverter('data', {
                                 it == null ? [:] : JSON.parseObject(it).collect { e ->
                                     [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
                                 }}).addConverter('input', {
@@ -237,7 +237,7 @@ class MntDecisionCtrl extends ServerTpl {
         Date end = endTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(endTime) : null
         if (pageSize && pageSize > 50) return ApiResp.fail("Param pageSize <=50")
         ApiResp.ok(
-            repo.findPage(CollectResult, page, pageSize?:10) { root, query, cb ->
+            repo.findPage(CollectRecord, page, pageSize?:10) { root, query, cb ->
                 query.orderBy(cb.desc(root.get('collectDate')))
                 def ps = []
                 ps << root.get('decisionId').in(ids)
@@ -309,7 +309,7 @@ class MntDecisionCtrl extends ServerTpl {
             if (!policy.rules) return ApiResp.fail("'${policy.策略名}' 是空策略")
             for (def rule : policy.rules) {
                 if (!rule.规则名) return ApiResp.fail('规则名字不能为空')
-                if (rule.decisionFn.size() < 1) return ApiResp.fail("'${rule.规则名}' 是空规则")
+                if (rule.fns.size() < 1) return ApiResp.fail("'${rule.规则名}' 是空规则")
             }
         }
 

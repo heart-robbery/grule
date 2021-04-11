@@ -43,7 +43,8 @@
                     </div>
                 </h-formitem>
             </h-form>
-    <div class="h-panel-body">
+        </div>
+        <div class="h-panel-body">
             <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading" @trdblclick="trdblclick" border>
                 <h-tableitem title="决策" align="center">
                     <template slot-scope="{data}">
@@ -158,10 +159,11 @@
             </div>
         `,
         data() {
+            console.log('=============', this.item.data, typeof this.item.data);
             return {
                 ruleKw: null,
                 attrKw: null,
-                attrs: this.item.attrs,
+                attrs: this.item.data,
                 rules: this.item.rules,
             }
         },

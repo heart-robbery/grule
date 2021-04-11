@@ -6,8 +6,8 @@ import cn.xnatural.jpa.Repo
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.serializer.SerializerFeature
 import core.OkHttpSrv
-import entity.CollectResult
-import entity.DecisionResult
+import entity.CollectRecord
+import entity.DecideRecord
 
 import java.time.Duration
 
@@ -45,9 +45,9 @@ class DecisionSrv extends ServerTpl {
         long cleanTotal = 0
         def keepCount = getLong("collectResult.keepCount", 0)
         if (keepCount > 0) { //保留多少条数据
-            def total = repo.count(CollectResult)
+            def total = repo.count(CollectRecord)
             while (total > keepCount) {
-                def cr = repo.find(CollectResult) {root, query, cb -> query.orderBy(cb.desc(root.get("collectDate")))}
+                def cr = repo.find(CollectRecord) { root, query, cb -> query.orderBy(cb.desc(root.get("collectDate")))}
                 repo.delete(cr)
                 total--; cleanTotal++
                 log.info("Deleted expire collectResult data: {}", JSON.toJSONString(cr))
@@ -58,7 +58,7 @@ class DecisionSrv extends ServerTpl {
             def cal = Calendar.getInstance()
             cal.add(Calendar.DAY_OF_MONTH, -keepDay)
             do {
-                def cr = repo.find(CollectResult) {root, query, cb -> query.orderBy(cb.desc(root.get("collectDate")))}
+                def cr = repo.find(CollectRecord) { root, query, cb -> query.orderBy(cb.desc(root.get("collectDate")))}
                 if (cr.collectDate == null || cr.collectDate < cal.time) {
                     repo.delete(cr)
                     cleanTotal++
@@ -77,9 +77,9 @@ class DecisionSrv extends ServerTpl {
         long cleanTotal = 0
         def keepCount = getLong("decisionResult.keepCount", 0)
         if (keepCount > 0) { //保留多少条数据
-            def total = repo.count(DecisionResult)
+            def total = repo.count(DecideRecord)
             while (total > keepCount) {
-                def dr = repo.find(DecisionResult) {root, query, cb -> query.orderBy(cb.desc(root.get("occurTime")))}
+                def dr = repo.find(DecideRecord) { root, query, cb -> query.orderBy(cb.desc(root.get("occurTime")))}
                 repo.delete(dr)
                 total--; cleanTotal++
                 log.info("Deleted expire decisionResult data: {}", JSON.toJSONString(dr))
@@ -90,7 +90,7 @@ class DecisionSrv extends ServerTpl {
             def cal = Calendar.getInstance()
             cal.add(Calendar.DAY_OF_MONTH, -keepDay)
             do {
-                def dr = repo.find(DecisionResult) {root, query, cb -> query.orderBy(cb.desc(root.get("occurTime")))}
+                def dr = repo.find(DecideRecord) { root, query, cb -> query.orderBy(cb.desc(root.get("occurTime")))}
                 if (dr.occurTime == null || dr.occurTime < cal.time) {
                     repo.delete(dr)
                     cleanTotal++
@@ -112,7 +112,7 @@ class DecisionSrv extends ServerTpl {
         ep.fire("wsMsg_rule", msg)
         String url = getStr('ddMsgNotifyUrl', null)
         if (url) {
-            bean(OkHttpSrv).post(url).jsonBody(JSON.toJSONString([
+            http.post(url).jsonBody(JSON.toJSONString([
                 msgtype: "text",
                 text: ["content": "RULE(${app().profile}): $msg".toString()],
                 at: ["isAtAll": false]
@@ -126,12 +126,13 @@ class DecisionSrv extends ServerTpl {
     void endDecision(DecisionContext ctx) {
         log.info("end decision: " + JSON.toJSONString(ctx.summary(), SerializerFeature.WriteMapNullValue))
 
-        super.async { // 异步查询的, 异步回调通知
-            if (Boolean.valueOf(ctx.input.getOrDefault('async', false).toString())) {
+        // 异步查询的, 异步回调通知
+        if (Boolean.valueOf(ctx.input.getOrDefault('async', false).toString())) {
+            async {
                 String cbUrl = ctx.input['callback'] // 回调Url
                 if (cbUrl && cbUrl.startsWith('http')) {
                     def result = ctx.result()
-                    (1..2).each {
+                    (1..getInteger("callbackMaxTry", 2)).each {
                         try {
                             http.post(cbUrl).jsonBody(JSON.toJSONString(result, SerializerFeature.WriteMapNullValue)).debug().execute()
                         } catch (ex) {
@@ -142,24 +143,18 @@ class DecisionSrv extends ServerTpl {
             }
         }
 
-        queue(SAVE_RESULT) { // 保存决策结果到数据库
+        // 保存决策结果到数据库
+        queue(SAVE_RESULT) {
             repo.saveOrUpdate(
-                repo.findById(DecisionResult, ctx.id).tap {
-                    def keyPropName = getStr("keyPropName.$ctx.decisionHolder.decision.decisionId", getStr("defaultKeyPropName", null))
-                    if (keyPropName) {
-                        keyProp = ctx.summary().get('attrs')[(keyPropName)]
-                    }
+                repo.findById(DecideRecord, ctx.id).tap {
                     status = ctx.status
-                    exception = ctx.summary().get('exception')
-                    decision = ctx.summary().get('decision')
-                    spend = ctx.summary().get('spend')
-                    attrs = JSON.toJSONString(ctx.summary().get('attrs'), SerializerFeature.WriteMapNullValue)
-
-                    def rs = ctx.summary().get('rules')
-                    if (rs) rules = JSON.toJSONString(rs, SerializerFeature.WriteMapNullValue)
-
-                    def dcr = ctx.summary().get('dataCollectResult')
-                    if (dcr) dataCollectResult = JSON.toJSONString(dcr, SerializerFeature.WriteMapNullValue)
+                    exception = ctx.summary()['exception']
+                    result = ctx.summary()['result']
+                    spend = ctx.summary()['spend']
+                    data = JSON.toJSONString(ctx.summary()['data'], SerializerFeature.WriteMapNullValue)
+                    detail = JSON.toJSONString(ctx.summary()['detail'], SerializerFeature.WriteMapNullValue)
+                    def dr = ctx.summary()['dataCollectResult']
+                    if (dr) dataCollectResult = JSON.toJSONString(dr, SerializerFeature.WriteMapNullValue)
                 }
             )
         }

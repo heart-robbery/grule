@@ -3,16 +3,16 @@ package entity
 
 import cn.xnatural.jpa.IEntity
 import org.hibernate.annotations.Type
-import service.rule.DecisionEnum
+import service.rule.DecideResult
 
 import javax.persistence.*
 
 /**
- * 决策结果保存地
+ * 决策记录
  */
 @Entity
 @Table(indexes = [@Index(name = "idx_occurTime", columnList = "occurTime")])
-class DecisionResult implements IEntity {
+class DecideRecord implements IEntity {
     /**
      * 流水id
      */
@@ -30,7 +30,7 @@ class DecisionResult implements IEntity {
      * 决策结果
      */
     @Enumerated(EnumType.STRING)
-    DecisionEnum decision
+    DecideResult result
     /**
      * 决策时间
      */
@@ -39,16 +39,12 @@ class DecisionResult implements IEntity {
     /**
      * 执行花费时间
      */
-    Long         spend
+    Integer      spend
     /**
      * 异常信息
      */
     @Column(length = 1000)
     String       exception
-    /**
-     * 关键属性
-     */
-    String       keyProp
     /**
      * 输入参数 json 字符串
      */
@@ -57,19 +53,19 @@ class DecisionResult implements IEntity {
     @Type(type = "text")
     String       input
     /**
-     * 属性集 json 字符串
+     * 最终数据集
      */
     @Lob
     @Basic
     @Type(type = "text")
-    String       attrs
+    String       data
     /**
-     * 执行的规则集
+     * 执行过程描述详情
      */
     @Lob
     @Basic
     @Type(type = "text")
-    String       rules
+    String       detail
     /**
      * 数据收集结果集
      */

@@ -12,7 +12,6 @@ import entity.Decision
 import entity.FieldType
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.ImportCustomizer
-import service.rule.spec.DecisionSpec
 
 import java.text.SimpleDateFormat
 import java.util.concurrent.ConcurrentHashMap
@@ -38,7 +37,7 @@ class DecisionManager extends ServerTpl {
     /**
      * 查找 决策
      * @param decisionId
-     * @return
+     * @return DecisionHolder
      */
     DecisionHolder findDecision(String decisionId) {
         def holder = decisionMap.get(decisionId)
@@ -263,18 +262,5 @@ class DecisionManager extends ServerTpl {
             }
         } : null)))
         log.info("初始化决策: {}, {}, " + decision.id, spec.决策名, spec.决策id)
-    }
-
-
-    /**
-     * 决策 Holder
-     */
-    class DecisionHolder {
-        // 对应实体 decision
-        Decision                               decision
-        // dsl spec
-        DecisionSpec                           spec
-        // 参数验证函数
-        Function<Map<String, Object>, Boolean> paramValidator
     }
 }
