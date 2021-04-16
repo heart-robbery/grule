@@ -140,10 +140,10 @@ class MntDecisionCtrl extends ServerTpl {
 
     @Path(path = 'decisionResultPage')
     ApiResp decisionResultPage(
-            HttpContext hCtx, Integer page, Integer pageSize, String id, String decisionId, DecideResult decision,
-            String keyProp, Long spend, String exception, String attrConditions, String rules, String startTime, String endTime
+            HttpContext hCtx, Integer page, Integer pageSize, String id, String decisionId, DecideResult result,
+            Long spend, String exception, String attrConditions, String startTime, String endTime
     ) {
-        hCtx.auth("decisionResult-read")
+        hCtx.auth("decideResult-read")
         if (pageSize && pageSize > 10) return ApiResp.fail("Param pageSize <=10")
         def ids = hCtx.getSessionAttr("permissions").split(",")
             .findAll {String p -> p.startsWith("decision-read-")}
@@ -161,9 +161,8 @@ class MntDecisionCtrl extends ServerTpl {
                     if (start) ps << cb.greaterThanOrEqualTo(root.get('occurTime'), start)
                     if (end) ps << cb.lessThanOrEqualTo(root.get('occurTime'), end)
                     if (decisionId) ps << cb.equal(root.get('decisionId'), decisionId)
-                    if (keyProp) ps << cb.like(root.get('keyProp'), '%' + keyProp + '%')
                     if (spend) ps << cb.ge(root.get('spend'), spend)
-                    if (decision) ps << cb.equal(root.get('decision'), decision)
+                    if (result) ps << cb.equal(root.get('result'), result)
                     if (exception) ps << cb.like(root.get('exception'), '%' + exception + '%')
                     // if (input) ps << cb.like(root.get('input'), '%' + input + '%')
                     if (attrConditions) { // json查询 暂时只支持mysql5.7+,MariaDB 10.2.3+
@@ -180,42 +179,51 @@ class MntDecisionCtrl extends ServerTpl {
                             else if (field.type == FieldType.Bool) value = jo.getBoolean('value')
 
                             if (op == '=') {
-                                ps << cb.equal(cb.function("JSON_EXTRACT", String, root.get('attrs'), cb.literal('$.' + field.enName)), value)
+                                ps << cb.equal(cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName)), value)
                             } else if (op == '>') {
-                                ps << cb.gt(cb.function("JSON_EXTRACT", String, root.get('attrs'), cb.literal('$.' + field.enName)), cb.literal(value))
+                                ps << cb.gt(cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName)), cb.literal(value))
                             } else if (op == '<') {
-                                ps << cb.lt(cb.function("JSON_EXTRACT", String, root.get('attrs'), cb.literal('$.' + field.enName)), cb.literal(value))
+                                ps << cb.lt(cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName)), cb.literal(value))
                             } else if (op == '>=') {
-                                ps << cb.ge(cb.function("JSON_EXTRACT", String, root.get('attrs'), cb.literal('$.' + field.enName)), cb.literal(value))
+                                ps << cb.ge(cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName)), cb.literal(value))
                             } else if (op == '<=') {
-                                ps << cb.le(cb.function("JSON_EXTRACT", String, root.get('attrs'), cb.literal('$.' + field.enName)), cb.literal(value))
+                                ps << cb.le(cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName)), cb.literal(value))
                             } else if (op == 'contains') {
-                                // ps << cb.equal(cb.function("JSON_CONTAINS", String, root.get('attrs'), cb.function('json_quote', String, cb.literal(value)), cb.literal('$.' + field.enName)), 1)
-                                ps << cb.like(cb.function("JSON_EXTRACT", String, root.get('attrs'), cb.literal('$.' + field.enName)), '%' + value + '%')
+                                // ps << cb.equal(cb.function("JSON_CONTAINS", String, root.get('data'), cb.function('json_quote', String, cb.literal(value)), cb.literal('$.' + field.enName)), 1)
+                                ps << cb.like(cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName)), '%' + value + '%')
                             } else throw new IllegalArgumentException("Param attrCondition op('$op') unknown")
                         }
                     }
-                    // if (rules) ps << cb.like(root.get('rules'), '%' + rules + '%')
                     if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
                 }.to{
                     Utils.toMapper(it).ignore("metaClass")
                             .addConverter('decisionId', 'decisionName', { String dId ->
                                 decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name
                             }).addConverter('data', {
-                                it == null ? [:] : JSON.parseObject(it).collect { e ->
+                                it == null ? null : JSON.parseObject(it).collect { e ->
                                     [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
                                 }}).addConverter('input', {
-                                    it == null ? [:] : JSON.parseObject(it)
+                                    it == null ? null : JSON.parseObject(it)
                                 }).addConverter('dataCollectResult', {
-                                    it == null ? [:] : JSON.parseObject(it)
-                                }).addConverter('rules', {
-                                    def arr = it == null ? [] : JSON.parseArray(it)
-                                    arr.each { JSONObject jo ->
-                                        jo.put('data', jo.getJSONObject('data').collect { Entry<String, Object> e ->
+                                    it == null ? null : JSON.parseObject(it)
+                                }).addConverter('detail', {String detailJsonStr ->
+                                    if (!detailJsonStr) return null
+                                    def detailJo = JSON.parseObject(detailJsonStr)
+                                    // 数据转换
+                                    detailJo.put('data', detailJo.getJSONObject('data')?.collect { Entry<String, Object> e ->
+                                        [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
+                                    }?:null)
+                                    detailJo.getJSONArray('policies')?.each {JSONObject pJo ->
+                                        pJo.put('data', pJo.getJSONObject('data')?.collect { Entry<String, Object> e ->
                                             [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
-                                        })
+                                        }?:null)
+                                        pJo.getJSONArray('rules')?.each {JSONObject rJo ->
+                                            rJo.put('data', rJo.getJSONObject('data')?.collect { Entry<String, Object> e ->
+                                                [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
+                                            }?:null)
+                                        }
                                     }
-                                    arr
+                                    detailJo
                                 }).build()
                 }
         )

@@ -373,7 +373,7 @@
                                 $.extend(decision, res.data);
                                 //decision.apiConfigO = decision.apiConfig ? JSON.parse(decision.apiConfig) : null;
                                 this.$Message.success('新增成功: ' + res.data.name);
-                                //this.load();
+                                this.load();
                             }
                         } else this.$Notice.error(res.desc)
                     }

@@ -3,16 +3,13 @@
         <div class="h-panel-bar">
             <h-form mode="threecolumn">
                 <h-formitem>
-                    <h-select v-model="model.decision" :datas="types" placeholder="决策结果" @change="load"></h-select>
+                    <h-select v-model="model.result" :datas="types" placeholder="决策结果" @change="load"></h-select>
                 </h-formitem>
                 <h-formitem>
                     <h-autocomplete v-model="model.decisionId" :option="decisions" @change="load" placeholder="决策"></h-autocomplete>
                 </h-formitem>
                 <h-formitem>
                     <input type="text" v-model="model.id" placeholder="流水id(精确)" style="width: 250px" @keyup.enter="load"/>
-                </h-formitem>
-                <h-formitem>
-                    <input type="text" v-model="model.keyProp" placeholder="关键属性值(模糊)" @keyup.enter="load"/>
                 </h-formitem>
                 <h-formitem>
                     <input type="number" v-model="model.spend" placeholder="耗时(>=ms)" @keyup.enter="load"/>
@@ -32,8 +29,7 @@
 
                 <h-formitem single v-for="(item, index) of model.attrFilters" :key="index">
                     <div class="h-input-group">
-                        <h-autocomplete v-model="item.fieldId" :option="item.fieldAc" placeholder="字段属性名"></h-autocomplete>
-<!--                        <input type="text" v-model="item.name" placeholder="属性名"/>-->
+                        <h-autocomplete v-model="item.fieldId" :option="item.fieldAc" placeholder="字段属性名" ></h-autocomplete>
                         <h-select v-model="item.op" :datas="ops" placeholder="比较符" :deletable="false"></h-select>
                         <input type="text" v-model="item.value" placeholder="属性值"/>
                         <div style="width: 70px; margin-left: 15px">
@@ -45,7 +41,7 @@
             </h-form>
         </div>
         <div class="h-panel-body">
-            <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading" @trdblclick="trdblclick" border>
+            <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading" @trdblclick="showDetail" border>
                 <h-tableitem title="决策" align="center">
                     <template slot-scope="{data}">
                         <a v-if="data.decisionName" href="javascript:void(0)" @click="jumpToDecision(data)">{{data.decisionName}}</a>
@@ -53,7 +49,6 @@
                     </template>
                 </h-tableitem>
                 <h-tableitem title="流水id" prop="id" align="center"></h-tableitem>
-<!--                <h-tableitem title="身份证" prop="idNum" align="center" :width="140"></h-tableitem>-->
                 <h-tableitem title="结果" prop="decision" align="center" :format="formatType" :width="70"></h-tableitem>
                 <h-tableitem title="决策时间" align="center" :width="135">
                     <template slot-scope="{data}">
@@ -62,6 +57,11 @@
                 </h-tableitem>
                 <h-tableitem title="耗时(ms)" prop="spend" align="center" :width="70"></h-tableitem>
                 <h-tableitem title="异常信息" prop="exception" align="center"></h-tableitem>
+                <h-tableitem title="操作" align="center" :width="70">
+                    <template slot-scope="{data}">
+                        <span class="text-hover" @click="showDetail(data)">详情</span>
+                    </template>
+                </h-tableitem>
                 <div slot="empty">暂时无数据</div>
             </h-table>
         </div>
@@ -98,22 +98,22 @@
                     <h-layout>
                         <h-sider style="flex: none; max-width: 60%; width: auto">
                             <div class="h-panel" style="max-height: 680px">
-                                <div class="h-panel-bar">执行规则集
+                                <div class="h-panel-bar">执行策略/规则集
                                     <div class="h-panel-right">
-                                        <Search placeholder="规则名" v-width="200" @search="ruleFilter" v-model="ruleKw"></Search>
+                                        <Search placeholder="策略/规则名" v-width="200" @search="ruleFilter" v-model="ruleKw"></Search>
                                         <i class="h-split"></i><button class="h-btn h-btn-green h-btn-m" @click="ruleFilter">查询</button>
                                     </div>
                                 </div>
                                 <div class="h-panel-body">
-                                    <h-table :datas="rules" stripe select-when-click-tr border :height="520">
-                                        <h-tableitem title="规则属性" :width="220" align="left">
+                                    <h-table ref="policyTb" :datas="policies" select-when-click-tr border :height="520">
+                                        <h-tableitem title="属性" :width="220" align="left" treeOpener>
                                             <template slot-scope="{data}">
                                                 <h-form readonly>
                                                     <h-formitem v-for="(v,k) in data.attrs" :key="k" :label="k">{{v}}</h-formitem>
                                                 </h-form>
                                             </template>
                                         </h-tableitem>
-                                        <h-tableitem title="决策" prop="decision" align="center" :width="80" :format="formatType"></h-tableitem>
+                                        <h-tableitem title="结果" prop="result" align="center" :width="80" :format="formatType"></h-tableitem>
                                         <h-tableitem title="数据" align="left">
                                             <template slot-scope="{data}">
                                                 <h-form readonly :labelWidth="170">
@@ -121,7 +121,7 @@
                                                 </h-form>
                                             </template>
                                         </h-tableitem>
-                                        <div slot="empty">无规则</div>
+                                        <div slot="empty">无策略/规则</div>
                                     </h-table>
                                 </div>
                             </div>
@@ -159,13 +159,17 @@
             </div>
         `,
         data() {
-            console.log('=============', this.item.data, typeof this.item.data);
+            this.item.detail.policies.map(p => p.children = p.rules)
             return {
                 ruleKw: null,
                 attrKw: null,
                 attrs: this.item.data,
-                rules: this.item.rules,
+                policies: this.item.detail.policies,
             }
+        },
+        mounted() {
+            if (this.$refs.policyTb) this.$refs.policyTb.foldAll();
+            this.$nextTick(() => this.$refs.policyTb.expandAll());
         },
         computed: {
             title: function () {
@@ -180,18 +184,29 @@
                 return v
             },
             ruleFilter() {
-                if (this.ruleKw && this.item.rules) {
-                    this.rules = this.item.rules.filter((item, index, arr) => {
-                        return item.attrs.规则名 ? item.attrs.规则名.indexOf(this.ruleKw) >= 0 : false
+                this.$refs.policyTb.foldAll();
+                if (this.ruleKw && this.item.detail.policies) {
+                    this.policies = this.item.detail.policies.filter((item, index, arr) => {
+                        item.children = item.rules.filter(o => o.attrs.规则名.indexOf(this.ruleKw) >= 0)
+                        if (item.attrs.策略名 && item.attrs.策略名.indexOf(this.ruleKw) === -1 && item.children.length === 0) return false;
+                        return true;
                     });
-                } else this.rules = this.item.rules;
+                } else {
+                    this.item.detail.policies.map(p => p.children = p.rules)
+                    this.policies = this.item.detail.policies;
+                }
+                this.$nextTick(() => {
+                    this.$refs.policyTb.expandAll();
+                })
             },
             attrFilter() {
-                if (this.attrKw && this.item.attrs) {
-                    this.attrs = this.item.attrs.filter((item, index, arr) => {
-                        return item.enName ? item.enName.toLowerCase().indexOf(this.attrKw.toLowerCase()) >= 0 : (item.cnName ? item.cnName.toLowerCase().indexOf(this.attrKw.toLowerCase()) >= 0 : false)
+                if (this.attrKw && this.item.data) {
+                    this.attrs = this.item.data.filter((item, index, arr) => {
+                        if (item.enName && item.enName.toLowerCase().indexOf(this.attrKw.toLowerCase()) >= 0) return true
+                        if (item.cnName && item.cnName.indexOf(this.attrKw) >= 0) return true
+                        return false
                     })
-                } else this.attrs = this.item.attrs;
+                } else this.attrs = this.item.data;
             }
         }
     };
@@ -272,7 +287,7 @@
                 this.tabs.showId = item.decisionId;
                 this.tabs.type = 'DecisionConfig';
             },
-            trdblclick(item) {
+            showDetail(item) {
                 this.$Modal({
                     middle: false, draggable: false,
                     type: 'drawer-right',

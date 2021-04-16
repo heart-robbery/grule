@@ -379,7 +379,7 @@ class DecisionContext {
                      policies: policies.collect { policy -> //执行过的策略集
                          [
                                  attrs: policy.attrs, result: policy.result, data: cleanData(policy.data), //只和策略相关(和具体规则无关)的数据
-                                 rules: policy.rules.collectEntries {rule ->
+                                 rules: policy.rules.collect {rule ->
                                      [attrs: rule.attrs, result: rule.result, data: cleanData(rule.data) /* 和具体规则相关的数据 */]
                                  }
                          ]
