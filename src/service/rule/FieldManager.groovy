@@ -54,14 +54,15 @@ class FieldManager extends ServerTpl {
         Long lastWarn // 上次告警时间
         queue(DATA_COLLECTED)
             .failMaxKeep(getInteger(DATA_COLLECTED + ".failMaxKeep", 10000))
-            .parallel(getInteger("saveResult.parallel", 2))
+            .parallel(getInteger("saveResult.parallel", 10))
             .errorHandle {ex, me ->
                 if (lastWarn == null || (System.currentTimeMillis() - lastWarn >= Duration.ofSeconds(getLong(DATA_COLLECTED + ".warnInterval", 60 * 5L)).toMillis())) {
                     lastWarn = System.currentTimeMillis()
                     log.error("保存数据收集结果到数据库错误", ex)
                     ep.fire("globalMsg", "保存数据收集结果到数据库错误: " + (ex.message?:ex.class.simpleName))
                 }
-                Thread.sleep(500 + new Random().nextInt(1000))
+                // 暂停一会
+                me.suspend(Duration.ofMillis(500 + new Random().nextInt(1000)))
             }
 
         ep.fire("${name}.started")

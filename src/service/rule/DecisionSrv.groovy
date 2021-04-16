@@ -26,15 +26,35 @@ class DecisionSrv extends ServerTpl {
         Long lastWarn // 上次告警时间
         queue(SAVE_RESULT)
             .failMaxKeep(getInteger(SAVE_RESULT + ".failMaxKeep", 10000))
-            .parallel(getInteger("saveResult.parallel", 2))
+            .parallel(getInteger("saveResult.parallel", 5))
             .errorHandle {ex, me ->
-                if (lastWarn == null || (System.currentTimeMillis() - lastWarn >= Duration.ofSeconds(getLong(SAVE_RESULT + ".warnInterval", 60 * 5L)).toMillis())) {
+                if (lastWarn == null || (System.currentTimeMillis() - lastWarn >= Duration.ofSeconds(getLong(SAVE_RESULT + ".warnInterval", 60 * 3L)).toMillis())) {
                     lastWarn = System.currentTimeMillis()
                     log.error("保存决策结果到数据库错误", ex)
                     ep.fire("globalMsg", "保存决策结果到数据库错误: " + (ex.message?:ex.class.simpleName))
                 }
-                Thread.sleep(500 + new Random().nextInt(1000))
+                // 暂停一会
+                me.suspend(Duration.ofMillis(500 + new Random().nextInt(1000)))
             }
+    }
+
+
+    /**
+     * 系统全局消息
+     * @param msg
+     */
+    @EL(name = 'globalMsg', async = true)
+    void globalMsg(String msg) {
+        log.info("系统消息: " + msg)
+        ep.fire("wsMsg_rule", msg)
+        String url = getStr('ddMsgNotifyUrl', null)
+        if (url) {
+            http.post(url).jsonBody(JSON.toJSONString([
+                    msgtype: "text",
+                    text: ["content": "RULE(${app().profile}): $msg".toString()],
+                    at: ["isAtAll": false]
+            ])).debug().execute()
+        }
     }
 
 
@@ -99,25 +119,6 @@ class DecisionSrv extends ServerTpl {
             } while (true)
         }
         return cleanTotal
-    }
-
-
-    /**
-     * 系统全局消息
-     * @param msg
-     */
-    @EL(name = 'globalMsg', async = true)
-    void globalMsg(String msg) {
-        log.info("系统消息: " + msg)
-        ep.fire("wsMsg_rule", msg)
-        String url = getStr('ddMsgNotifyUrl', null)
-        if (url) {
-            http.post(url).jsonBody(JSON.toJSONString([
-                msgtype: "text",
-                text: ["content": "RULE(${app().profile}): $msg".toString()],
-                at: ["isAtAll": false]
-            ])).debug().execute()
-        }
     }
 
 

@@ -45,7 +45,7 @@ dependencies {
     compile 'javax.inject:javax.inject:1'
     compile 'ch.qos.logback:logback-classic:1.2.3'
 
-    compile 'cn.xnatural.app:app:1.0.2'
+    compile 'cn.xnatural.app:app:1.0.3'
     //compile 'cn.xnatural.enet:enet-event:0.0.17'
     compile 'cn.xnatural.http:http:1.0.7'
     //compile 'cn.xnatural.aio:aio:1.0.6'
@@ -58,7 +58,8 @@ dependencies {
     // compile 'com.alibaba:druid:1.1.23'
     // compile 'com.zaxxer:HikariCP:3.4.1'
     // compile 'org.apache.commons:commons-dbcp2:2.7.0'
-    compile 'mysql:mysql-connector-java:5.1.34'
+    compile 'mysql:mysql-connector-java:8.0.23'
+    // compile 'mysql:mysql-connector-java:5.1.49'
     compile 'org.mariadb.jdbc:mariadb-java-client:2.1.2'
     compile 'com.h2database:h2:1.4.199'
 
