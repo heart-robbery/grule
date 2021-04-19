@@ -245,16 +245,20 @@ class DecisionContext {
             if (value == null && !super.containsKey(aName) && !ctx.end.get()) {// 属性值未找到,则从属性管理器获取
                 // 代表属性已从外部获取过,后面就不再去获取了(防止重复获取). TODO 循环属性获取链
                 safeSet(aName.toString(), null)
+                boolean fromInput
                 if (ctx.input) { //先从入参里面获取
                     if (ctx.input.containsKey(aName)) {
+                        fromInput = true
                         safeSet((String) aName, ctx.input.get(aName))
                     } else {
                         def alias = ctx.getFieldManager().alias(aName)
                         if (alias != null && ctx.input.containsKey(alias)) {
+                            fromInput = true
                             safeSet((String) aName, ctx.input.get(alias))
                         }
                     }
-                } else { //再从收集器获取
+                }
+                if (!fromInput) { //再从收集器获取
                     safeSet((String) aName, ctx.getFieldManager().dataCollect(aName.toString(), ctx))
                 }
                 value = super.get(aName)

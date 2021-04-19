@@ -159,12 +159,14 @@
             </div>
         `,
         data() {
-            this.item.detail.policies.map(p => p.children = p.rules)
+            if (this.item.detail && this.item.detail.policies) {
+                this.item.detail.policies.map(p => p.children = p.rules)
+            }
             return {
                 ruleKw: null,
                 attrKw: null,
                 attrs: this.item.data,
-                policies: this.item.detail.policies,
+                policies: this.item.detail ? this.item.detail.policies : null,
             }
         },
         mounted() {
