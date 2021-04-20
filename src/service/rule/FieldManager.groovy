@@ -453,7 +453,7 @@ if (idNumber && idNumber.length() > 17) {
             }
             log.info(ctx.logPrefix() + "${ -> cache ? '(缓存)' : ''}Sql脚本函数'$collector.name', 结果: $result".toString())
             dataCollected(new CollectRecord(
-                decideId: ctx.id, decisionId: ctx.decisionHolder.result.id, collector: collector.id,
+                decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.id,
                 status: (exx ? 'EEEE' : '0000'), dataStatus: (exx ? 'EEEE' : '0000'), collectDate: start, collectorType: collector.type,
                 spend: spend, cache: cache,
                 result: result instanceof Map ? JSON.toJSONString(result, SerializerFeature.WriteMapNullValue) : result?.toString(),
@@ -495,7 +495,7 @@ if (idNumber && idNumber.length() > 17) {
                 log.error(ctx.logPrefix() + "脚本函数'$collector.name'执行失败".toString(), ex)
             }
             dataCollected(new CollectRecord(
-                decideId: ctx.id, decisionId: ctx.decisionHolder.result.id, collector: collector.id,
+                decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.id,
                 status: (ex ? 'EEEE' : '0000'), dataStatus: (ex ? 'EEEE' : '0000'), collectDate: start, collectorType: collector.type,
                 spend: System.currentTimeMillis() - start.time, cache: false,
                 result: result instanceof Map ? JSON.toJSONString(result, SerializerFeature.WriteMapNullValue) : result?.toString(),
@@ -654,7 +654,7 @@ if (idNumber && idNumber.length() > 17) {
                 } catch (ex) {
                     log.error(logMsg.toString() + ", 异常: ", ex)
                     dataCollected(new CollectRecord(
-                        decideId: ctx.id, decisionId: ctx.decisionHolder.result.id, collector: collector.id,
+                        decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.id,
                         status: (ex instanceof ConnectException) ? 'E001': 'EEEE', dataStatus: (ex instanceof ConnectException) ? 'E001': 'EEEE',
                         collectDate: start, collectorType: collector.type, cache: cache,
                         spend: spend, url: url, body: bodyStr, result: result, httpException: ex.message?:ex.class.simpleName
@@ -697,7 +697,7 @@ if (idNumber && idNumber.length() > 17) {
                         log.info("${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}接口调用: name: $collector.name, url: ${ -> url}, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}".toString())
                     }
                     dataCollected(new CollectRecord(
-                        decideId: ctx.id, decisionId: ctx.decisionHolder.result.id, collector: collector.id,
+                        decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.id,
                         status: ex ? 'E002': '0000', dataStatus: dataStatus, cache: cache,
                         collectDate: start, collectorType: collector.type,
                         spend: spend, url: url, body: bodyStr, result: result, parseException: ex == null ? null : ex.message?:ex.class.simpleName,
@@ -709,7 +709,7 @@ if (idNumber && idNumber.length() > 17) {
 
             log.info("${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}接口调用: name: $collector.id, url: ${ -> url}, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}".toString())
             dataCollected(new CollectRecord(
-                decideId: ctx.id, decisionId: ctx.decisionHolder.result.id, collector: collector.id,
+                decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.id,
                 status: '0000', dataStatus: dataStatus, collectDate: start, collectorType: collector.type,
                 spend: spend, url: url, body: bodyStr, result: result, cache: cache
             ))

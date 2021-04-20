@@ -103,7 +103,7 @@
                     success: (res) => {
                         if (res.code == '00') {
                             let cate = [];
-                            for (const item of res.data.map((o) => o.decisionName + ' || ' + o.ruleName)) { // 保留顺序去重
+                            for (const item of res.data.map((o) => o.decisionName + ' || ' + o.policyName  + '||' + o.ruleName)) { // 保留顺序去重
                                 if (cate.indexOf(item) === -1) cate.push(item);
                             }
                             cate.reverse();
@@ -134,7 +134,7 @@
                                     data: (function () {
                                         let arr = [];
                                         cate.forEach(function(value, index, array){
-                                            let item = res.data.find(o => o.decision == 'Reject' && (o.decisionName + ' || ' + o.ruleName) == value);
+                                            let item = res.data.find(o => o.result === 'Reject' && (o.decisionName + ' || ' + o.policyName + ' || ' + o.ruleName) == value);
                                             arr.push(item ? item.total : 0);
                                         });
                                         return arr;
@@ -161,7 +161,7 @@
                                     data: (function () {
                                         let arr = [];
                                         cate.forEach(function(value, index, array){
-                                            let item = res.data.find(o => o.decision == 'Review' && (o.decisionName + ' || ' + o.ruleName) == value);
+                                            let item = res.data.find(o => o.result === 'Review' && (o.decisionName + ' || ' + o.policyName + ' || ' + o.ruleName) == value);
                                             arr.push(item ? item.total : 0);
                                         });
                                         return arr;
@@ -188,7 +188,7 @@
                                     data: (function () {
                                         let arr = [];
                                         cate.forEach(function(value, index, array){
-                                            let item = res.data.find(o => o.decision == 'Accept' && (o.decisionName + ' || ' + o.ruleName) == value);
+                                            let item = res.data.find(o => o.result === 'Accept' && (o.decisionName + ' || ' + o.policyName + ' || ' + o.ruleName) == value);
                                             arr.push(item ? item.total : 0);
                                         });
                                         return arr;

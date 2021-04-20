@@ -58,6 +58,46 @@ class DecisionSrv extends ServerTpl {
     }
 
 
+    // 决策执行结果监听
+    @EL(name = 'decision.end', async = true)
+    void endDecision(DecisionContext ctx) {
+        log.info("end decision: " + JSON.toJSONString(ctx.summary(), SerializerFeature.WriteMapNullValue))
+
+        // 异步查询的, 异步回调通知
+        if (Boolean.valueOf(ctx.input.getOrDefault('async', false).toString())) {
+            async {
+                String cbUrl = ctx.input['callback'] // 回调Url
+                if (cbUrl && cbUrl.startsWith('http')) {
+                    def result = ctx.result()
+                    (1..getInteger("callbackMaxTry", 2)).each {
+                        try {
+                            http.post(cbUrl).jsonBody(JSON.toJSONString(result, SerializerFeature.WriteMapNullValue)).debug().execute()
+                        } catch (ex) {
+                            log.error("回调失败. id: " + ctx.id + ", url: " + cbUrl, ex)
+                        }
+                    }
+                }
+            }
+        }
+
+        // 保存决策结果到数据库
+        queue(SAVE_RESULT) {
+            repo.saveOrUpdate(
+                    repo.findById(DecideRecord, ctx.id).tap {
+                        status = ctx.status
+                        exception = ctx.summary()['exception']
+                        result = ctx.summary()['result']
+                        spend = ctx.summary()['spend']
+                        data = JSON.toJSONString(ctx.summary()['data'], SerializerFeature.WriteMapNullValue)
+                        detail = JSON.toJSONString(ctx.summary()['detail'], SerializerFeature.WriteMapNullValue)
+                        def dr = ctx.summary()['dataCollectResult']
+                        if (dr) dataCollectResult = JSON.toJSONString(dr, SerializerFeature.WriteMapNullValue)
+                    }
+            )
+        }
+    }
+
+
     /**
      * 清理过期CollectResult数据
      */
@@ -119,45 +159,5 @@ class DecisionSrv extends ServerTpl {
             } while (true)
         }
         return cleanTotal
-    }
-
-
-    // 决策执行结果监听
-    @EL(name = 'decision.end', async = true)
-    void endDecision(DecisionContext ctx) {
-        log.info("end decision: " + JSON.toJSONString(ctx.summary(), SerializerFeature.WriteMapNullValue))
-
-        // 异步查询的, 异步回调通知
-        if (Boolean.valueOf(ctx.input.getOrDefault('async', false).toString())) {
-            async {
-                String cbUrl = ctx.input['callback'] // 回调Url
-                if (cbUrl && cbUrl.startsWith('http')) {
-                    def result = ctx.result()
-                    (1..getInteger("callbackMaxTry", 2)).each {
-                        try {
-                            http.post(cbUrl).jsonBody(JSON.toJSONString(result, SerializerFeature.WriteMapNullValue)).debug().execute()
-                        } catch (ex) {
-                            log.error("回调失败. id: " + ctx.id + ", url: " + cbUrl, ex)
-                        }
-                    }
-                }
-            }
-        }
-
-        // 保存决策结果到数据库
-        queue(SAVE_RESULT) {
-            repo.saveOrUpdate(
-                repo.findById(DecideRecord, ctx.id).tap {
-                    status = ctx.status
-                    exception = ctx.summary()['exception']
-                    result = ctx.summary()['result']
-                    spend = ctx.summary()['spend']
-                    data = JSON.toJSONString(ctx.summary()['data'], SerializerFeature.WriteMapNullValue)
-                    detail = JSON.toJSONString(ctx.summary()['detail'], SerializerFeature.WriteMapNullValue)
-                    def dr = ctx.summary()['dataCollectResult']
-                    if (dr) dataCollectResult = JSON.toJSONString(dr, SerializerFeature.WriteMapNullValue)
-                }
-            )
-        }
     }
 }

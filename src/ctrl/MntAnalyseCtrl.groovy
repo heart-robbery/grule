@@ -38,10 +38,10 @@ class MntAnalyseCtrl extends ServerTpl {
         if (!ids) return ApiResp.ok()
         hCtx.response.cacheControl(2) // 缓存2秒
         String sql = """
-            select t1.decision_id, t2.name decisionName, t1.decision, count(1) total from ${repo.tbName(DecideRecord).replace("`", '')} t1
+            select t1.decision_id, t2.name decisionName, t1.result, count(1) total from ${repo.tbName(DecideRecord).replace("`", '')} t1
             left join decision t2 on t1.decision_id = t2.id
-            where t1.decision is not null and t1.occur_time>=:start${end ? " and t1.occur_time<=:end" : ""} and t1.decision_id in (:ids) 
-            group by t1.decision_id, t1.decision
+            where t1.result is not null and t1.occur_time>=:start${end ? " and t1.occur_time<=:end" : ""} and t1.decision_id in (:ids) 
+            group by t1.decision_id, t1.result
         """.trim()
         ApiResp.ok(end ? repo.rows(sql, start, end, ids) : repo.rows(sql, start, ids))
     }
@@ -67,9 +67,9 @@ class MntAnalyseCtrl extends ServerTpl {
         if (!ids) return ApiResp.ok().desc("无可查看的决策")
         hCtx.response.cacheControl(5) // 缓存5秒
         String sql = """
-            select t1.decision_id decisionId, t2.name decisionName, t1.rules from ${repo.tbName(DecideRecord).replace("`", '')} t1
+            select t1.decision_id decisionId, t2.name decisionName, t1.detail from ${repo.tbName(DecideRecord).replace("`", '')} t1
             left join decision t2 on t1.decision_id = t2.id
-            where t1.decision is not null and t1.rules is not null and t1.occur_time>=:start${end ? " and t1.occur_time<=:end" : ""} and t1.decision_id in (:ids)
+            where t1.result is not null and t1.detail is not null and t1.occur_time>=:start${end ? " and t1.occur_time<=:end" : ""} and t1.decision_id in (:ids)
         """.trim()
         def ls = [] as LinkedList
         for (int page = 1, pageSize = 200; ;page++) {
@@ -77,18 +77,20 @@ class MntAnalyseCtrl extends ServerTpl {
             ls.addAll(rPage.list)
             if (page >= rPage.totalPage) break
         }
-        // decision_id, decisionName, ruleName, decision, total
+        // decisionId, decisionName, policyName, ruleName, result, total
         ApiResp.ok(
-            ls.findResults {Map<String, String> e ->
-                JSON.parseArray(e['rules']).findResults { JSONObject jo ->
-                    e['decisionId'] + '||' + e['decisionName'] + '||' + jo['attrs']['规则名'] + '||' + (jo['decision']?:DecideResult.Accept)
-                }
+            ls.findResults {Map<String, String> record ->
+                JSON.parseObject("detail")?.getJSONArray("policies")?.findResults {JSONObject pJo ->
+                    pJo.getJSONArray("rules").findResults { JSONObject rJo ->
+                        record['decisionId'] + '||' + record['decisionName'] + '||' + pJo['attr']['策略名']  +'||' + rJo['attrs']['规则名'] + '||' + (rJo['result']?:DecideResult.Accept)
+                    }
+                }?.flatten()
             }.flatten().countBy {it}.findResults {e ->
                 def arr = e.key.split("\\|\\|")
-                return [decisionId: arr[0], decisionName: arr[1], ruleName: arr[2], decision: arr[3], total: e.value]
+                return [decisionId: arr[0], decisionName: arr[1], policyName: arr[2], ruleName: arr[3], result: arr[4], total: e.value]
             }.sort {o1, o2 ->
                 // 把拒绝多的排前面
-                if (o1['decision'] == "Reject" && o2['decision'] == "Reject") return o2['total'] - o1['total']
+                if (o1['result'] == "Reject" && o2['result'] == "Reject") return o2['total'] - o1['total']
                 else if (o1['decision'] == "Reject") return -1
                 else if (o2['decision'] == "Reject") return 1
                 else return 0
