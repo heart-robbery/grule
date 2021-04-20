@@ -196,7 +196,7 @@ class DecisionContext {
                 ctx.curPassedPolicy = new PassedPolicy(spec: spec, attrs: [策略名: spec.策略名, *:spec.attrs])
                 ctx.policies.add(ctx.curPassedPolicy)
                 log.debug(logPrefix() + "开始执行策略")
-                spec.fns.each {e ->
+                for (def e : spec.fns) {
                     if (e.v1 == 'Condition') { // 执行策略条件函数. 条件函数返回false, 则跳出, 继续执行下一个策略
                         log.trace(logPrefix() + "开始执行策略条件函数")
                         if (!e.v2.call(ctx.data)) {
