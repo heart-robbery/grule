@@ -103,7 +103,7 @@
                     success: (res) => {
                         if (res.code == '00') {
                             let cate = [];
-                            for (const item of res.data.map((o) => o.decisionName + ' || ' + o.policyName  + '||' + o.ruleName)) { // 保留顺序去重
+                            for (const item of res.data.map((o) => o.decisionName + ' || ' + o.policyName  + ' || ' + o.ruleName)) { // 保留顺序去重
                                 if (cate.indexOf(item) === -1) cate.push(item);
                             }
                             cate.reverse();

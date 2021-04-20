@@ -80,21 +80,21 @@ class MntAnalyseCtrl extends ServerTpl {
         // decisionId, decisionName, policyName, ruleName, result, total
         ApiResp.ok(
             ls.findResults {Map<String, String> record ->
-                JSON.parseObject("detail")?.getJSONArray("policies")?.findResults {JSONObject pJo ->
+                record["detail"] ? JSON.parseObject(record["detail"])?.getJSONArray("policies")?.findResults {JSONObject pJo ->
                     pJo.getJSONArray("rules").findResults { JSONObject rJo ->
-                        record['decisionId'] + '||' + record['decisionName'] + '||' + pJo['attr']['策略名']  +'||' + rJo['attrs']['规则名'] + '||' + (rJo['result']?:DecideResult.Accept)
+                        record['decisionId'] + '||' + record['decisionName'] + '||' + pJo['attrs']['策略名']  +'||' + rJo['attrs']['规则名'] + '||' + (rJo['result']?:DecideResult.Accept)
                     }
-                }?.flatten()
+                }?.flatten() : []
             }.flatten().countBy {it}.findResults {e ->
                 def arr = e.key.split("\\|\\|")
                 return [decisionId: arr[0], decisionName: arr[1], policyName: arr[2], ruleName: arr[3], result: arr[4], total: e.value]
             }.sort {o1, o2 ->
                 // 把拒绝多的排前面
                 if (o1['result'] == "Reject" && o2['result'] == "Reject") return o2['total'] - o1['total']
-                else if (o1['decision'] == "Reject") return -1
-                else if (o2['decision'] == "Reject") return 1
+                else if (o1['result'] == "Reject") return -1
+                else if (o2['result'] == "Reject") return 1
                 else return 0
-            }.takeRight(decisionId ? Integer.MAX_VALUE : 400) // 如果是指定某个决策, 则全部显示, 如果是查所有则限制显示(有可能会得多)
+            }.takeRight(decisionId ? Integer.MAX_VALUE : 50) // 如果是指定某个决策, 则全部显示, 如果是查所有则限制显示(有可能会得多)
         )
     }
 }

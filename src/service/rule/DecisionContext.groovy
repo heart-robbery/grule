@@ -69,7 +69,7 @@ class DecisionContext {
         log.info(logPrefix() + "开始")
         decisionHolder.spec.operateFn?.call(data) // 预执行操作
         if (!ruleIterator.hasNext()) {
-            decideResult = DecideResult.Reject
+            decideResult = DecideResult.Accept
             exception = new Exception("没有可执行的策略")
             log.warn(logPrefix() + exception)
         }

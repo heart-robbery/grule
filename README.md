@@ -158,7 +158,7 @@ DSL: 开发 和 业务 共识的语言. 方便业务表达需求, 方便开发�
 ![Image text](https://gitee.com/xnat/tmp/raw/master/img/userchange.png)
 
 # 使用说明
-jdk8, gradle6.5+
+jdk8, gradle6.5+, mysql5.7+/MariaDB10.2+
 
 1. IntelliJ IDEA 运行 main.groovy
 2. 

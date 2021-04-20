@@ -311,13 +311,15 @@ class MntDecisionCtrl extends ServerTpl {
         //dsl 验证
         if (!spec.决策id) return ApiResp.fail("决策id 不能为空")
         if (!spec.决策名) return ApiResp.fail("决策名 不能为空")
-        if (!spec.policies) return ApiResp.fail("${spec.决策名} 是空决策")
-        for (def policy : spec.policies) {
-            if (!policy.策略名) return ApiResp.fail('策略名字不能为空')
-            if (!policy.rules) return ApiResp.fail("'${policy.策略名}' 是空策略")
-            for (def rule : policy.rules) {
-                if (!rule.规则名) return ApiResp.fail('规则名字不能为空')
-                if (rule.fns.size() < 1) return ApiResp.fail("'${rule.规则名}' 是空规则")
+        // if (!spec.policies) return ApiResp.fail("${spec.决策名} 是空决策")
+        if (spec.policies) {
+            for (def policy : spec.policies) {
+                if (!policy.策略名) return ApiResp.fail('策略名字不能为空')
+                if (!policy.rules) return ApiResp.fail("'${policy.策略名}' 是空策略")
+                for (def rule : policy.rules) {
+                    if (!rule.规则名) return ApiResp.fail('规则名字不能为空')
+                    if (rule.fns.size() < 1) return ApiResp.fail("'${rule.规则名}' 是空规则")
+                }
             }
         }
 

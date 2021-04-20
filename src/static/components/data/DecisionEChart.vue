@@ -114,7 +114,7 @@
                                     data: (function () {
                                         let arr = [];
                                         cate.forEach(function(value, index, array){
-                                            let item = res.data.find(o => o.decision == 'Reject' && o.decisionName == value);
+                                            let item = res.data.find(o => o.result == 'Reject' && o.decisionName == value);
                                             arr.push(item ? item.total : 0);
                                         });
                                         return arr;
@@ -141,7 +141,7 @@
                                     data: (function () {
                                         let arr = [];
                                         cate.forEach(function(value, index, array){
-                                            let item = res.data.find(o => o.decision == 'Review' && o.decisionName == value);
+                                            let item = res.data.find(o => o.result == 'Review' && o.decisionName == value);
                                             arr.push(item ? item.total : 0);
                                         });
                                         return arr;
@@ -168,7 +168,7 @@
                                     data: (function () {
                                         let arr = [];
                                         cate.forEach(function(value, index, array){
-                                            let item = res.data.find(o => o.decision == 'Accept' && o.decisionName == value);
+                                            let item = res.data.find(o => o.result == 'Accept' && o.decisionName == value);
                                             arr.push(item ? item.total : 0);
                                         });
                                         return arr;
