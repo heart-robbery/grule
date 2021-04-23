@@ -1,3 +1,8 @@
+<style>
+.policyTr {
+    background-color: #eae5e5
+}
+</style>
 <template>
     <div class="h-panel">
         <div class="h-panel-bar">
@@ -31,7 +36,7 @@
                     <div class="h-input-group">
                         <h-autocomplete v-model="item.fieldId" :option="item.fieldAc" placeholder="字段属性名" ></h-autocomplete>
                         <h-select v-model="item.op" :datas="ops" placeholder="比较符" :deletable="false"></h-select>
-                        <input type="text" v-model="item.value" placeholder="属性值"/>
+                        <input type="text" v-model="item.value" placeholder="属性值" @keyup.enter="load"/>
                         <div style="width: 70px; margin-left: 15px">
                             <span class="h-icon-minus" @click="delAttrFilter(item)"></span>&nbsp;
                             <span v-if="model.attrFilters.length == (index + 1)" class="h-icon-plus" @click="addAttrFilter"></span>
@@ -59,7 +64,7 @@
                 <h-tableitem title="异常信息" prop="exception" align="center"></h-tableitem>
                 <h-tableitem title="操作" align="center" :width="70">
                     <template slot-scope="{data}">
-                        <span class="text-hover" @click="showDetail(data)">详情</span>
+                        <span class="text-hover" style="color: #9bbdef" @click="showDetail(data)">详情</span>
                     </template>
                 </h-tableitem>
                 <div slot="empty">暂时无数据</div>
@@ -87,7 +92,7 @@
     const detail = {
         props: ['item'],
         template:`
-            <div style="max-height: 800px;overflow-y: auto;">
+            <div :style="detailDivStyle">
                 <header class="h-modal-header text-center">{{title}}</header>
                 <h-layout>
                     <h-header>
@@ -105,7 +110,7 @@
                                     </div>
                                 </div>
                                 <div class="h-panel-body">
-                                    <h-table ref="policyTb" :datas="policies" select-when-click-tr border :height="520">
+                                    <h-table ref="policyTb" :datas="policies" select-when-click-tr border :height="520" :getTrClass="getTrClass">
                                         <h-tableitem title="属性" :width="220" align="left" treeOpener>
                                             <template slot-scope="{data}">
                                                 <h-form readonly>
@@ -163,6 +168,7 @@
                 this.item.detail.policies.map(p => p.children = p.rules)
             }
             return {
+                detailDivStyle: {maxHeight: document.body.clientHeight + "px", overflowY: 'auto'},
                 ruleKw: null,
                 attrKw: null,
                 attrs: this.item.data,
@@ -179,6 +185,11 @@
             }
         },
         methods: {
+            getTrClass(data, index) {
+                if (data.attrs['策略名']) {
+                    return ['policyTr'];
+                }
+            },
             formatType(v) {
                 for (let type of types) {
                     if (type.key == v) return type.title

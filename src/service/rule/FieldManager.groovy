@@ -191,22 +191,22 @@ class FieldManager extends ServerTpl {
 
     // ======================= 监听变化 ==========================
     @EL(name = ['fieldChange', 'field.dataVersion'], async = true)
-    void listenFieldChange(EC ec, String enName) {
-        def field = repo.find(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}
+    void listenFieldChange(EC ec, String id) {
+        def field = repo.findById(RuleField, id)
         if (field == null) {
-            def f = fieldMap.remove(enName)
-            if (f) fieldMap.remove(f.cnName)
-            log.info("delField: " + f)
+            for (def itt = fieldMap.iterator(); itt.hasNext(); ) {
+                def e = itt.next()
+                if (e.value.id = id) itt.remove()
+            }
+            log.info("delField: " + id)
         } else {
-            boolean isNew = true
-            if (fieldMap.containsKey(field.enName)) isNew = false
             fieldMap.put(field.enName, field)
             fieldMap.put(field.cnName, field)
-            log.info("${isNew ? 'addedField' : 'updatedField'}: ${field.cnName}, $enName".toString())
+            log.info("fieldChanged: ${field.cnName}, $id".toString())
         }
         def remoter = bean(Remoter)
         if (remoter && ec?.source() != remoter) { // 不是远程触发的事件
-            remoter.dataVersion('field').update(enName, field ? field.updateTime.time : System.currentTimeMillis(), null)
+            remoter.dataVersion('field').update(id, field ? field.updateTime.time : System.currentTimeMillis(), null)
         }
     }
 

@@ -5,7 +5,6 @@
             <h-button v-if="sUser.permissionIds.find((e) => e == 'decision-add')" @click="add"><i class="h-icon-plus"></i></h-button>
             <input type="text" v-model="model.nameLike" placeholder="决策名" style="width: 250px" @keyup.enter="load"/>
             <div class="h-panel-right">
-<!--                <h-search placeholder="查询" v-width="200" v-model="kw" show-search-button search-text="搜索" @search="load"></h-search>-->
                 <button class="h-btn h-btn-primary float-right" @click="load"><i class="h-icon-search"></i><span>搜索</span></button>
             </div>
         </div>
@@ -14,7 +13,7 @@
                 <h-collapse v-model="collapse" accordion>
                     <h-collapseitem v-for="item in decision.list" :key="item.decisionId" :name="item.decisionId" :data-id="item.id">
                         <template slot='title'>
-                            {{item.name + '(' + item.decisionId + ')' + (item.comment ? ': ' + item.comment : '')}}
+                            {{item.name + '(' + item.decisionId + ')'}}
                             &nbsp;&nbsp;&nbsp;
                             <date-item :time="item.updateTime"></date-item>
                             &nbsp;&nbsp;&nbsp;
@@ -31,9 +30,6 @@
                         <ace-groovy v-if="collapse && collapse.length > 0 && collapse[0] == item.decisionId"
                                     v-model="item.dsl" height="650px" width="90%" @save="save(item)" :readonly="item._readonly">
                         </ace-groovy>
-<!--                        <div style="height: 650px; width: 100vh">-->
-<!--                            <div v-if="collapse && collapse.length > 0 && collapse[0] == item.decisionId " ref="dslEditor" style="height: 650px; width: 800px"></div>-->
-<!--                        </div>-->
                     </h-collapseitem>
                 </h-collapse>
             </div>
@@ -370,7 +366,7 @@
                                 //decision.apiConfigO = decision.apiConfig ? JSON.parse(decision.apiConfig) : null;
                                 this.$Message.success('更新成功: ' + decision.name);
                             } else {
-                                $.extend(decision, res.data);
+                                //$.extend(decision, res.data);
                                 //decision.apiConfigO = decision.apiConfig ? JSON.parse(decision.apiConfig) : null;
                                 this.$Message.success('新增成功: ' + res.data.name);
                                 this.load();

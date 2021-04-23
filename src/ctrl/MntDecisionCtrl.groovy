@@ -613,13 +613,13 @@ class MntDecisionCtrl extends ServerTpl {
     }
 
 
-    @Path(path = 'delField/:enName')
-    ApiResp delField(HttpContext hCtx, String enName) {
-        if (!enName) return ApiResp.fail("Param enName not empty")
+    @Path(path = 'delField/:id')
+    ApiResp delField(HttpContext hCtx, String id) {
+        if (!id) return ApiResp.fail("Param id not empty")
         hCtx.auth('field-del')
-        def field = repo.find(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}
+        def field = repo.findById(RuleField, id)
         repo.delete(field)
-        ep.fire('fieldChange', enName)
+        ep.fire('fieldChange', id)
         ep.fire('enHistory', field, hCtx.getSessionAttr('uName'))
         ApiResp.ok()
     }
