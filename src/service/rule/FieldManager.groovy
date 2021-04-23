@@ -196,7 +196,7 @@ class FieldManager extends ServerTpl {
         if (field == null) {
             for (def itt = fieldMap.iterator(); itt.hasNext(); ) {
                 def e = itt.next()
-                if (e.value.id = id) itt.remove()
+                if (e.value.id == id) itt.remove()
             }
             log.info("delField: " + id)
         } else {
