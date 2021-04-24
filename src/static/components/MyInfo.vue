@@ -50,7 +50,7 @@
                         type: 'post',
                         data: {id: app.$data.user.id, newPassword: this.data.newpassword2, oldPassword: this.data.oldpassword},
                         success: (res) => {
-                            if (res.code == '00') {
+                            if (res.code === '00') {
                                 this.$Message.success(`更新密码成功`);
                                 this.data = {};
                                 this.isLoading = false;

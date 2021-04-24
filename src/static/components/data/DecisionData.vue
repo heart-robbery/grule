@@ -43,7 +43,7 @@
                 $.ajax({
                     url: 'mnt/cleanExpire',
                     success: (res) => {
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.$Message.success(res.desc);
                         } else {
                             this.$Message.error(res.desc);

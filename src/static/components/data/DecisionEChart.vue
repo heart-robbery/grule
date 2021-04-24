@@ -7,7 +7,8 @@
             <h-datepicker v-model="model.endTime" type="datetime" :option="{minuteStep:2}" :has-seconds="true" placeholder="结束时间" style="width: 160px"></h-datepicker>
         </div>
         <div class="h-panel-body bottom-line">
-            <div ref="main" v-bind:style="{width: widthPx, height: heightPx, minHeight: minHeight}"></div>
+            <div ref="main" style="width: 100%; height: 250px;"></div>
+            <h-loading text="Loading" :loading="loading"></h-loading>
         </div>
     </div>
 </template>
@@ -15,7 +16,7 @@
     module.exports = {
         data() {
             return {
-                widthPx: '100%', heightPx: '100%', minHeight: '400px',
+                loading: false,
                 taskId: null,
                 model: {startTime: (function () {
                         let d = new Date();
@@ -79,15 +80,22 @@
                 // console.log('chart', this.chart);
                 this.chart.setOption(this.option);
                 // console.log('option', this.option)
+                if (this.option.yAxis.data.length > 3) {
+                    this.chart.getDom().style.height = (Math.min(this.option.yAxis.data.length * 80, 800)) + 'px';
+                } else {
+                    this.chart.getDom().style.height = '250px'
+                }
+                this.chart.resize()
             },
             load(cb) {
+                this.loading = true
                 $.ajax({
                     url: 'mnt/countDecide',
                     data: this.model,
                     success: (res) => {
-                        if (res.code == '00') {
+                        this.loading = false
+                        if (res.code === '00') {
                             let cate = Array.from(new Set(res.data.map((o) => o.decisionName)));
-                            this.minHeight = cate.length < 2 ? '200px' : (Math.min(cate.length * 80, 800)) + 'px';
                             this.option.yAxis = {
                                 type: 'category',
                                 data: cate
@@ -176,8 +184,17 @@
                                 }
                             ];
                             if (cb) cb()
+                            if (this.chart) { //随数据多少自适应高度
+                                if (cate.length > 3) {
+                                    this.chart.getDom().style.height = (Math.min(cate.length * 80, 800)) + 'px';
+                                } else {
+                                    this.chart.getDom().style.height = '250px'
+                                }
+                                this.chart.resize()
+                            }
                         } else this.$Message.error(res.desc)
-                    }
+                    },
+                    error: () => this.loading = false
                 })
             }
         }

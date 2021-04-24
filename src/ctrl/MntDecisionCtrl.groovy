@@ -11,6 +11,7 @@ import cn.xnatural.jpa.Repo
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONArray
 import com.alibaba.fastjson.JSONObject
+import com.alibaba.fastjson.parser.Feature
 import entity.*
 import service.rule.DecideResult
 import service.rule.DecisionManager
@@ -200,12 +201,16 @@ class MntDecisionCtrl extends ServerTpl {
                             .addConverter('decisionId', 'decisionName', { String dId ->
                                 decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name
                             }).addConverter('data', {
-                                it == null ? null : JSON.parseObject(it).collect { e ->
+                                it == null ? null : JSON.parseObject(it, Feature.OrderedField).collect { e ->
                                     [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
                                 }}).addConverter('input', {
                                     it == null ? null : JSON.parseObject(it)
                                 }).addConverter('dataCollectResult', {
-                                    it == null ? null : JSON.parseObject(it)
+                                    it == null ? null : JSON.parseObject(it, Feature.OrderedField).collectEntries { e ->
+                                            [
+                                                    (fieldManager.collectors.findResult {it.value.collector.id == e.key ? it.value.collector.name : null}?:e.key): e.value
+                                            ]
+                                    }
                                 }).addConverter('detail', {String detailJsonStr ->
                                     if (!detailJsonStr) return null
                                     def detailJo = JSON.parseObject(detailJsonStr)

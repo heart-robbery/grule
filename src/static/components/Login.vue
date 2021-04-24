@@ -52,7 +52,7 @@
                         data: this.model,
                         success: (res) => {
                             this.isLoading = true;
-                            if (res.code == '00') {
+                            if (res.code === '00') {
                                 this.$Message.success('登录成功');
                                 // $.extend(app.$data.user, res.data);
                                 app.$data.user = res.data;

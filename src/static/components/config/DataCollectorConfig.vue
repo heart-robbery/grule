@@ -161,7 +161,7 @@
                     data: this.model,
                     success: (res) => {
                         this.isLoading = false;
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.$emit('close');
                             this.$Message.success(`更新: ${this.model.name} 成功`);
                             $.extend(this.collector, this.model);
@@ -178,7 +178,7 @@
                     data: this.model,
                     success: (res) => {
                         this.isLoading = false;
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.$emit('close');
                             this.$Message.success(`添加: ${this.model.name} 成功`);
                             this.$emit('reload');
@@ -242,7 +242,7 @@
                     url: this.url,
                     data: items,
                     success: (res) => {
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.result = JSON.stringify(res.data, null, 4).trim();
                             this.$Message.success(`测试调用: ${this.collector.name} 成功`);
                             localStorage.setItem(this.cacheKey, JSON.stringify(this.items.map(o => {return {code: o.code, value: o.value}})));
@@ -330,7 +330,7 @@
                     type: 'post',
                     data: item,
                     success: (res) => {
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.$Message.success(`${item.enabled ? '启用' : '禁用'}: ${item.name} 成功`);
                         } else {
                             this.$Notice.error(res.desc);
@@ -346,7 +346,7 @@
                     $.ajax({
                         url: 'mnt/delDataCollector/' + collector.id,
                         success: (res) => {
-                            if (res.code == '00') {
+                            if (res.code === '00') {
                                 this.$Message.success(`删除收集器: ${collector.name} 成功`);
                                 this.load();
                             } else this.$Message.error(res.desc)
@@ -369,7 +369,7 @@
                     success: (res) => {
                         this.tabs.showId = null;
                         this.loading = false;
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.page = res.data.page;
                             this.pageSize = res.data.pageSize;
                             this.totalRow = res.data.totalRow;

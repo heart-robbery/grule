@@ -2,17 +2,16 @@
     <div class="h-panel">
         <div class="h-panel-bar">
             <span class="h-panel-title">决策规则统计</span>
-<!--            <span v-color:gray v-font="13">说明~~</span>-->
             <div style="float: right">
                 <h-autocomplete v-model="model.decisionId" :option="decisionAc" style="float:left; width: 180px" @change="load((() => chart.setOption(option)))" placeholder="决策"></h-autocomplete>
             </div>
             <h-datepicker v-model="model.startTime" type="datetime" :option="{minuteStep:2}" :has-seconds="true" placeholder="开始时间" style="width: 160px"></h-datepicker>
             -
             <h-datepicker v-model="model.endTime" type="datetime" :option="{minuteStep:2}" :has-seconds="true" placeholder="结束时间" style="width: 160px"></h-datepicker>
-
         </div>
         <div class="h-panel-body">
-            <div ref="main" v-bind:style="{width: widthPx, height: heightPx, minHeight: minHeight, maxHeight: '1000px', overflow:'auto'}"></div>
+            <div ref="main" style="width: 100%; height: 250px;"></div>
+            <h-loading text="Loading" :loading="loading"></h-loading>
         </div>
     </div>
 </template>
@@ -20,7 +19,7 @@
     module.exports = {
         data() {
             return {
-                widthPx: '100%', heightPx: '100%', minHeight: '400px',
+                loading: false,
                 decisionAc: {
                     keyName: 'decisionId',
                     titleName: 'name',
@@ -31,7 +30,7 @@
                             data: {page: 1, pageSize: 5, nameLike: filter},
                             success: (res) => {
                                 this.isLoading = false;
-                                if (res.code == '00') {
+                                if (res.code === '00') {
                                     cb(res.data.list.map((r) => {
                                         return {decisionId: r.id, name: r.name}
                                     }))
@@ -41,7 +40,7 @@
                     }
                 },
                 taskId: null,
-                model: {startTime: (function () {
+                model: {startTime: (function () { // 从0点开始的时间
                         let d = new Date();
                         let month = d.getMonth() + 1;
                         return d.getFullYear() + "-" + (month < 10 ? '0' + month : month) + "-" + (d.getDate() < 10 ? '0' + d.getDate() : d.getDate()) + " 00:00:00"
@@ -94,20 +93,27 @@
                 this.chart = echarts.init(this.$refs.main);
                 // console.log('chart', this.chart);
                 this.chart.setOption(this.option);
+                if (this.option.yAxis.data.length > 3) {
+                    this.chart.getDom().style.height = (Math.min(this.option.yAxis.data.length * 80, 800)) + 'px';
+                } else {
+                    this.chart.getDom().style.height = '250px'
+                }
+                this.chart.resize()
                 // console.log('option', this.option)
             },
             load(cb) {
+                this.loading = true
                 $.ajax({
                     url: 'mnt/countRule',
                     data: this.model,
                     success: (res) => {
-                        if (res.code == '00') {
+                        this.loading = false
+                        if (res.code === '00') {
                             let cate = [];
                             for (const item of res.data.map((o) => o.decisionName + ' || ' + o.policyName  + ' || ' + o.ruleName)) { // 保留顺序去重
                                 if (cate.indexOf(item) === -1) cate.push(item);
                             }
                             cate.reverse();
-                            this.minHeight = cate.length < 2 ? '250px' : (Math.min(cate.length * 80, 800)) + 'px';
                             this.option.yAxis = {
                                 type: 'category',
                                 data: cate
@@ -196,8 +202,17 @@
                                 }
                             ];
                             if (cb) cb()
+                            if (this.chart) { //随数据多少自适应高度
+                                if (cate.length > 3) {
+                                    this.chart.getDom().style.height = (Math.min(cate.length * 80, 800)) + 'px';
+                                } else {
+                                    this.chart.getDom().style.height = '250px'
+                                }
+                                this.chart.resize()
+                            }
                         } else this.$Message.error(res.desc)
-                    }
+                    },
+                    error: () => this.loading = false
                 })
             }
         }

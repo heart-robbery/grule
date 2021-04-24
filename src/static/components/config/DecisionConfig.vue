@@ -265,7 +265,7 @@
                     url: this.url,
                     data: this.items.map((param) => {let o={}; o[param.code] = param.value; return o}).reduce((o1, o2) => {let o = {...o1, ...o2}; return o}),
                     success: (res) => {
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.result = JSON.stringify(res.data, null, 4).trim();
                             this.$Message.success(`测试调用: ${this.decision.name} 成功`);
                             app.$data.tmp.testResultId = res.data.id;
@@ -338,7 +338,7 @@
                         $.ajax({
                             url: 'mnt/delDecision/' + item.id,
                             success: (res) => {
-                                if (res.code == '00') {
+                                if (res.code === '00') {
                                     this.$Message.success(`删除决策: ${item.name}成功`);
                                   this.load();
                                   localStorage.removeItem('rule.test.' + item.decisionId)
@@ -360,7 +360,7 @@
                     type: 'post',
                     data: {id: decision.id, dsl: decision.dsl, apiConfig: decision.apiConfigO ? JSON.stringify(decision.apiConfigO) : decision.apiConfig},
                     success: (res) => {
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             if (decision.id) {
                                 $.extend(decision, res.data);
                                 //decision.apiConfigO = decision.apiConfig ? JSON.parse(decision.apiConfig) : null;
@@ -437,7 +437,7 @@
                     data: $.extend({page: page.page || 1, pageSize: 5, decisionId: this.tabs.showId}, this.model),
                     success: (res) => {
                         this.decisionLoading = false;
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.decision = res.data;
                         } else this.$Notice.error(res.desc)
                     },

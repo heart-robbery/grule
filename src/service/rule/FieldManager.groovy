@@ -94,33 +94,26 @@ class FieldManager extends ServerTpl {
             throw new RuntimeException("Field '$aName' not belong to '${ctx.decisionHolder.decision.name}'")
         }
         if (ctx.dataCollectResult.containsKey(collectorId)) { // 已查询过
-            def value = ctx.dataCollectResult.get(collectorId)
-            return value instanceof Map ? value.get(aName) : value
+            def collectResult = ctx.dataCollectResult.get(collectorId)
+            return collectResult instanceof Map ? (collectResult.containsKey(aName) ? collectResult.get(aName) : collectResult.get(alias(aName))) : collectResult
         }
 
         // 函数执行
         def doApply = {Function<DecisionContext, Object> fn ->
             log.debug(ctx.logPrefix() + "Get attr '{}' value apply function: '{}'", aName, "${collectors[collectorId]}($collectorId)".toString())
-            def v = null
+            def collectResult = null
             try {
-                v = fn.apply(ctx)
+                collectResult = fn.apply(ctx)
             } catch (ex) { // 接口执行报错, 默认继续往下执行规则
                 log.error(ctx.logPrefix() + "数据收集器'${collectors[collectorId]}($collectorId)' 执行错误".toString(), ex)
             }
-            if (v instanceof Map) { // 收集器,收集结果为多个属性的值, 则暂先保存
-                Map<String, Object> result = new HashMap<>()
-                ctx.dataCollectResult.put(collectorId, result)
-                v.each {entry ->
-                    String k = (String) entry.key
-                    result.put(k, entry.value)
-                    k = alias(k)
-                    if (k) result.put(k, entry.value)
-                }
-                return result.get(aName)
+            if (collectResult instanceof Map) { // 收集器,收集结果为多个属性的值, 则暂先保存
+                ctx.dataCollectResult.put(collectorId, collectResult)
+                return collectResult.containsKey(aName) ? collectResult.get(aName) : collectResult.get(alias(aName))
             }
             else {
-                ctx.dataCollectResult.put(collectorId, v)
-                return v
+                ctx.dataCollectResult.put(collectorId, collectResult)
+                return collectResult
             }
         }
 

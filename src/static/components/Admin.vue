@@ -116,7 +116,7 @@
                     $.ajax({
                         url: 'mnt/logout',
                         success: (res) => {
-                            if (res.code == '00') {
+                            if (res.code === '00') {
                                 location.reload();
                             } else this.$Notice.error(res.desc)
                         }
