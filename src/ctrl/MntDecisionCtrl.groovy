@@ -434,7 +434,7 @@ class MntDecisionCtrl extends ServerTpl {
         if ('http' == collector.type) {
             if (!url) return ApiResp.fail('Param url not empty')
             if (!method) return ApiResp.fail('Param method not empty')
-            if (!contentType) return ApiResp.fail('Param contentType not empty')
+            if (!contentType && !'get'.equalsIgnoreCase(method)) return ApiResp.fail('Param contentType not empty')
             if (!url.startsWith("http") && !url.startsWith('${')) return ApiResp.fail('Param url incorrect')
             collector.parseScript = parseScript?.trim()
             if (collector.parseScript && !collector.parseScript.startsWith("{") && !collector.parseScript.endsWith("}")) {
