@@ -110,16 +110,16 @@
                         </h-formitem>
 
                         <h-formitem v-show="model.type == 'http'" label="是否成功" icon="h-icon-complete" prop="dataSuccessScript" single>
-                          <ace-groovy v-model="model.dataSuccessScript" height="90px" width="670px" ></ace-groovy>
+                          <ace-groovy v-model="model.dataSuccessScript" style="height: 90px; width: 670px"></ace-groovy>
                         </h-formitem>
                         <h-formitem v-show="model.type == 'http'" label="结果解析" icon="h-icon-complete" prop="parseScript" single>
-                          <ace-groovy v-model="model.parseScript" height="190px" width="670px" ></ace-groovy>
+                          <ace-groovy v-model="model.parseScript" style="height: 190px; width: 670px"></ace-groovy>
                         </h-formitem>
                         <h-formitem v-show="model.type == 'script'" label="值计算脚本" icon="h-icon-complete" prop="computeScript" single>
-                          <ace-groovy v-model="model.computeScript" height="300px" width="670px" ></ace-groovy>
+                          <ace-groovy v-model="model.computeScript" style="height: 300px; width: 670px"></ace-groovy>
                         </h-formitem>
                         <h-formitem v-show="model.type == 'sql'" label="sql执行脚本" icon="h-icon-complete" prop="sqlScript" single>
-                          <ace-groovy v-model="model.sqlScript" height="250px" width="670px" ></ace-groovy>
+                          <ace-groovy v-model="model.sqlScript" style="height: 250px, width: 670px"></ace-groovy>
                         </h-formitem>
                         <h-formitem single>
                                 <h-button v-if="model.id" color="primary" :loading="isLoading" @click="update">提交</h-button>
@@ -130,14 +130,16 @@
                 `,
         props: ['collector'],
         data() {
-            let defaultModel = {type: 'http', method: 'GET', timeout: 10000, minIdle: 1, maxActive: 5, dataSuccessScript:
-`{resultStr ->
-    return resultStr ? JSON.parseObject(resultStr)?['code'] == '0000' : false
-}`
-            };
             return {
-                isLoading: false, defaultModel: defaultModel,
-                model: this.collector ? $.extend({sqlScript: '', computeScript: '', parseScript: '', dataSuccessScript: ''}, this.collector) : defaultModel,
+                isLoading: false,
+                model: this.collector ? $.extend({sqlScript: '', computeScript: '', parseScript: '', dataSuccessScript: ''}, this.collector): {
+                    type: 'http', method: 'GET', timeout: 10000, minIdle: 1, maxActive: 5, dataSuccessScript:
+`{resultStr, respCode -> // 接口返回的字符串, 接口http响应码(如果是缓存则为空)
+    return (respCode == null || respCode == 200) && resultStr
+}`, parseScript: `{resultStr, respCode -> // 接口返回的字符串, 接口http响应码(如果是缓存则为空)
+    return resultStr
+}`
+                },
                 validationRules: {
                     required: ['name', 'type']
                 },

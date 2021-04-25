@@ -139,11 +139,10 @@ Vue.component('ace-json', (resolve, reject) => {
         loadJs('ace-tools', 'ace-lang-json', () => {
             resolve({
                 model: {prop: 'content', event: 'update'},
-                props: {content: String, width: String, height: String, readonly: Boolean},
-                template: '<div ref="editor" v-bind:style="{height: heightPx, width: widthPx}"></div>',
+                props: {content: String, readonly: Boolean},
+                template: '<div ref="editor" style="height: 200px; width: 99%"></div>',
                 data() {
                     return {
-                        widthPx: this.width || '100%', heightPx: this.height || '250px',
                         editor: null
                     }
                 },
@@ -197,11 +196,10 @@ Vue.component('ace-groovy', (resolve, reject) => {
         loadJs('ace-tools', 'ace-lang-groovy', 'ace-snip-groovy', () => {
             resolve({
                 model: {prop: 'content', event: 'update'},
-                props: {content: String, width: String, height: String, readonly: Boolean},
-                template: '<div ref="editor" v-bind:style="{height: heightPx, width: widthPx}"></div>',
+                props: {content: String, readonly: Boolean},
+                template: '<div ref="editor" style="height: 250px; width: 99%"></div>',
                 data() {
                     return {
-                        widthPx: this.width || '100%', heightPx: this.height || '250px',
                         editor: null
                     }
                 },

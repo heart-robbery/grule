@@ -28,7 +28,7 @@
                             </span>
                         </template>
                         <ace-groovy v-if="collapse && collapse.length > 0 && collapse[0] == item.decisionId"
-                                    v-model="item.dsl" height="650px" width="90%" @save="save(item)" :readonly="item._readonly">
+                                    v-model="item.dsl" style="height: 650px" @save="save(item)" :readonly="item._readonly">
                         </ace-groovy>
                     </h-collapseitem>
                 </h-collapse>
@@ -128,7 +128,7 @@
                                         <input type="text" v-model="data.regex" />
                                     </h-formitem>
                                     <h-formitem v-if="data.type == 'Str'" label="验证函数">
-                                        <ace-groovy v-model="data.validFun" height="80px"></ace-groovy>
+                                        <ace-groovy v-model="data.validFun" style="height: 80px}"></ace-groovy>
                                     </h-formitem>
 
                                     <h-formitem v-if="data.type == 'Int'" label="最小值">
@@ -227,7 +227,7 @@
                 </h-cell>
             </h-row>
             <h-row>
-                <ace-json v-model="result" height="200px" width="99%" :readonly="true"></ace-json>
+                <ace-json v-model="result" :readonly="true"></ace-json>
             </h-row>
             </div>
         `,
