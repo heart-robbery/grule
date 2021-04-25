@@ -619,7 +619,7 @@ class MntDecisionCtrl extends ServerTpl {
 
 
     @Path(path = 'delField/:id')
-    ApiResp delField(HttpContext hCtx, String id) {
+    ApiResp delField(HttpContext hCtx, Long id) {
         if (!id) return ApiResp.fail("Param id not empty")
         hCtx.auth('field-del')
         def field = repo.findById(RuleField, id)

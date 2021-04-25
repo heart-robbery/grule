@@ -185,7 +185,7 @@ class FieldManager extends ServerTpl {
 
     // ======================= 监听变化 ==========================
     @EL(name = ['fieldChange', 'field.dataVersion'], async = true)
-    void listenFieldChange(EC ec, String id) {
+    void listenFieldChange(EC ec, Long id) {
         def field = repo.findById(RuleField, id)
         if (field == null) {
             for (def itt = fieldMap.iterator(); itt.hasNext(); ) {
