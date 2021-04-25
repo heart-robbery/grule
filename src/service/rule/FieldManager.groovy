@@ -20,6 +20,7 @@ import groovy.sql.Sql
 import groovy.text.GStringTemplateEngine
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.ImportCustomizer
+import org.slf4j.LoggerFactory
 
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
@@ -100,7 +101,7 @@ class FieldManager extends ServerTpl {
 
         // 函数执行
         def doApply = {Function<DecisionContext, Object> fn ->
-            log.debug(ctx.logPrefix() + "Get attr '{}' value apply function: '{}'", aName, "${collectors[collectorId]}($collectorId)".toString())
+            log.debug(ctx.logPrefix() + "Get attr '{}' value apply function: '{}'", aName, "${collectors[collectorId].collector.name}($collectorId)".toString())
             def collectResult = null
             try {
                 collectResult = fn.apply(ctx)
@@ -375,6 +376,7 @@ if (idNumber && idNumber.length() > 17) {
         Binding binding = new Binding()
         def config = new CompilerConfiguration()
         binding.setProperty('DB', db)
+        binding.setProperty('LOG', LoggerFactory.getLogger("ROOT"))
         def icz = new ImportCustomizer()
         config.addCompilationCustomizers(icz)
         icz.addImports(JSON.class.name, JSONObject.class.name, Utils.class.name)
@@ -471,6 +473,7 @@ if (idNumber && idNumber.length() > 17) {
             log.warn("Script collector'$collector.name' script must not be empty".toString()); return
         }
         Binding binding = new Binding()
+        binding.setProperty('LOG', LoggerFactory.getLogger("ROOT"))
         def config = new CompilerConfiguration()
         def icz = new ImportCustomizer()
         config.addCompilationCustomizers(icz)
@@ -518,6 +521,7 @@ if (idNumber && idNumber.length() > 17) {
         Closure parseFn
         if (collector.parseScript) { // 结果解析函数
             Binding binding = new Binding()
+            binding.setProperty('LOG', LoggerFactory.getLogger("ROOT"))
             def config = new CompilerConfiguration()
             def icz = new ImportCustomizer()
             config.addCompilationCustomizers(icz)
@@ -545,6 +549,11 @@ if (idNumber && idNumber.length() > 17) {
             String bodyStr = collector.bodyStr // http 请求 body字符串
             String cacheKey // 缓存key
             boolean cache = false //结果是否取自缓存
+            Integer respCode // http响应码
+
+            String retryMsg = '' //重试消息
+            // 日志字符串
+            def logMsg = "${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}接口调用${ -> retryMsg}: name: $collector.name, url: ${ -> url}${ -> bodyStr == null ? '' : ', body: ' + bodyStr}${ -> respCode ? ', respCode: ' + respCode : ''}${ -> ', result: ' + result}${ -> resolveResult == null ? '' : ', resolveResult: ' + resolveResult}"
 
             //1. 先从缓存中取
             if (collector.cacheTimeout && collector.cacheKey) {
@@ -619,25 +628,24 @@ if (idNumber && idNumber.length() > 17) {
                         }
                     }).toString()
                 }
-                // NOTE: 如果是json 并且是,} 结尾, 则删除 最后的,(因为spring解析入参数会认为json格式错误)
-                // if (bodyStr.endsWith(',}')) bodyStr = bodyStr.substring(0, bodyStr.length() - 3) + '}'
-                String retryMsg = ''
-                // 日志消息
-                def logMsg = "${ctx.logPrefix()}接口调用${ -> retryMsg}: name: $collector.name, url: ${ -> url}, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}"
                 try {
                     start = new Date() // 调用时间
                     for (int i = 0, times = getInteger('http.retry', 2) + 1; i < times; i++) { // 接口一般遇网络错重试2次
                         try {
                             retryMsg = i > 0 ? "(重试第${i}次)" : ''
                             if ('get'.equalsIgnoreCase(collector.method)) {
-                                result = http.get(url).execute()
+                                def h = http.get(url)
+                                result = h.execute()
+                                respCode = h.respCode
                             } else if ('post'.equalsIgnoreCase(collector.method)) {
-                                result = http.post(url).textBody(bodyStr).contentType(collector.contentType).execute()
+                                def h = http.post(url)
+                                result = h.textBody(bodyStr).contentType(collector.contentType).execute()
+                                respCode = h.respCode
                             } else throw new Exception("Not support http method $collector.method")
                             break
                         } catch (ex) {
                             if ((ex instanceof ConnectException) && (i + 1) < times) {
-                                log.error(logMsg.toString() + ", 异常: " + (ex.class.simpleName + ': ' + ex.message))
+                                log.warn(logMsg.toString() + ", 异常: " + (ex.class.simpleName + ': ' + ex.message))
                                 continue
                             } else throw ex
                         } finally {
@@ -645,7 +653,7 @@ if (idNumber && idNumber.length() > 17) {
                         }
                     }
                 } catch (ex) {
-                    log.error(logMsg.toString() + ", 异常: ", ex)
+                    log.error(logMsg.toString(), ex)
                     dataCollected(new CollectRecord(
                         decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.id,
                         status: (ex instanceof ConnectException) ? 'E001': 'EEEE', dataStatus: (ex instanceof ConnectException) ? 'E001': 'EEEE',
@@ -662,7 +670,7 @@ if (idNumber && idNumber.length() > 17) {
             }
 
             //3. 判断http返回结果是否为有效数据. 默认有效(0000)
-            String dataStatus = successFn ? (successFn.rehydrate(ctx.data, successFn, this)(result) ? '0000' : '0001') : '0000'
+            String dataStatus = successFn ? (successFn.rehydrate(ctx.data, successFn, this)(result, respCode) ? '0000' : '0001') : '0000'
 
             //4. 如果接口返回的是有效数据, 则缓存
             if ('0000' == dataStatus && cacheKey) {
@@ -680,14 +688,14 @@ if (idNumber && idNumber.length() > 17) {
             if (parseFn && dataStatus == '0000') {
                 Exception ex
                 try {
-                    resolveResult = parseFn.rehydrate(ctx.data, parseFn, this)(result)
+                    resolveResult = parseFn.rehydrate(ctx.data, parseFn, this)(result, respCode)
                 } catch (e) {
                     ex = e
                 } finally {
                     if (ex) {
-                        log.error("${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}接口调用: name: $collector.name, url: ${ -> url}, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}".toString() + ", 解析函数执行失败", ex)
+                        log.error(logMsg.toString() + ", 解析函数执行失败", ex)
                     } else {
-                        log.info("${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}接口调用: name: $collector.name, url: ${ -> url}, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}".toString())
+                        log.info(logMsg.toString())
                     }
                     dataCollected(new CollectRecord(
                         decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.id,
@@ -700,7 +708,7 @@ if (idNumber && idNumber.length() > 17) {
                 return resolveResult
             }
 
-            log.info("${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}接口调用: name: $collector.id, url: ${ -> url}, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}".toString())
+            log.info(logMsg.toString())
             dataCollected(new CollectRecord(
                 decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.id,
                 status: '0000', dataStatus: dataStatus, collectDate: start, collectorType: collector.type,
@@ -754,17 +762,22 @@ if (idNumber && idNumber.length() > 17) {
             String result // 接口返回结果字符串
             Object resolveResult // 解析接口返回结果
 
+            Integer respCode //http响应码
             if ('get'.equalsIgnoreCase(collector.method)) {
-                result = http.get(url).debug().execute()
+                def h = http.get(url)
+                result = h.debug().execute()
+                respCode = h.respCode
             } else if ('post'.equalsIgnoreCase(collector.method)) {
-                result = http.post(url).textBody(bodyStr).contentType(collector.contentType).debug().execute()
+                def h = http.post(url)
+                result = h.textBody(bodyStr).contentType(collector.contentType).debug().execute()
+                respCode = h.respCode
             } else throw new Exception("Not support http method $collector.method")
 
             // http 返回结果成功判断. 默认成功
-            String dataStatus = successFn ? (successFn.rehydrate(param, successFn, this)(result) ? '0000' : '0001') : '0000'
+            String dataStatus = successFn ? (successFn.rehydrate(param, successFn, this)(result, respCode) ? '0000' : '0001') : '0000'
 
             if (parseFn && dataStatus == '0000') { // 解析接口返回结果
-                return parseFn.rehydrate(param, parseFn, this)(result)
+                return parseFn.rehydrate(param, parseFn, this)(result, respCode)
             }
             return dataStatus == '0000' ? result : null
         }))

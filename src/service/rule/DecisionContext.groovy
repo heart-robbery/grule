@@ -93,12 +93,12 @@ class DecisionContext {
             }
             if (decideResult?.block || !ruleIterator.hasNext()) {
                 end.set(true); decideResult = decideResult?:DecideResult.Accept; status = '0000'
-                log.info(logPrefix() + "结束成功. 共执行: " + (summary()['spend']) + "ms "  + result())
+                log.info(logPrefix() + "结束成功. 共执行: " + (summary()['spend']) + "ms. result: "  + result())
                 ep?.fire("decision.end", this)
             }
         } catch (Throwable ex) {
             end.set(true); decideResult = DecideResult.Reject; status = 'EEEE'; this.exception = ex
-            log.error(logPrefix() + "结束错误. 共执行: " + (summary()['spend']) + "ms " + result(), ex)
+            log.error(logPrefix() + "结束错误. 共执行: " + (summary()['spend']) + "ms. result: " + result(), ex)
             ep?.fire("decision.end", this)
         }
     }
@@ -404,7 +404,7 @@ class DecisionContext {
                 decideId: id, result: decideResult, decisionId: decisionHolder.decision.decisionId,
                 status  : status,
                 desc    : exception?.toString(),
-                data    : end.get() ? decisionHolder.spec.returnAttrs.collectEntries { name ->
+                data    : end.get() && decisionHolder.spec.returnAttrs ? decisionHolder.spec.returnAttrs.collectEntries { name ->
                 def v = data.get(name)
                 if (v instanceof Optional) {
                     v = v.orElseGet({ null })

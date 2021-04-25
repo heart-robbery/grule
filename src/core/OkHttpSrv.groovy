@@ -157,6 +157,7 @@ class OkHttpSrv extends ServerTpl {
         protected       String                               contentType
         protected       String                               bodyStr
         protected       boolean                              debug
+        protected       Integer                              respCode
 
         protected OkHttp(String urlStr, Request.Builder builder) {
             if (builder == null) throw new NullPointerException('builder == null')
@@ -208,8 +209,10 @@ class OkHttpSrv extends ServerTpl {
             this
         }
         OkHttp debug() {this.debug = true; this}
+
+        Integer getRespCode() { return respCode }
         // 请求执行
-        def execute(Consumer<String> okFn = null, Consumer<Exception> failFn = {throw it}) {
+        def execute(Consumer<String> okFn = null, BiConsumer<Integer, Exception> failFn = {throw it}) {
             List<File> tmpFile = null
             if ('GET' == builder.method) { // get 请求拼装参数
                 urlStr = Utils.buildUrl(urlStr, params)
@@ -279,6 +282,8 @@ class OkHttpSrv extends ServerTpl {
 
             def result
             def ex
+            // 日志消息
+            def logMsg = "Send http(${builder.method}): ${url.toString()}${ -> bodyStr ? ', body: ' + bodyStr : ''}${ -> params ? ', params: ' + params : ''}${ -> fileStreams ? "fileStreams: " + fileStreams.join(",") : ''}${ -> respCode == null ? '' : ' respCode: ' + respCode}${ -> result == null ? '' : ' result: ' + result}"
             try {
                 // 发送请求
                 def call =  client.newCall(builder.url(url).build())
@@ -286,23 +291,18 @@ class OkHttpSrv extends ServerTpl {
                     call.enqueue(new Callback() {
                         @Override
                         void onFailure(Call c, IOException e) {
-                            log.error('Send http: '+urlStr+', params: ' + params?:bodyStr, e)
+                            log.error(logMsg.toString(), e)
                             tmpFile?.each {it.delete()}
-                            failFn?.accept(e)
+                            failFn?.accept(respCode, e)
                         }
 
                         @Override
                         void onResponse(Call c, Response resp) throws IOException {
                             result = resp.body()?.string()
-                            if (200 != resp.code()) {
-                                log.error('Send http: {}, params: {}, ' + (fileStreams ? "fileStreams: " + fileStreams.join(",") : '') + ' result: ' + Objects.toString(result, ''), urlStr, params?:bodyStr)
-                                tmpFile?.each {it.delete()}
-                                failFn?.accept(new Exception("Http error. code: ${resp.code()}, url: $urlStr, resp: ${Objects.toString(result, '')}"))
-                            } else {
-                                log.info('Send http: {}, params: {}, ' + (fileStreams ? "fileStreams: " + fileStreams.join(",") : '') + 'result: ' + Objects.toString(result, ''), urlStr, params?:bodyStr)
-                                tmpFile?.each {it.delete()}
-                                okFn?.accept(result)
-                            }
+                            respCode = resp.code()
+                            if (debug) log.info(logMsg.toString())
+                            tmpFile?.each {it.delete()}
+                            okFn?.accept(result)
                         }
                     })
                     null
@@ -310,21 +310,19 @@ class OkHttpSrv extends ServerTpl {
                     def resp = call.execute()
                     result = resp.body()?.string()
                     tmpFile?.each {it.delete()}
-                    if (200 != resp.code()) {
-                        throw new RuntimeException("Http error. code: ${resp.code()}, url: $urlStr, resp: ${Objects.toString(result, '')}")
-                    }
+                    respCode = resp.code()
                 }
             } catch(Exception t) {
                 ex = t
             }
             if (debug && !okFn) {
                 if (ex) {
-                    log.error('Send http: ' + urlStr + ', params: ' + (params?:bodyStr) + (fileStreams ? ", fileStreams: " + fileStreams.join(",") : ''), ex)
+                    log.error(logMsg.toString(), ex)
                 } else {
-                    log.info('Send http: {}, params: {}, ' + (fileStreams ? "fileStreams: " + fileStreams.join(";") : '') + ' result: ' + Objects.toString(result, ''), urlStr, params?:bodyStr)
+                    log.info(logMsg.toString())
                 }
             }
-            // if (ex) throw ex
+            if (ex) throw ex
             return result
         }
     }
