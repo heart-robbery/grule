@@ -6,7 +6,6 @@ import cn.xnatural.jpa.Repo
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.serializer.SerializerFeature
 import core.OkHttpSrv
-import entity.CollectRecord
 import entity.DecideRecord
 
 import java.time.Duration
@@ -99,63 +98,43 @@ class DecisionSrv extends ServerTpl {
 
 
     /**
-     * 清理过期CollectResult数据
+     * 计划清理过期DecideRecord数据
      */
-    long cleanCollectResult() {
+    long cleanDecideRecord() {
         long cleanTotal = 0
-        def keepCount = getLong("collectResult.keepCount", 0)
-        if (keepCount > 0) { //保留多少条数据
-            def total = repo.count(CollectRecord)
-            while (total > keepCount) {
-                def cr = repo.find(CollectRecord) { root, query, cb -> query.orderBy(cb.desc(root.get("collectDate")))}
-                repo.delete(cr)
-                total--; cleanTotal++
-                log.info("Deleted expire collectResult data: {}", JSON.toJSONString(cr))
+
+        // DecideRecord 清理函数
+        def clean = {DecideRecord dr ->
+            int count = repo.trans { session ->
+                // 删除关联的 收集器记录
+                session.createQuery("delete from CollectRecord where decideId=:decideId")
+                        .setParameter("decideId", dr.id).executeUpdate()
+                session.createQuery("delete from DecideRecord where id=:id")
+                        .setParameter("id", dr.id).executeUpdate()
             }
+            cleanTotal += count
+            log.info("Deleted expire decideRecord data: {}", JSON.toJSONString(dr))
         }
-        def keepDay = getInteger("collectResult.keepDay", 0)
-        if (keepDay > 0) { //保留多天的数据
-            def cal = Calendar.getInstance()
-            cal.add(Calendar.DAY_OF_MONTH, -keepDay)
-            do {
-                def cr = repo.find(CollectRecord) { root, query, cb -> query.orderBy(cb.desc(root.get("collectDate")))}
-                if (cr.collectDate == null || cr.collectDate < cal.time) {
-                    repo.delete(cr)
-                    cleanTotal++
-                    log.info("Deleted expire collectResult data: {}", JSON.toJSONString(cr))
-                } else break
-            } while (true)
-        }
-        return cleanTotal
-    }
 
-
-    /**
-     * 计划清理过期DecisionResult数据
-     */
-    long cleanDecisionResult() {
-        long cleanTotal = 0
-        def keepCount = getLong("decisionResult.keepCount", 0)
-        if (keepCount > 0) { //保留多少条数据
+        //保留多少条数据. NOTE: 不能多个进程同时删除(多删)
+        def keepCount = getLong("decideRecord.keepCount", 0)
+        if (keepCount > 0) {
             def total = repo.count(DecideRecord)
             while (total > keepCount) {
-                def dr = repo.find(DecideRecord) { root, query, cb -> query.orderBy(cb.desc(root.get("occurTime")))}
-                repo.delete(dr)
-                total--; cleanTotal++
-                log.info("Deleted expire decisionResult data: {}", JSON.toJSONString(dr))
+                clean(repo.find(DecideRecord) { root, query, cb -> query.orderBy(cb.asc(root.get("occurTime")))})
+                total--
             }
         }
-        def keepDay = getInteger("decisionResult.keepDay", 0)
-        if (keepDay > 0) { //保留多天的数据
+
+        //保留多天的数据,如果 配置了decideRecord.keepCount 则不执行此清理
+        def keepDay = getInteger("decideRecord.keepDay", 0)
+        if (keepDay > 0 && !keepCount) {
             def cal = Calendar.getInstance()
             cal.add(Calendar.DAY_OF_MONTH, -keepDay)
             do {
-                def dr = repo.find(DecideRecord) { root, query, cb -> query.orderBy(cb.desc(root.get("occurTime")))}
-                if (dr.occurTime == null || dr.occurTime < cal.time) {
-                    repo.delete(dr)
-                    cleanTotal++
-                    log.info("Deleted expire decisionResult data: {}", JSON.toJSONString(dr))
-                } else break
+                def dr = repo.find(DecideRecord) { root, query, cb -> query.orderBy(cb.asc(root.get("occurTime")))}
+                if (dr.occurTime == null || dr.occurTime < cal.time) clean(dr)
+                else break
             } while (true)
         }
         return cleanTotal

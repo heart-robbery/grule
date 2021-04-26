@@ -653,12 +653,8 @@ class MntDecisionCtrl extends ServerTpl {
         hCtx.auth("grant")
         def srv = bean(DecisionSrv)
         if (srv) {
-            queue("cleanCollectResult") {
-                def total = srv.cleanCollectResult()
-                ep.fire("globalMsg", "清理过期收集数据结束. 共计: " + total)
-            }
-            queue("cleanDecisionResult") {
-                def total = srv.cleanDecisionResult()
+            queue("cleanDecideRecord") {
+                def total = srv.cleanDecideRecord()
                 ep.fire("globalMsg", "清理过期决策数据结束. 共计: " + total)
             }
             return ApiResp.ok().desc("等待后台清理完成...")
