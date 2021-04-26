@@ -415,7 +415,7 @@ class MntDecisionCtrl extends ServerTpl {
             }
             throw ex
         }
-        ep.fire('fieldChange', field.enName)
+        ep.fire('fieldChange', field.id)
         ep.fire('enHistory', field, hCtx.getSessionAttr('uName'))
         ApiResp.ok(field)
     }
@@ -526,7 +526,7 @@ class MntDecisionCtrl extends ServerTpl {
             }
             throw ex
         }
-        ep.fire('fieldChange', field.enName)
+        ep.fire('fieldChange', field.id)
         ep.fire('enHistory', field, hCtx.getSessionAttr('uName'))
         ApiResp.ok(field)
     }
