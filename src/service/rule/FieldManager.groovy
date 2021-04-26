@@ -106,7 +106,7 @@ class FieldManager extends ServerTpl {
             try {
                 collectResult = fn.apply(ctx)
             } catch (ex) { // 接口执行报错, 默认继续往下执行规则
-                log.error(ctx.logPrefix() + "数据收集器'${collectors[collectorId]}($collectorId)' 执行错误".toString(), ex)
+                log.error(ctx.logPrefix() + "数据收集器'${collectors[collectorId].collector.name}($collectorId)' 执行错误".toString(), ex)
             }
             if (collectResult instanceof Map) { // 收集器,收集结果为多个属性的值, 则暂先保存
                 ctx.dataCollectResult.put(collectorId, collectResult)
