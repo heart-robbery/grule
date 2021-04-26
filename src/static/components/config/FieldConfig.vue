@@ -286,7 +286,7 @@
                 this.$Confirm(`删除字段: ${field.cnName}`, '确定删除?').then(() => {
                     this.$Message(`删除字段: ${field.cnName}`);
                     $.ajax({
-                        url: 'mnt/delField/' + field.enName,
+                        url: 'mnt/delField/' + field.id,
                         success: (res) => {
                             if (res.code === '00') {
                                 this.$Message.success(`删除字段: ${field.cnName} 成功`);

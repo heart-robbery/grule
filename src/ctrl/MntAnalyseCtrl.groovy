@@ -40,7 +40,7 @@ class MntAnalyseCtrl extends ServerTpl {
         String sql = """
             select t1.decision_id, t2.name decisionName, t1.result, count(1) total from ${repo.tbName(DecideRecord).replace("`", '')} t1
             left join decision t2 on t1.decision_id = t2.id
-            where t1.result is not null and t1.occur_time>=:start${end ? " and t1.occur_time<=:end" : ""} and t1.decision_id in (:ids) 
+            where t1.occur_time>=:start${end ? " and t1.occur_time<=:end" : ""} and t1.decision_id in (:ids) and t1.result is not null 
             group by t1.decision_id, t1.result
         """.trim()
         ApiResp.ok(end ? repo.rows(sql, start, end, ids) : repo.rows(sql, start, ids))
@@ -67,9 +67,12 @@ class MntAnalyseCtrl extends ServerTpl {
         if (!ids) return ApiResp.ok().desc("无可查看的决策")
         hCtx.response.cacheControl(5) // 缓存5秒
         String sql = """
-            select t1.decision_id decisionId, t2.name decisionName, t1.detail from ${repo.tbName(DecideRecord).replace("`", '')} t1
+            select t1.decision_id decisionId, t2.name decisionName, t1.detail 
+            from ${repo.tbName(DecideRecord).replace("`", '')} t1
             left join decision t2 on t1.decision_id = t2.id
-            where t1.result is not null and t1.detail is not null and t1.occur_time>=:start${end ? " and t1.occur_time<=:end" : ""} and t1.decision_id in (:ids)
+            where 
+                t1.occur_time>=:start${end ? " and t1.occur_time<=:end" : ""} and t1.decision_id in (:ids)
+                and t1.detail is not null and t1.result is not null
         """.trim()
         def ls = [] as LinkedList
         for (int page = 1, pageSize = 200; ;page++) {
