@@ -119,7 +119,7 @@
                           <ace-groovy v-model="model.computeScript" style="height: 300px; width: 670px"></ace-groovy>
                         </h-formitem>
                         <h-formitem v-show="model.type == 'sql'" label="sql执行脚本" icon="h-icon-complete" prop="sqlScript" single>
-                          <ace-groovy v-model="model.sqlScript" style="height: 250px, width: 670px"></ace-groovy>
+                          <ace-groovy v-model="model.sqlScript" style="height: 250px; width: 670px"></ace-groovy>
                         </h-formitem>
                         <h-formitem single>
                                 <h-button v-if="model.id" color="primary" :loading="isLoading" @click="update">提交</h-button>
