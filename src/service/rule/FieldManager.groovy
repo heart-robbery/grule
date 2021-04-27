@@ -146,11 +146,11 @@ class FieldManager extends ServerTpl {
 
     /**
      * 决策产生的数据接口调用
-     * @param collectResult CollectResult
+     * @param collectRecord CollectResult
      */
-    protected void dataCollected(CollectRecord collectResult) {
+    protected void dataCollected(CollectRecord collectRecord) {
         queue(DATA_COLLECTED) {
-            repo.saveOrUpdate(collectResult)
+            repo.saveOrUpdate(collectRecord)
         }
     }
 
@@ -200,7 +200,7 @@ class FieldManager extends ServerTpl {
         }
         def remoter = bean(Remoter)
         if (remoter && ec?.source() != remoter) { // 不是远程触发的事件
-            remoter.dataVersion('field').update(id, field ? field.updateTime.time : System.currentTimeMillis(), null)
+            remoter.dataVersion('field').update(id.toString(), field ? field.updateTime.time : System.currentTimeMillis(), null)
         }
     }
 
