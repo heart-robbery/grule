@@ -28,7 +28,7 @@ class DecisionContext {
     @Lazy Map<String, Object> data = new Data(this)
     // 执行的策略集
     final List<PassedPolicy> policies = new LinkedList<>()
-    // 数据收集器名 -> 数据收集结果集. 不用 ConcurrentHashMap 因为不能放null值
+    // 数据key -> 数据收集结果集. 不用 ConcurrentHashMap 因为不能放null值
     final Map<String, Object> dataCollectResult = new LinkedHashMap<>()
     // 过程数据: 决策(非策略,规则)
     final Map<String, Object> decisionData = new LinkedHashMap<>()
@@ -206,6 +206,9 @@ class DecisionContext {
                     } else if (e.v1 == 'Operate') { // 执行策略操作函数
                         log.trace(logPrefix() + "开始执行策略操作函数")
                         e.v2.call(ctx.data)
+                    } else if (e.v1 == 'Clear') { // 执行策略清理函数
+                        log.trace(logPrefix() + "开始执行策略清理函数")
+                        e.v2.call(ctx.data)
                     } else throw new IllegalArgumentException('策略不支持类型函数: ' + e.v1)
                 }
                 // 创建策略的规则迭代器
@@ -223,6 +226,11 @@ class DecisionContext {
      */
     protected class Data extends LinkedHashMap<String, Object> {
         final DecisionContext ctx
+        /**
+         * 属性值来源: 为了解决优先级,及重新获取的问题
+         * 优先级: 执行上下文设置 > input > 收集器(可重复计算)
+         */
+        final Map<String, String> valueFromMap = new HashMap<>()
 
         Data(DecisionContext ctx) {this.ctx = ctx}
 
@@ -238,31 +246,37 @@ class DecisionContext {
         @Override
         Object get(Object aName) {
             if (aName == null) return null
-            //函数名
+            // 函数名
             if (ctx.decisionHolder.spec.functions.containsKey(aName)) return null
 
-            def value = super.get(aName)
-            if (value == null && !super.containsKey(aName) && !ctx.end.get()) {// 属性值未找到,则从属性管理器获取
-                // 代表属性已从外部获取过,后面就不再去获取了(防止重复获取). TODO 循环属性获取链
-                safeSet(aName.toString(), null)
-                boolean fromInput
-                if (ctx.input) { //先从入参里面获取
-                    if (ctx.input.containsKey(aName)) {
-                        fromInput = true
-                        safeSet((String) aName, ctx.input.get(aName))
-                    } else {
-                        def alias = ctx.getFieldManager().alias(aName)
-                        if (alias != null && ctx.input.containsKey(alias)) {
+            if (!ctx.end.get()) {
+                // 属性值已存在
+                if (super.containsKey(aName)) {
+                    // 判断是否需要重尝试新计算
+                    if (valueFromMap.get(aName) == 'collector') {
+                        safeSet((String) aName, ctx.getFieldManager().dataCollect(aName.toString(), ctx), 'collector')
+                    }
+                } else { // 第一次获取属性值
+                    safeSet(aName.toString(), null, null) // 占位. 解决 循环属性获取链
+                    boolean fromInput = false
+                    if (ctx.input) { //数据源1: 先从入参里面获取
+                        if (ctx.input.containsKey(aName)) {
                             fromInput = true
-                            safeSet((String) aName, ctx.input.get(alias))
+                            safeSet((String) aName, ctx.input.get(aName), 'input')
+                        } else {
+                            def alias = ctx.getFieldManager().alias(aName)
+                            if (alias != null && ctx.input.containsKey(alias)) {
+                                fromInput = true
+                                safeSet((String) aName, ctx.input.get(alias), 'input')
+                            }
                         }
                     }
+                    if (!fromInput) { //数据源2: 再从数据收集器获取
+                        safeSet((String) aName, ctx.getFieldManager().dataCollect(aName.toString(), ctx), 'collector')
+                    }
                 }
-                if (!fromInput) { //再从收集器获取
-                    safeSet((String) aName, ctx.getFieldManager().dataCollect(aName.toString(), ctx))
-                }
-                value = super.get(aName)
             }
+            def value = super.get(aName)
             if (value instanceof Optional) {
                 if (value.present) value = value.get()
                 else value = null
@@ -272,23 +286,28 @@ class DecisionContext {
             return value
         }
 
-        // 1. 转换成具体类型, 再保存; 2. 同时保存别名的值
-        protected Object safeSet(String key, Object value) {
+        // 1. 转换成具体类型, 再保存; 2. 同时保存别名的值; 3. 保存值来源
+        protected Object safeSet(String key, Object value, String from) {
             if (value instanceof Optional) {
                 value = value.present ? Optional.ofNullable(ctx.getFieldManager().convert(key, value.get())) : value
             } else {
                 value = ctx.getFieldManager().convert(key, value) // 属性值类型转换
             }
             super.put(key, value)
+            valueFromMap.put(key, from)
 
             def n = ctx.getFieldManager().alias(key)
-            if (n && n != key) super.put(n, value)
+            if (n && n != key) {
+                super.put(n, value)
+                valueFromMap.put(n, from)
+            }
+
             value
         }
 
         @Override
         Object put(String key, Object value) {
-            ctx.recordData(key, safeSet(key, value))
+            ctx.recordData(key, safeSet(key, value, 'byHand'))
             value
         }
 
@@ -299,7 +318,9 @@ class DecisionContext {
             if (field) {
                 super.remove(field.enName)
                 super.remove(field.cnName)
-                ctx.dataCollectResult.remove(field.dataCollector)
+                // ctx.dataCollectResult.remove(field.dataCollector)
+                valueFromMap.remove(field.enName)
+                valueFromMap.remove(field.cnName)
             }
             return r
         }

@@ -65,7 +65,7 @@ class MntAnalyseCtrl extends ServerTpl {
         if (!ids) return ApiResp.ok().desc("无可查看的决策")
         ids = decisionId ? ids.findAll {it == decisionId} : ids
         if (!ids) return ApiResp.ok().desc("无可查看的决策")
-        hCtx.response.cacheControl(5) // 缓存5秒
+        hCtx.response.cacheControl(60) // 缓存60秒
         String sql = """
             select t1.decision_id decisionId, t2.name decisionName, t1.detail 
             from ${repo.tbName(DecideRecord).replace("`", '')} t1
@@ -85,7 +85,7 @@ class MntAnalyseCtrl extends ServerTpl {
             ls.findResults {Map<String, String> record ->
                 record["detail"] ? JSON.parseObject(record["detail"])?.getJSONArray("policies")?.findResults {JSONObject pJo ->
                     pJo.getJSONArray("rules").findResults { JSONObject rJo ->
-                        record['decisionId'] + '||' + record['decisionName'] + '||' + pJo['attrs']['策略名']  +'||' + rJo['attrs']['规则名'] + '||' + (rJo['result']?:DecideResult.Accept)
+                        record['decisionId'] + '||' + record['decisionName'] + '||' + pJo['attrs']['策略名'] +'||' + rJo['attrs']['规则名'] + '||' + (rJo['result']?:DecideResult.Accept)
                     }
                 }?.flatten() : []
             }.flatten().countBy {it}.findResults {e ->

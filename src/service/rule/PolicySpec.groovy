@@ -17,7 +17,7 @@ class PolicySpec {
      */
     @Lazy Map<String, Object> attrs = new HashMap<>()
     /**
-     * 顺序函数: 条件, 操作
+     * 顺序函数: 条件, 操作, 清除
      */
     @Lazy List<Tuple2<String, Closure>> fns = new LinkedList<>()
 
@@ -51,6 +51,19 @@ class PolicySpec {
         if (!属性名) throw new IllegalArgumentException("属性名 不能为空")
         attrs.put(属性名, 值)
         this
+    }
+
+
+    /**
+     * 清除属性值缓存
+     * @param 属性名
+     */
+    void 清除(String... 属性名) {
+        if (!属性名) return
+        fns << Tuple.tuple('Clear', { Map ctx ->
+            属性名.each {ctx.remove(it)}
+            null
+        })
     }
 
 

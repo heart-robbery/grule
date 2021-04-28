@@ -200,16 +200,23 @@ class MntDecisionCtrl extends ServerTpl {
                     Utils.toMapper(it).ignore("metaClass")
                             .addConverter('decisionId', 'decisionName', { String dId ->
                                 decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name
-                            }).addConverter('data', {
-                                it == null ? null : JSON.parseObject(it, Feature.OrderedField).collect { e ->
+                            }).addConverter('data', {String jsonStr ->
+                                it == null ? null : JSON.parseObject(jsonStr, Feature.OrderedField).collect { e ->
                                     [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
-                                }}).addConverter('input', {
-                                    it == null ? null : JSON.parseObject(it)
-                                }).addConverter('dataCollectResult', {
-                                    it == null ? null : JSON.parseObject(it, Feature.OrderedField).collectEntries { e ->
-                                            [
-                                                    (fieldManager.collectors.findResult {it.value.collector.id == e.key ? it.value.collector.name : null}?:e.key): e.value
-                                            ]
+                                }}).addConverter('input', {jsonStr ->
+                                    it == null ? null : JSON.parseObject(jsonStr)
+                                }).addConverter('dataCollectResult', {String jsonStr ->
+                                    it == null ? null : JSON.parseObject(jsonStr, Feature.OrderedField).collectEntries { e ->
+                                        // 格式为: collectorId[_数据key], 把collectorId替换为收集器名字
+                                        String collectorId
+                                        def arr = e.key.split("_")
+                                        if (arr.length == 1) collectorId = e.key
+                                        else collectorId = arr[0]
+                                        [
+                                                (fieldManager.collectors.findResult {
+                                                    it.value.collector.id == collectorId ? it.value.collector.name + (arr.length > 1 ? '_' + arr.drop(1).join('_') : '') : null
+                                                }?:e.key): e.value
+                                        ]
                                     }
                                 }).addConverter('detail', {String detailJsonStr ->
                                     if (!detailJsonStr) return null

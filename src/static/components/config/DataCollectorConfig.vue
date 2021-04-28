@@ -78,12 +78,12 @@
                             <h-select v-model="model.method" :datas="methods"></h-select>
                         </h-formitem>
                         <h-formitem v-if="model.type == 'http'" label="超时(ms)" icon="h-icon-user" prop="timeout">
-                            <h-numberinput v-model="model.timeout" :min="1000" :max="600000"></h-numberinput>
+                            <h-numberinput v-model="model.timeout" :min="20" :max="600000"></h-numberinput>
                         </h-formitem>
-                        <h-formitem v-if="model.type == 'http' || model.type == 'sql'" label="缓存key" icon="h-icon-user" prop="cacheKey">
-                            <input type="text" v-model="model.cacheKey" />
+                        <h-formitem label="缓存key" icon="h-icon-user" prop="cacheKey">
+                            <input type="text" v-model="model.cacheKey" placeholder="用于判断数据是否需要重复计算" />
                         </h-formitem>
-                        <h-formitem v-if="model.type == 'http' || model.type == 'sql'" label="缓存超时(m)" icon="h-icon-user" prop="timeout">
+                        <h-formitem label="缓存超时(m)" icon="h-icon-user" prop="timeout">
                             <h-numberinput v-model="model.cacheTimeout" :min="0" :max="2147483647"></h-numberinput>
                         </h-formitem>
                         <h-formitem v-if="model.type == 'http' && model.method == 'POST'" label="ContentType" icon="h-icon-user" prop="contentType">

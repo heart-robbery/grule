@@ -77,14 +77,14 @@ class FieldManager extends ServerTpl {
     /**
      * 执行数据收集, 获取属性值
      * @param aName 属性名
-     * @param ctx
+     * @param ctx 决策执行上下文
      * @return 当前属性的值
      */
     def dataCollect(String aName, DecisionContext ctx) {
         def field = fieldMap.get(aName)
         if (field == null) {
             log.debug("未找到属性'$aName'对应的配置".toString())
-            return
+            return null
         }
         String collectorId = field.dataCollector // 属性对应的 值 收集器名
         if (!collectorId) {
@@ -94,42 +94,40 @@ class FieldManager extends ServerTpl {
         if (field.decision && field.decision != ctx.decisionHolder.decision.id) {
             throw new RuntimeException("Field '$aName' not belong to '${ctx.decisionHolder.decision.name}'")
         }
-        if (ctx.dataCollectResult.containsKey(collectorId)) { // 已查询过
-            def collectResult = ctx.dataCollectResult.get(collectorId)
+        // 得到收集器
+        def collector = collectors.get(collectorId)
+        if (!collector) {
+            // 重新去数据库中查找
+            initDataCollector(repo.findById(DataCollector, collectorId))
+            collector = collectors.get(collectorId)
+        }
+        // 未找到收集器
+        if (!collector) {
+            log.warn(ctx.logPrefix() + "Not fund '${aName}' mapped getter function '${collector.name}($collectorId)'".toString())
+            return null
+        }
+
+        String dataKey = collector.dataKeyFn.apply(ctx) //数据key,判断是否需要重新执行收集器的计算函数拿结果
+        if (ctx.dataCollectResult.containsKey(dataKey)) { // 已查询过
+            def collectResult = ctx.dataCollectResult.get(dataKey)
             return collectResult instanceof Map ? (collectResult.containsKey(aName) ? collectResult.get(aName) : collectResult.get(alias(aName))) : collectResult
         }
 
         // 函数执行
-        def doApply = {Function<DecisionContext, Object> fn ->
-            log.debug(ctx.logPrefix() + "Get attr '{}' value apply function: '{}'", aName, "${collectors[collectorId].collector.name}($collectorId)".toString())
-            def collectResult = null
-            try {
-                collectResult = fn.apply(ctx)
-            } catch (ex) { // 接口执行报错, 默认继续往下执行规则
-                log.error(ctx.logPrefix() + "数据收集器'${collectors[collectorId].collector.name}($collectorId)' 执行错误".toString(), ex)
-            }
-            if (collectResult instanceof Map) { // 收集器,收集结果为多个属性的值, 则暂先保存
-                ctx.dataCollectResult.put(collectorId, collectResult)
-                return collectResult.containsKey(aName) ? collectResult.get(aName) : collectResult.get(alias(aName))
-            }
-            else {
-                ctx.dataCollectResult.put(collectorId, collectResult)
-                return collectResult
-            }
+        log.debug(ctx.logPrefix() + "Get '${aName}' value apply function: '${collector.name}($collectorId)'".toString())
+        def collectResult = null
+        try {
+            collectResult = collector.computeFn.apply(ctx)
+        } catch (ex) { // 接口执行报错, 默认继续往下执行规则
+            log.error(ctx.logPrefix() + "数据收集器'${collector.name}($collectorId)' 执行错误".toString(), ex)
         }
-
-        def collector = collectors.get(collectorId)
-        if (collector) {
-            return doApply(collector.computeFn)
-        } else {
-            // 重新去数据库中查找
-            initDataCollector(repo.findById(DataCollector, collectorId))
-            collector = collectors.get(collectorId)
-            if (collector) return doApply(collector.computeFn)
-            else {
-                log.warn(ctx.logPrefix() + "Not fund attr '{}' mapped getter function '{}'", aName, "${collectors[collectorId]}($collectorId)".toString())
-                return null
-            }
+        if (collectResult instanceof Map) { // 收集器,收集结果为多个属性的值, 则暂先保存
+            ctx.dataCollectResult.put(dataKey, collectResult)
+            return collectResult.containsKey(aName) ? collectResult.get(aName) : collectResult.get(alias(aName))
+        }
+        else {
+            ctx.dataCollectResult.put(dataKey, collectResult)
+            return collectResult
         }
     }
 
@@ -261,7 +259,7 @@ class FieldManager extends ServerTpl {
                 dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "性别")}?.id, comment: '值: F,M'))
             repo.saveOrUpdate(new RuleField(enName: 'week', cnName: '星期几', type: FieldType.Int, decision: '',
                 dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "星期几")}?.id, comment: '值: 1,2,3,4,5,6,7'))
-            repo.saveOrUpdate(new RuleField(enName: 'currentTime', cnName: '当前时间', type: FieldType.Int, decision: '',
+            repo.saveOrUpdate(new RuleField(enName: 'currentTime', cnName: '当前时间', type: FieldType.Str, decision: '',
                 dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "当前时间")}?.id, comment: '值: yyyy-MM-dd HH:mm:ss'))
         }
     }
@@ -384,7 +382,9 @@ if (idNumber && idNumber.length() > 17) {
 
         // GString 模板替换
         def tplEngine = new GStringTemplateEngine(Thread.currentThread().contextClassLoader)
-        collectors.put(collector.id, new CollectorHolder(collector: collector, sql: db, computeFn: { ctx ->
+        collectors.put(collector.id, new CollectorHolder(collector: collector, sql: db, dataKeyFn: {ctx -> //数据结果唯一性key计算逻辑
+            computeCollectDataKey(collector, ctx)
+        }, computeFn: { ctx -> //sql脚本执行函数
             Object result // 结果
             Exception exx //异常
             String cacheKey //缓存key
@@ -455,7 +455,7 @@ if (idNumber && idNumber.length() > 17) {
                 scriptException: exx == null ? null : exx.message?:exx.class.simpleName
             ))
             return result
-        }, testComputeFn: {param ->
+        }, testComputeFn: {param -> // 测试:sql脚本执行函数
             sqlScript.rehydrate(param, sqlScript, this)()
         }))
     }
@@ -479,7 +479,12 @@ if (idNumber && idNumber.length() > 17) {
         config.addCompilationCustomizers(icz)
         icz.addImports(JSON.class.name, JSONObject.class.name, Utils.class.name)
         Closure script = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("{ -> $collector.computeScript}")
-        collectors.put(collector.id, new CollectorHolder(collector: collector, computeFn: { ctx ->
+
+        // GString 模板替换
+        def tplEngine = new GStringTemplateEngine(Thread.currentThread().contextClassLoader)
+        collectors.put(collector.id, new CollectorHolder(collector: collector, dataKeyFn: {ctx -> //数据结果唯一性key计算逻辑
+            computeCollectDataKey(collector, ctx)
+        }, computeFn: { ctx ->
             Object result
             final def start = new Date()
             Exception ex
@@ -531,6 +536,7 @@ if (idNumber && idNumber.length() > 17) {
         Closure successFn
         if (collector.dataSuccessScript) { // 是否成功判断函数
             Binding binding = new Binding()
+            binding.setProperty('LOG', LoggerFactory.getLogger("ROOT"))
             def config = new CompilerConfiguration()
             def icz = new ImportCustomizer()
             config.addCompilationCustomizers(icz)
@@ -540,7 +546,9 @@ if (idNumber && idNumber.length() > 17) {
 
         // GString 模板替换
         def tplEngine = new GStringTemplateEngine(Thread.currentThread().contextClassLoader)
-        collectors.put(collector.id, new CollectorHolder(collector: collector, computeFn: { ctx -> // 数据集成中3方接口访问过程
+        collectors.put(collector.id, new CollectorHolder(collector: collector, dataKeyFn: {ctx -> //数据结果唯一性key计算逻辑
+            computeCollectDataKey(collector, ctx)
+        }, computeFn: { ctx -> // 数据集成中3方接口访问过程
             String result // 接口返回结果字符串
             Object resolveResult // 解析接口返回结果
             long spend = 0 // 取数据,(网络)耗时时长
@@ -557,23 +565,7 @@ if (idNumber && idNumber.length() > 17) {
 
             //1. 先从缓存中取
             if (collector.cacheTimeout && collector.cacheKey) {
-                cacheKey = collector.cacheKey
-                for (int i = 0; i < 2; i++) { // 替换 ${} 变量
-                    if (!cacheKey.contains('${')) break
-                    cacheKey = tplEngine.createTemplate(cacheKey).make(new HashMap(1) {
-                        int paramIndex
-                        @Override
-                        boolean containsKey(Object key) { return true } // 加这行是为了 防止 MissingPropertyException
-                        @Override
-                        Object get(Object key) { return ctx.data.get(key) }
-
-                        @Override
-                        Object put(Object key, Object value) {
-                            log.error("$collector.name cacheKey config error, not allow set property '$key'".toString())
-                            null
-                        }
-                    }).toString()
-                }
+                cacheKey = computeCollectDataKey(collector, ctx)
                 if (cacheKey) {
                     if (redis) {
                         start = new Date() // 调用时间
@@ -785,6 +777,39 @@ if (idNumber && idNumber.length() > 17) {
 
 
     /**
+     * 计算收集器的数据缓存key
+     * @param collector 收集器
+     * @param ctx 当前执行上下文
+     * @return dataKey
+     */
+    String computeCollectDataKey(DataCollector collector, DecisionContext ctx) {
+        if (!collector.cacheKey) return collector.id //未配置,dataKey为收集器id
+        String dataKey = collector.cacheKey
+        if (dataKey.contains('${')) {
+            def tplEngine = new GStringTemplateEngine(Thread.currentThread().contextClassLoader)
+            for (int i = 0; i < 2; i++) { // 替换 ${} 变量
+                if (!dataKey.contains('${')) break
+                dataKey = tplEngine.createTemplate(dataKey).make(new HashMap(1) {
+                    int paramIndex
+                    @Override
+                    boolean containsKey(Object key) { return true } // 加这行是为了 防止 MissingPropertyException
+                    @Override
+                    Object get(Object key) { return ctx.data.get(key) }
+
+                    @Override
+                    Object put(Object key, Object value) {
+                        log.error("$collector.name cacheKey config error, not allow set property '$key'".toString())
+                        null
+                    }
+                }).toString()
+            }
+        }
+
+        return collector.id + '_' + dataKey
+    }
+
+
+    /**
      * 收集器 Holder
      */
     class CollectorHolder {
@@ -792,6 +817,8 @@ if (idNumber && idNumber.length() > 17) {
         DataCollector collector
         // 把收集器转换的执行函数
         Function<DecisionContext, Object> computeFn
+        // 数据收集上下文唯一key: 用于标识当前执行上下文是否需要重复计算当前收集器的结果
+        Function<DecisionContext, String> dataKeyFn
         // 单元测试函数
         Function<Map, Object> testComputeFn
         // DB
