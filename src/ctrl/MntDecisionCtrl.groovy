@@ -55,7 +55,7 @@ class MntDecisionCtrl extends ServerTpl {
                     def ps = []
                     ps << root.get("id").in(ids)
                     if (decisionId) ps << cb.equal(root.get('id'), decisionId)
-                    if (nameLike) ps << cb.like(root.get('name'), '%' + nameLike + '%')
+                    if (nameLike) ps << cb.or(cb.like(root.get('name'), '%' + nameLike + '%'), cb.like(root.get('decisionId'), '%' + nameLike + '%'))
                     if (kw) ps << cb.like(root.get('dsl'), '%' + kw + '%')
                     cb.and(ps.toArray(new Predicate[ps.size()]))
                 }.to{decision ->
@@ -165,7 +165,6 @@ class MntDecisionCtrl extends ServerTpl {
                     if (spend) ps << cb.ge(root.get('spend'), spend)
                     if (result) ps << cb.equal(root.get('result'), result)
                     if (exception) ps << cb.like(root.get('exception'), '%' + exception + '%')
-                    // if (input) ps << cb.like(root.get('input'), '%' + input + '%')
                     if (attrConditions) { // json查询 暂时只支持mysql5.7+,MariaDB 10.2.3+
                         JSON.parseArray(attrConditions).each {JSONObject jo ->
                             def fieldId = jo.getLong('fieldId')

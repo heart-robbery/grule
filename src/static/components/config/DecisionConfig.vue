@@ -2,8 +2,8 @@
     <div class="h-panel">
         <div class="h-panel-bar">
             &nbsp;&nbsp;
-            <h-button v-if="sUser.permissionIds.find((e) => e == 'decision-add')" @click="add"><i class="h-icon-plus"></i></h-button>
-            <input type="text" v-model="model.nameLike" placeholder="决策名" style="width: 250px" @keyup.enter="load"/>
+            <h-button v-if="sUser.permissionIds.find((e) => e === 'decision-add')" @click="add"><i class="h-icon-plus"></i></h-button>
+            <input type="text" v-model="model.nameLike" placeholder="决策名,决策id" style="width: 250px" @keyup.enter="load"/>
             <div class="h-panel-right">
                 <button class="h-btn h-btn-primary float-right" @click="load"><i class="h-icon-search"></i><span>搜索</span></button>
             </div>
@@ -192,6 +192,7 @@
             },
             save() {
                 this.$emit('update');
+                this.$emit('close');
             },
             del(item) {
                 let index = this.decision.apiConfigO.indexOf(item);
@@ -322,7 +323,7 @@
             },
             showTestPop(item) {
                 this.$Modal({
-                    title: `测试: ${item.name}`, middle: true, draggable: true,
+                    title: `测试: ${item.name}`, draggable: true,
                     component: {
                         vue: testPop,
                         datas: {decision: item}
@@ -363,7 +364,6 @@
                         if (res.code === '00') {
                             if (decision.id) {
                                 $.extend(decision, res.data);
-                                //decision.apiConfigO = decision.apiConfig ? JSON.parse(decision.apiConfig) : null;
                                 this.$Message.success('更新成功: ' + decision.name);
                             } else {
                                 //$.extend(decision, res.data);
