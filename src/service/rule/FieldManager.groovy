@@ -256,7 +256,7 @@ class FieldManager extends ServerTpl {
             repo.saveOrUpdate(new RuleField(enName: 'age', cnName: '年龄', type: FieldType.Int, decision: '',
                 dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "年龄")}?.id))
             repo.saveOrUpdate(new RuleField(enName: 'gender', cnName: '性别', type: FieldType.Str, decision: '',
-                dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "性别")}?.id, comment: '值: F,M'))
+                dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "性别")}?.id, comment: '值: F(女),M(男)'))
             repo.saveOrUpdate(new RuleField(enName: 'week', cnName: '星期几', type: FieldType.Int, decision: '',
                 dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "星期几")}?.id, comment: '值: 1,2,3,4,5,6,7'))
             repo.saveOrUpdate(new RuleField(enName: 'currentTime', cnName: '当前时间', type: FieldType.Str, decision: '',
