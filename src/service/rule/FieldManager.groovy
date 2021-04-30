@@ -20,6 +20,7 @@ import groovy.sql.Sql
 import groovy.text.GStringTemplateEngine
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.ImportCustomizer
+import org.slf4j.LoggerFactory
 
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
@@ -76,14 +77,14 @@ class FieldManager extends ServerTpl {
     /**
      * 执行数据收集, 获取属性值
      * @param aName 属性名
-     * @param ctx
+     * @param ctx 决策执行上下文
      * @return 当前属性的值
      */
     def dataCollect(String aName, DecisionContext ctx) {
         def field = fieldMap.get(aName)
         if (field == null) {
             log.debug("未找到属性'$aName'对应的配置".toString())
-            return
+            return null
         }
         String collectorId = field.dataCollector // 属性对应的 值 收集器名
         if (!collectorId) {
@@ -93,49 +94,40 @@ class FieldManager extends ServerTpl {
         if (field.decision && field.decision != ctx.decisionHolder.decision.id) {
             throw new RuntimeException("Field '$aName' not belong to '${ctx.decisionHolder.decision.name}'")
         }
-        if (ctx.dataCollectResult.containsKey(collectorId)) { // 已查询过
-            def value = ctx.dataCollectResult.get(collectorId)
-            return value instanceof Map ? value.get(aName) : value
-        }
-
-        // 函数执行
-        def doApply = {Function<DecisionContext, Object> fn ->
-            log.debug(ctx.logPrefix() + "Get attr '{}' value apply function: '{}'", aName, "${collectors[collectorId]}($collectorId)".toString())
-            def v = null
-            try {
-                v = fn.apply(ctx)
-            } catch (ex) { // 接口执行报错, 默认继续往下执行规则
-                log.error(ctx.logPrefix() + "数据收集器'${collectors[collectorId]}($collectorId)' 执行错误".toString(), ex)
-            }
-            if (v instanceof Map) { // 收集器,收集结果为多个属性的值, 则暂先保存
-                Map<String, Object> result = new HashMap<>()
-                ctx.dataCollectResult.put(collectorId, result)
-                v.each {entry ->
-                    String k = (String) entry.key
-                    result.put(k, entry.value)
-                    k = alias(k)
-                    if (k) result.put(k, entry.value)
-                }
-                return result.get(aName)
-            }
-            else {
-                ctx.dataCollectResult.put(collectorId, v)
-                return v
-            }
-        }
-
+        // 得到收集器
         def collector = collectors.get(collectorId)
-        if (collector) {
-            return doApply(collector.computeFn)
-        } else {
+        if (!collector) {
             // 重新去数据库中查找
             initDataCollector(repo.findById(DataCollector, collectorId))
             collector = collectors.get(collectorId)
-            if (collector) return doApply(collector.computeFn)
-            else {
-                log.warn(ctx.logPrefix() + "Not fund attr '{}' mapped getter function '{}'", aName, "${collectors[collectorId]}($collectorId)".toString())
-                return null
-            }
+        }
+        // 未找到收集器
+        if (!collector) {
+            log.warn(ctx.logPrefix() + "Not fund '${aName}' mapped getter function '${collector.name}($collectorId)'".toString())
+            return null
+        }
+
+        String dataKey = collector.dataKeyFn.apply(ctx) //数据key,判断是否需要重新执行收集器的计算函数拿结果
+        if (ctx.dataCollectResult.containsKey(dataKey)) { // 已查询过
+            def collectResult = ctx.dataCollectResult.get(dataKey)
+            return collectResult instanceof Map ? (collectResult.containsKey(aName) ? collectResult.get(aName) : collectResult.get(alias(aName))) : collectResult
+        }
+
+        // 函数执行
+        log.debug(ctx.logPrefix() + "Get '${aName}' value apply function: '${collector.name}($collectorId)'".toString())
+        def collectResult = null
+        try {
+            collectResult = collector.computeFn.apply(ctx)
+        } catch (ex) { // 接口执行报错, 默认继续往下执行规则
+            log.error(ctx.logPrefix() + "数据收集器'${collector.name}($collectorId)' 执行错误".toString(), ex)
+        }
+        if (collectResult instanceof Map) { // 收集器,收集结果为多个属性的值, 则暂先保存
+            ctx.dataCollectResult.put(dataKey, collectResult)
+            return collectResult.containsKey(aName) ? collectResult.get(aName) : collectResult.get(alias(aName))
+        }
+        else {
+            ctx.dataCollectResult.put(dataKey, collectResult)
+            return collectResult
         }
     }
 
@@ -152,11 +144,11 @@ class FieldManager extends ServerTpl {
 
     /**
      * 决策产生的数据接口调用
-     * @param collectResult CollectResult
+     * @param collectRecord CollectResult
      */
-    protected void dataCollected(CollectRecord collectResult) {
+    protected void dataCollected(CollectRecord collectRecord) {
         queue(DATA_COLLECTED) {
-            repo.saveOrUpdate(collectResult)
+            repo.saveOrUpdate(collectRecord)
         }
     }
 
@@ -191,22 +183,22 @@ class FieldManager extends ServerTpl {
 
     // ======================= 监听变化 ==========================
     @EL(name = ['fieldChange', 'field.dataVersion'], async = true)
-    void listenFieldChange(EC ec, String enName) {
-        def field = repo.find(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}
+    void listenFieldChange(EC ec, Long id) {
+        def field = repo.findById(RuleField, id)
         if (field == null) {
-            def f = fieldMap.remove(enName)
-            if (f) fieldMap.remove(f.cnName)
-            log.info("delField: " + f)
+            for (def itt = fieldMap.iterator(); itt.hasNext(); ) {
+                def e = itt.next()
+                if (e.value.id == id) itt.remove()
+            }
+            log.info("delField: " + id)
         } else {
-            boolean isNew = true
-            if (fieldMap.containsKey(field.enName)) isNew = false
             fieldMap.put(field.enName, field)
             fieldMap.put(field.cnName, field)
-            log.info("${isNew ? 'addedField' : 'updatedField'}: ${field.cnName}, $enName".toString())
+            log.info("fieldChanged: ${field.cnName}, $id".toString())
         }
         def remoter = bean(Remoter)
         if (remoter && ec?.source() != remoter) { // 不是远程触发的事件
-            remoter.dataVersion('field').update(enName, field ? field.updateTime.time : System.currentTimeMillis(), null)
+            remoter.dataVersion('field').update(id.toString(), field ? field.updateTime.time : System.currentTimeMillis(), null)
         }
     }
 
@@ -264,10 +256,10 @@ class FieldManager extends ServerTpl {
             repo.saveOrUpdate(new RuleField(enName: 'age', cnName: '年龄', type: FieldType.Int, decision: '',
                 dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "年龄")}?.id))
             repo.saveOrUpdate(new RuleField(enName: 'gender', cnName: '性别', type: FieldType.Str, decision: '',
-                dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "性别")}?.id, comment: '值: F,M'))
+                dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "性别")}?.id, comment: '值: F(女),M(男)'))
             repo.saveOrUpdate(new RuleField(enName: 'week', cnName: '星期几', type: FieldType.Int, decision: '',
                 dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "星期几")}?.id, comment: '值: 1,2,3,4,5,6,7'))
-            repo.saveOrUpdate(new RuleField(enName: 'currentTime', cnName: '当前时间', type: FieldType.Int, decision: '',
+            repo.saveOrUpdate(new RuleField(enName: 'currentTime', cnName: '当前时间', type: FieldType.Str, decision: '',
                 dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "当前时间")}?.id, comment: '值: yyyy-MM-dd HH:mm:ss'))
         }
     }
@@ -382,6 +374,7 @@ if (idNumber && idNumber.length() > 17) {
         Binding binding = new Binding()
         def config = new CompilerConfiguration()
         binding.setProperty('DB', db)
+        binding.setProperty('LOG', LoggerFactory.getLogger("ROOT"))
         def icz = new ImportCustomizer()
         config.addCompilationCustomizers(icz)
         icz.addImports(JSON.class.name, JSONObject.class.name, Utils.class.name)
@@ -389,7 +382,9 @@ if (idNumber && idNumber.length() > 17) {
 
         // GString 模板替换
         def tplEngine = new GStringTemplateEngine(Thread.currentThread().contextClassLoader)
-        collectors.put(collector.id, new CollectorHolder(collector: collector, sql: db, computeFn: { ctx ->
+        collectors.put(collector.id, new CollectorHolder(collector: collector, sql: db, dataKeyFn: {ctx -> //数据结果唯一性key计算逻辑
+            computeCollectDataKey(collector, ctx)
+        }, computeFn: { ctx -> //sql脚本执行函数
             Object result // 结果
             Exception exx //异常
             String cacheKey //缓存key
@@ -453,14 +448,14 @@ if (idNumber && idNumber.length() > 17) {
             }
             log.info(ctx.logPrefix() + "${ -> cache ? '(缓存)' : ''}Sql脚本函数'$collector.name', 结果: $result".toString())
             dataCollected(new CollectRecord(
-                decideId: ctx.id, decisionId: ctx.decisionHolder.result.id, collector: collector.id,
+                decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.id,
                 status: (exx ? 'EEEE' : '0000'), dataStatus: (exx ? 'EEEE' : '0000'), collectDate: start, collectorType: collector.type,
                 spend: spend, cache: cache,
                 result: result instanceof Map ? JSON.toJSONString(result, SerializerFeature.WriteMapNullValue) : result?.toString(),
                 scriptException: exx == null ? null : exx.message?:exx.class.simpleName
             ))
             return result
-        }, testComputeFn: {param ->
+        }, testComputeFn: {param -> // 测试:sql脚本执行函数
             sqlScript.rehydrate(param, sqlScript, this)()
         }))
     }
@@ -478,12 +473,18 @@ if (idNumber && idNumber.length() > 17) {
             log.warn("Script collector'$collector.name' script must not be empty".toString()); return
         }
         Binding binding = new Binding()
+        binding.setProperty('LOG', LoggerFactory.getLogger("ROOT"))
         def config = new CompilerConfiguration()
         def icz = new ImportCustomizer()
         config.addCompilationCustomizers(icz)
         icz.addImports(JSON.class.name, JSONObject.class.name, Utils.class.name)
         Closure script = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("{ -> $collector.computeScript}")
-        collectors.put(collector.id, new CollectorHolder(collector: collector, computeFn: { ctx ->
+
+        // GString 模板替换
+        def tplEngine = new GStringTemplateEngine(Thread.currentThread().contextClassLoader)
+        collectors.put(collector.id, new CollectorHolder(collector: collector, dataKeyFn: {ctx -> //数据结果唯一性key计算逻辑
+            computeCollectDataKey(collector, ctx)
+        }, computeFn: { ctx ->
             Object result
             final def start = new Date()
             Exception ex
@@ -495,7 +496,7 @@ if (idNumber && idNumber.length() > 17) {
                 log.error(ctx.logPrefix() + "脚本函数'$collector.name'执行失败".toString(), ex)
             }
             dataCollected(new CollectRecord(
-                decideId: ctx.id, decisionId: ctx.decisionHolder.result.id, collector: collector.id,
+                decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.id,
                 status: (ex ? 'EEEE' : '0000'), dataStatus: (ex ? 'EEEE' : '0000'), collectDate: start, collectorType: collector.type,
                 spend: System.currentTimeMillis() - start.time, cache: false,
                 result: result instanceof Map ? JSON.toJSONString(result, SerializerFeature.WriteMapNullValue) : result?.toString(),
@@ -525,6 +526,7 @@ if (idNumber && idNumber.length() > 17) {
         Closure parseFn
         if (collector.parseScript) { // 结果解析函数
             Binding binding = new Binding()
+            binding.setProperty('LOG', LoggerFactory.getLogger("ROOT"))
             def config = new CompilerConfiguration()
             def icz = new ImportCustomizer()
             config.addCompilationCustomizers(icz)
@@ -534,6 +536,7 @@ if (idNumber && idNumber.length() > 17) {
         Closure successFn
         if (collector.dataSuccessScript) { // 是否成功判断函数
             Binding binding = new Binding()
+            binding.setProperty('LOG', LoggerFactory.getLogger("ROOT"))
             def config = new CompilerConfiguration()
             def icz = new ImportCustomizer()
             config.addCompilationCustomizers(icz)
@@ -543,7 +546,9 @@ if (idNumber && idNumber.length() > 17) {
 
         // GString 模板替换
         def tplEngine = new GStringTemplateEngine(Thread.currentThread().contextClassLoader)
-        collectors.put(collector.id, new CollectorHolder(collector: collector, computeFn: { ctx -> // 数据集成中3方接口访问过程
+        collectors.put(collector.id, new CollectorHolder(collector: collector, dataKeyFn: {ctx -> //数据结果唯一性key计算逻辑
+            computeCollectDataKey(collector, ctx)
+        }, computeFn: { ctx -> // 数据集成中3方接口访问过程
             String result // 接口返回结果字符串
             Object resolveResult // 解析接口返回结果
             long spend = 0 // 取数据,(网络)耗时时长
@@ -552,26 +557,15 @@ if (idNumber && idNumber.length() > 17) {
             String bodyStr = collector.bodyStr // http 请求 body字符串
             String cacheKey // 缓存key
             boolean cache = false //结果是否取自缓存
+            Integer respCode // http响应码
+
+            String retryMsg = '' //重试消息
+            // 日志字符串
+            def logMsg = "${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}接口调用${ -> retryMsg}: name: $collector.name, url: ${ -> url}${ -> bodyStr == null ? '' : ', body: ' + bodyStr}${ -> respCode ? ', respCode: ' + respCode : ''}${ -> ', result: ' + result}${ -> resolveResult == null ? '' : ', resolveResult: ' + resolveResult}"
 
             //1. 先从缓存中取
             if (collector.cacheTimeout && collector.cacheKey) {
-                cacheKey = collector.cacheKey
-                for (int i = 0; i < 2; i++) { // 替换 ${} 变量
-                    if (!cacheKey.contains('${')) break
-                    cacheKey = tplEngine.createTemplate(cacheKey).make(new HashMap(1) {
-                        int paramIndex
-                        @Override
-                        boolean containsKey(Object key) { return true } // 加这行是为了 防止 MissingPropertyException
-                        @Override
-                        Object get(Object key) { return ctx.data.get(key) }
-
-                        @Override
-                        Object put(Object key, Object value) {
-                            log.error("$collector.name cacheKey config error, not allow set property '$key'".toString())
-                            null
-                        }
-                    }).toString()
-                }
+                cacheKey = computeCollectDataKey(collector, ctx)
                 if (cacheKey) {
                     if (redis) {
                         start = new Date() // 调用时间
@@ -626,25 +620,24 @@ if (idNumber && idNumber.length() > 17) {
                         }
                     }).toString()
                 }
-                // NOTE: 如果是json 并且是,} 结尾, 则删除 最后的,(因为spring解析入参数会认为json格式错误)
-                // if (bodyStr.endsWith(',}')) bodyStr = bodyStr.substring(0, bodyStr.length() - 3) + '}'
-                String retryMsg = ''
-                // 日志消息
-                def logMsg = "${ctx.logPrefix()}接口调用${ -> retryMsg}: name: $collector.name, url: ${ -> url}, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}"
                 try {
                     start = new Date() // 调用时间
                     for (int i = 0, times = getInteger('http.retry', 2) + 1; i < times; i++) { // 接口一般遇网络错重试2次
                         try {
                             retryMsg = i > 0 ? "(重试第${i}次)" : ''
                             if ('get'.equalsIgnoreCase(collector.method)) {
-                                result = http.get(url).execute()
+                                def h = http.get(url)
+                                result = h.execute()
+                                respCode = h.respCode
                             } else if ('post'.equalsIgnoreCase(collector.method)) {
-                                result = http.post(url).textBody(bodyStr).contentType(collector.contentType).execute()
+                                def h = http.post(url)
+                                result = h.textBody(bodyStr).contentType(collector.contentType).execute()
+                                respCode = h.respCode
                             } else throw new Exception("Not support http method $collector.method")
                             break
                         } catch (ex) {
                             if ((ex instanceof ConnectException) && (i + 1) < times) {
-                                log.error(logMsg.toString() + ", 异常: " + (ex.class.simpleName + ': ' + ex.message))
+                                log.warn(logMsg.toString() + ", 异常: " + (ex.class.simpleName + ': ' + ex.message))
                                 continue
                             } else throw ex
                         } finally {
@@ -652,9 +645,9 @@ if (idNumber && idNumber.length() > 17) {
                         }
                     }
                 } catch (ex) {
-                    log.error(logMsg.toString() + ", 异常: ", ex)
+                    log.error(logMsg.toString(), ex)
                     dataCollected(new CollectRecord(
-                        decideId: ctx.id, decisionId: ctx.decisionHolder.result.id, collector: collector.id,
+                        decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.id,
                         status: (ex instanceof ConnectException) ? 'E001': 'EEEE', dataStatus: (ex instanceof ConnectException) ? 'E001': 'EEEE',
                         collectDate: start, collectorType: collector.type, cache: cache,
                         spend: spend, url: url, body: bodyStr, result: result, httpException: ex.message?:ex.class.simpleName
@@ -669,7 +662,7 @@ if (idNumber && idNumber.length() > 17) {
             }
 
             //3. 判断http返回结果是否为有效数据. 默认有效(0000)
-            String dataStatus = successFn ? (successFn.rehydrate(ctx.data, successFn, this)(result) ? '0000' : '0001') : '0000'
+            String dataStatus = successFn ? (successFn.rehydrate(ctx.data, successFn, this)(result, respCode) ? '0000' : '0001') : '0000'
 
             //4. 如果接口返回的是有效数据, 则缓存
             if ('0000' == dataStatus && cacheKey) {
@@ -687,17 +680,17 @@ if (idNumber && idNumber.length() > 17) {
             if (parseFn && dataStatus == '0000') {
                 Exception ex
                 try {
-                    resolveResult = parseFn.rehydrate(ctx.data, parseFn, this)(result)
+                    resolveResult = parseFn.rehydrate(ctx.data, parseFn, this)(result, respCode)
                 } catch (e) {
                     ex = e
                 } finally {
                     if (ex) {
-                        log.error("${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}接口调用: name: $collector.name, url: ${ -> url}, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}".toString() + ", 解析函数执行失败", ex)
+                        log.error(logMsg.toString() + ", 解析函数执行失败", ex)
                     } else {
-                        log.info("${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}接口调用: name: $collector.name, url: ${ -> url}, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}".toString())
+                        log.info(logMsg.toString())
                     }
                     dataCollected(new CollectRecord(
-                        decideId: ctx.id, decisionId: ctx.decisionHolder.result.id, collector: collector.id,
+                        decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.id,
                         status: ex ? 'E002': '0000', dataStatus: dataStatus, cache: cache,
                         collectDate: start, collectorType: collector.type,
                         spend: spend, url: url, body: bodyStr, result: result, parseException: ex == null ? null : ex.message?:ex.class.simpleName,
@@ -707,9 +700,9 @@ if (idNumber && idNumber.length() > 17) {
                 return resolveResult
             }
 
-            log.info("${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}接口调用: name: $collector.id, url: ${ -> url}, bodyStr: $bodyStr${ -> ', result: ' + result}${ -> ', resolveResult: ' + resolveResult}".toString())
+            log.info(logMsg.toString())
             dataCollected(new CollectRecord(
-                decideId: ctx.id, decisionId: ctx.decisionHolder.result.id, collector: collector.id,
+                decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.id,
                 status: '0000', dataStatus: dataStatus, collectDate: start, collectorType: collector.type,
                 spend: spend, url: url, body: bodyStr, result: result, cache: cache
             ))
@@ -761,20 +754,58 @@ if (idNumber && idNumber.length() > 17) {
             String result // 接口返回结果字符串
             Object resolveResult // 解析接口返回结果
 
+            Integer respCode //http响应码
             if ('get'.equalsIgnoreCase(collector.method)) {
-                result = http.get(url).debug().execute()
+                def h = http.get(url)
+                result = h.debug().execute()
+                respCode = h.respCode
             } else if ('post'.equalsIgnoreCase(collector.method)) {
-                result = http.post(url).textBody(bodyStr).contentType(collector.contentType).debug().execute()
+                def h = http.post(url)
+                result = h.textBody(bodyStr).contentType(collector.contentType).debug().execute()
+                respCode = h.respCode
             } else throw new Exception("Not support http method $collector.method")
 
             // http 返回结果成功判断. 默认成功
-            String dataStatus = successFn ? (successFn.rehydrate(param, successFn, this)(result) ? '0000' : '0001') : '0000'
+            String dataStatus = successFn ? (successFn.rehydrate(param, successFn, this)(result, respCode) ? '0000' : '0001') : '0000'
 
             if (parseFn && dataStatus == '0000') { // 解析接口返回结果
-                return parseFn.rehydrate(param, parseFn, this)(result)
+                return parseFn.rehydrate(param, parseFn, this)(result, respCode)
             }
             return dataStatus == '0000' ? result : null
         }))
+    }
+
+
+    /**
+     * 计算收集器的数据缓存key
+     * @param collector 收集器
+     * @param ctx 当前执行上下文
+     * @return dataKey
+     */
+    String computeCollectDataKey(DataCollector collector, DecisionContext ctx) {
+        if (!collector.cacheKey) return collector.id //未配置,dataKey为收集器id
+        String dataKey = collector.cacheKey
+        if (dataKey.contains('${')) {
+            def tplEngine = new GStringTemplateEngine(Thread.currentThread().contextClassLoader)
+            for (int i = 0; i < 2; i++) { // 替换 ${} 变量
+                if (!dataKey.contains('${')) break
+                dataKey = tplEngine.createTemplate(dataKey).make(new HashMap(1) {
+                    int paramIndex
+                    @Override
+                    boolean containsKey(Object key) { return true } // 加这行是为了 防止 MissingPropertyException
+                    @Override
+                    Object get(Object key) { return ctx.data.get(key) }
+
+                    @Override
+                    Object put(Object key, Object value) {
+                        log.error("$collector.name cacheKey config error, not allow set property '$key'".toString())
+                        null
+                    }
+                }).toString()
+            }
+        }
+
+        return collector.id + '_' + dataKey
     }
 
 
@@ -786,6 +817,8 @@ if (idNumber && idNumber.length() > 17) {
         DataCollector collector
         // 把收集器转换的执行函数
         Function<DecisionContext, Object> computeFn
+        // 数据收集上下文唯一key: 用于标识当前执行上下文是否需要重复计算当前收集器的结果
+        Function<DecisionContext, String> dataKeyFn
         // 单元测试函数
         Function<Map, Object> testComputeFn
         // DB

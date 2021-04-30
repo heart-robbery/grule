@@ -78,12 +78,12 @@
                             <h-select v-model="model.method" :datas="methods"></h-select>
                         </h-formitem>
                         <h-formitem v-if="model.type == 'http'" label="超时(ms)" icon="h-icon-user" prop="timeout">
-                            <h-numberinput v-model="model.timeout" :min="1000" :max="600000"></h-numberinput>
+                            <h-numberinput v-model="model.timeout" :min="20" :max="600000"></h-numberinput>
                         </h-formitem>
-                        <h-formitem v-if="model.type == 'http' || model.type == 'sql'" label="缓存key" icon="h-icon-user" prop="cacheKey">
-                            <input type="text" v-model="model.cacheKey" />
+                        <h-formitem label="缓存key" icon="h-icon-user" prop="cacheKey">
+                            <input type="text" v-model="model.cacheKey" placeholder="用于判断数据是否需要重复计算" />
                         </h-formitem>
-                        <h-formitem v-if="model.type == 'http' || model.type == 'sql'" label="缓存超时(m)" icon="h-icon-user" prop="timeout">
+                        <h-formitem label="缓存超时(m)" icon="h-icon-user" prop="timeout">
                             <h-numberinput v-model="model.cacheTimeout" :min="0" :max="2147483647"></h-numberinput>
                         </h-formitem>
                         <h-formitem v-if="model.type == 'http' && model.method == 'POST'" label="ContentType" icon="h-icon-user" prop="contentType">
@@ -110,16 +110,16 @@
                         </h-formitem>
 
                         <h-formitem v-show="model.type == 'http'" label="是否成功" icon="h-icon-complete" prop="dataSuccessScript" single>
-                          <ace-groovy v-model="model.dataSuccessScript" height="90px" width="670px" ></ace-groovy>
+                          <ace-groovy v-model="model.dataSuccessScript" style="height: 90px; width: 670px"></ace-groovy>
                         </h-formitem>
                         <h-formitem v-show="model.type == 'http'" label="结果解析" icon="h-icon-complete" prop="parseScript" single>
-                          <ace-groovy v-model="model.parseScript" height="190px" width="670px" ></ace-groovy>
+                          <ace-groovy v-model="model.parseScript" style="height: 190px; width: 670px"></ace-groovy>
                         </h-formitem>
                         <h-formitem v-show="model.type == 'script'" label="值计算脚本" icon="h-icon-complete" prop="computeScript" single>
-                          <ace-groovy v-model="model.computeScript" height="300px" width="670px" ></ace-groovy>
+                          <ace-groovy v-model="model.computeScript" style="height: 300px; width: 670px"></ace-groovy>
                         </h-formitem>
                         <h-formitem v-show="model.type == 'sql'" label="sql执行脚本" icon="h-icon-complete" prop="sqlScript" single>
-                          <ace-groovy v-model="model.sqlScript" height="250px" width="670px" ></ace-groovy>
+                          <ace-groovy v-model="model.sqlScript" style="height: 250px; width: 670px"></ace-groovy>
                         </h-formitem>
                         <h-formitem single>
                                 <h-button v-if="model.id" color="primary" :loading="isLoading" @click="update">提交</h-button>
@@ -130,14 +130,16 @@
                 `,
         props: ['collector'],
         data() {
-            let defaultModel = {type: 'http', method: 'GET', timeout: 10000, minIdle: 1, maxActive: 5, dataSuccessScript:
-`{resultStr ->
-    return resultStr ? JSON.parseObject(resultStr)?['code'] == '0000' : false
-}`
-            };
             return {
-                isLoading: false, defaultModel: defaultModel,
-                model: this.collector ? $.extend({sqlScript: '', computeScript: '', parseScript: '', dataSuccessScript: ''}, this.collector) : defaultModel,
+                isLoading: false,
+                model: this.collector ? $.extend({sqlScript: '', computeScript: '', parseScript: '', dataSuccessScript: ''}, this.collector): {
+                    type: 'http', method: 'GET', timeout: 10000, minIdle: 1, maxActive: 5, dataSuccessScript:
+`{resultStr, respCode -> // 接口返回的字符串, 接口http响应码(如果是缓存则为空)
+    return (respCode == null || respCode == 200) && resultStr
+}`, parseScript: `{resultStr, respCode -> // 接口返回的字符串, 接口http响应码(如果是缓存则为空)
+    return resultStr
+}`
+                },
                 validationRules: {
                     required: ['name', 'type']
                 },
@@ -161,7 +163,7 @@
                     data: this.model,
                     success: (res) => {
                         this.isLoading = false;
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.$emit('close');
                             this.$Message.success(`更新: ${this.model.name} 成功`);
                             $.extend(this.collector, this.model);
@@ -178,7 +180,7 @@
                     data: this.model,
                     success: (res) => {
                         this.isLoading = false;
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.$emit('close');
                             this.$Message.success(`添加: ${this.model.name} 成功`);
                             this.$emit('reload');
@@ -242,7 +244,7 @@
                     url: this.url,
                     data: items,
                     success: (res) => {
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.result = JSON.stringify(res.data, null, 4).trim();
                             this.$Message.success(`测试调用: ${this.collector.name} 成功`);
                             localStorage.setItem(this.cacheKey, JSON.stringify(this.items.map(o => {return {code: o.code, value: o.value}})));
@@ -330,7 +332,7 @@
                     type: 'post',
                     data: item,
                     success: (res) => {
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.$Message.success(`${item.enabled ? '启用' : '禁用'}: ${item.name} 成功`);
                         } else {
                             this.$Notice.error(res.desc);
@@ -346,7 +348,7 @@
                     $.ajax({
                         url: 'mnt/delDataCollector/' + collector.id,
                         success: (res) => {
-                            if (res.code == '00') {
+                            if (res.code === '00') {
                                 this.$Message.success(`删除收集器: ${collector.name} 成功`);
                                 this.load();
                             } else this.$Message.error(res.desc)
@@ -369,7 +371,7 @@
                     success: (res) => {
                         this.tabs.showId = null;
                         this.loading = false;
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.page = res.data.page;
                             this.pageSize = res.data.pageSize;
                             this.totalRow = res.data.totalRow;

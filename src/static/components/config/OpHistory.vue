@@ -81,7 +81,7 @@
                     data: $.extend({page: page.page || 1, pageSize: 4}, this.model),
                     success: (res) => {
                         this.loading = false;
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.page = res.data.page;
                             this.pageSize = res.data.pageSize;
                             this.totalRow = res.data.totalRow;

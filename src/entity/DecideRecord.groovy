@@ -14,7 +14,7 @@ import javax.persistence.*
 @Table(indexes = [@Index(name = "idx_occurTime", columnList = "occurTime")])
 class DecideRecord implements IEntity {
     /**
-     * 流水id
+     * 决策流水id
      */
     @Id
     String       id

@@ -87,7 +87,7 @@
                         url: 'mnt/user/groupPage',
                         data: {page: 1, pageSize: 5, kw: filter},
                         success: (res) => {
-                          if (res.code == '00') {
+                          if (res.code === '00') {
                             let ls = res.data.list || [];
                             if (ls.length < 1 || !ls.filter(e => e == filter)) ls.unshift(filter);
                             cb(ls)
@@ -104,7 +104,7 @@
                             type: 'port',
                             data: {page: 1, pageSize: 5, kw: filter, notPermissionIds: this.model.permissions.map(o => o.enName)},
                             success: (res) => {
-                                if (res.code == '00') {
+                                if (res.code === '00') {
                                     cb(res.data.list)
                                 } else this.$Message.error(res.desc)
                             },
@@ -129,7 +129,7 @@
                     data: data,
                     success: (res) => {
                         this.isLoading = false;
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.$emit('close');
                             this.$Message.success(`更新用户: ${this.model.name} 成功`);
                             this.$emit('reload');
@@ -149,7 +149,7 @@
                     data: data,
                     success: (res) => {
                         this.isLoading = false;
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.$emit('close');
                             this.$Message.success(`添加用户: ${this.model.name} 成功`);
                             this.$emit('reload');
@@ -189,7 +189,7 @@
                     data: {id: this.model.id, newPassword: this.model.newPassword},
                     success: (res) => {
                         this.isLoading = false;
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.$emit('close');
                             this.$Message.success(`用户 ${this.model.name} 密码重置成功`);
                         } else this.$Notice.error(res.desc)
@@ -230,7 +230,7 @@
                     $.ajax({
                         url: 'mnt/user/del/' + user.id,
                         success: (res) => {
-                            if (res.code == '00') {
+                            if (res.code === '00') {
                                 this.$Message.success(`删除用户: ${user.name} 成功`);
                                 this.load();
                             } else this.$Notice.error(res.desc)
@@ -296,7 +296,7 @@
                     url: 'mnt/user/page',
                     data: {page: page.page || 1, kw: this.kw},
                     success: (res) => {
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.page = res.data.page;
                             this.pageSize = res.data.pageSize;
                             this.totalRow = res.data.totalRow;

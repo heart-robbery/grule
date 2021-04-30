@@ -123,23 +123,4 @@ void heartbeat() {
     field.setAccessible(true)
     Map<String, Object> m = field.get(Thread.currentThread().contextClassLoader.parent.parent)
     m.clear()
-    return
-    if (m != null) {
-        for (def itt = m.iterator(); itt.hasNext(); ) {
-            def entry = itt.next()
-            if ((entry.key.startsWith("script") && entry.key.endsWith(".groovy")) ||
-                entry.key.startsWith("groovy.runtime.metaclass") ||
-                entry.key.startsWith("Script") ||
-                entry.key.contains("GStringTemplateScript") ||
-                entry.key.contains("SimpleTemplateScript") ||
-                entry.key.contains("XmlTemplateScript") ||
-                entry.key.contains("StreamingTemplateScript") ||
-                entry.key.contains("GeneratedMarkupTemplate")
-            ) {
-                itt.remove()
-                log.trace("Removed class parallelLock: {}", entry.key)
-            }
-        }
-        log.info("Clean parallelLock. left: {}", m.size())
-    }
 }

@@ -111,7 +111,7 @@
                                 data: {page: 1, pageSize: 5, kw: filter},
                                 success: (res) => {
                                     this.isLoading = false;
-                                    if (res.code == '00') {
+                                    if (res.code === '00') {
                                         cb(res.data.list.map((r) => {
                                             return {id: r.id, name: r.name}
                                         }))
@@ -130,7 +130,7 @@
                                 data: {page: 1, pageSize: 5, nameLike: filter},
                                 success: (res) => {
                                     this.isLoading = false;
-                                    if (res.code == '00') {
+                                    if (res.code === '00') {
                                         cb(res.data.list.map((r) => {
                                             return {id: r.id, name: r.name}
                                         }))
@@ -150,7 +150,7 @@
                         data: this.model,
                         success: (res) => {
                             this.isLoading = false;
-                            if (res.code == '00') {
+                            if (res.code === '00') {
                                 this.$emit('close');
                                 this.$Message.success(`更新字段: ${this.model.cnName} 成功`);
                                 //$.extend(this.field, this.model);
@@ -168,7 +168,7 @@
                         data: this.model,
                         success: (res) => {
                             this.isLoading = false;
-                            if (res.code == '00') {
+                            if (res.code === '00') {
                                 this.$emit('close');
                                 this.$Message.success(`添加字段: ${this.model.cnName} 成功`);
                                 this.$emit('reload');
@@ -196,7 +196,7 @@
                             data: {page: 1, pageSize: 5, kw: filter},
                             success: (res) => {
                                 this.isLoading = false;
-                                if (res.code == '00') {
+                                if (res.code === '00') {
                                     cb(res.data.list.map((r) => {
                                         return {id: r.id, name: r.name}
                                     }))
@@ -215,7 +215,7 @@
                             data: {page: 1, pageSize: 5, nameLike: filter},
                             success: (res) => {
                                 this.isLoading = false;
-                                if (res.code == '00') {
+                                if (res.code === '00') {
                                     cb(res.data.list.map((r) => {
                                         return {id: r.id, name: r.name}
                                     }))
@@ -286,9 +286,9 @@
                 this.$Confirm(`删除字段: ${field.cnName}`, '确定删除?').then(() => {
                     this.$Message(`删除字段: ${field.cnName}`);
                     $.ajax({
-                        url: 'mnt/delField/' + field.enName,
+                        url: 'mnt/delField/' + field.id,
                         success: (res) => {
-                            if (res.code == '00') {
+                            if (res.code === '00') {
                                 this.$Message.success(`删除字段: ${field.cnName} 成功`);
                                 this.load();
                             } else this.$Message.error(res.desc)
@@ -310,7 +310,7 @@
                     data: $.extend({page: page.page || 1}, this.model),
                     success: (res) => {
                         this.loading = false;
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.page = res.data.page;
                             this.pageSize = res.data.pageSize;
                             this.totalRow = res.data.totalRow;

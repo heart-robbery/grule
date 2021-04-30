@@ -11,6 +11,7 @@ import cn.xnatural.jpa.Repo
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONArray
 import com.alibaba.fastjson.JSONObject
+import com.alibaba.fastjson.parser.Feature
 import entity.*
 import service.rule.DecideResult
 import service.rule.DecisionManager
@@ -54,7 +55,7 @@ class MntDecisionCtrl extends ServerTpl {
                     def ps = []
                     ps << root.get("id").in(ids)
                     if (decisionId) ps << cb.equal(root.get('id'), decisionId)
-                    if (nameLike) ps << cb.like(root.get('name'), '%' + nameLike + '%')
+                    if (nameLike) ps << cb.or(cb.like(root.get('name'), '%' + nameLike + '%'), cb.like(root.get('decisionId'), '%' + nameLike + '%'))
                     if (kw) ps << cb.like(root.get('dsl'), '%' + kw + '%')
                     cb.and(ps.toArray(new Predicate[ps.size()]))
                 }.to{decision ->
@@ -164,7 +165,6 @@ class MntDecisionCtrl extends ServerTpl {
                     if (spend) ps << cb.ge(root.get('spend'), spend)
                     if (result) ps << cb.equal(root.get('result'), result)
                     if (exception) ps << cb.like(root.get('exception'), '%' + exception + '%')
-                    // if (input) ps << cb.like(root.get('input'), '%' + input + '%')
                     if (attrConditions) { // json查询 暂时只支持mysql5.7+,MariaDB 10.2.3+
                         JSON.parseArray(attrConditions).each {JSONObject jo ->
                             def fieldId = jo.getLong('fieldId')
@@ -199,13 +199,24 @@ class MntDecisionCtrl extends ServerTpl {
                     Utils.toMapper(it).ignore("metaClass")
                             .addConverter('decisionId', 'decisionName', { String dId ->
                                 decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name
-                            }).addConverter('data', {
-                                it == null ? null : JSON.parseObject(it).collect { e ->
+                            }).addConverter('data', {String jsonStr ->
+                                it == null ? null : JSON.parseObject(jsonStr, Feature.OrderedField).collect { e ->
                                     [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
-                                }}).addConverter('input', {
-                                    it == null ? null : JSON.parseObject(it)
-                                }).addConverter('dataCollectResult', {
-                                    it == null ? null : JSON.parseObject(it)
+                                }}).addConverter('input', {jsonStr ->
+                                    it == null ? null : JSON.parseObject(jsonStr)
+                                }).addConverter('dataCollectResult', {String jsonStr ->
+                                    it == null ? null : JSON.parseObject(jsonStr, Feature.OrderedField).collectEntries { e ->
+                                        // 格式为: collectorId[_数据key], 把collectorId替换为收集器名字
+                                        String collectorId
+                                        def arr = e.key.split("_")
+                                        if (arr.length == 1) collectorId = e.key
+                                        else collectorId = arr[0]
+                                        [
+                                                (fieldManager.collectors.findResult {
+                                                    it.value.collector.id == collectorId ? it.value.collector.name + (arr.length > 1 ? '_' + arr.drop(1).join('_') : '') : null
+                                                }?:e.key): e.value
+                                        ]
+                                    }
                                 }).addConverter('detail', {String detailJsonStr ->
                                     if (!detailJsonStr) return null
                                     def detailJo = JSON.parseObject(detailJsonStr)
@@ -311,13 +322,15 @@ class MntDecisionCtrl extends ServerTpl {
         //dsl 验证
         if (!spec.决策id) return ApiResp.fail("决策id 不能为空")
         if (!spec.决策名) return ApiResp.fail("决策名 不能为空")
-        if (!spec.policies) return ApiResp.fail("${spec.决策名} 是空决策")
-        for (def policy : spec.policies) {
-            if (!policy.策略名) return ApiResp.fail('策略名字不能为空')
-            if (!policy.rules) return ApiResp.fail("'${policy.策略名}' 是空策略")
-            for (def rule : policy.rules) {
-                if (!rule.规则名) return ApiResp.fail('规则名字不能为空')
-                if (rule.fns.size() < 1) return ApiResp.fail("'${rule.规则名}' 是空规则")
+        // if (!spec.policies) return ApiResp.fail("${spec.决策名} 是空决策")
+        if (spec.policies) {
+            for (def policy : spec.policies) {
+                if (!policy.策略名) return ApiResp.fail('策略名字不能为空')
+                if (!policy.rules) return ApiResp.fail("'${policy.策略名}' 是空策略")
+                for (def rule : policy.rules) {
+                    if (!rule.规则名) return ApiResp.fail('规则名字不能为空')
+                    if (rule.fns.size() < 1) return ApiResp.fail("'${rule.规则名}' 是空规则")
+                }
             }
         }
 
@@ -408,7 +421,7 @@ class MntDecisionCtrl extends ServerTpl {
             }
             throw ex
         }
-        ep.fire('fieldChange', field.enName)
+        ep.fire('fieldChange', field.id)
         ep.fire('enHistory', field, hCtx.getSessionAttr('uName'))
         ApiResp.ok(field)
     }
@@ -427,7 +440,7 @@ class MntDecisionCtrl extends ServerTpl {
         if ('http' == collector.type) {
             if (!url) return ApiResp.fail('Param url not empty')
             if (!method) return ApiResp.fail('Param method not empty')
-            if (!contentType) return ApiResp.fail('Param contentType not empty')
+            if (!contentType && !'get'.equalsIgnoreCase(method)) return ApiResp.fail('Param contentType not empty')
             if (!url.startsWith("http") && !url.startsWith('${')) return ApiResp.fail('Param url incorrect')
             collector.parseScript = parseScript?.trim()
             if (collector.parseScript && !collector.parseScript.startsWith("{") && !collector.parseScript.endsWith("}")) {
@@ -519,7 +532,7 @@ class MntDecisionCtrl extends ServerTpl {
             }
             throw ex
         }
-        ep.fire('fieldChange', field.enName)
+        ep.fire('fieldChange', field.id)
         ep.fire('enHistory', field, hCtx.getSessionAttr('uName'))
         ApiResp.ok(field)
     }
@@ -611,13 +624,13 @@ class MntDecisionCtrl extends ServerTpl {
     }
 
 
-    @Path(path = 'delField/:enName')
-    ApiResp delField(HttpContext hCtx, String enName) {
-        if (!enName) return ApiResp.fail("Param enName not empty")
+    @Path(path = 'delField/:id')
+    ApiResp delField(HttpContext hCtx, Long id) {
+        if (!id) return ApiResp.fail("Param id not empty")
         hCtx.auth('field-del')
-        def field = repo.find(RuleField) {root, query, cb -> cb.equal(root.get('enName'), enName)}
+        def field = repo.findById(RuleField, id)
         repo.delete(field)
-        ep.fire('fieldChange', enName)
+        ep.fire('fieldChange', id)
         ep.fire('enHistory', field, hCtx.getSessionAttr('uName'))
         ApiResp.ok()
     }
@@ -646,12 +659,8 @@ class MntDecisionCtrl extends ServerTpl {
         hCtx.auth("grant")
         def srv = bean(DecisionSrv)
         if (srv) {
-            queue("cleanCollectResult") {
-                def total = srv.cleanCollectResult()
-                ep.fire("globalMsg", "清理过期收集数据结束. 共计: " + total)
-            }
-            queue("cleanDecisionResult") {
-                def total = srv.cleanDecisionResult()
+            queue("cleanDecideRecord") {
+                def total = srv.cleanDecideRecord()
                 ep.fire("globalMsg", "清理过期决策数据结束. 共计: " + total)
             }
             return ApiResp.ok().desc("等待后台清理完成...")

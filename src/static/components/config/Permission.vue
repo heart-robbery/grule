@@ -85,7 +85,7 @@
                     data: this.model,
                     success: (res) => {
                         this.isLoading = false;
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.$emit('close');
                             this.$Message.success(`更新: ${this.model.cnName} 成功`);
                             $.extend(this.permission, this.model);
@@ -102,7 +102,7 @@
                     data: this.model,
                     success: (res) => {
                         this.isLoading = false;
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.$emit('close');
                             this.$Message.success(`添加: ${this.model.cnName} 成功`);
                             this.$emit('reload');
@@ -160,7 +160,7 @@
                         url: 'mnt/user/delPermission/' + permission.id,
                         type: 'post',
                         success: (res) => {
-                            if (res.code == '00') {
+                            if (res.code === '00') {
                                 this.$Message.success(`删除: ${permission.cnName} 成功`);
                                 this.load();
                             } else this.$Notice.error(res.desc)
@@ -182,7 +182,7 @@
                     data: {page: page.page || 1, kw: this.kw},
                     success: (res) => {
                         this.loading = false;
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.page = res.data.page;
                             this.pageSize = res.data.pageSize;
                             this.totalRow = res.data.totalRow;

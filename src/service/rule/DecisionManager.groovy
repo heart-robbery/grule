@@ -81,7 +81,7 @@ class DecisionManager extends ServerTpl {
                 }
             }
         }
-        for (int page = 0, limit = 50; ; page++) {
+        for (int page = 0, limit = 20; ; page++) {
             def ls = repo.findList(Decision, page * limit, limit, null)
             if (!ls) { // 结束
                 tryCompleteFn()
@@ -261,6 +261,6 @@ class DecisionManager extends ServerTpl {
                 true
             }
         } : null)))
-        log.info("初始化决策: {}, {}, " + decision.id, spec.决策名, spec.决策id)
+        log.info("初始化决策(${decision.id}): ${decision.name}, ${decision.decisionId}".toString())
     }
 }

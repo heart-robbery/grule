@@ -58,8 +58,8 @@ dependencies {
     // compile 'com.alibaba:druid:1.1.23'
     // compile 'com.zaxxer:HikariCP:3.4.1'
     // compile 'org.apache.commons:commons-dbcp2:2.7.0'
-    compile 'mysql:mysql-connector-java:8.0.23'
-    // compile 'mysql:mysql-connector-java:5.1.49'
+    // compile 'mysql:mysql-connector-java:8.0.23'
+    compile 'mysql:mysql-connector-java:5.1.49'
     compile 'org.mariadb.jdbc:mariadb-java-client:2.1.2'
     compile 'com.h2database:h2:1.4.199'
 

@@ -1,3 +1,8 @@
+<style>
+.policyTr {
+    background-color: #eae5e5
+}
+</style>
 <template>
     <div class="h-panel">
         <div class="h-panel-bar">
@@ -6,7 +11,7 @@
                     <h-select v-model="model.result" :datas="types" placeholder="决策结果" @change="load"></h-select>
                 </h-formitem>
                 <h-formitem>
-                    <h-autocomplete v-model="model.decisionId" :option="decisions" @change="load" placeholder="决策"></h-autocomplete>
+                    <h-autocomplete v-model="model.decisionId" :option="decisionAc" @change="load" placeholder="决策"></h-autocomplete>
                 </h-formitem>
                 <h-formitem>
                     <input type="text" v-model="model.id" placeholder="流水id(精确)" style="width: 250px" @keyup.enter="load"/>
@@ -31,10 +36,10 @@
                     <div class="h-input-group">
                         <h-autocomplete v-model="item.fieldId" :option="item.fieldAc" placeholder="字段属性名" ></h-autocomplete>
                         <h-select v-model="item.op" :datas="ops" placeholder="比较符" :deletable="false"></h-select>
-                        <input type="text" v-model="item.value" placeholder="属性值"/>
+                        <input type="text" v-model="item.value" placeholder="属性值" @keyup.enter="load"/>
                         <div style="width: 70px; margin-left: 15px">
                             <span class="h-icon-minus" @click="delAttrFilter(item)"></span>&nbsp;
-                            <span v-if="model.attrFilters.length == (index + 1)" class="h-icon-plus" @click="addAttrFilter"></span>
+                            <span v-if="model.attrFilters.length === (index + 1)" class="h-icon-plus" @click="addAttrFilter"></span>
                         </div>
                     </div>
                 </h-formitem>
@@ -49,7 +54,7 @@
                     </template>
                 </h-tableitem>
                 <h-tableitem title="流水id" prop="id" align="center"></h-tableitem>
-                <h-tableitem title="结果" prop="decision" align="center" :format="formatType" :width="70"></h-tableitem>
+                <h-tableitem title="结果" prop="result" align="center" :format="formatType" :width="70"></h-tableitem>
                 <h-tableitem title="决策时间" align="center" :width="135">
                     <template slot-scope="{data}">
                         <date-item :time="data.occurTime" />
@@ -59,7 +64,7 @@
                 <h-tableitem title="异常信息" prop="exception" align="center"></h-tableitem>
                 <h-tableitem title="操作" align="center" :width="70">
                     <template slot-scope="{data}">
-                        <span class="text-hover" @click="showDetail(data)">详情</span>
+                        <span class="text-hover" style="color: #9bbdef" @click="showDetail(data)">详情</span>
                     </template>
                 </h-tableitem>
                 <div slot="empty">暂时无数据</div>
@@ -87,17 +92,17 @@
     const detail = {
         props: ['item'],
         template:`
-            <div style="max-height: 800px;overflow-y: auto;">
+            <div ref="detailDiv" style="overflow: auto; height: 100vh">
                 <header class="h-modal-header text-center">{{title}}</header>
                 <h-layout>
-                    <h-header>
+                    <h-header style="max-height: 30vh">
                         <h-form readonly>
                             <h-formitem label="入参">{{item.input}}</h-formitem>
                         </h-form>
                     </h-header>
                     <h-layout>
                         <h-sider style="flex: none; max-width: 60%; width: auto">
-                            <div class="h-panel" style="max-height: 680px">
+                            <div class="h-panel">
                                 <div class="h-panel-bar">执行策略/规则集
                                     <div class="h-panel-right">
                                         <Search placeholder="策略/规则名" v-width="200" @search="ruleFilter" v-model="ruleKw"></Search>
@@ -105,7 +110,7 @@
                                     </div>
                                 </div>
                                 <div class="h-panel-body">
-                                    <h-table ref="policyTb" :datas="policies" select-when-click-tr border :height="520">
+                                    <h-table ref="policyTb" :datas="policies" select-when-click-tr border style="max-height: 70vh; overflow: auto" :getTrClass="getTrClass">
                                         <h-tableitem title="属性" :width="220" align="left" treeOpener>
                                             <template slot-scope="{data}">
                                                 <h-form readonly>
@@ -127,7 +132,7 @@
                             </div>
                         </h-sider>
                         <h-content>
-                            <div class="h-panel" style="max-height: 680px">
+                            <div class="h-panel">
                                 <div class="h-panel-bar">属性结果集
                                     <div class="h-panel-right">
                                         <Search placeholder="属性名" v-width="200" @search="attrFilter" v-model="attrKw"></Search>
@@ -135,7 +140,7 @@
                                     </div>
                                 </div>
                                 <div class="h-panel-body">
-                                    <h-table :datas="attrs" stripe select-when-click-tr border :height="520">
+                                    <h-table :datas="attrs" stripe select-when-click-tr border style="max-height: 70vh; overflow: auto">
                                         <h-tableitem title="属性名" :width="100" align="right">
                                             <template slot-scope="{data}">
                                                 <span>{{data.cnName ? data.cnName : data.enName}}</span>
@@ -148,10 +153,10 @@
                             </div>
                         </h-content>
                     </h-layout>
-                    <h-footer v-if="item.dataCollectResult">
+                    <h-footer v-if="dataCollectResult">
                         <h-form readonly>
                             <h-formitem label="数据收集">
-                              <code>{{item.dataCollectResult}}</code>
+                                <ace-json v-model="dataCollectResult" style="height: 30vh; width: 99%; max-height: 60%" :readonly="true"></ace-json>
                             </h-formitem>
                         </h-form>
                     </h-footer>
@@ -159,12 +164,15 @@
             </div>
         `,
         data() {
-            this.item.detail.policies.map(p => p.children = p.rules)
+            if (this.item.detail && this.item.detail.policies) {
+                this.item.detail.policies.map(p => p.children = p.rules)
+            }
             return {
                 ruleKw: null,
                 attrKw: null,
                 attrs: this.item.data,
-                policies: this.item.detail.policies,
+                policies: this.item.detail ? this.item.detail.policies : null,
+                dataCollectResult: this.item.dataCollectResult ? JSON.stringify(this.item.dataCollectResult, null, 2) : null
             }
         },
         mounted() {
@@ -173,10 +181,15 @@
         },
         computed: {
             title: function () {
-                return this.item.decisionName + ' ' + this.item.id + ' ' + this.formatType(this.item.decision);
+                return this.item.decisionName + ' ' + this.item.id + ' ' + this.formatType(this.item.result);
             }
         },
         methods: {
+            getTrClass(data, index) {
+                if (data.attrs['策略名']) {
+                    return ['policyTr'];
+                }
+            },
             formatType(v) {
                 for (let type of types) {
                     if (type.key == v) return type.title
@@ -215,7 +228,7 @@
         data() {
             return {
                 types: types, ops: ops,
-                decisions: {
+                decisionAc: {
                     keyName: 'decisionId',
                     titleName: 'name',
                     minWord: 1,
@@ -225,7 +238,7 @@
                             data: {page: 1, pageSize: 5, nameLike: filter},
                             success: (res) => {
                                 this.isLoading = false;
-                                if (res.code == '00') {
+                                if (res.code === '00') {
                                     cb(res.data.list.map((r) => {
                                         return {decisionId: r.id, name: r.name}
                                     }))
@@ -255,6 +268,14 @@
                 this.load()
             }
         },
+        watch: {
+            'model.startTime'() {
+                this.load()
+            },
+            'model.endTime'() {
+                this.load()
+            }
+        },
         methods: {
             fieldAc() {
                 return {
@@ -267,7 +288,7 @@
                         data: {page: 1, pageSize: 5, kw: filter},
                         success: (res) => {
                             this.isLoading = false;
-                            if (res.code == '00') {
+                            if (res.code === '00') {
                                 cb(res.data.list.map((r) => {
                                     return {id: r.id, cnName: r.cnName}
                                 }))
@@ -295,7 +316,7 @@
                         vue: detail,
                         datas: {item: item}
                     },
-                    width: 1200,
+                    width: document.body.clientWidth - 250,
                     hasCloseIcon: true, fullScreen: false, transparent: false, closeOnMask: true,
                     events: {
                         // reload: () => {
@@ -328,7 +349,7 @@
                     data: data,
                     success: (res) => {
                         this.loading = false;
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.page = res.data.page;
                             this.pageSize = res.data.pageSize;
                             this.totalRow = res.data.totalRow;

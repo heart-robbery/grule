@@ -12,13 +12,9 @@
             <h-datepicker v-model="model.startTime" type="datetime" :option="{minuteStep:2}" :has-seconds="true" placeholder="开始时间" style="width: 160px"></h-datepicker>
             <h-datepicker v-model="model.endTime" type="datetime" :option="{minuteStep:2}" :has-seconds="true" placeholder="结束时间" style="width: 160px"></h-datepicker>
             <button class="h-btn h-btn-primary float-right" @click="load"><span>搜索</span></button>
-<!--            <div class="h-panel-right">-->
-<!--                <h-search placeholder="查询" v-width="200" v-model="model.kw" show-search-button search-text="搜索" @search="load"></h-search>-->
-<!--            </div>-->
         </div>
         <div class="h-panel-body">
             <h-table ref="table" :datas="list" stripe select-when-click-tr :loading="loading" border>
-                <!--                <h-tableitem title="ID" prop="id" align="center"></h-tableitem>-->
                 <h-tableitem title="决策" align="center">
                     <template slot-scope="{data}">
                         <a v-if="data.decisionName" href="javascript:void(0)" @click="jumpToDecision(data)">{{data.decisionName}}</a>
@@ -48,7 +44,7 @@
                 <h-tableitem title="缓存" prop="cache" align="center" :format="formatBoolType" :width="40"></h-tableitem>
                 <h-tableitem title="操作" align="center" :width="70">
                     <template slot-scope="{data}">
-                        <span class="text-hover" @click="open(data)">{{data._expand?'收起':'展开'}}</span>
+                        <span class="text-hover" style="color: #9bbdef" @click="open(data)">{{data._expand?'收起':'展开'}}</span>
                     </template>
                 </h-tableitem>
                 <template slot="expand" slot-scope="{index, data}">
@@ -111,7 +107,7 @@
                             data: {page: 1, pageSize: 5, nameLike: filter},
                             success: (res) => {
                                 this.isLoading = false;
-                                if (res.code == '00') {
+                                if (res.code === '00') {
                                     cb(res.data.list.map((r) => {
                                         return {decisionId: r.id, name: r.name}
                                     }))
@@ -130,7 +126,7 @@
                             data: {page: 1, pageSize: 5, kw: filter},
                             success: (res) => {
                                 this.isLoading = false;
-                                if (res.code == '00') {
+                                if (res.code === '00') {
                                     cb(res.data.list.map((r) => {
                                         return {id: r.id, name: r.name}
                                     }))
@@ -201,7 +197,7 @@
                     data: $.extend({page: page.page || 1}, this.model),
                     success: (res) => {
                         this.loading = false;
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.page = res.data.page;
                             this.pageSize = res.data.pageSize;
                             this.totalRow = res.data.totalRow;

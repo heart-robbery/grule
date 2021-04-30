@@ -2,10 +2,9 @@
     <div class="h-panel">
         <div class="h-panel-bar">
             &nbsp;&nbsp;
-            <h-button v-if="sUser.permissionIds.find((e) => e == 'decision-add')" @click="add"><i class="h-icon-plus"></i></h-button>
-            <input type="text" v-model="model.nameLike" placeholder="决策名" style="width: 250px" @keyup.enter="load"/>
+            <h-button v-if="sUser.permissionIds.find((e) => e === 'decision-add')" @click="add"><i class="h-icon-plus"></i></h-button>
+            <input type="text" v-model="model.nameLike" placeholder="决策名,决策id" style="width: 250px" @keyup.enter="load"/>
             <div class="h-panel-right">
-<!--                <h-search placeholder="查询" v-width="200" v-model="kw" show-search-button search-text="搜索" @search="load"></h-search>-->
                 <button class="h-btn h-btn-primary float-right" @click="load"><i class="h-icon-search"></i><span>搜索</span></button>
             </div>
         </div>
@@ -14,7 +13,7 @@
                 <h-collapse v-model="collapse" accordion>
                     <h-collapseitem v-for="item in decision.list" :key="item.decisionId" :name="item.decisionId" :data-id="item.id">
                         <template slot='title'>
-                            {{item.name + '(' + item.decisionId + ')' + (item.comment ? ': ' + item.comment : '')}}
+                            {{item.name + '(' + item.decisionId + ')'}}
                             &nbsp;&nbsp;&nbsp;
                             <date-item :time="item.updateTime"></date-item>
                             &nbsp;&nbsp;&nbsp;
@@ -29,11 +28,8 @@
                             </span>
                         </template>
                         <ace-groovy v-if="collapse && collapse.length > 0 && collapse[0] == item.decisionId"
-                                    v-model="item.dsl" height="650px" width="90%" @save="save(item)" :readonly="item._readonly">
+                                    v-model="item.dsl" style="height: 650px" @save="save(item)" :readonly="item._readonly">
                         </ace-groovy>
-<!--                        <div style="height: 650px; width: 100vh">-->
-<!--                            <div v-if="collapse && collapse.length > 0 && collapse[0] == item.decisionId " ref="dslEditor" style="height: 650px; width: 800px"></div>-->
-<!--                        </div>-->
                     </h-collapseitem>
                 </h-collapse>
             </div>
@@ -132,7 +128,7 @@
                                         <input type="text" v-model="data.regex" />
                                     </h-formitem>
                                     <h-formitem v-if="data.type == 'Str'" label="验证函数">
-                                        <ace-groovy v-model="data.validFun" height="80px"></ace-groovy>
+                                        <ace-groovy v-model="data.validFun" style="height: 80px}"></ace-groovy>
                                     </h-formitem>
 
                                     <h-formitem v-if="data.type == 'Int'" label="最小值">
@@ -196,6 +192,7 @@
             },
             save() {
                 this.$emit('update');
+                this.$emit('close');
             },
             del(item) {
                 let index = this.decision.apiConfigO.indexOf(item);
@@ -231,7 +228,7 @@
                 </h-cell>
             </h-row>
             <h-row>
-                <ace-json v-model="result" height="200px" width="99%" :readonly="true"></ace-json>
+                <ace-json v-model="result" :readonly="true"></ace-json>
             </h-row>
             </div>
         `,
@@ -269,7 +266,7 @@
                     url: this.url,
                     data: this.items.map((param) => {let o={}; o[param.code] = param.value; return o}).reduce((o1, o2) => {let o = {...o1, ...o2}; return o}),
                     success: (res) => {
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.result = JSON.stringify(res.data, null, 4).trim();
                             this.$Message.success(`测试调用: ${this.decision.name} 成功`);
                             app.$data.tmp.testResultId = res.data.id;
@@ -326,7 +323,7 @@
             },
             showTestPop(item) {
                 this.$Modal({
-                    title: `测试: ${item.name}`, middle: true, draggable: true,
+                    title: `测试: ${item.name}`, draggable: true,
                     component: {
                         vue: testPop,
                         datas: {decision: item}
@@ -342,7 +339,7 @@
                         $.ajax({
                             url: 'mnt/delDecision/' + item.id,
                             success: (res) => {
-                                if (res.code == '00') {
+                                if (res.code === '00') {
                                     this.$Message.success(`删除决策: ${item.name}成功`);
                                   this.load();
                                   localStorage.removeItem('rule.test.' + item.decisionId)
@@ -364,13 +361,12 @@
                     type: 'post',
                     data: {id: decision.id, dsl: decision.dsl, apiConfig: decision.apiConfigO ? JSON.stringify(decision.apiConfigO) : decision.apiConfig},
                     success: (res) => {
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             if (decision.id) {
                                 $.extend(decision, res.data);
-                                //decision.apiConfigO = decision.apiConfig ? JSON.parse(decision.apiConfig) : null;
                                 this.$Message.success('更新成功: ' + decision.name);
                             } else {
-                                $.extend(decision, res.data);
+                                //$.extend(decision, res.data);
                                 //decision.apiConfigO = decision.apiConfig ? JSON.parse(decision.apiConfig) : null;
                                 this.$Message.success('新增成功: ' + res.data.name);
                                 this.load();
@@ -441,7 +437,7 @@
                     data: $.extend({page: page.page || 1, pageSize: 5, decisionId: this.tabs.showId}, this.model),
                     success: (res) => {
                         this.decisionLoading = false;
-                        if (res.code == '00') {
+                        if (res.code === '00') {
                             this.decision = res.data;
                         } else this.$Notice.error(res.desc)
                     },
