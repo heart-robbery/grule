@@ -240,7 +240,7 @@ class FieldManager extends ServerTpl {
                 fieldMap.remove(e.key)
             }
         }
-        log.info("加载字段属性配置 {}个", fieldMap.size() / 2)
+        log.info("加载字段属性 {}个", fieldMap.size() / 2)
     }
 
 
@@ -284,7 +284,7 @@ class FieldManager extends ServerTpl {
                 collectors.remove(e.key)
             }
         }
-        log.info("加载数据收集器配置 {}个", collectors.size())
+        log.info("加载数据收集器 {}个", collectors.size())
     }
 
 

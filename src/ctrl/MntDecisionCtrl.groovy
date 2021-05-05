@@ -17,7 +17,7 @@ import service.rule.DecideResult
 import service.rule.DecisionManager
 import service.rule.DecisionSrv
 import service.rule.FieldManager
-import service.rule.DecisionSpec
+import service.rule.spec.DecisionSpec
 
 import javax.persistence.criteria.Predicate
 import java.text.SimpleDateFormat
@@ -228,7 +228,7 @@ class MntDecisionCtrl extends ServerTpl {
                                         pJo.put('data', pJo.getJSONObject('data')?.collect { Entry<String, Object> e ->
                                             [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
                                         }?:null)
-                                        pJo.getJSONArray('rules')?.each {JSONObject rJo ->
+                                        pJo.getJSONArray('items')?.each {JSONObject rJo ->
                                             rJo.put('data', rJo.getJSONObject('data')?.collect { Entry<String, Object> e ->
                                                 [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
                                             }?:null)
@@ -322,17 +322,6 @@ class MntDecisionCtrl extends ServerTpl {
         //dsl 验证
         if (!spec.决策id) return ApiResp.fail("决策id 不能为空")
         if (!spec.决策名) return ApiResp.fail("决策名 不能为空")
-        // if (!spec.policies) return ApiResp.fail("${spec.决策名} 是空决策")
-        if (spec.policies) {
-            for (def policy : spec.policies) {
-                if (!policy.策略名) return ApiResp.fail('策略名字不能为空')
-                if (!policy.rules) return ApiResp.fail("'${policy.策略名}' 是空策略")
-                for (def rule : policy.rules) {
-                    if (!rule.规则名) return ApiResp.fail('规则名字不能为空')
-                    if (rule.fns.size() < 1) return ApiResp.fail("'${rule.规则名}' 是空规则")
-                }
-            }
-        }
 
         Decision decision
         if (id) { // 更新

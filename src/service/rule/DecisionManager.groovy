@@ -12,6 +12,7 @@ import entity.Decision
 import entity.FieldType
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.ImportCustomizer
+import service.rule.spec.DecisionSpec
 
 import java.text.SimpleDateFormat
 import java.util.concurrent.ConcurrentHashMap

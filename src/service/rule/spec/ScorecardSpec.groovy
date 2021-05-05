@@ -1,4 +1,6 @@
-package service.rule
+package service.rule.spec
+
+import service.rule.DecisionContext
 
 /**
  * 评分卡spec
@@ -15,7 +17,11 @@ package service.rule
      赋值变量 = '评分结果'
  }
  */
-class ScorecardSpec {
+class ScorecardSpec extends BaseSpec {
+    /**
+     * 评分卡名字
+     */
+    String 评分卡名
     /**
      * 可要可不要
      */
@@ -39,16 +45,22 @@ class ScorecardSpec {
     /**
      * 计算结果
      * 按模型顺序依次计算结果并累加
-     * @param data
+     * @param ctx
      */
-    def compute(Map data) {
-        模型.findResults {item ->
-            def attrValue = data.get(item[0])
-            def enumValue = item[2]
+    def compute(DecisionContext ctx) {
+        def result = (基础分?:0) + 模型.findResults {item ->
+            def attrValue = ctx.data.get(item[0])
+            def enumValue = item[1]
             if (enumValue instanceof Range || enumValue instanceof Collection) {
-                if (attrValue in enumValue) return item[3]
-            } else if (attrValue == enumValue) return item[3]
+                if (attrValue in enumValue) return item[2]
+            } else if (attrValue == enumValue) return item[2]
             0
         }.sum()
+        ctx.setAttr(赋值变量, result)
+        return result
     }
+
+
+    @Override
+    String name() { return 评分卡名 }
 }

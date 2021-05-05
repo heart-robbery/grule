@@ -165,7 +165,7 @@
         `,
         data() {
             if (this.item.detail && this.item.detail.policies) {
-                this.item.detail.policies.map(p => p.children = p.rules)
+                this.item.detail.policies.map(p => p.children = p.items)
             }
             return {
                 ruleKw: null,
