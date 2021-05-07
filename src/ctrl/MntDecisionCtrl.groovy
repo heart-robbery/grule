@@ -646,15 +646,7 @@ class MntDecisionCtrl extends ServerTpl {
     @Path(path = 'cleanExpire')
     ApiResp cleanExpire(HttpContext hCtx) {
         hCtx.auth("grant")
-        def srv = bean(DecisionSrv)
-        if (srv) {
-            queue("cleanDecideRecord") {
-                def total = srv.cleanDecideRecord()
-                ep.fire("globalMsg", "清理过期决策数据结束. 共计: " + total)
-            }
-            return ApiResp.ok().desc("等待后台清理完成...")
-        } else {
-            return ApiResp.fail("清理失败")
-        }
+        bean(DecisionSrv).cleanDecideRecord()
+        return ApiResp.ok().desc("等待后台清理完成...")
     }
 }
