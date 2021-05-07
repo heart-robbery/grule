@@ -219,7 +219,7 @@ class MntDecisionCtrl extends ServerTpl {
                                     }
                                 }).addConverter('detail', {String detailJsonStr ->
                                     if (!detailJsonStr) return null
-                                    def detailJo = JSON.parseObject(detailJsonStr)
+                                    def detailJo = JSON.parseObject(detailJsonStr, Feature.OrderedField)
                                     // 数据转换
                                     detailJo.put('data', detailJo.getJSONObject('data')?.collect { Entry<String, Object> e ->
                                         [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
