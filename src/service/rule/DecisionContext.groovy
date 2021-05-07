@@ -96,42 +96,62 @@ class DecisionContext {
     }
 
 
+    /**
+     * 执行策略
+     * @param spec
+     * @return
+     */
     DecideResult run(PolicySpec spec) {
         curPassedPolicy = new PassedSpec(spec: spec, attrs: [策略名: spec.策略名, *:spec.attrs])
         policies.add(curPassedPolicy)
         log.debug(logPrefix() + "开始执行")
         DecideResult result = spec.compute(this)
         curPassedPolicy.result = result
-        log.trace(logPrefix() + "结束执行: " + result + ", data: " + (curPassedPolicy.data?:null))
+        log.info(logPrefix() + "结束执行. result: " + result + ", data: " + (curPassedPolicy.data?:null))
         curPassedPolicy = null
         result
     }
 
 
+    /**
+     * 执行规则
+     * @param spec
+     * @return
+     */
     DecideResult run(RuleSpec spec) {
         curPassedRule = new PassedSpec(spec: spec, attrs: [规则名: spec.规则名, *:spec.attrs])
         curPassedPolicy.items.add(curPassedRule)
         log.debug(logPrefix() + "开始执行")
         DecideResult result = spec.compute(this)
         curPassedRule.result = result
-        log.debug(logPrefix() + "结束执行. " + result + ", data: " + (curPassedRule.data?:null))
+        log.info(logPrefix() + "结束执行. result: " + result + ", data: " + (curPassedRule.data?:null))
         curPassedRule = null
         result
     }
 
 
+    /**
+     * 执行评分卡
+     * @param spec
+     * @return
+     */
     def run(ScorecardSpec spec) {
         curPassedScorecard = new PassedSpec(spec: spec, attrs: [评分卡名: spec.评分卡名, *:spec.attrs])
         curPassedPolicy.items.add(curPassedScorecard)
         log.debug(logPrefix() + "开始执行")
         def result = spec.compute(this)
         curPassedScorecard.result = result
-        log.debug(logPrefix() + "结束执行. " + result + ", data: " + (curPassedScorecard.data?:null))
+        log.info(logPrefix() + "结束执行. result: " + result + ", data: " + (curPassedScorecard.data?:null))
         curPassedScorecard = null
         result
     }
 
 
+    /**
+     * 执行子决策
+     * @param spec
+     * @return
+     */
     DecideResult run(DecisionSpec spec) {
         // 根据 决策id 找到对应的 决策
         DecisionManager dm = ep.fire("bean.get", DecisionManager)
@@ -142,13 +162,16 @@ class DecisionContext {
         curPassedPolicy.items.add(curPassedDecision)
         log.debug(logPrefix() + "开始执行")
 
+        DecideResult result
         DecisionContext ctx = new DecisionContext(id, holder, data, fieldManager, ep)
-        ctx.start()
-        DecideResult result = ctx.decideResult
-        ctx.result()['data']?.each {setAttr(it.key, it.value)} //设置返回属性
+        if (ctx.started.compareAndSet(false, true)) {
+            result = holder.spec.compute(ctx)
+            ctx.end.set(true); ctx.status = '0000'
+            ctx.result()['data']?.each {setAttr(it.key, it.value)} //设置返回属性
+        }
 
         curPassedDecision.result = result
-        log.debug(logPrefix() + "结束执行. " + result + ", data: " + (curPassedDecision.data?:null))
+        log.info(logPrefix() + "结束执行. result: " + result + ", data: " + (curPassedDecision.data?:null) + ", summary: " + ctx.summary())
         curPassedDecision = null
         result
     }
