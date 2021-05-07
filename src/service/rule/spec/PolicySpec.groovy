@@ -1,5 +1,6 @@
 package service.rule.spec
 
+import cn.xnatural.app.Utils
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.ImportCustomizer
 import service.rule.DecideResult
@@ -9,7 +10,7 @@ import service.rule.DecisionContext
  * 策略定义 spec
  */
 class PolicySpec extends BaseSpec {
-    String                         策略名
+    String 策略名
 
 
     void 操作(Closure 操作) {
@@ -156,7 +157,7 @@ class PolicySpec extends BaseSpec {
         def config = new CompilerConfiguration()
         def icz = new ImportCustomizer()
         config.addCompilationCustomizers(icz)
-        icz.addImports(PolicySpec.name)
+        icz.addImports(PolicySpec.name, Utils.name)
         icz.addStarImports(RuleSpec.name, DecisionSpec.name, ScorecardSpec.name)
         def shell = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config)
         shell.evaluate("service.rule.spec.PolicySpec.of{$dsl}")

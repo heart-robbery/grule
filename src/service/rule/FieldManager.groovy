@@ -259,8 +259,12 @@ class FieldManager extends ServerTpl {
                 dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "性别")}?.id, comment: '值: F(女),M(男)'))
             repo.saveOrUpdate(new RuleField(enName: 'week', cnName: '星期几', type: FieldType.Int, decision: '',
                 dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "星期几")}?.id, comment: '值: 1,2,3,4,5,6,7'))
+            repo.saveOrUpdate(new RuleField(enName: 'currentDateTime', cnName: '当前日期时间', type: FieldType.Str, decision: '',
+                dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "当前日期时间")}?.id, comment: '值: yyyy-MM-dd HH:mm:ss'))
+            repo.saveOrUpdate(new RuleField(enName: 'currentDate', cnName: '当前日期', type: FieldType.Str, decision: '',
+                dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "当前日期")}?.id, comment: '值: yyyy-MM-dd'))
             repo.saveOrUpdate(new RuleField(enName: 'currentTime', cnName: '当前时间', type: FieldType.Str, decision: '',
-                dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "当前时间")}?.id, comment: '值: yyyy-MM-dd HH:mm:ss'))
+                dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "当前时间")}?.id, comment: '值: HH:mm:ss'))
         }
     }
 
@@ -298,8 +302,14 @@ class FieldManager extends ServerTpl {
 Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1
             """.trim()))
 
-            repo.saveOrUpdate(new DataCollector(type: 'script', name: '当前时间', enabled: true, comment: '值: yyyy-MM-dd HH:mm:ss', cacheKey: '${System.currentTimeMillis() / 1000}', computeScript: """
+            repo.saveOrUpdate(new DataCollector(type: 'script', name: '当前日期时间', enabled: true, comment: '值: yyyy-MM-dd HH:mm:ss', cacheKey: '${(long) (System.currentTimeMillis() / 1000)}', computeScript: """
 new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())
+            """.trim()))
+            repo.saveOrUpdate(new DataCollector(type: 'script', name: '当前日期', enabled: true, comment: '值: yyyy-MM-dd', cacheKey: '${(long) (System.currentTimeMillis() / (1000 * 60 * 60 * 24))}', computeScript: """
+new java.text.SimpleDateFormat("yyyy-MM-dd").format(new Date())
+            """.trim()))
+            repo.saveOrUpdate(new DataCollector(type: 'script', name: '当前时间', enabled: true, comment: '值: HH:mm:ss', cacheKey: '${(long) (System.currentTimeMillis() / 1000)}', computeScript: """
+new java.text.SimpleDateFormat("HH:mm:ss").format(new Date())
             """.trim()))
 
             repo.saveOrUpdate(new DataCollector(type: 'script', name: '性别', enabled: true, comment: '根据身份证计算. 值: F,M', computeScript: """
