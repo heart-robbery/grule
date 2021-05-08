@@ -33,22 +33,23 @@ sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
 
+ext {
+    groovyVerion = '3.0.8'
+}
 dependencies {
     compile fileTree(dir: 'sysLib', include: ['*.jar'])
-    compile 'org.codehaus.groovy:groovy:3.0.7'
-    compile 'org.codehaus.groovy:groovy-templates:3.0.7'
-    compile 'org.codehaus.groovy:groovy-sql:3.0.7'
-    compile 'org.codehaus.groovy:groovy-json:3.0.7'
-    compile 'org.codehaus.groovy:groovy-jmx:3.0.7'
+    compile "org.codehaus.groovy:groovy:$groovyVerion"
+    compile "org.codehaus.groovy:groovy-templates:$groovyVerion"
+    compile "org.codehaus.groovy:groovy-sql:$groovyVerion"
+    compile "org.codehaus.groovy:groovy-json:$groovyVerion"
+    compile "org.codehaus.groovy:groovy-jmx:$groovyVerion"
 
     //compile 'com.alibaba:fastjson:1.2.73'
     compile 'javax.inject:javax.inject:1'
     compile 'ch.qos.logback:logback-classic:1.2.3'
 
     compile 'cn.xnatural.app:app:1.0.3'
-    //compile 'cn.xnatural.enet:enet-event:0.0.17'
     compile 'cn.xnatural.http:http:1.0.7'
-    //compile 'cn.xnatural.aio:aio:1.0.6'
     compile 'cn.xnatural.jpa:jpa:1.0.4'
     compile 'cn.xnatural.sched:sched:1.0.1'
     compile 'cn.xnatural.remoter:remoter:1.0.2'
@@ -58,8 +59,8 @@ dependencies {
     // compile 'com.alibaba:druid:1.1.23'
     // compile 'com.zaxxer:HikariCP:3.4.1'
     // compile 'org.apache.commons:commons-dbcp2:2.7.0'
-    // compile 'mysql:mysql-connector-java:8.0.23'
-    compile 'mysql:mysql-connector-java:5.1.49'
+    compile 'mysql:mysql-connector-java:8.0.23'
+    // compile 'mysql:mysql-connector-java:5.1.49'
     compile 'org.mariadb.jdbc:mariadb-java-client:2.1.2'
     compile 'com.h2database:h2:1.4.199'
 
