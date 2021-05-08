@@ -83,7 +83,7 @@ class FieldManager extends ServerTpl {
     def dataCollect(String aName, DecisionContext ctx) {
         def field = fieldMap.get(aName)
         if (field == null) {
-            log.debug("未找到属性'$aName'对应的配置".toString())
+            log.warn(ctx.logPrefix() + "未找到属性'$aName'对应的配置".toString())
             return null
         }
         String collectorId = field.dataCollector // 属性对应的 值 收集器名
@@ -95,31 +95,31 @@ class FieldManager extends ServerTpl {
             throw new RuntimeException("Field '$aName' not belong to '${ctx.decisionHolder.decision.name}'")
         }
         // 得到收集器
-        def collector = collectors.get(collectorId)
-        if (!collector) {
+        def collectorHolder = collectors.get(collectorId)
+        if (!collectorHolder) {
             // 重新去数据库中查找
             initDataCollector(repo.findById(DataCollector, collectorId))
-            collector = collectors.get(collectorId)
+            collectorHolder = collectors.get(collectorId)
         }
         // 未找到收集器
-        if (!collector) {
-            log.warn(ctx.logPrefix() + "Not fund '${aName}' mapped getter function '${collector.name}($collectorId)'".toString())
+        if (!collectorHolder) {
+            log.warn(ctx.logPrefix() + "Not fund '${aName}' mapped getter function '${collectorHolder.collector.name}($collectorId)'".toString())
             return null
         }
 
-        String dataKey = collector.dataKeyFn.apply(ctx) //数据key,判断是否需要重新执行收集器的计算函数拿结果
+        String dataKey = collectorHolder.dataKeyFn.apply(ctx) //数据key,判断是否需要重新执行收集器的计算函数拿结果
         if (ctx.dataCollectResult.containsKey(dataKey)) { // 已查询过
             def collectResult = ctx.dataCollectResult.get(dataKey)
             return collectResult instanceof Map ? (collectResult.containsKey(aName) ? collectResult.get(aName) : collectResult.get(alias(aName))) : collectResult
         }
 
         // 函数执行
-        log.debug(ctx.logPrefix() + "Get '${aName}' value apply function: '${collector.name}($collectorId)'".toString())
+        log.debug(ctx.logPrefix() + "Get '${aName}' value apply function: '${collectorHolder.collector.name}($collectorId)'".toString())
         def collectResult = null
         try {
-            collectResult = collector.computeFn.apply(ctx)
+            collectResult = collectorHolder.computeFn.apply(ctx)
         } catch (ex) { // 接口执行报错, 默认继续往下执行规则
-            log.error(ctx.logPrefix() + "数据收集器'${collector.name}($collectorId)' 执行错误".toString(), ex)
+            log.error(ctx.logPrefix() + "数据收集器'${collectorHolder.collector.name}($collectorId)' 执行错误".toString(), ex)
         }
         if (collectResult instanceof Map) { // 收集器,收集结果为多个属性的值, 则暂先保存
             ctx.dataCollectResult.put(dataKey, collectResult)
@@ -240,7 +240,7 @@ class FieldManager extends ServerTpl {
                 fieldMap.remove(e.key)
             }
         }
-        log.info("加载字段属性配置 {}个", fieldMap.size() / 2)
+        log.info("加载字段属性 {}个", fieldMap.size() / 2)
     }
 
 
@@ -259,8 +259,12 @@ class FieldManager extends ServerTpl {
                 dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "性别")}?.id, comment: '值: F(女),M(男)'))
             repo.saveOrUpdate(new RuleField(enName: 'week', cnName: '星期几', type: FieldType.Int, decision: '',
                 dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "星期几")}?.id, comment: '值: 1,2,3,4,5,6,7'))
+            repo.saveOrUpdate(new RuleField(enName: 'currentDateTime', cnName: '当前日期时间', type: FieldType.Str, decision: '',
+                dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "当前日期时间")}?.id, comment: '值: yyyy-MM-dd HH:mm:ss'))
+            repo.saveOrUpdate(new RuleField(enName: 'currentDate', cnName: '当前日期', type: FieldType.Str, decision: '',
+                dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "当前日期")}?.id, comment: '值: yyyy-MM-dd'))
             repo.saveOrUpdate(new RuleField(enName: 'currentTime', cnName: '当前时间', type: FieldType.Str, decision: '',
-                dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "当前时间")}?.id, comment: '值: yyyy-MM-dd HH:mm:ss'))
+                dataCollector: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "当前时间")}?.id, comment: '值: HH:mm:ss'))
         }
     }
 
@@ -271,7 +275,7 @@ class FieldManager extends ServerTpl {
     void loadDataCollector() {
         initDefaultCollector()
         Set<String> ids = (collectors.isEmpty() ? null : new HashSet<>(50))
-        for (int page = 0, limit = 200; ; page++) {
+        for (int page = 0, limit = 50; ; page++) {
             def ls = repo.findList(DataCollector, page * limit, limit, null)
             if (!ls) break
             ls.each {collector ->
@@ -284,7 +288,7 @@ class FieldManager extends ServerTpl {
                 collectors.remove(e.key)
             }
         }
-        log.info("加载数据收集器配置 {}个", collectors.size())
+        log.info("加载数据收集器 {}个", collectors.size())
     }
 
 
@@ -297,14 +301,23 @@ class FieldManager extends ServerTpl {
             repo.saveOrUpdate(new DataCollector(type: 'script', name: '星期几', enabled: true, comment: '值: 1,2,3,4,5,6,7', computeScript: """
 Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1
             """.trim()))
-            repo.saveOrUpdate(new DataCollector(type: 'script', name: '当前时间', enabled: true, comment: '值: yyyy-MM-dd HH:mm:ss', computeScript: """
+
+            repo.saveOrUpdate(new DataCollector(type: 'script', name: '当前日期时间', enabled: true, comment: '值: yyyy-MM-dd HH:mm:ss', cacheKey: '${(long) (System.currentTimeMillis() / 1000)}', computeScript: """
 new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())
             """.trim()))
+            repo.saveOrUpdate(new DataCollector(type: 'script', name: '当前日期', enabled: true, comment: '值: yyyy-MM-dd', cacheKey: '${(long) (System.currentTimeMillis() / (1000 * 60 * 60 * 24))}', computeScript: """
+new java.text.SimpleDateFormat("yyyy-MM-dd").format(new Date())
+            """.trim()))
+            repo.saveOrUpdate(new DataCollector(type: 'script', name: '当前时间', enabled: true, comment: '值: HH:mm:ss', cacheKey: '${(long) (System.currentTimeMillis() / 1000)}', computeScript: """
+new java.text.SimpleDateFormat("HH:mm:ss").format(new Date())
+            """.trim()))
+
             repo.saveOrUpdate(new DataCollector(type: 'script', name: '性别', enabled: true, comment: '根据身份证计算. 值: F,M', computeScript: """
 if (idNumber && idNumber.length() > 17) {
     Integer.parseInt(idNumber.substring(16, 17)) % 2 == 0 ? 'F' : 'M'
 } else null
             """.trim()))
+
             repo.saveOrUpdate(new DataCollector(type: 'script', name: '年龄', enabled: true, comment: '根据身份证计算', computeScript: """
 if (idNumber && idNumber.length() > 17) {
     Calendar cal = Calendar.getInstance()
@@ -387,66 +400,53 @@ if (idNumber && idNumber.length() > 17) {
         }, computeFn: { ctx -> //sql脚本执行函数
             Object result // 结果
             Exception exx //异常
-            String cacheKey //缓存key
-            Boolean cache = false //结果是否取自缓存
-            def start = new Date() //取数据开始时间
+            String dataKey //数据缓存key
+            boolean cache = false //结果是否取自缓存
+            Date start //取数据开始时间
             long spend
+            def logMsg = "${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}Sql收集器'${collector.name}(${collector.id})'${ -> spend ? ', spend: ' + spend : ''}, result: ${ -> result}"
 
             //1. 先从缓存中取
             if (collector.cacheTimeout && collector.cacheKey) {
-                cacheKey = collector.cacheKey
-                for (int i = 0; i < 2; i++) { // 替换 ${} 变量
-                    if (!cacheKey.contains('${')) break
-                    cacheKey = tplEngine.createTemplate(cacheKey).make(new HashMap(1) {
-                        int paramIndex
-                        @Override
-                        boolean containsKey(Object key) { return true } // 加这行是为了 防止 MissingPropertyException
-                        @Override
-                        Object get(Object key) { return ctx.data.get(key) }
-
-                        @Override
-                        Object put(Object key, Object value) {
-                            log.error("$collector.name cacheKey config error, not allow set property '$key'".toString())
-                            null
-                        }
-                    }).toString()
+                dataKey = computeCollectDataKey(collector, ctx)
+                if (redis) {
+                    start = new Date() // 调用时间
+                    result = redis.get(getStr("collectorCacheKeyPrefix", "collector") + ":" + dataKey)
+                    spend = System.currentTimeMillis() - start.time
                 }
-                if (cacheKey) {
-                    if (redis) {
-                        start = new Date() // 调用时间
-                        result = redis.get(getStr("collectorCacheKeyPrefix", "collector") + ":" + cacheKey)
-                        spend = System.currentTimeMillis() - start.time
-                    }
-                    else if (cacheSrv) {
-                        start = new Date() // 调用时间
-                        result = cacheSrv.get(getStr("collectorCacheKeyPrefix", "collector") +":"+ cacheKey)?.toString()
-                        spend = System.currentTimeMillis() - start.time
-                    }
+                else if (cacheSrv) {
+                    start = new Date() // 调用时间
+                    result = cacheSrv.get(getStr("collectorCacheKeyPrefix", "collector") +":"+ dataKey)?.toString()
+                    spend = System.currentTimeMillis() - start.time
                 }
             }
-            if (!result) {
+            //2. 执行sql脚本
+            if (result == null || result.toString().isEmpty()) {
                 try {
+                    start = new Date() // 调用时间
                     result = sqlScript.rehydrate(ctx.data, sqlScript, this)()
                     spend = System.currentTimeMillis() - start.time
-                    log.info(ctx.logPrefix() + "Sql脚本函数'$collector.name'执行结果: $result".toString())
-                    if (result != null && !result.toString().isEmpty() && cacheKey) { //缓存结果
-                        if (redis) {
-                            String key = getStr("collectorCacheKeyPrefix", "collector") +":"+ cacheKey
-                            redis.set(key, result.toString())
-                            redis.expire(key, collector.cacheTimeout * 60)
-                        }
-                        else if (cacheSrv) {
-                            cacheSrv.set(getStr("collectorCacheKeyPrefix", "collector") +":"+ cacheKey, result, Duration.ofMinutes(collector.cacheTimeout))
-                        }
-                    }
+                    log.info(logMsg.toString())
                 } catch (ex) {
                     exx = ex
-                    log.error(ctx.logPrefix() + "Sql脚本函数'$collector.name'执行失败".toString(), ex)
+                    log.error(logMsg.toString(), ex)
                 }
             } else {
                 cache = true
+                log.info(logMsg.toString())
             }
-            log.info(ctx.logPrefix() + "${ -> cache ? '(缓存)' : ''}Sql脚本函数'$collector.name', 结果: $result".toString())
+            //3. 缓存结果
+            if (result != null && !result.toString().isEmpty() && dataKey && !cache) { //缓存结果
+                if (redis) {
+                    String key = getStr("collectorCacheKeyPrefix", "collector") +":"+ dataKey
+                    redis.set(key, result.toString())
+                    redis.expire(key, collector.cacheTimeout * 60)
+                }
+                else if (cacheSrv) {
+                    cacheSrv.set(getStr("collectorCacheKeyPrefix", "collector") +":"+ dataKey, result, Duration.ofMinutes(collector.cacheTimeout))
+                }
+            }
+            //4. 保存结果
             dataCollected(new CollectRecord(
                 decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.id,
                 status: (exx ? 'EEEE' : '0000'), dataStatus: (exx ? 'EEEE' : '0000'), collectDate: start, collectorType: collector.type,
@@ -485,20 +485,59 @@ if (idNumber && idNumber.length() > 17) {
         collectors.put(collector.id, new CollectorHolder(collector: collector, dataKeyFn: {ctx -> //数据结果唯一性key计算逻辑
             computeCollectDataKey(collector, ctx)
         }, computeFn: { ctx ->
-            Object result
-            final def start = new Date()
+            def result
+            Date start
+            long spend
+            String dataKey // 缓存key
+            boolean cache = false // 是否取自缓存
             Exception ex
-            try {
-                result = script.rehydrate(ctx.data, script, this)()
-                log.info(ctx.logPrefix() + "脚本函数'$collector.name'执行结果: $result".toString())
-            } catch (e) {
-                ex = e
-                log.error(ctx.logPrefix() + "脚本函数'$collector.name'执行失败".toString(), ex)
+            def logMsg = "${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}脚本收集器'${collector.name}(${collector.id})'${ -> ', spend: ' + spend}, result: ${ -> result}"
+
+            //1. 先从缓存中取
+            if (collector.cacheTimeout && collector.cacheKey) {
+                dataKey = computeCollectDataKey(collector, ctx)
+                if (redis) {
+                    start = new Date() // 调用时间
+                    result = redis.get(getStr("collectorCacheKeyPrefix", "collector") + ":" +dataKey)
+                    spend = System.currentTimeMillis() - start.time
+                }
+                else if (cacheSrv) {
+                    start = new Date() // 调用时间
+                    result = cacheSrv.get(getStr("collectorCacheKeyPrefix", "collector") + ":" +dataKey)?.toString()
+                    spend = System.currentTimeMillis() - start.time
+                }
             }
+            //2. 调用脚本
+            if (!result) {
+                try {
+                    start = new Date() // 调用时间
+                    result = script.rehydrate(ctx.data, script, this)()
+                    spend = System.currentTimeMillis() - start.time
+                    log.info(logMsg.toString())
+                } catch (e) {
+                    ex = e
+                    log.error(logMsg.toString(), ex)
+                }
+            } else {
+                cache = true
+                log.error(logMsg.toString(), ex)
+            }
+            //3. 缓存结果
+            if (!cache && result != null && !result.toString().isEmpty() && dataKey) {
+                if (redis) {
+                    String key = getStr("collectorCacheKeyPrefix", "collector") +":"+ dataKey
+                    redis.set(key, result.toString())
+                    redis.expire(key, collector.cacheTimeout * 60)
+                }
+                else if (cacheSrv) {
+                    cacheSrv.set(getStr("collectorCacheKeyPrefix", "collector") +":"+ dataKey, result, Duration.ofMinutes(collector.cacheTimeout))
+                }
+            }
+            //4. 保存结果
             dataCollected(new CollectRecord(
                 decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.id,
                 status: (ex ? 'EEEE' : '0000'), dataStatus: (ex ? 'EEEE' : '0000'), collectDate: start, collectorType: collector.type,
-                spend: System.currentTimeMillis() - start.time, cache: false,
+                spend: spend, cache: cache,
                 result: result instanceof Map ? JSON.toJSONString(result, SerializerFeature.WriteMapNullValue) : result?.toString(),
                 scriptException: ex == null ? null : ex.message?:ex.class.simpleName
             ))
@@ -555,28 +594,26 @@ if (idNumber && idNumber.length() > 17) {
             Date start //取数据开始时间
             String url = collector.url // http请求 url
             String bodyStr = collector.bodyStr // http 请求 body字符串
-            String cacheKey // 缓存key
+            String dataKey // 数据缓存key
             boolean cache = false //结果是否取自缓存
             Integer respCode // http响应码
 
             String retryMsg = '' //重试消息
             // 日志字符串
-            def logMsg = "${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}接口调用${ -> retryMsg}: name: $collector.name, url: ${ -> url}${ -> bodyStr == null ? '' : ', body: ' + bodyStr}${ -> respCode ? ', respCode: ' + respCode : ''}${ -> ', result: ' + result}${ -> resolveResult == null ? '' : ', resolveResult: ' + resolveResult}"
+            def logMsg = "${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}接口收集器'$collector.name(${collector.id})'${ -> retryMsg}, url: ${ -> url}${ -> bodyStr == null ? '' : ', body: ' + bodyStr}${ -> spend ? ', spend: ' + spend : ''}${ -> respCode ? ', respCode: ' + respCode : ''}${ -> ', result: ' + result}${ -> resolveResult == null ? '' : ', resolveResult: ' + resolveResult}"
 
             //1. 先从缓存中取
             if (collector.cacheTimeout && collector.cacheKey) {
-                cacheKey = computeCollectDataKey(collector, ctx)
-                if (cacheKey) {
-                    if (redis) {
-                        start = new Date() // 调用时间
-                        result = redis.get(getStr("collectorCacheKeyPrefix", "collector") + ":" +cacheKey)
-                        spend = System.currentTimeMillis() - start.time
-                    }
-                    else if (cacheSrv) {
-                        start = new Date() // 调用时间
-                        result = cacheSrv.get(getStr("collectorCacheKeyPrefix", "collector") + ":" +cacheKey)?.toString()
-                        spend = System.currentTimeMillis() - start.time
-                    }
+                dataKey = computeCollectDataKey(collector, ctx)
+                if (redis) {
+                    start = new Date() // 调用时间
+                    result = redis.get(getStr("collectorCacheKeyPrefix", "collector") + ":" +dataKey)
+                    spend = System.currentTimeMillis() - start.time
+                }
+                else if (cacheSrv) {
+                    start = new Date() // 调用时间
+                    result = cacheSrv.get(getStr("collectorCacheKeyPrefix", "collector") + ":" +dataKey)?.toString()
+                    spend = System.currentTimeMillis() - start.time
                 }
             }
 
@@ -656,8 +693,7 @@ if (idNumber && idNumber.length() > 17) {
                 } finally {
                     retryMsg = ''
                 }
-            }
-            else {
+            } else {
                 cache = true
             }
 
@@ -665,14 +701,14 @@ if (idNumber && idNumber.length() > 17) {
             String dataStatus = successFn ? (successFn.rehydrate(ctx.data, successFn, this)(result, respCode) ? '0000' : '0001') : '0000'
 
             //4. 如果接口返回的是有效数据, 则缓存
-            if ('0000' == dataStatus && cacheKey) {
+            if ('0000' == dataStatus && dataKey && !cache) {
                 if (redis) {
-                    String key = getStr("collectorCacheKeyPrefix", "collector") +":"+ cacheKey
+                    String key = getStr("collectorCacheKeyPrefix", "collector") +":"+ dataKey
                     redis.set(key, result)
                     redis.expire(key, collector.cacheTimeout * 60)
                 }
                 else if (cacheSrv) {
-                    cacheSrv.set(getStr("collectorCacheKeyPrefix", "collector") +":"+ cacheKey, result, Duration.ofMinutes(collector.cacheTimeout))
+                    cacheSrv.set(getStr("collectorCacheKeyPrefix", "collector") +":"+ dataKey, result, Duration.ofMinutes(collector.cacheTimeout))
                 }
             }
 

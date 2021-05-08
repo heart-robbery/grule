@@ -9,7 +9,10 @@ import javax.persistence.*
  * 决策结果保存地
  */
 @Entity
-@Table(indexes = [@Index(name = "idx_collectDate", columnList = "collectDate")])
+@Table(indexes = [
+        @Index(name = "idx_collectDate", columnList = "collectDate"),
+        @Index(name = "idx_decideId", columnList = "decideId")
+])
 class CollectRecord implements IEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -41,6 +44,7 @@ class CollectRecord implements IEntity {
     /**
      * 收集时间
      */
+    @Column(nullable = false)
     Date   collectDate
     /**
      * 执行时长

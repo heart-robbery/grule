@@ -4,21 +4,20 @@ import cn.xnatural.jpa.UUIDEntity
 import org.hibernate.annotations.DynamicUpdate
 import org.hibernate.annotations.Type
 
-import javax.persistence.Basic
-import javax.persistence.Column
-import javax.persistence.Entity
-import javax.persistence.Lob
+import javax.persistence.*
 
 /**
  * 决策
  */
 @Entity
 @DynamicUpdate
+@Table(indexes = [
+        @Index(name = "idx_decisionId", columnList = "decisionId", unique = true),
+])
 class Decision extends UUIDEntity {
     /**
      * 决策id
      */
-    @Column(unique = true)
     String decisionId
     /**
      * 决策名

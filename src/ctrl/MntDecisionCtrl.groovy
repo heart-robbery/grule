@@ -17,7 +17,7 @@ import service.rule.DecideResult
 import service.rule.DecisionManager
 import service.rule.DecisionSrv
 import service.rule.FieldManager
-import service.rule.DecisionSpec
+import service.rule.spec.DecisionSpec
 
 import javax.persistence.criteria.Predicate
 import java.text.SimpleDateFormat
@@ -157,10 +157,10 @@ class MntDecisionCtrl extends ServerTpl {
                 repo.findPage(DecideRecord, page, pageSize?:10) { root, query, cb ->
                     query.orderBy(cb.desc(root.get('occurTime')))
                     def ps = []
-                    ps << root.get('decisionId').in(ids)
-                    if (id) ps << cb.equal(root.get('id'), id)
                     if (start) ps << cb.greaterThanOrEqualTo(root.get('occurTime'), start)
                     if (end) ps << cb.lessThanOrEqualTo(root.get('occurTime'), end)
+                    if (id) ps << cb.equal(root.get('id'), id)
+                    ps << root.get('decisionId').in(ids)
                     if (decisionId) ps << cb.equal(root.get('decisionId'), decisionId)
                     if (spend) ps << cb.ge(root.get('spend'), spend)
                     if (result) ps << cb.equal(root.get('result'), result)
@@ -219,7 +219,7 @@ class MntDecisionCtrl extends ServerTpl {
                                     }
                                 }).addConverter('detail', {String detailJsonStr ->
                                     if (!detailJsonStr) return null
-                                    def detailJo = JSON.parseObject(detailJsonStr)
+                                    def detailJo = JSON.parseObject(detailJsonStr, Feature.OrderedField)
                                     // 数据转换
                                     detailJo.put('data', detailJo.getJSONObject('data')?.collect { Entry<String, Object> e ->
                                         [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
@@ -228,7 +228,7 @@ class MntDecisionCtrl extends ServerTpl {
                                         pJo.put('data', pJo.getJSONObject('data')?.collect { Entry<String, Object> e ->
                                             [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
                                         }?:null)
-                                        pJo.getJSONArray('rules')?.each {JSONObject rJo ->
+                                        pJo.getJSONArray('items')?.each {JSONObject rJo ->
                                             rJo.put('data', rJo.getJSONObject('data')?.collect { Entry<String, Object> e ->
                                                 [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
                                             }?:null)
@@ -259,14 +259,14 @@ class MntDecisionCtrl extends ServerTpl {
             repo.findPage(CollectRecord, page, pageSize?:10) { root, query, cb ->
                 query.orderBy(cb.desc(root.get('collectDate')))
                 def ps = []
-                ps << root.get('decisionId').in(ids)
+                if (start) ps << cb.greaterThanOrEqualTo(root.get('collectDate'), start)
+                if (end) ps << cb.lessThanOrEqualTo(root.get('collectDate'), end)
                 if (decideId) ps << cb.equal(root.get('decideId'), decideId)
+                ps << root.get('decisionId').in(ids)
                 if (decisionId) ps << cb.equal(root.get('decisionId'), decisionId)
                 if (collectorType) ps << cb.equal(root.get('collectorType'), collectorType)
                 if (collector) ps << cb.equal(root.get('collector'), collector)
                 if (spend) ps << cb.ge(root.get('spend'), spend)
-                if (start) ps << cb.greaterThanOrEqualTo(root.get('collectDate'), start)
-                if (end) ps << cb.lessThanOrEqualTo(root.get('collectDate'), end)
                 if (success != null) {
                     if (success) {
                         ps << cb.equal(root.get('status'), '0000')
@@ -322,17 +322,6 @@ class MntDecisionCtrl extends ServerTpl {
         //dsl 验证
         if (!spec.决策id) return ApiResp.fail("决策id 不能为空")
         if (!spec.决策名) return ApiResp.fail("决策名 不能为空")
-        // if (!spec.policies) return ApiResp.fail("${spec.决策名} 是空决策")
-        if (spec.policies) {
-            for (def policy : spec.policies) {
-                if (!policy.策略名) return ApiResp.fail('策略名字不能为空')
-                if (!policy.rules) return ApiResp.fail("'${policy.策略名}' 是空策略")
-                for (def rule : policy.rules) {
-                    if (!rule.规则名) return ApiResp.fail('规则名字不能为空')
-                    if (rule.fns.size() < 1) return ApiResp.fail("'${rule.规则名}' 是空规则")
-                }
-            }
-        }
 
         Decision decision
         if (id) { // 更新
@@ -657,15 +646,7 @@ class MntDecisionCtrl extends ServerTpl {
     @Path(path = 'cleanExpire')
     ApiResp cleanExpire(HttpContext hCtx) {
         hCtx.auth("grant")
-        def srv = bean(DecisionSrv)
-        if (srv) {
-            queue("cleanDecideRecord") {
-                def total = srv.cleanDecideRecord()
-                ep.fire("globalMsg", "清理过期决策数据结束. 共计: " + total)
-            }
-            return ApiResp.ok().desc("等待后台清理完成...")
-        } else {
-            return ApiResp.fail("清理失败")
-        }
+        bean(DecisionSrv).cleanDecideRecord()
+        return ApiResp.ok().desc("等待后台清理完成...")
     }
 }

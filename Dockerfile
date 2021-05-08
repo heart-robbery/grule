@@ -1,15 +1,15 @@
-FROM docker.io/gradle:6.5
+FROM docker.io/gradle:6.8
 ENV TZ Asia/Shanghai
 
-RUN mkdir -p /srv/gy
+RUN mkdir -p /srv/rule
 
-ADD bin /srv/gy/bin
-ADD conf /srv/gy/conf
-ADD src /srv/gy/src
-ADD build.gradle /srv/gy/build.gradle
-ADD start.sh /srv/gy/start.sh
+ADD bin /srv/rule/bin
+ADD conf /srv/rule/conf
+ADD src /srv/rule/src
+ADD build.gradle /srv/rule/build.gradle
+ADD start.sh /srv/rule/start.sh
 
-WORKDIR /srv/gy/
+WORKDIR /srv/rule/
 
 RUN gradle deps
 

@@ -7,7 +7,9 @@ import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.serializer.SerializerFeature
 import core.OkHttpSrv
 import entity.DecideRecord
+import entity.Lock
 
+import java.text.SimpleDateFormat
 import java.time.Duration
 
 /**
@@ -100,43 +102,70 @@ class DecisionSrv extends ServerTpl {
     /**
      * 计划清理过期DecideRecord数据
      */
-    long cleanDecideRecord() {
-        long cleanTotal = 0
+    void cleanDecideRecord() {
+        def lock = new Lock(name: 'cleanDecideRecord', comment: "清理过期数据")
+        // 执行清理逻辑
+        def doClean = {
+            long cleanTotal = 0
 
-        // DecideRecord 清理函数
-        def clean = {DecideRecord dr ->
-            int count = repo.trans { session ->
-                // 删除关联的 收集器记录
-                session.createQuery("delete from CollectRecord where decideId=:decideId")
-                        .setParameter("decideId", dr.id).executeUpdate()
-                session.createQuery("delete from DecideRecord where id=:id")
-                        .setParameter("id", dr.id).executeUpdate()
+            // DecideRecord 清理函数
+            def clean = {DecideRecord dr ->
+                int count = repo.trans { session ->
+                    // 删除关联的 收集器记录
+                    session.createQuery("delete from CollectRecord where decideId=:decideId")
+                            .setParameter("decideId", dr.id).executeUpdate()
+                    session.createQuery("delete from DecideRecord where id=:id")
+                            .setParameter("id", dr.id).executeUpdate()
+                }
+                cleanTotal += count
+                log.info("Deleted expire decideRecord data: {}", JSON.toJSONString(dr))
             }
-            cleanTotal += count
-            log.info("Deleted expire decideRecord data: {}", JSON.toJSONString(dr))
-        }
 
-        //保留多少条数据. NOTE: 不能多个进程同时删除(多删)
-        def keepCount = getLong("decideRecord.keepCount", 0)
-        if (keepCount > 0) {
-            def total = repo.count(DecideRecord)
-            while (total > keepCount) {
-                clean(repo.find(DecideRecord) { root, query, cb -> query.orderBy(cb.asc(root.get("occurTime")))})
-                total--
+            //保留多少条数据. NOTE: 不能多个进程同时删除(多删)
+            def keepCount = getLong("decideRecord.keepCount", 0)
+            if (keepCount > 0) {
+                for (long total = repo.count(DecideRecord); total > keepCount; total--) {
+                    clean(repo.find(DecideRecord) { root, query, cb -> query.orderBy(cb.asc(root.get("occurTime")))})
+                    if (cleanTotal % getInteger("deleteUnit", 10) == 0) {
+                        total = repo.count(DecideRecord)
+                    }
+                }
             }
-        }
 
-        //保留多天的数据,如果 配置了decideRecord.keepCount 则不执行此清理
-        def keepDay = getInteger("decideRecord.keepDay", 0)
-        if (keepDay > 0 && !keepCount) {
-            def cal = Calendar.getInstance()
-            cal.add(Calendar.DAY_OF_MONTH, -keepDay)
-            do {
-                def dr = repo.find(DecideRecord) { root, query, cb -> query.orderBy(cb.asc(root.get("occurTime")))}
-                if (dr.occurTime == null || dr.occurTime < cal.time) clean(dr)
-                else break
-            } while (true)
+            //保留多天的数据,如果 配置了decideRecord.keepCount 则不执行此清理
+            def keepDay = getInteger("decideRecord.keepDay", 0)
+            if (keepDay > 0 && !keepCount) {
+                def cal = Calendar.getInstance()
+                cal.add(Calendar.DAY_OF_MONTH, -keepDay)
+                do {
+                    def dr = repo.find(DecideRecord) { root, query, cb -> query.orderBy(cb.asc(root.get("occurTime")))}
+                    if (dr.occurTime == null || dr.occurTime < cal.time) clean(dr)
+                    else break
+                } while (true)
+            }
+            return cleanTotal
         }
-        return cleanTotal
+        try {
+            repo.saveOrUpdate(lock)
+            async {
+                try {
+                    def total = doClean()
+                    ep.fire("globalMsg", "清理过期决策数据结束. 共计: " + total)
+                } finally {
+                    repo.delete(lock)
+                }
+            }
+        } catch (ex) {
+            def cause = ex
+            while (cause != null) {
+                if (cause.message.contains("Duplicate entry")) {
+                    def exist = repo.find(Lock) {root, query, cb -> cb.equal(root.get("name"), lock.name)}
+                    throw new RuntimeException("清理中... 开始时间: " + new SimpleDateFormat('yyyy-MM-dd HH:mm:ss').format(exist.createTime))
+                }
+                cause = cause.cause
+            }
+            repo.delete(lock)
+            throw ex
+        }
     }
 }

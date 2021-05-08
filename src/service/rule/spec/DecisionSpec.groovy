@@ -1,4 +1,4 @@
-package service.rule
+package service.rule.spec
 
 import cn.xnatural.app.Utils
 import com.alibaba.fastjson.JSON
@@ -7,59 +7,48 @@ import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.ImportCustomizer
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import service.rule.DecideResult
+import service.rule.DecisionContext
 
 import java.lang.reflect.Array
 
 /**
  * 决策 DSL
  */
-class DecisionSpec {
+class DecisionSpec extends BaseSpec {
     String 决策id
     String 决策名
     String 决策描述
 
     /**
-     * 策略集: 顺序执行
-     */
-    protected final List<PolicySpec> policies    = new LinkedList<>()
-    /**
      * 接口返回属性集
      */
-    @Lazy protected Set<String>      returnAttrs = new LinkedHashSet<>()
+    @Lazy Set<String> returnAttrs = new LinkedHashSet<>()
     /**
-     * 自定义属性
+     * 全局决策内自定义函数
      */
-    @Lazy protected Map<String, Object> attrs = new HashMap<>()
-    /**
-     * 自定义函数
-     */
-    protected final Map<String, Closure> functions = new HashMap<>()
-    /**
-     * 预操作函数
-     */
-    protected Closure operateFn
+    @Lazy Map<String, Closure> globalFunctions = new HashMap<>()
 
 
     DecisionSpec() {
         Logger log = LoggerFactory.getLogger("ROOT")
-        functions.put("INFO", {String msg -> if (msg) log.info(msg.toString()) })
+        globalFunctions.put("INFO", { String msg -> if (msg) log.info(msg.toString()) })
     }
 
 
     void 操作(Closure 操作) {
-        operateFn = { Map ctx ->
-            def cl = 操作.rehydrate(ctx, 操作, this)
+        nodes << Tuple2.tuple("Operate", { DecisionContext ctx ->
+            def cl = 操作.rehydrate(ctx.data, 操作, this)
             cl.resolveStrategy = Closure.DELEGATE_FIRST
             cl()
-            null
-        }
+        })
     }
 
 
     DecisionSpec 函数定义(String 函数名, Closure 函数) {
         if (!函数名) throw new IllegalArgumentException("函数名 不能为空")
         if (!函数) throw new IllegalArgumentException("函数 不能为空")
-        functions.put(函数名, 函数)
+        globalFunctions.put(函数名, 函数)
         this
     }
 
@@ -71,13 +60,43 @@ class DecisionSpec {
     }
 
 
-    DecisionSpec 策略定义(@DelegatesTo(PolicySpec) Closure cl) {
-        PolicySpec policy = new PolicySpec(); policies.add(policy)
-        def code = cl.rehydrate(policy, cl, this)
+    DecisionSpec 返回属性(String 属性名) { returnAttrs.add(属性名); this }
+
+
+    /**
+     * 根据 dsl 创建 策略, 并创建执行
+     * @param cl
+     */
+    void 策略(@DelegatesTo(PolicySpec) Closure cl) {
+        PolicySpec spec = new PolicySpec()
+        def code = cl.rehydrate(spec, cl, this)
         code.resolveStrategy = Closure.DELEGATE_FIRST
         code()
-        this
+        // 定义执行函数
+        nodes << Tuple.tuple("Policy", {DecisionContext ctx -> ctx.run(spec)})
     }
+
+
+    /**
+     * 执行决策
+     * @param ctx
+     * @return
+     */
+    DecideResult compute(DecisionContext ctx) {
+        for (def node : nodes) {
+            if ("Policy" == node.v1) {
+                DecideResult result = node.v2.call(ctx)
+                if (result && result.block) return result
+            } else if ("Operate" == node.v1) {
+                node.v2.call(ctx)
+            } else throw new IllegalArgumentException("Unknown type: " + node.v1)
+        }
+        DecideResult.Accept
+    }
+
+
+    @Override
+    String name() { return 决策名 }
 
 
     /**
@@ -86,7 +105,7 @@ class DecisionSpec {
      * @param args 参数
      */
     def methodMissing(String name, def args) {
-        def fn = functions.get(name)
+        def fn = globalFunctions.get(name)
         if (fn) {
             int length = Array.getLength(args)
             if (length == 0) return fn()
@@ -99,9 +118,6 @@ class DecisionSpec {
         }
         else throw new MissingMethodException(name, DecisionSpec, args)
     }
-
-
-    DecisionSpec 返回属性(String 属性名) { returnAttrs.add(属性名); this }
 
 
     static DecisionSpec of(@DelegatesTo(DecisionSpec) Closure cl) {
@@ -125,6 +141,6 @@ class DecisionSpec {
         config.addCompilationCustomizers(icz)
         icz.addImports(DecisionSpec.class.name, JSON.class.name, JSONObject.class.name, Utils.class.name)
         def shell = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config)
-        shell.evaluate("service.rule.DecisionSpec.of{$dsl}")
+        shell.evaluate("service.rule.spec.DecisionSpec.of{$dsl}")
     }
 }

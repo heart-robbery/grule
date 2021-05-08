@@ -34,6 +34,7 @@ class DataCollector extends UUIDEntity {
     /**
      * 备注说明
      */
+    @Column(length = 2000)
     String  comment
     /**
      * 创建者

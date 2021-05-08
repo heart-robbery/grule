@@ -122,7 +122,11 @@ class MntUserCtrl extends ServerTpl {
         //1. grant, grant-user 可以添加用户
         hCtx.auth("grant", "grant-user", "user-add")
         if (!name) return ApiResp.fail("Param name not empty")
+        name = name.trim()
+        if (name.length() < 2) return ApiResp.fail("Param name length >= 2")
         if (!password) return ApiResp.fail("Param password not empty")
+        password = password.trim()
+        if (password.length() < 2) return ApiResp.fail("Param password length >= 2")
         ApiResp resp = ApiResp.ok()
 
         //2. 只grant-user: 不能分配grant, grant-user; 添加的用户默认同一组, 忽略group参数
