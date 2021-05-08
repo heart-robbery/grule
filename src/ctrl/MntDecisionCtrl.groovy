@@ -157,10 +157,10 @@ class MntDecisionCtrl extends ServerTpl {
                 repo.findPage(DecideRecord, page, pageSize?:10) { root, query, cb ->
                     query.orderBy(cb.desc(root.get('occurTime')))
                     def ps = []
-                    ps << root.get('decisionId').in(ids)
-                    if (id) ps << cb.equal(root.get('id'), id)
                     if (start) ps << cb.greaterThanOrEqualTo(root.get('occurTime'), start)
                     if (end) ps << cb.lessThanOrEqualTo(root.get('occurTime'), end)
+                    if (id) ps << cb.equal(root.get('id'), id)
+                    ps << root.get('decisionId').in(ids)
                     if (decisionId) ps << cb.equal(root.get('decisionId'), decisionId)
                     if (spend) ps << cb.ge(root.get('spend'), spend)
                     if (result) ps << cb.equal(root.get('result'), result)
@@ -259,14 +259,14 @@ class MntDecisionCtrl extends ServerTpl {
             repo.findPage(CollectRecord, page, pageSize?:10) { root, query, cb ->
                 query.orderBy(cb.desc(root.get('collectDate')))
                 def ps = []
-                ps << root.get('decisionId').in(ids)
+                if (start) ps << cb.greaterThanOrEqualTo(root.get('collectDate'), start)
+                if (end) ps << cb.lessThanOrEqualTo(root.get('collectDate'), end)
                 if (decideId) ps << cb.equal(root.get('decideId'), decideId)
+                ps << root.get('decisionId').in(ids)
                 if (decisionId) ps << cb.equal(root.get('decisionId'), decisionId)
                 if (collectorType) ps << cb.equal(root.get('collectorType'), collectorType)
                 if (collector) ps << cb.equal(root.get('collector'), collector)
                 if (spend) ps << cb.ge(root.get('spend'), spend)
-                if (start) ps << cb.greaterThanOrEqualTo(root.get('collectDate'), start)
-                if (end) ps << cb.lessThanOrEqualTo(root.get('collectDate'), end)
                 if (success != null) {
                     if (success) {
                         ps << cb.equal(root.get('status'), '0000')
