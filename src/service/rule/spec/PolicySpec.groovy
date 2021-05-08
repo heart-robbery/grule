@@ -83,6 +83,7 @@ class PolicySpec extends BaseSpec {
         code()
 
         if (!spec.评分卡名) throw new IllegalArgumentException("评分卡名不能为空")
+        if (!spec.赋值变量) throw new IllegalArgumentException("评分卡赋值变量不能为空")
         if (!spec.模型) throw new IllegalArgumentException("$spec.评分卡名 是空评分卡")
 
         // 定义执行函数

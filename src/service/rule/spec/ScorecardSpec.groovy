@@ -51,11 +51,29 @@ class ScorecardSpec extends BaseSpec {
      */
     def compute(DecisionContext ctx) {
         def result = (基础分?:0) + 模型.findResults {item ->
-            def attrValue = ctx.data.get(item[0])
-            def enumValue = item[1]
-            if (enumValue instanceof Range || enumValue instanceof Collection) {
-                if (attrValue in enumValue) return item[2]
-            } else if (attrValue == enumValue) return item[2]
+            // 3位: 变量名, 取值范围, 分值
+            if (item.size() == 3) {
+                def attrValue = ctx.data.get(item[0])
+                def enumValue = item[1]
+                if (enumValue instanceof Range || enumValue instanceof Collection) {
+                    if (attrValue in enumValue) return item[2]
+                } else if (attrValue == enumValue) return item[2]
+            }
+            // 2位: 变量名, 分值计算函数
+            else if (item.size() == 2) {
+                def attrValue = ctx.data.get(item[0])
+                if (item[1] instanceof Closure) {//动态分值计算函数
+                    def cl = item[1].rehydrate(ctx.data, item[1], this)
+                    cl.resolveStrategy = Closure.DELEGATE_FIRST
+                    return cl(attrValue)
+                } else throw new IllegalArgumentException("评分卡($评分卡名)模型格式错误: 变量名, 分值计算函数")
+            }
+            //1位: 变量名
+            else if (item.size() == 1) {
+                def v = ctx.data.get(item[0])
+                return v == null ? 0 : v  //直接取值为评分
+            }
+            else throw new IllegalArgumentException("评分卡($评分卡名)模型格式错误: 位数")
             0
         }.sum()
         ctx.setAttr(赋值变量, result)
