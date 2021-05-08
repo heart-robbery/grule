@@ -61,6 +61,7 @@ cygwin=false
 msys=false
 darwin=false
 nonstop=false
+linux=false
 case "$(uname)" in
   CYGWIN* )
     cygwin=true
@@ -73,6 +74,9 @@ case "$(uname)" in
     ;;
   NONSTOP* )
     nonstop=true
+    ;;
+  Linux* )
+    linux=true
     ;;
 esac
 
@@ -108,6 +112,11 @@ if [ -z "$JAVA_HOME" ] ; then
     fi
 
     export JAVA_HOME
+fi
+
+# GROOVY-9875: backspace does not work in the SecureCRT connecting Linux
+if $linux ; then
+    export TERM=linux
 fi
 
 # For Cygwin, ensure paths are in UNIX format before anything is touched.
@@ -152,7 +161,7 @@ fi
 if [ -z "$GROOVY_CONF" ] ; then
     GROOVY_CONF="$GROOVY_HOME/conf/groovy-starter.conf"
 fi
-STARTER_CLASSPATH="$GROOVY_HOME/lib/groovy-3.0.7.jar"
+STARTER_CLASSPATH="$GROOVY_HOME/lib/groovy-3.0.8.jar"
 
 # Create the final classpath. Setting a classpath using the -cp or -classpath option means not to use the
 # global classpath. Groovy behaves then the same as the java interpreter
