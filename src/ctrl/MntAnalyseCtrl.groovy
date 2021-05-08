@@ -106,9 +106,9 @@ class MntAnalyseCtrl extends ServerTpl {
         ApiResp.ok(
             ls.findResults {Map<String, String> record ->
                 record["detail"] ? JSON.parseObject(record["detail"])?.getJSONArray("policies")?.findResults {JSONObject pJo ->
-                    pJo.getJSONArray("rules").findResults { JSONObject rJo ->
+                    pJo.getJSONArray("items")?.findResults { JSONObject rJo ->
                         record['decisionId'] + '||' + record['decisionName'] + '||' + pJo['attrs']['策略名'] +'||' + rJo['attrs']['规则名'] + '||' + (rJo['result']?:DecideResult.Accept)
-                    }
+                    }?:[]
                 }?.flatten() : []
             }.flatten().countBy {it}.findResults {e ->
                 def arr = e.key.split("\\|\\|")
