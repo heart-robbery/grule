@@ -155,7 +155,6 @@ class MntDecisionCtrl extends ServerTpl {
         Date end = endTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(endTime) : null
         ApiResp.ok(
                 repo.findPage(DecideRecord, page, pageSize?:10) { root, query, cb ->
-                    query.orderBy(cb.desc(root.get('occurTime')))
                     def ps = []
                     if (start) ps << cb.greaterThanOrEqualTo(root.get('occurTime'), start)
                     if (end) ps << cb.lessThanOrEqualTo(root.get('occurTime'), end)
@@ -165,13 +164,23 @@ class MntDecisionCtrl extends ServerTpl {
                     if (spend) ps << cb.ge(root.get('spend'), spend)
                     if (result) ps << cb.equal(root.get('result'), result)
                     if (exception) ps << cb.like(root.get('exception'), '%' + exception + '%')
+                    def orders = []
                     if (attrConditions) { // json查询 暂时只支持mysql5.7+,MariaDB 10.2.3+
                         JSON.parseArray(attrConditions).each {JSONObject jo ->
                             def fieldId = jo.getLong('fieldId')
                             if (!fieldId) return
                             def field = fieldManager.fieldMap.find {it.value.id == fieldId}?.value
                             if (field == null) return
+
+                            def exp = cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName))
                             def op = jo['op']
+                            if (op == "desc") { //降序
+                                orders << cb.desc(exp)
+                                return
+                            } else if (op == 'asc') { //升序
+                                orders << cb.asc(exp)
+                                return
+                            }
                             String value = jo['value']
                             if (value == null || value.empty) return
                             if (field.type == FieldType.Int) value = jo.getInteger('value')
@@ -179,20 +188,25 @@ class MntDecisionCtrl extends ServerTpl {
                             else if (field.type == FieldType.Bool) value = jo.getBoolean('value')
 
                             if (op == '=') {
-                                ps << cb.equal(cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName)), value)
+                                ps << cb.equal(exp, value)
                             } else if (op == '>') {
-                                ps << cb.gt(cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName)), cb.literal(value))
+                                ps << cb.gt(exp, cb.literal(value))
                             } else if (op == '<') {
-                                ps << cb.lt(cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName)), cb.literal(value))
+                                ps << cb.lt(exp, cb.literal(value))
                             } else if (op == '>=') {
-                                ps << cb.ge(cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName)), cb.literal(value))
+                                ps << cb.ge(exp, cb.literal(value))
                             } else if (op == '<=') {
-                                ps << cb.le(cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName)), cb.literal(value))
+                                ps << cb.le(exp, cb.literal(value))
                             } else if (op == 'contains') {
                                 // ps << cb.equal(cb.function("JSON_CONTAINS", String, root.get('data'), cb.function('json_quote', String, cb.literal(value)), cb.literal('$.' + field.enName)), 1)
                                 ps << cb.like(cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName)), '%' + value + '%')
                             } else throw new IllegalArgumentException("Param attrCondition op('$op') unknown")
                         }
+                    }
+                    if (orders) { // 按照data中的属性进行排序
+                        query.orderBy(orders)
+                    } else { // 默认时间降序
+                        query.orderBy(cb.desc(root.get('occurTime')))
                     }
                     if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
                 }.to{

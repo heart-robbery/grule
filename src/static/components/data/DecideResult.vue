@@ -36,7 +36,7 @@
                     <div class="h-input-group">
                         <h-autocomplete v-model="item.fieldId" :option="item.fieldAc" placeholder="字段属性名" ></h-autocomplete>
                         <h-select v-model="item.op" :datas="ops" placeholder="比较符" :deletable="false"></h-select>
-                        <input type="text" v-model="item.value" placeholder="属性值" @keyup.enter="load"/>
+                        <input v-if="item.op !== 'desc' && item.op !== 'asc'" type="text" v-model="item.value" placeholder="属性值" @keyup.enter="load"/>
                         <div style="width: 70px; margin-left: 15px">
                             <span class="h-icon-minus" @click="delAttrFilter(item)"></span>&nbsp;
                             <span v-if="model.attrFilters.length === (index + 1)" class="h-icon-plus" @click="addAttrFilter"></span>
@@ -88,6 +88,8 @@
         { title: '小于', key: '<'},
         { title: '小于等于', key: '<='},
         { title: '包含', key: 'contains'},
+        { title: '降序', key: 'desc'},
+        { title: '升序', key: 'asc'},
     ];
     const detail = {
         props: ['item'],
