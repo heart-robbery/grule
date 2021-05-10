@@ -1,15 +1,10 @@
 <template>
     <div class="h-panel">
         <div class="h-panel-bar">
-<!--            <span class="h-panel-title">数据集</span>-->
-            <!--            <span v-color:gray v-font="13">说明~~</span>-->
             <h-button v-if="sUser.permissionIds.find((e) => e == 'dataCollector-add') == 'dataCollector-add'" @click="showAddPop"><i class="h-icon-plus"></i></h-button>
             <h-select v-model="model.type" :datas="types" placeholder="所有" style="width: 70px; float: left" @change="load"></h-select>
             <input type="text" v-model="model.kw" placeholder="关键词" @keyup.enter="load"/>
             <div class="h-panel-right">
-<!--                <h-search placeholder="查询" v-width="200" v-model="model.kw" show-search-button search-text="搜索" @search="load"></h-search>-->
-                <!--                <i class="h-split"></i>-->
-<!--                <button class="h-btn h-btn-green h-btn-m" @click="load">查询</button>-->
                 <button class="h-btn h-btn-primary float-right" @click="load"><i class="h-icon-search"></i><span>搜索</span></button>
             </div>
         </div>
@@ -84,7 +79,7 @@
                             <input type="text" v-model="model.cacheKey" placeholder="用于判断数据是否需要重复计算" />
                         </h-formitem>
                         <h-formitem label="缓存超时(m)" icon="h-icon-user" prop="timeout">
-                            <h-numberinput v-model="model.cacheTimeout" :min="0" :max="2147483647"></h-numberinput>
+                            <input type="text" v-model="model.cacheTimeout" />
                         </h-formitem>
                         <h-formitem v-if="model.type == 'http' && model.method == 'POST'" label="ContentType" icon="h-icon-user" prop="contentType">
                             <h-select v-model="model.contentType" :datas="contentTypes"></h-select>

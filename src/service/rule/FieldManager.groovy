@@ -347,13 +347,17 @@ if (idNumber && idNumber.length() > 17) {
      */
     void initDataCollector(DataCollector collector) {
         if (!collector) return
-        if ('http' == collector.type) { // http 接口
-            initHttpCollector(collector)
-        } else if ('script' == collector.type) { // groovy 脚本
-            initScriptCollector(collector)
-        } else if ('sql' == collector.type) { // 数据库查询脚本
-            initSqlCollector(collector)
-        } else throw new Exception("Not support type: $collector.type")
+        try {
+            if ('http' == collector.type) { // http 接口
+                initHttpCollector(collector)
+            } else if ('script' == collector.type) { // groovy 脚本
+                initScriptCollector(collector)
+            } else if ('sql' == collector.type) { // 数据库查询脚本
+                initSqlCollector(collector)
+            } else throw new Exception("Not support type: $collector.type")
+        } catch (ex) {
+            log.error("初始化收集器'$collector.name($collector.id)' 错误".toString(), ex)
+        }
     }
 
 
@@ -393,6 +397,9 @@ if (idNumber && idNumber.length() > 17) {
         icz.addImports(JSON.class.name, JSONObject.class.name, Utils.class.name)
         Closure sqlScript = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("{ -> $collector.sqlScript }")
 
+        // 缓存时间计算函数
+        Closure cacheTimeoutFn = buildCacheTimeoutFn(collector)
+
         // GString 模板替换
         def tplEngine = new GStringTemplateEngine(Thread.currentThread().contextClassLoader)
         collectors.put(collector.id, new CollectorHolder(collector: collector, sql: db, dataKeyFn: {ctx -> //数据结果唯一性key计算逻辑
@@ -407,7 +414,7 @@ if (idNumber && idNumber.length() > 17) {
             def logMsg = "${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}Sql收集器'${collector.name}(${collector.id})'${ -> spend ? ', spend: ' + spend : ''}, result: ${ -> result}"
 
             //1. 先从缓存中取
-            if (collector.cacheTimeout && collector.cacheKey) {
+            if (collector.cacheTimeoutFn && collector.cacheKey) {
                 dataKey = computeCollectDataKey(collector, ctx)
                 if (redis) {
                     start = new Date() // 调用时间
@@ -437,14 +444,7 @@ if (idNumber && idNumber.length() > 17) {
             }
             //3. 缓存结果
             if (result != null && !result.toString().isEmpty() && dataKey && !cache) { //缓存结果
-                if (redis) {
-                    String key = getStr("collectorCacheKeyPrefix", "collector") +":"+ dataKey
-                    redis.set(key, result.toString())
-                    redis.expire(key, collector.cacheTimeout * 60)
-                }
-                else if (cacheSrv) {
-                    cacheSrv.set(getStr("collectorCacheKeyPrefix", "collector") +":"+ dataKey, result, Duration.ofMinutes(collector.cacheTimeout))
-                }
+                setCache(ctx, cacheTimeoutFn, dataKey, result)
             }
             //4. 保存结果
             dataCollected(new CollectRecord(
@@ -480,6 +480,9 @@ if (idNumber && idNumber.length() > 17) {
         icz.addImports(JSON.class.name, JSONObject.class.name, Utils.class.name)
         Closure script = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("{ -> $collector.computeScript}")
 
+        // 缓存时间计算函数
+        Closure cacheTimeoutFn = buildCacheTimeoutFn(collector)
+
         // GString 模板替换
         def tplEngine = new GStringTemplateEngine(Thread.currentThread().contextClassLoader)
         collectors.put(collector.id, new CollectorHolder(collector: collector, dataKeyFn: {ctx -> //数据结果唯一性key计算逻辑
@@ -494,7 +497,7 @@ if (idNumber && idNumber.length() > 17) {
             def logMsg = "${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}脚本收集器'${collector.name}(${collector.id})'${ -> ', spend: ' + spend}, result: ${ -> result}"
 
             //1. 先从缓存中取
-            if (collector.cacheTimeout && collector.cacheKey) {
+            if (collector.cacheTimeoutFn && collector.cacheKey) {
                 dataKey = computeCollectDataKey(collector, ctx)
                 if (redis) {
                     start = new Date() // 调用时间
@@ -524,14 +527,7 @@ if (idNumber && idNumber.length() > 17) {
             }
             //3. 缓存结果
             if (!cache && result != null && !result.toString().isEmpty() && dataKey) {
-                if (redis) {
-                    String key = getStr("collectorCacheKeyPrefix", "collector") +":"+ dataKey
-                    redis.set(key, result.toString())
-                    redis.expire(key, collector.cacheTimeout * 60)
-                }
-                else if (cacheSrv) {
-                    cacheSrv.set(getStr("collectorCacheKeyPrefix", "collector") +":"+ dataKey, result, Duration.ofMinutes(collector.cacheTimeout))
-                }
+                setCache(ctx, cacheTimeoutFn, dataKey, result)
             }
             //4. 保存结果
             dataCollected(new CollectRecord(
@@ -562,8 +558,9 @@ if (idNumber && idNumber.length() > 17) {
         http.setAttr('readTimeout', getLong("http.readTimeout." + collector.id, getLong('http.readTimeout', Long.valueOf(collector.timeout?:20))))
         http.init()
 
+        // 结果解析函数
         Closure parseFn
-        if (collector.parseScript) { // 结果解析函数
+        if (collector.parseScript) {
             Binding binding = new Binding()
             binding.setProperty('LOG', LoggerFactory.getLogger("ROOT"))
             def config = new CompilerConfiguration()
@@ -572,8 +569,11 @@ if (idNumber && idNumber.length() > 17) {
             icz.addImports(JSON.class.name, JSONObject.class.name, Utils.class.name)
             parseFn = new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("$collector.parseScript")
         }
+        // 缓存时间计算函数
+        Closure cacheTimeoutFn = buildCacheTimeoutFn(collector)
+        // 是否成功判断函数
         Closure successFn
-        if (collector.dataSuccessScript) { // 是否成功判断函数
+        if (collector.dataSuccessScript) {
             Binding binding = new Binding()
             binding.setProperty('LOG', LoggerFactory.getLogger("ROOT"))
             def config = new CompilerConfiguration()
@@ -603,7 +603,7 @@ if (idNumber && idNumber.length() > 17) {
             def logMsg = "${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}接口收集器'$collector.name(${collector.id})'${ -> retryMsg}, url: ${ -> url}${ -> bodyStr == null ? '' : ', body: ' + bodyStr}${ -> spend ? ', spend: ' + spend : ''}${ -> respCode ? ', respCode: ' + respCode : ''}${ -> ', result: ' + result}${ -> resolveResult == null ? '' : ', resolveResult: ' + resolveResult}"
 
             //1. 先从缓存中取
-            if (collector.cacheTimeout && collector.cacheKey) {
+            if (collector.cacheTimeoutFn && collector.cacheKey) {
                 dataKey = computeCollectDataKey(collector, ctx)
                 if (redis) {
                     start = new Date() // 调用时间
@@ -702,14 +702,7 @@ if (idNumber && idNumber.length() > 17) {
 
             //4. 如果接口返回的是有效数据, 则缓存
             if ('0000' == dataStatus && dataKey && !cache) {
-                if (redis) {
-                    String key = getStr("collectorCacheKeyPrefix", "collector") +":"+ dataKey
-                    redis.set(key, result)
-                    redis.expire(key, collector.cacheTimeout * 60)
-                }
-                else if (cacheSrv) {
-                    cacheSrv.set(getStr("collectorCacheKeyPrefix", "collector") +":"+ dataKey, result, Duration.ofMinutes(collector.cacheTimeout))
-                }
+                setCache(ctx, cacheTimeoutFn, dataKey, result)
             }
 
             //5. 解析接口返回结果
@@ -842,6 +835,57 @@ if (idNumber && idNumber.length() > 17) {
         }
 
         return collector.id + '_' + dataKey
+    }
+
+
+    /**
+     * 缓存结果
+     * @param ctx 当前执行上下文
+     * @param timeoutFn 缓存时间计算函数
+     * @param dataKey 缓存数据key
+     * @param result 要缓存的数据
+     */
+    void setCache(DecisionContext ctx, Closure timeoutFn, String dataKey, def result) {
+        def cacheTimeout = timeoutFn.rehydrate(ctx.data, timeoutFn, this)()
+        if (cacheTimeout instanceof Date) {
+            long v = cacheTimeout.time - System.currentTimeMillis()
+            if (v < 2000) {
+                log.warn(ctx.logPrefix() + "缓存过期时间不能小于当前时间. dataKey: " + dataKey)
+                return
+            }
+            cacheTimeout = Duration.ofMillis(v)
+        } else if (cacheTimeout instanceof Integer) {
+            if (cacheTimeout < 0) throw new RuntimeException("缓存时间不能小于0")
+            cacheTimeout = Duration.ofMinutes(cacheTimeout)
+        } else if (cacheTimeout instanceof Duration) {
+
+        } else throw new RuntimeException("缓存过期时间函数返回类型错误")
+        if (redis) {
+            String key = getStr("collectorCacheKeyPrefix", "collector") +":"+ dataKey
+            redis.set(key, result.toString())
+            redis.expire(key, cacheTimeout.seconds)
+        }
+        else if (cacheSrv) {
+            cacheSrv.set(getStr("collectorCacheKeyPrefix", "collector") +":"+ dataKey, result, cacheTimeout)
+        }
+    }
+
+
+    /**
+     * 构建收集器 缓存时间计算函数
+     * @param collector 收集器
+     */
+    Closure buildCacheTimeoutFn(DataCollector collector) {
+        if (collector.cacheTimeoutFn) {
+            Binding binding = new Binding()
+            //binding.setProperty('LOG', LoggerFactory.getLogger("ROOT"))
+            def config = new CompilerConfiguration()
+            def icz = new ImportCustomizer()
+            config.addCompilationCustomizers(icz)
+            icz.addImports(JSON.class.name, JSONObject.class.name, Utils.class.name)
+            return new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate(collector.cacheTimeoutFn)
+        }
+        null
     }
 
 
