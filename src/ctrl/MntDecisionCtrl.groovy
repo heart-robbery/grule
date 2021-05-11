@@ -178,31 +178,30 @@ class MntDecisionCtrl extends ServerTpl {
                             def exp = cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName))
                             def op = jo['op']
                             if (op == "desc") { //降序
-                                orders << cb.desc(exp)
+                                orders << cb.desc(exp.as(field.type.clzType))
                                 return
                             } else if (op == 'asc') { //升序
-                                orders << cb.asc(exp)
+                                orders << cb.asc(exp.as(field.type.clzType))
                                 return
                             }
-                            String value = jo['value']
+                            def value = jo['value']
                             if (value == null || value.empty) return
                             if (field.type == FieldType.Int) value = jo.getInteger('value')
                             else if (field.type == FieldType.Decimal) value = jo.getBigDecimal('value')
                             else if (field.type == FieldType.Bool) value = jo.getBoolean('value')
 
                             if (op == '=') {
-                                ps << cb.equal(exp, value)
+                                ps << cb.equal(exp.as(field.type.clzType), value)
                             } else if (op == '>') {
-                                ps << cb.gt(exp, cb.literal(value))
+                                ps << cb.gt(exp.as(field.type.clzType), value)
                             } else if (op == '<') {
-                                ps << cb.lt(exp, cb.literal(value))
+                                ps << cb.lt(exp.as(field.type.clzType), value)
                             } else if (op == '>=') {
-                                ps << cb.ge(exp, cb.literal(value))
+                                ps << cb.ge(exp.as(field.type.clzType), value)
                             } else if (op == '<=') {
-                                ps << cb.le(exp, cb.literal(value))
+                                ps << cb.le(exp.as(field.type.clzType), value)
                             } else if (op == 'contains') {
-                                // ps << cb.equal(cb.function("JSON_CONTAINS", String, root.get('data'), cb.function('json_quote', String, cb.literal(value)), cb.literal('$.' + field.enName)), 1)
-                                ps << cb.like(cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName)), '%' + value + '%')
+                                ps << cb.like(exp, '%' + value + '%')
                             } else throw new IllegalArgumentException("Param attrCondition op('$op') unknown")
                         }
                     }
