@@ -35,7 +35,7 @@
                 <h-formitem single v-for="(item, index) of model.attrFilters" :key="index">
                     <div class="h-input-group">
                         <h-autocomplete v-model="item.fieldId" :option="item.fieldAc" placeholder="字段属性名" ></h-autocomplete>
-                        <h-select v-model="item.op" :datas="ops" placeholder="比较符" :deletable="false"></h-select>
+                        <h-select v-model="item.op" :datas="ops" placeholder="比较符" :deletable="false" @change="(item.op === 'desc' || item.op === 'asc') ? load() : null"></h-select>
                         <input v-if="item.op !== 'desc' && item.op !== 'asc'" type="text" v-model="item.value" placeholder="属性值" @keyup.enter="load"/>
                         <div style="width: 70px; margin-left: 15px">
                             <span class="h-icon-minus" @click="delAttrFilter(item)"></span>&nbsp;
