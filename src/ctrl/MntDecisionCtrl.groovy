@@ -186,20 +186,17 @@ class MntDecisionCtrl extends ServerTpl {
                             }
                             def value = jo['value']
                             if (value == null || value.empty) return
-                            if (field.type == FieldType.Int) value = jo.getInteger('value')
-                            else if (field.type == FieldType.Decimal) value = jo.getBigDecimal('value')
-                            else if (field.type == FieldType.Bool) value = jo.getBoolean('value')
 
                             if (op == '=') {
-                                ps << cb.equal(exp.as(field.type.clzType), value)
+                                ps << cb.equal(exp, value)
                             } else if (op == '>') {
-                                ps << cb.gt(exp.as(field.type.clzType), value)
+                                ps << cb.gt(exp.as(field.type.clzType), Utils.to(value, field.type.clzType))
                             } else if (op == '<') {
-                                ps << cb.lt(exp.as(field.type.clzType), value)
+                                ps << cb.lt(exp.as(field.type.clzType), Utils.to(value, field.type.clzType))
                             } else if (op == '>=') {
-                                ps << cb.ge(exp.as(field.type.clzType), value)
+                                ps << cb.ge(exp.as(field.type.clzType), Utils.to(value, field.type.clzType))
                             } else if (op == '<=') {
-                                ps << cb.le(exp.as(field.type.clzType), value)
+                                ps << cb.le(exp.as(field.type.clzType), Utils.to(value, field.type.clzType))
                             } else if (op == 'contains') {
                                 ps << cb.like(exp, '%' + value + '%')
                             } else throw new IllegalArgumentException("Param attrCondition op('$op') unknown")
