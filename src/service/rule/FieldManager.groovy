@@ -878,7 +878,6 @@ if (idNumber && idNumber.length() > 17) {
     Closure buildCacheTimeoutFn(DataCollector collector) {
         if (collector.cacheTimeoutFn) {
             Binding binding = new Binding()
-            //binding.setProperty('LOG', LoggerFactory.getLogger("ROOT"))
             def config = new CompilerConfiguration()
             def icz = new ImportCustomizer()
             config.addCompilationCustomizers(icz)
