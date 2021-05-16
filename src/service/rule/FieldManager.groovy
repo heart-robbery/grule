@@ -860,13 +860,13 @@ if (idNumber && idNumber.length() > 17) {
         } else if (cacheTimeout instanceof Duration) {
 
         } else throw new RuntimeException("缓存过期时间函数返回类型错误")
+        String key = getStr("collectorCacheKeyPrefix", "collector") +":"+ dataKey
         if (redis) {
-            String key = getStr("collectorCacheKeyPrefix", "collector") +":"+ dataKey
             redis.set(key, result.toString())
             redis.expire(key, cacheTimeout.seconds)
         }
         else if (cacheSrv) {
-            cacheSrv.set(getStr("collectorCacheKeyPrefix", "collector") +":"+ dataKey, result, cacheTimeout)
+            cacheSrv.set(key, result, cacheTimeout)
         }
     }
 

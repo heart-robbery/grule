@@ -175,6 +175,11 @@
                 this.parseApiConfig()
             }
         },
+        mounted() {
+            document.onkeyup = (e) => {
+                this.$emit('close');
+            }
+        },
         methods: {
             parseApiConfig() {
                 this.decision.apiConfigO = JSON.parse(this.decision.apiConfig);
@@ -257,6 +262,11 @@
                     return arr
                 })(),
                 result: ''
+            }
+        },
+        mounted() {
+            document.onkeyup = (e) => {
+                this.$emit('close');
             }
         },
         methods: {

@@ -141,6 +141,11 @@
                     }
                 }
             },
+            mounted() {
+                document.onkeyup = (e) => {
+                    this.$emit('close');
+                }
+            },
             methods: {
                 update() {
                     this.isLoading = true;
@@ -258,7 +263,7 @@
                         datas: {}
                     },
                     width: 500,
-                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false,
+                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false, closeOnMask: false,
                     events: {
                         reload: () => {
                             this.load()

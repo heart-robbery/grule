@@ -149,6 +149,11 @@
                 ],
             }
         },
+        mounted() {
+            document.onkeyup = (e) => {
+                this.$emit('close');
+            }
+        },
         methods: {
             update() {
                 this.isLoading = true;
@@ -226,6 +231,11 @@
                     return [{name: "参数", value: null}]
                 })(),
                 result: ''
+            }
+        },
+        mounted() {
+            document.onkeyup = (e) => {
+                this.$emit('close');
             }
         },
         methods: {
