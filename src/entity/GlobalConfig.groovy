@@ -27,12 +27,4 @@ class GlobalConfig extends LongIdEntity {
     @Basic
     @Type(type = "text")
     String value
-    /**
-     * 额外属性1
-     */
-    String prop1
-    /**
-     * 额外属性2
-     */
-    String prop2
 }
