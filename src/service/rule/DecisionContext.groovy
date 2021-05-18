@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * 决策执行上下文
  */
 class DecisionContext {
-    protected static final Logger log = LoggerFactory.getLogger(DecisionContext)
+    public static final Logger log = LoggerFactory.getLogger(DecisionContext)
     // 决策执行标识(id)
     final String id
     // 开始时间
@@ -334,7 +334,7 @@ class DecisionContext {
 
 
     // 日志前缀
-    protected String logPrefix() {
+    String logPrefix() {
         "[${id? "$id, " :''}${decisionHolder.decision.decisionId? "决策: $decisionHolder.spec.决策id" :''}${ -> curPassedPolicy? ", 策略: " + curPassedPolicy.spec.name() :''}${ -> curPassedRule ? ", 规则: " + curPassedRule.spec.name() :''}${ -> curPassedScorecard ? ", 评分卡: " + curPassedScorecard.spec.name() :''}${ -> curPassedDecision ?  ", 子决策: " + curPassedDecision.spec.name() + "(" + curPassedDecision.spec.决策id + ")":''}] -> "
     }
 
