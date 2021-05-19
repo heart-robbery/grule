@@ -143,7 +143,7 @@
             },
             mounted() {
                 document.onkeyup = (e) => {
-                    this.$emit('close');
+                    if (e.code === 'Escape') this.$emit('close');
                 }
             },
             methods: {
