@@ -34,15 +34,15 @@ targetCompatibility = 1.8
 
 
 ext {
-    groovyVerion = '3.0.8'
+    groovyVersion = '3.0.8'
 }
 dependencies {
     compile fileTree(dir: 'sysLib', include: ['*.jar'])
-    compile "org.codehaus.groovy:groovy:$groovyVerion"
-    compile "org.codehaus.groovy:groovy-templates:$groovyVerion"
-    compile "org.codehaus.groovy:groovy-sql:$groovyVerion"
-    compile "org.codehaus.groovy:groovy-json:$groovyVerion"
-    compile "org.codehaus.groovy:groovy-jmx:$groovyVerion"
+    compile "org.codehaus.groovy:groovy:$groovyVersion"
+    compile "org.codehaus.groovy:groovy-templates:$groovyVersion"
+    compile "org.codehaus.groovy:groovy-sql:$groovyVersion"
+    compile "org.codehaus.groovy:groovy-json:$groovyVersion"
+    compile "org.codehaus.groovy:groovy-jmx:$groovyVersion"
 
     //compile 'com.alibaba:fastjson:1.2.73'
     compile 'javax.inject:javax.inject:1'
@@ -50,7 +50,7 @@ dependencies {
 
     compile 'cn.xnatural.app:app:1.0.3'
     compile 'cn.xnatural.http:http:1.0.7'
-    compile 'cn.xnatural.jpa:jpa:1.0.4'
+    compile 'cn.xnatural.jpa:jpa:1.0.5'
     compile 'cn.xnatural.sched:sched:1.0.1'
     compile 'cn.xnatural.remoter:remoter:1.0.2'
     compile 'cn.xnatural.task:task:1.0.0'
