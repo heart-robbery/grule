@@ -28,7 +28,7 @@ if (appenders.contains('console')) { // 标准输出
     appender('console', ConsoleAppender) {
         encoder(PatternLayoutEncoder) {
             // 控制台日志格式配置
-            delegate.pattern = "%d{yyyy-MM-dd HH:mm:ss.SSS} [%-7thread] [%-5level] [%-40.40C :%-3L] => %m%n"
+            delegate.pattern = "%d{yyyy-MM-dd HH:mm:ss.SSS} [%-5level] [%-7thread] [%-40.40C :%-3L] => %m%n"
             delegate.charset = Charset.forName("utf8")
         }
     }
@@ -39,7 +39,7 @@ if (logPath) { // 有日志输出目录配置
         appender('file', RollingFileAppender) {
             encoder(PatternLayoutEncoder) {
                 // 文件日志格式配置
-                delegate.pattern = "%d{yyyy-MM-dd HH:mm:ss.SSS} [%-7thread] [%-5level] [%-40.40C :%-3L] => %m%n"
+                delegate.pattern = "%d{yyyy-MM-dd HH:mm:ss.SSS} [%-5level] [%-7thread] [%-40.40C :%-3L] => %m%n"
                 delegate.charset = StandardCharsets.UTF_8
             }
             if ("/" == logPath) file = "/${logFileName}.log"
@@ -47,9 +47,9 @@ if (logPath) { // 有日志输出目录配置
             rollingPolicy(SizeAndTimeBasedRollingPolicy) {
                 if ("/" == logPath) delegate.fileNamePattern = "/${logFileName}.%d{yyyy-MM-dd}.%i.log"
                 else delegate.fileNamePattern = "${logPath}/${logFileName}.%d{yyyy-MM-dd}.%i.log"
-                delegate.maxFileSize = FileSize.valueOf('50MB')
-                delegate.maxHistory = 500
-                delegate.totalSizeCap = FileSize.valueOf('50GB')
+                delegate.maxFileSize = FileSize.valueOf(System.getProperty("log.maxFileSize", '50MB'))
+                delegate.maxHistory = Integer.valueOf(System.getProperty("log.maxHistory", '500'))
+                delegate.totalSizeCap = FileSize.valueOf(System.getProperty("log.totalSizeCap", '50GB'))
             }
         }
     }
