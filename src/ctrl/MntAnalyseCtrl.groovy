@@ -66,6 +66,38 @@ class MntAnalyseCtrl extends ServerTpl {
         ids = decisionId ? ids.findAll {it == decisionId} : ids
         if (!ids) return ApiResp.ok().desc("无可查看的决策")
         hCtx.response.cacheControl(60) // 缓存60秒
+
+        // mysql 8.0.4+ or mariaDb 10.6+ 有json_table函数
+        def verArr = repo.getDBVersion().split("\\.")
+        if (
+            (repo.dialect.containsIgnoreCase("mysql") && verArr[0].toInteger() >= 8 && verArr[2].toInteger() >= 4) ||
+            (repo.dialect.containsIgnoreCase("maria") && verArr[0].toInteger() >= 10 && verArr[1].toInteger() >= 6)
+        ) {
+            String sql = """
+                SELECT
+                    t1.decision_id decisionId, t3.name decisionName, t2.policyName, t2.ruleName, t2.result, count(1) total
+                FROM decide_record t1
+                join json_table(JSON_SET(t1.detail, '\$.id', t1.id),
+                    '\$' COLUMNS (
+                        id varchar(50) path '\$.id',
+                        NESTED PATH '\$.policies[*]' COLUMNS (
+                            policyName varchar(200) path '\$.attrs."策略名"',
+                                NESTED PATH '\$.rules[*]' COLUMNS (
+                                    ruleName varchar(200) path '\$.attrs."规则名"',
+                                    result varchar(20) path '\$.result'
+                        )))
+                ) t2 on t2.id=t1.id
+                left join decision t3 on t1.decision_id = t3.id
+                where
+                    t1.occur_time>=:start${end ? " and t1.occur_time<=:end" : ""} and t1.decision_id in (:ids)
+                    and t1.detail is not null and t1.result is not null
+                group by decisionId, policyName, ruleName, result
+                order by case t2.result when 'Reject' then 3 when 'Review' then 2 when 'Accept' then 1 when isnull(t2.result) then 0 end desc, total desc
+                limit 30
+            """
+            return ApiResp.ok(end ? repo.rows(sql, start, end, ids) : repo.rows(sql, start, ids))
+        }
+
         String sql = """
             select t1.decision_id decisionId, t2.name decisionName, t1.detail 
             from ${repo.tbName(DecideRecord).replace("`", '')} t1
@@ -74,28 +106,7 @@ class MntAnalyseCtrl extends ServerTpl {
                 t1.occur_time>=:start${end ? " and t1.occur_time<=:end" : ""} and t1.decision_id in (:ids)
                 and t1.detail is not null and t1.result is not null
         """.trim()
-//        sql = """
-//            SELECT
-//                t1.decision_id decisionId, t3.name decisionName, t2.policyName, t2.ruleName, t2.result, count(1) total
-//            FROM decide_record t1
-//            join json_table(JSON_SET(t1.detail, '\$.id', t1.id),
-//                '\$' COLUMNS (
-//                    id varchar(50) path '\$.id',
-//                    NESTED PATH '\$.policies[*]' COLUMNS (
-//                        policyName varchar(200) path '\$.attrs."策略名"',
-//                            NESTED PATH '\$.rules[*]' COLUMNS (
-//                                ruleName varchar(200) path '\$.attrs."规则名"',
-//                                result varchar(20) path '\$.result'
-//                    )))
-//            ) t2 on t2.id=t1.id
-//            left join decision t3 on t1.decision_id = t3.id
-//            where
-//                t1.occur_time>=:start${end ? " and t1.occur_time<=:end" : ""} and t1.decision_id in (:ids)
-//                and t1.detail is not null and t1.result is not null
-//            group by decisionId, policyName, ruleName, result
-//            order by case t2.result when 'Reject' then 3 when 'Review' then 2 when 'Accept' then 1 when isnull(t2.result) then 0 end desc, total desc
-//            limit 30
-//        """
+
         def ls = [] as LinkedList
         for (int page = 1, pageSize = 200; ;page++) {
             Page rPage = end ? repo.sqlPage(sql, page, pageSize, start, end, ids) : repo.sqlPage(sql, page, pageSize, start, ids)

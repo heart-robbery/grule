@@ -51,7 +51,7 @@ dependencies {
     compile 'cn.xnatural.app:app:1.0.3'
     compile 'cn.xnatural.http:http:1.0.7'
     compile 'cn.xnatural.jpa:jpa:1.0.5'
-    compile 'cn.xnatural.sched:sched:1.0.1'
+    compile 'cn.xnatural.sched:sched:1.0.2'
     compile 'cn.xnatural.remoter:remoter:1.0.2'
     compile 'cn.xnatural.task:task:1.0.0'
 
