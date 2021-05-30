@@ -32,9 +32,10 @@ class RuleField extends LongIdEntity {
     @Enumerated(EnumType.STRING)
     FieldType type
     /**
-     * 值函数名 对应 {@link DataCollector#id}
+     * 收集器选项
+     * [{collectorId: '收集器id', chooseFn: '选择函数,返回true则使用此收集器'}]
      */
-    String    dataCollector
+    String    collectorOptions
     /**
      * 关联到哪个decision#id
      * 如果为空 则是公用字段

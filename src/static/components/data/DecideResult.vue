@@ -180,6 +180,9 @@
         mounted() {
             if (this.$refs.policyTb) this.$refs.policyTb.foldAll();
             this.$nextTick(() => this.$refs.policyTb.expandAll());
+            document.onkeyup = (e) => {
+                if (e.code === 'Escape') this.$emit('close');
+            }
         },
         computed: {
             title: function () {
@@ -310,7 +313,9 @@
                 this.tabs.showId = item.decisionId;
                 this.tabs.type = 'DecisionConfig';
             },
-            showDetail(item) {
+            showDetail(item, event) {
+                // h-table-tr-hovered
+                //console.log('===========', event)
                 this.$Modal({
                     middle: false, draggable: false,
                     type: 'drawer-right',

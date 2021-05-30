@@ -298,7 +298,7 @@ class DecisionContext {
         @Override
         Object remove(Object key) { // 删除缓存
             def r = super.remove(key)
-            def field = ctx.getFieldManager().fieldMap.get(key)
+            def field = ctx.getFieldManager().fieldHolders.get(key)?.field
             if (field) {
                 super.remove(field.enName)
                 super.remove(field.cnName)
@@ -348,8 +348,8 @@ class DecisionContext {
         //去重复记录(去对应的中文, 保留对应的英文)
         def cleanData = {Map data ->
             data ? data.collect { e ->
-                def value = e.value instanceof Optional ? e.value.orElseGet({ null }) : e.value
-                def field = fieldManager.fieldMap.get(e.key)
+                def value = e.value instanceof Optional ? e.value.orElse(null) : e.value
+                def field = fieldManager.fieldHolders.get(e.key)?.field
                 if (field && field.cnName == e.key) return [field.enName, value]
                 return [e.key, value]
             }.collectEntries() : null
@@ -396,7 +396,7 @@ class DecisionContext {
                 if (v instanceof Optional) {
                     v = v.orElseGet({ null })
                 }
-                def field = fieldManager.fieldMap.get(name)
+                def field = fieldManager.fieldHolders.get(name)?.field
                 //如果key是中文, 则翻译成对应的英文名
                 if (field && field.cnName == name) return [field.enName, v]
                 else return [name, v]

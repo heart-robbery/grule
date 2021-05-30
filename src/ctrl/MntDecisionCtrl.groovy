@@ -80,7 +80,7 @@ class MntDecisionCtrl extends ServerTpl {
                 )
             }
             if (collector) {
-                ps << cb.equal(root.get("dataCollector"), collector)
+                ps << cb.function("JSON_SEARCH", String, root.get('collectorOptions'), cb.literal('one'), cb.literal(collector)).isNotNull()
             }
             if (decision) {
                 ps << cb.equal(root.get("decision"), decision)
@@ -89,7 +89,14 @@ class MntDecisionCtrl extends ServerTpl {
         }.to{ Utils.toMapper(it).ignore("metaClass")
             .addConverter("decision", "decisionName") {dId -> dId ? decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name : null}
             .addConverter("decision", "decisionId") {dId -> dId ? decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.decisionId : null}
-            .addConverter("dataCollector", "dataCollectorName") {collectorId -> collectorId ? fieldManager.collectors.get(collectorId)?.collector?.name : null}
+            .addConverter("collectorOptions") {String opts ->
+                JSON.parseArray(opts).collect {JSONObject jo ->
+                    jo.fluentPut(
+                            "collectorName",
+                            fieldManager.collectorHolders.find {it.key == jo['collectorId']}?.value?.collector?.name
+                    )
+                }
+            }
             .build()
         })
     }
@@ -172,7 +179,7 @@ class MntDecisionCtrl extends ServerTpl {
                         JSON.parseArray(attrConditions).each {JSONObject jo ->
                             def fieldId = jo.getLong('fieldId')
                             if (!fieldId) return
-                            def field = fieldManager.fieldMap.find {it.value.id == fieldId}?.value
+                            def field = fieldManager.fieldHolders.find {it.value.id == fieldId}?.value?.field
                             if (field == null) return
 
                             def exp = cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName))
@@ -214,7 +221,7 @@ class MntDecisionCtrl extends ServerTpl {
                                 decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name
                             }).addConverter('data', {String jsonStr ->
                                 it == null ? null : JSON.parseObject(jsonStr, Feature.OrderedField).collect { e ->
-                                    [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
+                                    [enName: e.key, cnName: fieldManager.fieldHolders.get(e.key)?.field?.cnName, value: e.value]
                                 }}).addConverter('input', {jsonStr ->
                                     it == null ? null : JSON.parseObject(jsonStr)
                                 }).addConverter('dataCollectResult', {String jsonStr ->
@@ -225,7 +232,7 @@ class MntDecisionCtrl extends ServerTpl {
                                         if (arr.length == 1) collectorId = e.key
                                         else collectorId = arr[0]
                                         [
-                                                (fieldManager.collectors.findResult {
+                                                (fieldManager.collectorHolders.findResult {
                                                     it.value.collector.id == collectorId ? it.value.collector.name + (arr.length > 1 ? '_' + arr.drop(1).join('_') : '') : null
                                                 }?:e.key): e.value
                                         ]
@@ -235,15 +242,15 @@ class MntDecisionCtrl extends ServerTpl {
                                     def detailJo = JSON.parseObject(detailJsonStr, Feature.OrderedField)
                                     // 数据转换
                                     detailJo.put('data', detailJo.getJSONObject('data')?.collect { Entry<String, Object> e ->
-                                        [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
+                                        [enName: e.key, cnName: fieldManager.fieldHolders.get(e.key)?.field?.cnName, value: e.value]
                                     }?:null)
                                     detailJo.getJSONArray('policies')?.each {JSONObject pJo ->
                                         pJo.put('data', pJo.getJSONObject('data')?.collect { Entry<String, Object> e ->
-                                            [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
+                                            [enName: e.key, cnName: fieldManager.fieldHolders.get(e.key)?.field?.cnName, value: e.value]
                                         }?:null)
                                         pJo.getJSONArray('items')?.each {JSONObject rJo ->
                                             rJo.put('data', rJo.getJSONObject('data')?.collect { Entry<String, Object> e ->
-                                                [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
+                                                [enName: e.key, cnName: fieldManager.fieldHolders.get(e.key)?.field?.cnName, value: e.value]
                                             }?:null)
                                         }
                                     }
@@ -306,7 +313,7 @@ class MntDecisionCtrl extends ServerTpl {
                 .addConverter('decisionId', 'decisionName', {String dId ->
                     decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name
                 }).addConverter('collector', 'collectorName', {String cId ->
-                    fieldManager.collectors.get(cId)?.collector?.name
+                    fieldManager.collectorHolders.get(cId)?.collector?.name
                 }).build()
             }
         )
@@ -389,7 +396,7 @@ class MntDecisionCtrl extends ServerTpl {
 
 
     @Path(path = 'addField', method = 'post')
-    ApiResp addField(HttpContext hCtx, String enName, String cnName, FieldType type, String comment, String dataCollector, String decision) {
+    ApiResp addField(HttpContext hCtx, String enName, String cnName, FieldType type, String comment, String collectorOptions, String decision) {
         hCtx.auth('field-add')
         if (!enName) return ApiResp.fail("Param enName not empty")
         if (!cnName) return ApiResp.fail("Param cnName not empty")
@@ -402,9 +409,18 @@ class MntDecisionCtrl extends ServerTpl {
             }
             decisionName = d.name
         }
+        // 验证 collectorOptions
+        if (collectorOptions) {
+            JSON.parseArray(collectorOptions).each {JSONObject jo ->
+                if (!jo['collectorId']) throw new IllegalArgumentException("Param collectorOptions.collectorId not empty")
+                if (!repo.count(DataCollector) {root, query, cb -> cb.equal(root.get("id"), jo['collectorId'])}) {
+                    throw new IllegalArgumentException("Param collectorOptions.collectorId not exist")
+                }
+            }
+        }
         def field = new RuleField(
             enName: enName, cnName: cnName, type: type, comment: comment, decision: decision == null ? '' : decision,
-            dataCollector: dataCollector, creator: hCtx.getSessionAttr('uName')
+            collectorOptions: collectorOptions, creator: hCtx.getSessionAttr('uName')
         )
         try {
             repo.saveOrUpdate(field)
@@ -495,7 +511,7 @@ class MntDecisionCtrl extends ServerTpl {
 
 
     @Path(path = 'updateField', method = 'post')
-    ApiResp updateField(HttpContext hCtx, Long id, String enName, String cnName, FieldType type, String comment, String dataCollector, String decision) {
+    ApiResp updateField(HttpContext hCtx, Long id, String enName, String cnName, FieldType type, String comment, String collectorOptions, String decision) {
         hCtx.auth('field-update')
         if (!id) return ApiResp.fail("Param id not legal")
         if (!enName) return ApiResp.fail("Param enName not empty")
@@ -512,11 +528,20 @@ class MntDecisionCtrl extends ServerTpl {
             }
             decisionName = d.name
         }
+        // 验证 collectorOptions
+        if (collectorOptions) {
+            JSON.parseArray(collectorOptions).each {JSONObject jo ->
+                if (!jo['collectorId']) throw new IllegalArgumentException("Param collectorOptions.collectorId not empty")
+                if (!repo.count(DataCollector) {root, query, cb -> cb.equal(root.get("id"), jo['collectorId'])}) {
+                    throw new IllegalArgumentException("Param collectorOptions.collectorId not exist")
+                }
+            }
+        }
         field.enName = enName
         field.cnName = cnName
         field.type = type
         field.comment = comment
-        field.dataCollector = dataCollector
+        field.collectorOptions = collectorOptions
         field.decision = decision == null ? '' : decision
         field.updater = hCtx.getSessionAttr("uName")
         try {

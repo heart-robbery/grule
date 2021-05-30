@@ -25,8 +25,10 @@
                 <h-tableitem title="描述" prop="comment" align="center"></h-tableitem>
                 <h-tableitem title="收集器" align="center">
                     <template slot-scope="{data}">
-                        <a v-if="data.dataCollectorName" href="javascript:void(0)" @click="jumpToDataCollector(data)">{{data.dataCollectorName}}</a>
-                        <span v-else>{{data.dataCollector}}</span>
+                        <div v-if="data.collectorOptions" v-for="opt in data.collectorOptions" :key="opt.collectorId">
+                            <a v-if="opt.collectorName" href="javascript:void(0)" @click="jumpToDataCollector(opt)">{{opt.collectorName}}</a>
+                            <span v-else>{{opt.collectorId}}</span>
+                        </div>
                     </template>
                 </h-tableitem>
                 <h-tableitem title="决策" align="center">
@@ -59,7 +61,7 @@
     ];
     const addEditPop = { //添加,编辑窗口组件
         template: `
-                <div v-width="400" style="padding-top: 10px">
+                <div v-width="600" style="padding-top: 10px">
                     <h-form ref="form"
                             :valid-on-change="true"
                             :show-error-tip="true"
@@ -80,46 +82,42 @@
                             <textarea v-model="model.comment" />
                         </h-formitem>
                         <h-formitem label="值函数" icon="h-icon-complete" prop="dataCollector">
-                            <h-autocomplete v-model="model.dataCollector" :show="model.dataCollectorName" :option="param"></h-autocomplete>
+<!--                            <h-autocomplete v-model="model.dataCollector" :show="model.dataCollectorName" :option="param"></h-autocomplete>-->
+                            <div v-for="(opt, index) in model.collectorOptions" :key="opt">
+                                <h-autocomplete v-model="opt.collectorId" :show="opt.collectorName" :option="opt.ac"></h-autocomplete>
+                                <ace-groovy v-model="opt.chooseFn" style="height: 70px"></ace-groovy>
+                                <i v-if="model.collectorOptions.length == (index + 1)" class="h-icon-plus" @click="addCollectorOpt"></i>
+                                <i class="h-icon-minus" @click="delCollectorOpt(opt)"></i>
+                            </div>
                         </h-formitem>
                         <h-formitem label="决策" icon="h-icon-complete" prop="decision">
                             <h-autocomplete v-model="model.decision" :show="model.decisionName" :option="decisionAc"></h-autocomplete>
                         </h-formitem>
                         <h-formitem>
-                                <h-button v-if="model.id" color="primary" :loading="isLoading" @click="update">提交</h-button>
-                                <h-button v-else color="primary" :loading="isLoading" @click="add">提交</h-button>
-                            </h-formitem>
+                            <h-button v-if="model.id" color="primary" :loading="isLoading" @click="update">提交</h-button>
+                            <h-button v-else color="primary" :loading="isLoading" @click="add">提交</h-button>
+                        </h-formitem>
                     </h-form>
                 </div>
                 `,
             props: ['field'],
             data() {
+                if (this.field) {
+                    if (this.field.collectorOptions && this.field.collectorOptions.length > 0) {
+                        this.field.collectorOptions.forEach((item) => {
+                            item.ac = this.collectorAc();
+                        })
+                    } else {
+                        this.field.collectorOptions = [{collectorId: null, chooseFn: 'true', ac: this.collectorAc()}];
+                    }
+                }
                 return {
                     isLoading: false,
-                    model: this.field ? $.extend({}, this.field) : {type: 'Str'},
+                    model: this.field ? $.extend({}, this.field) : {type: 'Str', collectorOptions: [{collectorId: null, chooseFn: 'true', ac: this.collectorAc()}]},
                     validationRules: {
-                        required: ['enName', 'cnName', 'type']
+                        required: ['enName', 'cnName', 'type', 'collectorOptions.collectorId']
                     },
                     types: types,
-                    param: {
-                        keyName: 'id',
-                        titleName: 'name',
-                        minWord: 1,
-                        loadData: (filter, cb) => {
-                            $.ajax({
-                                url: 'mnt/dataCollectorPage',
-                                data: {page: 1, pageSize: 5, kw: filter},
-                                success: (res) => {
-                                    this.isLoading = false;
-                                    if (res.code === '00') {
-                                        cb(res.data.list.map((r) => {
-                                            return {id: r.id, name: r.name}
-                                        }))
-                                    } else this.$Notice.error(res.desc)
-                                },
-                            });
-                        }
-                    },
                     decisionAc: {
                         keyName: 'id',
                         titleName: 'name',
@@ -147,12 +145,51 @@
                 }
             },
             methods: {
+                addCollectorOpt() {
+                    this.model.collectorOptions.push({collectorId: null, chooseFn: 'true', ac: this.collectorAc()})
+                },
+                delCollectorOpt(opt) {
+                    this.model.collectorOptions.splice(this.model.collectorOptions.indexOf(opt), 1)
+                },
+                collectorAc() {
+                    return {
+                        keyName: 'id',
+                        titleName: 'name',
+                        minWord: 1,
+                        loadData: (filter, cb) => {
+                            $.ajax({
+                                url: 'mnt/dataCollectorPage',
+                                data: {page: 1, pageSize: 5, kw: filter},
+                                success: (res) => {
+                                    this.isLoading = false;
+                                    if (res.code === '00') {
+                                        cb(res.data.list.map((r) => {
+                                            return {id: r.id, name: r.name}
+                                        }))
+                                    } else this.$Message.error(res.desc)
+                                },
+                            });
+                        }
+                    }
+                },
                 update() {
+                    let data = $.extend({}, this.model)
+                    data.collectorOptions = [];
+                    if (this.model.collectorOptions && this.model.collectorOptions.length > 0) {
+                        this.model.collectorOptions.forEach((value) => {
+                            if (value.collectorId) {
+                                data.collectorOptions.push({collectorId: value.collectorId, chooseFn: value.chooseFn})
+                            }
+                        })
+                    }
+                    if (data.collectorOptions && data.collectorOptions.length > 0) {
+                        data.collectorOptions = JSON.stringify(data.collectorOptions);
+                    }
                     this.isLoading = true;
                     $.ajax({
                         url: 'mnt/updateField',
                         type: 'post',
-                        data: this.model,
+                        data: data,
                         success: (res) => {
                             this.isLoading = false;
                             if (res.code === '00') {
@@ -166,11 +203,23 @@
                     })
                 },
                 add() {
+                    let data = $.extend({}, this.model)
+                    data.collectorOptions = [];
+                    if (this.model.collectorOptions && this.model.collectorOptions.length > 0) {
+                        this.model.collectorOptions.forEach((value) => {
+                            if (value.collectorId) {
+                                data.collectorOptions.push({collectorId: value.collectorId, chooseFn: value.chooseFn})
+                            }
+                        })
+                    }
+                    if (data.collectorOptions && data.collectorOptions.length > 0) {
+                        data.collectorOptions = JSON.stringify(data.collectorOptions);
+                    }
                     this.isLoading = true;
                     $.ajax({
                         url: 'mnt/addField',
                         type: 'post',
-                        data: this.model,
+                        data: data,
                         success: (res) => {
                             this.isLoading = false;
                             if (res.code === '00') {
@@ -242,7 +291,7 @@
         },
         methods: {
             jumpToDataCollector(item) {
-                this.tabs.showId = item.dataCollector;
+                this.tabs.showId = item.collectorId;
                 this.tabs.type = 'DataCollectorConfig';
             },
             jumpToDecision(item) {
@@ -262,7 +311,7 @@
                         vue: addEditPop,
                         datas: {}
                     },
-                    width: 500,
+                    width: 680,
                     hasCloseIcon: true, fullScreen: false, middle: false, transparent: false, closeOnMask: false,
                     events: {
                         reload: () => {
@@ -278,7 +327,7 @@
                         vue: addEditPop,
                         datas: {field: field}
                     },
-                    width: 500,
+                    width: 680,
                     hasCloseIcon: true, fullScreen: false, middle: false, transparent: false,
                     events: {
                         reload: () => {
