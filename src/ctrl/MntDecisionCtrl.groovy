@@ -396,19 +396,11 @@ class MntDecisionCtrl extends ServerTpl {
 
 
     @Path(path = 'addField', method = 'post')
-    ApiResp addField(HttpContext hCtx, String enName, String cnName, FieldType type, String comment, String collectorOptions, String decision) {
+    ApiResp addField(HttpContext hCtx, String enName, String cnName, FieldType type, String comment, String collectorOptions) {
         hCtx.auth('field-add')
         if (!enName) return ApiResp.fail("Param enName not empty")
         if (!cnName) return ApiResp.fail("Param cnName not empty")
         if (!type) return ApiResp.fail("Param type not empty")
-        String decisionName
-        if (decision) {
-            def d = repo.findById(Decision, decision)
-            if (!d) {
-                return ApiResp.fail("Param decision not exist")
-            }
-            decisionName = d.name
-        }
         // 验证 collectorOptions
         if (collectorOptions) {
             JSON.parseArray(collectorOptions).each {JSONObject jo ->
@@ -419,7 +411,7 @@ class MntDecisionCtrl extends ServerTpl {
             }
         }
         def field = new RuleField(
-            enName: enName, cnName: cnName, type: type, comment: comment, decision: decision == null ? '' : decision,
+            enName: enName, cnName: cnName, type: type, comment: comment,
             collectorOptions: collectorOptions, creator: hCtx.getSessionAttr('uName')
         )
         try {
@@ -428,11 +420,11 @@ class MntDecisionCtrl extends ServerTpl {
             def cause = ex
             while (cause != null) {
                 if (cause.message.contains("Duplicate entry")) {
-                    if (cause.message.contains(RuleField.idx_cnName_decision)) {
-                        return ApiResp.fail("$cnName${decision ? ', ' + decisionName + ' ' : ''} aleady exist")
+                    if (cause.message.contains("cnName")) {
+                        return ApiResp.fail("$cnName aleady exist")
                     }
-                    if (cause.message.contains(RuleField.idx_enName_decision)) {
-                        return ApiResp.fail("$enName${decision ? ', ' + decisionName + ' ' : ''} aleady exist")
+                    if (cause.message.contains("enName")) {
+                        return ApiResp.fail("$enName aleady exist")
                     }
                 }
                 cause = cause.cause
@@ -511,7 +503,7 @@ class MntDecisionCtrl extends ServerTpl {
 
 
     @Path(path = 'updateField', method = 'post')
-    ApiResp updateField(HttpContext hCtx, Long id, String enName, String cnName, FieldType type, String comment, String collectorOptions, String decision) {
+    ApiResp updateField(HttpContext hCtx, Long id, String enName, String cnName, FieldType type, String comment, String collectorOptions) {
         hCtx.auth('field-update')
         if (!id) return ApiResp.fail("Param id not legal")
         if (!enName) return ApiResp.fail("Param enName not empty")
@@ -519,15 +511,7 @@ class MntDecisionCtrl extends ServerTpl {
         if (!type) return ApiResp.fail("Param type not empty")
         def field = repo.findById(RuleField, id)
         if (field == null) return ApiResp.fail("Param id: $id not found")
-        // if (enName != field.enName) return ApiResp.fail('enName can not change')
-        String decisionName
-        if (decision) {
-            def d = repo.findById(Decision, decision)
-            if (!d) {
-                return ApiResp.fail("Param decision not exist")
-            }
-            decisionName = d.name
-        }
+
         // 验证 collectorOptions
         if (collectorOptions) {
             JSON.parseArray(collectorOptions).each {JSONObject jo ->
@@ -542,7 +526,6 @@ class MntDecisionCtrl extends ServerTpl {
         field.type = type
         field.comment = comment
         field.collectorOptions = collectorOptions
-        field.decision = decision == null ? '' : decision
         field.updater = hCtx.getSessionAttr("uName")
         try {
             repo.saveOrUpdate(field)
@@ -550,11 +533,11 @@ class MntDecisionCtrl extends ServerTpl {
             def cause = ex
             while (cause != null) {
                 if (cause.message.contains("Duplicate entry")) {
-                    if (cause.message.contains(RuleField.idx_cnName_decision)) {
-                        return ApiResp.fail("$cnName${decision ? ', ' + decisionName + ' ' : ''} aleady exist")
+                    if (cause.message.contains("cnName")) {
+                        return ApiResp.fail("$cnName aleady exist")
                     }
-                    if (cause.message.contains(RuleField.idx_enName_decision)) {
-                        return ApiResp.fail("$enName${decision ? ', ' + decisionName + ' ' : ''} aleady exist")
+                    if (cause.message.contains("enName")) {
+                        return ApiResp.fail("$enName aleady exist")
                     }
                 }
                 cause = cause.cause

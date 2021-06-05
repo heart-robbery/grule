@@ -91,9 +91,6 @@ class FieldManager extends ServerTpl {
             log.warn(ctx.logPrefix() + "属性'" + aName + "'没有对应的取值配置")
             return null
         }
-        if (fieldHolder.field.decision && fieldHolder.field.decision != ctx.decisionHolder.decision.id) {
-            throw new RuntimeException("Field '$aName' not belong to '${ctx.decisionHolder.decision.name}'")
-        }
         // 得到收集器
         def collectorHolder = collectorHolders.get(collectorId)
         if (!collectorHolder) {
