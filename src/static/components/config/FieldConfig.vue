@@ -31,12 +31,6 @@
                         </div>
                     </template>
                 </h-tableitem>
-                <h-tableitem title="决策" align="center">
-                    <template slot-scope="{data}">
-                        <a v-if="data.decisionName" href="javascript:void(0)" @click="jumpToDecision(data)">{{data.decisionName}}</a>
-                        <span v-else>{{data.decisionId}}</span>
-                    </template>
-                </h-tableitem>
                 <h-tableitem v-if="sUser.permissionIds.find((e) => e == 'field-update' || e == 'field-del')" title="操作" align="center" :width="90">
                     <template slot-scope="{data}">
                         <span v-if="sUser.permissionIds.find((e) => e == 'field-update') == 'field-update'" class="text-hover" @click="showUpdatePop(data)">编辑</span>
