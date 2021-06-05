@@ -2,6 +2,7 @@ package entity
 
 import cn.xnatural.jpa.LongIdEntity
 import org.hibernate.annotations.DynamicUpdate
+import org.hibernate.annotations.Type
 
 import javax.persistence.*
 
@@ -33,6 +34,9 @@ class RuleField extends LongIdEntity {
      * 收集器选项
      * [{collectorId: '收集器id', chooseFn: '选择函数,返回true则使用此收集器'}]
      */
+    @Lob
+    @Basic
+    @Type(type = "text")
     String    collectorOptions
     /**
      * 创建者

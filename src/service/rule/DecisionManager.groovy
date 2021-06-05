@@ -219,7 +219,7 @@ class DecisionManager extends ServerTpl {
                         if (!format) throw new IllegalArgumentException("Param '$code' type is Time, format must config")
                         try {
                             // if (value.toString().length() != format.length()) throw new Exception()
-                            value = new SimpleDateFormat(format).parse(value.toString())
+                            new SimpleDateFormat(format).parse(value.toString())
                         } catch (ex) {
                             throw new IllegalArgumentException("Param '$code' format error. format: $format, value: $value")
                         }

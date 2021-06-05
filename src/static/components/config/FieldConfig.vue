@@ -22,7 +22,6 @@
                     <template slot-scope="{data}"><date-item :time="data.updateTime" /></template>
                 </h-tableitem>
                 <!--                    <h-tableitem title="创建时间" prop="createTime" align="center"></h-tableitem>-->
-                <h-tableitem title="描述" prop="comment" align="center"></h-tableitem>
                 <h-tableitem title="收集器" align="center">
                     <template slot-scope="{data}">
                         <div v-if="data.collectorOptions" v-for="opt in data.collectorOptions" :key="opt.collectorId">
@@ -31,6 +30,7 @@
                         </div>
                     </template>
                 </h-tableitem>
+                <h-tableitem title="描述" prop="comment" align="center"></h-tableitem>
                 <h-tableitem v-if="sUser.permissionIds.find((e) => e == 'field-update' || e == 'field-del')" title="操作" align="center" :width="90">
                     <template slot-scope="{data}">
                         <span v-if="sUser.permissionIds.find((e) => e == 'field-update') == 'field-update'" class="text-hover" @click="showUpdatePop(data)">编辑</span>
@@ -83,9 +83,6 @@
                                 <i v-if="model.collectorOptions.length == (index + 1)" class="h-icon-plus" @click="addCollectorOpt"></i>
                                 <i class="h-icon-minus" @click="delCollectorOpt(opt)"></i>
                             </div>
-                        </h-formitem>
-                        <h-formitem label="决策" icon="h-icon-complete" prop="decision">
-                            <h-autocomplete v-model="model.decision" :show="model.decisionName" :option="decisionAc"></h-autocomplete>
                         </h-formitem>
                         <h-formitem>
                             <h-button v-if="model.id" color="primary" :loading="isLoading" @click="update">提交</h-button>
