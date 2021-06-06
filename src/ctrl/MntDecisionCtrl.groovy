@@ -179,7 +179,7 @@ class MntDecisionCtrl extends ServerTpl {
                         JSON.parseArray(attrConditions).each {JSONObject jo ->
                             def fieldId = jo.getLong('fieldId')
                             if (!fieldId) return
-                            def field = fieldManager.fieldHolders.find {it.value.id == fieldId}?.value?.field
+                            def field = fieldManager.fieldHolders.find {it.value.field.id == fieldId}?.value?.field
                             if (field == null) return
 
                             def exp = cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName))
