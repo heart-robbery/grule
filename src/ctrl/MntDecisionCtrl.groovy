@@ -119,9 +119,6 @@ class MntDecisionCtrl extends ServerTpl {
                 if (id) ps << cb.equal(root.get("id"), id)
                 if (type) ps << cb.equal(root.get('type'), type)
                 cb.and(ps.toArray(new Predicate[ps.size()]))
-            }.to {Utils.toMapper(it).ignore("metaClass", "cacheTimeout")
-                    .addConverter("cacheTimeoutFn", "cacheTimeout") {String fn -> fn.replace("{ -> ", "").replace("}", "")}
-                    .build()
             }
         )
     }
