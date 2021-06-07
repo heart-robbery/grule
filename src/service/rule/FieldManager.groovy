@@ -894,7 +894,7 @@ if (idNumber && idNumber.length() > 17) {
             def icz = new ImportCustomizer()
             config.addCompilationCustomizers(icz)
             icz.addImports(JSON.class.name, JSONObject.class.name, Utils.class.name)
-            return new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate(collector.cacheTimeoutFn)
+            return new GroovyShell(Thread.currentThread().contextClassLoader, binding, config).evaluate("{ -> $collector.cacheTimeoutFn }")
         }
         null
     }

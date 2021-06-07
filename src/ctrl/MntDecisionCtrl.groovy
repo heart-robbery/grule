@@ -481,9 +481,7 @@ class MntDecisionCtrl extends ServerTpl {
         } else return ApiResp.fail('Not support type: ' + collector.type)
         collector.creator = hCtx.getSessionAttr("uName")
         collector.cacheKey = cacheKey
-        if (cacheTimeout.trim()) {
-            collector.cacheTimeoutFn = '{ -> ' + cacheTimeout.trim() + '}'
-        }
+        collector.cacheTimeoutFn = cacheTimeout
         try {
             repo.saveOrUpdate(collector)
         } catch (ex) {
@@ -602,9 +600,7 @@ class MntDecisionCtrl extends ServerTpl {
         collector.comment = comment
         collector.enabled = enabled == null ? true : enabled
         collector.cacheKey = cacheKey
-        if (cacheTimeout.trim()) {
-            collector.cacheTimeoutFn = '{ -> ' + cacheTimeout.trim() + '}'
-        }
+        collector.cacheTimeoutFn = cacheTimeout
         collector.updater = hCtx.getSessionAttr("uName")
 
         try {
