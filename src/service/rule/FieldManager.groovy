@@ -71,7 +71,15 @@ class FieldManager extends ServerTpl {
 
 
     @EL(name = 'sys.stopping', async = true)
-    void stop() { collectorHolders.each {it.value.close()} }
+    protected void stop() {
+        collectorHolders.each {it.value.close()}
+        // 尽量等到 对列中的 数据都持久化完成
+        long start = System.currentTimeMillis()
+        while (queue(DATA_COLLECTED).waitingCount > 0 && System.currentTimeMillis() - start < 1000 * 60 * 2) {
+            log.warn("等待数据收集结果数据保存完...")
+            Thread.sleep(1000)
+        }
+    }
 
 
     /**
@@ -199,18 +207,18 @@ class FieldManager extends ServerTpl {
      */
     void loadField() {
         initDefaultField()
-        Set<String> enNames = (fieldHolders.isEmpty() ? null : new HashSet<>(100))
+        Set<String> names = (fieldHolders.isEmpty() ? null : new HashSet<>(100))
         for (int page = 0, limit = 100; ; page++) {
             def ls = repo.findList(RuleField, page * limit, limit, null)
             if (!ls) break
             ls.each {field ->
                 initField(field)
-                enNames?.add(field.enName)
-                enNames?.add(field.cnName)
+                names?.add(field.enName)
+                names?.add(field.cnName)
             }
         }
-        if (enNames) { // 重新加载, 要删除内存中有, 但库中没有
-            fieldHolders.findAll {!enNames.contains(it.key)}.each { e ->
+        if (names) { // 重新加载, 要删除内存中有, 但库中没有
+            fieldHolders.findAll {!names.contains(it.key)}.each { e ->
                 fieldHolders.remove(e.key)
             }
         }

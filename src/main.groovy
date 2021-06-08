@@ -79,7 +79,8 @@ app.addSource(new ServerTpl("jpa_rule") { //数据库 jpa_rule
         ep.fire("${name}.started")
     }
 
-    @EL(name = "sys.stopping", async = true)
+    // 数据库 最后再关闭
+    @EL(name = "sys.stopping", async = true, order = 2)
     void stop() { repo?.close() }
 })
 app.addSource(new HttpSrv().ctrls(
