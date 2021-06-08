@@ -438,7 +438,7 @@ class MntDecisionCtrl extends ServerTpl {
     ApiResp addDataCollector(
         HttpContext hCtx, String name, String type, String url, String bodyStr,
         String method, String parseScript, String contentType, String comment, String computeScript, String dataSuccessScript,
-        String sqlScript, Integer minIdle, Integer maxActive, Integer timeout, Boolean enabled, String cacheKey, String cacheTimeout
+        String sqlScript, Integer minIdle, Integer maxActive, Integer timeout, Boolean enabled, String cacheKey, String cacheTimeoutFn
     ) {
         hCtx.auth('dataCollector-add')
         DataCollector collector = new DataCollector(name: name, type: type, comment: comment, enabled: (enabled == null ? true : enabled))
@@ -478,7 +478,7 @@ class MntDecisionCtrl extends ServerTpl {
         } else return ApiResp.fail('Not support type: ' + collector.type)
         collector.creator = hCtx.getSessionAttr("uName")
         collector.cacheKey = cacheKey
-        collector.cacheTimeoutFn = cacheTimeout
+        collector.cacheTimeoutFn = cacheTimeoutFn
         try {
             repo.saveOrUpdate(collector)
         } catch (ex) {
@@ -549,7 +549,7 @@ class MntDecisionCtrl extends ServerTpl {
     ApiResp updateDataCollector(
         HttpContext hCtx, String id, String name, String url, String bodyStr,
         String method, String parseScript, String contentType, String comment, String computeScript, String dataSuccessScript,
-        String sqlScript, Integer minIdle, Integer maxActive, Integer timeout, Boolean enabled, String cacheKey, String cacheTimeout
+        String sqlScript, Integer minIdle, Integer maxActive, Integer timeout, Boolean enabled, String cacheKey, String cacheTimeoutFn
     ) {
         hCtx.auth('dataCollector-update')
         if (!id) return ApiResp.fail("Param id not legal")
@@ -597,7 +597,7 @@ class MntDecisionCtrl extends ServerTpl {
         collector.comment = comment
         collector.enabled = enabled == null ? true : enabled
         collector.cacheKey = cacheKey
-        collector.cacheTimeoutFn = cacheTimeout
+        collector.cacheTimeoutFn = cacheTimeoutFn
         collector.updater = hCtx.getSessionAttr("uName")
 
         try {

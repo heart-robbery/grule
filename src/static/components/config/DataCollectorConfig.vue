@@ -79,7 +79,7 @@
                             <input type="text" v-model="model.cacheKey" placeholder="用于判断数据是否需要重复计算" />
                         </h-formitem>
                         <h-formitem label="缓存超时(m)" icon="h-icon-user" prop="timeout">
-                            <input type="text" v-model="model.cacheTimeout" />
+                            <input type="text" v-model="model.cacheTimeoutFn" />
                         </h-formitem>
                         <h-formitem v-if="model.type == 'http' && model.method == 'POST'" label="ContentType" icon="h-icon-user" prop="contentType">
                             <h-select v-model="model.contentType" :datas="contentTypes"></h-select>
