@@ -72,7 +72,7 @@ class ScorecardSpec extends BaseSpec {
                     def v = ctx.data.get(item[0])
                     return v == null ? 0 : v  //直接取值为评分
                 } else if (item[0] instanceof Closure) { // 分值计算函数
-                    return item[0].rehydrate(ctx.data, item[1], this)()
+                    return item[0].rehydrate(ctx.data, item[0], this)()
                 } else throw new IllegalArgumentException("评分卡($评分卡名)模型格式错误: 变量名 或 分值计算函数")
             }
             else throw new IllegalArgumentException("评分卡($评分卡名)模型格式错误: 位数")
