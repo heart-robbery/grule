@@ -53,7 +53,11 @@
                         <span v-else>{{data.decisionId}}</span>
                     </template>
                 </h-tableitem>
-                <h-tableitem title="流水id" prop="id" align="center"></h-tableitem>
+                <h-tableitem title="流水id" align="center">
+                    <template slot-scope="{data}">
+                        <a href="javascript:void(0)" @click="jumpToCollectRecord(data)">{{data.id}}</a>
+                    </template>
+                </h-tableitem>
                 <h-tableitem title="结果" prop="result" align="center" :format="formatType" :width="70"></h-tableitem>
                 <h-tableitem title="决策时间" align="center" :width="135">
                     <template slot-scope="{data}">
@@ -282,6 +286,11 @@
             }
         },
         methods: {
+            jumpToCollectRecord(item) {
+                this.tabs.decideId = item.id;
+                this.tabs.startTime = this.model.startTime;
+                this.tabs.type = 'CollectResult';
+            },
             fieldAc() {
                 return {
                     keyName: 'id',
