@@ -3,11 +3,7 @@ package service.rule
 import cn.xnatural.enet.event.EP
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import service.rule.spec.BaseSpec
-import service.rule.spec.DecisionSpec
-import service.rule.spec.PolicySpec
-import service.rule.spec.RuleSpec
-import service.rule.spec.ScorecardSpec
+import service.rule.spec.*
 
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -376,7 +372,7 @@ class DecisionContext {
                          ]
                      }
                 ],
-                dataCollectResult: dataCollectResult?:null // 执行过程中数据收集的结果集
+                dataCollectResult: dataCollectResult?.findAll {!(it.value instanceof Closure)}?:null // 执行过程中数据收集的结果集
         ]
         this._summary
     }

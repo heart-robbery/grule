@@ -311,6 +311,8 @@ class MntDecisionCtrl extends ServerTpl {
                     decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name
                 }).addConverter('collector', 'collectorName', {String cId ->
                     fieldManager.collectorHolders.get(cId)?.collector?.name
+                }).addConverter('collector', 'collectorType', {String cId ->
+                    fieldManager.collectorHolders.get(cId)?.collector?.type
                 }).build()
             }
         )

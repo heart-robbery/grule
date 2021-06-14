@@ -22,17 +22,13 @@ class CollectRecord implements IEntity {
      */
     String decideId
     /**
-     * 决策id
+     * 决策id {@link Decision#id}
      */
     String decisionId
     /**
-     * 收集器id
+     * 收集器id {@link DataCollector#id}
      */
     String collector
-    /**
-     * 收集器:类型
-     */
-    String collectorType
     /**
      * 执行结果状态
      */
@@ -74,31 +70,24 @@ class CollectRecord implements IEntity {
     @Type(type = "text")
     String result
     /**
-     * 结果解析之后
+     * 收集器执行异常
+     */
+    @Lob
+    @Basic
+    @Type(type = "text")
+    String exception
+    /**
+     * 解析结果
      */
     @Lob
     @Basic
     @Type(type = "text")
     String resolveResult
     /**
-     * http 请求异常
+     * 解析异常
      */
     @Lob
     @Basic
     @Type(type = "text")
-    String httpException
-    /**
-     * 解析http返回异常
-     */
-    @Lob
-    @Basic
-    @Type(type = "text")
-    String parseException
-    /**
-     * 脚本执行异常
-     */
-    @Lob
-    @Basic
-    @Type(type = "text")
-    String scriptException
+    String resolveException
 }
