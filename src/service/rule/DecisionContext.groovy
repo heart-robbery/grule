@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * 决策执行上下文
  */
 class DecisionContext {
-    protected static final Logger log = LoggerFactory.getLogger(DecisionContext)
+    public static final Logger log = LoggerFactory.getLogger(DecisionContext)
     // 决策执行标识(id)
     final String id
     // 开始时间
@@ -298,7 +298,7 @@ class DecisionContext {
         @Override
         Object remove(Object key) { // 删除缓存
             def r = super.remove(key)
-            def field = ctx.getFieldManager().fieldMap.get(key)
+            def field = ctx.getFieldManager().fieldHolders.get(key)?.field
             if (field) {
                 super.remove(field.enName)
                 super.remove(field.cnName)
@@ -334,7 +334,7 @@ class DecisionContext {
 
 
     // 日志前缀
-    protected String logPrefix() {
+    String logPrefix() {
         "[${id? "$id, " :''}${decisionHolder.decision.decisionId? "决策: $decisionHolder.spec.决策id" :''}${ -> curPassedPolicy? ", 策略: " + curPassedPolicy.spec.name() :''}${ -> curPassedRule ? ", 规则: " + curPassedRule.spec.name() :''}${ -> curPassedScorecard ? ", 评分卡: " + curPassedScorecard.spec.name() :''}${ -> curPassedDecision ?  ", 子决策: " + curPassedDecision.spec.name() + "(" + curPassedDecision.spec.决策id + ")":''}] -> "
     }
 
@@ -348,8 +348,8 @@ class DecisionContext {
         //去重复记录(去对应的中文, 保留对应的英文)
         def cleanData = {Map data ->
             data ? data.collect { e ->
-                def value = e.value instanceof Optional ? e.value.orElseGet({ null }) : e.value
-                def field = fieldManager.fieldMap.get(e.key)
+                def value = e.value instanceof Optional ? e.value.orElse(null) : e.value
+                def field = fieldManager.fieldHolders.get(e.key)?.field
                 if (field && field.cnName == e.key) return [field.enName, value]
                 return [e.key, value]
             }.collectEntries() : null
@@ -396,7 +396,7 @@ class DecisionContext {
                 if (v instanceof Optional) {
                     v = v.orElseGet({ null })
                 }
-                def field = fieldManager.fieldMap.get(name)
+                def field = fieldManager.fieldHolders.get(name)?.field
                 //如果key是中文, 则翻译成对应的英文名
                 if (field && field.cnName == name) return [field.enName, v]
                 else return [name, v]

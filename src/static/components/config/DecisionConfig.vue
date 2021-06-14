@@ -175,6 +175,11 @@
                 this.parseApiConfig()
             }
         },
+        mounted() {
+            document.onkeyup = (e) => {
+                if (e.code === 'Escape') this.$emit('close');
+            }
+        },
         methods: {
             parseApiConfig() {
                 this.decision.apiConfigO = JSON.parse(this.decision.apiConfig);
@@ -257,6 +262,11 @@
                     return arr
                 })(),
                 result: ''
+            }
+        },
+        mounted() {
+            document.onkeyup = (e) => {
+                if (e.code === 'Escape') this.$emit('close');
             }
         },
         methods: {
@@ -356,6 +366,7 @@
             },
             save(decision) {
                 decision = decision || this.curDecision;
+                this.$Message.success('更新决策: ' + decision.name + ' ...');
                 $.ajax({
                     url: 'mnt/setDecision',
                     type: 'post',

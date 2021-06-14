@@ -53,9 +53,13 @@ class DataCollector extends UUIDEntity {
      */
     String  cacheKey
     /**
-     * 缓存时间,单位分钟
+     * 缓存时间计算函数
+     * 1. 返回数字: 单位分钟
+     * 2. 返回 {@link java.time.Duration}
+     * 3. 返回 {@link Date}: 过期具体时间
      */
-    Integer cacheTimeout
+    @Column(length = 1000)
+    String cacheTimeoutFn
 
 
     /**

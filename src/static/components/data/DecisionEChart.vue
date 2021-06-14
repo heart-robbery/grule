@@ -7,7 +7,7 @@
             <h-datepicker v-model="model.endTime" type="datetime" :option="{minuteStep:2}" :has-seconds="true" placeholder="结束时间" style="width: 160px"></h-datepicker>
         </div>
         <div class="h-panel-body bottom-line">
-            <div ref="main" style="width: 100%; height: 250px; overflow-y: auto"></div>
+            <div ref="main" style="width: 100%; height: 250px; overflow-y: auto; overflow-x: hidden"></div>
             <h-loading text="Loading" :loading="loading"></h-loading>
         </div>
     </div>

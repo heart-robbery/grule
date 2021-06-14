@@ -137,19 +137,41 @@
                 },
             }
         },
-        mounted() {
-            this.load()
-        },
         activated() {
-            if (
-                app.$data.tmp.testResultId &&
-                !this.model.decideId &&
-                this.list && this.list.filter(o => o.decideId == app.$data.tmp.testResultId).length == 0
-            ) {
+            if (this.initQuery()) {
+                this.load()
+            }
+            // if (
+            //     app.$data.tmp.testResultId &&
+            //     !this.model.decideId &&
+            //     this.list && this.list.filter(o => o.decideId == app.$data.tmp.testResultId).length == 0
+            // ) {
+            //     this.load()
+            // }
+        },
+        watch: {
+            'model.startTime'() {
+                this.load()
+            },
+            'model.endTime'() {
                 this.load()
             }
         },
         methods: {
+            initQuery() {
+                let changed = false
+                if (this.tabs.decideId && this.tabs.decideId !== this.model.decideId) {
+                    this.model.decideId = this.tabs.decideId
+                    changed = true
+                }
+                if (this.tabs.startTime && this.tabs.startTime !== this.model.startTime) {
+                    this.model.startTime = this.tabs.startTime
+                    changed = true
+                }
+                this.tabs.decideId = null;
+                this.tabs.startTime = null;
+                return changed
+            },
             jumpToDataCollector(item) {
                 this.tabs.showId = item.collector;
                 this.tabs.type = 'DataCollectorConfig';

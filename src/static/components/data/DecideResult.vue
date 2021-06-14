@@ -35,8 +35,8 @@
                 <h-formitem single v-for="(item, index) of model.attrFilters" :key="index">
                     <div class="h-input-group">
                         <h-autocomplete v-model="item.fieldId" :option="item.fieldAc" placeholder="字段属性名" ></h-autocomplete>
-                        <h-select v-model="item.op" :datas="ops" placeholder="比较符" :deletable="false"></h-select>
-                        <input type="text" v-model="item.value" placeholder="属性值" @keyup.enter="load"/>
+                        <h-select v-model="item.op" :datas="ops" placeholder="比较符" :deletable="false" @change="(item.op === 'desc' || item.op === 'asc') ? load() : null"></h-select>
+                        <input v-if="item.op !== 'desc' && item.op !== 'asc'" type="text" v-model="item.value" placeholder="属性值" @keyup.enter="load"/>
                         <div style="width: 70px; margin-left: 15px">
                             <span class="h-icon-minus" @click="delAttrFilter(item)"></span>&nbsp;
                             <span v-if="model.attrFilters.length === (index + 1)" class="h-icon-plus" @click="addAttrFilter"></span>
@@ -53,7 +53,11 @@
                         <span v-else>{{data.decisionId}}</span>
                     </template>
                 </h-tableitem>
-                <h-tableitem title="流水id" prop="id" align="center"></h-tableitem>
+                <h-tableitem title="流水id" align="center">
+                    <template slot-scope="{data}">
+                        <a href="javascript:void(0)" @click="jumpToCollectRecord(data)">{{data.id}}</a>
+                    </template>
+                </h-tableitem>
                 <h-tableitem title="结果" prop="result" align="center" :format="formatType" :width="70"></h-tableitem>
                 <h-tableitem title="决策时间" align="center" :width="135">
                     <template slot-scope="{data}">
@@ -88,6 +92,8 @@
         { title: '小于', key: '<'},
         { title: '小于等于', key: '<='},
         { title: '包含', key: 'contains'},
+        { title: '降序', key: 'desc'},
+        { title: '升序', key: 'asc'},
     ];
     const detail = {
         props: ['item'],
@@ -178,6 +184,9 @@
         mounted() {
             if (this.$refs.policyTb) this.$refs.policyTb.foldAll();
             this.$nextTick(() => this.$refs.policyTb.expandAll());
+            document.onkeyup = (e) => {
+                if (e.code === 'Escape') this.$emit('close');
+            }
         },
         computed: {
             title: function () {
@@ -277,6 +286,11 @@
             }
         },
         methods: {
+            jumpToCollectRecord(item) {
+                this.tabs.decideId = item.id;
+                this.tabs.startTime = this.model.startTime;
+                this.tabs.type = 'CollectResult';
+            },
             fieldAc() {
                 return {
                     keyName: 'id',
@@ -308,7 +322,9 @@
                 this.tabs.showId = item.decisionId;
                 this.tabs.type = 'DecisionConfig';
             },
-            showDetail(item) {
+            showDetail(item, event) {
+                // h-table-tr-hovered
+                //console.log('===========', event)
                 this.$Modal({
                     middle: false, draggable: false,
                     type: 'drawer-right',

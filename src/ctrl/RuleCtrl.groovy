@@ -69,10 +69,10 @@ class RuleCtrl extends ServerTpl {
         if (!dr) return ApiResp.fail("未找到记录: " + decideId)
         def dm = bean(DecisionManager)
         def decisionHolder = dm.decisionMap.find {it.value.decision.id == dr.decisionId}.value
-        def attrs = dr.attrs ? JSON.parseObject(dr.attrs) : [:]
+        def attrs = dr.data ? JSON.parseObject(dr.data) : [:]
         ApiResp.ok(
             [
-                decideId: decideId, decision: dr.decision, decisionId: decisionHolder.decision.decisionId,
+                decideId: decideId, decision: dr.decisionId, decisionId: decisionHolder.decision.decisionId,
                 status  : dr.status,
                 desc    : dr.exception,
                 attrs   : decisionHolder.spec.returnAttrs.collectEntries { name ->
@@ -80,7 +80,7 @@ class RuleCtrl extends ServerTpl {
                     if (v instanceof Optional) {
                         v = v.orElseGet({ null })
                     }
-                    def field = fieldManager.fieldMap.get(name)
+                    def field = fieldManager.fieldHolders.get(name)?.field
                     //如果key是中文, 则翻译成对应的英文名
                     if (field && field.cnName == name) return [field.enName, v]
                     else return [name, v]

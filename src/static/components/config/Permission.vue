@@ -1,9 +1,6 @@
 <template>
     <div class="h-panel">
         <div class="h-panel-bar">
-            <!--            <span class="h-panel-title">属性集</span>-->
-            <!--            <span v-color:gray v-font="13">说明~~</span>-->
-            &nbsp;&nbsp;
             <h-button v-if="sUser.permissionIds.find((e) => e == 'grant' || e == 'grant')" @click="showAddPop"><i class="h-icon-plus"></i></h-button>
             <div class="h-panel-right">
                 <h-search placeholder="查询" v-width="200" v-model="kw" show-search-button search-text="搜索" @search="load"></h-search>
@@ -48,7 +45,7 @@
                             :rules="validationRules"
                             :model="model">
                         <h-formitem label="权限标识" icon="h-icon-complete" prop="enName">
-                            <input type="text" v-model="model.enName" :readonly="permission.mark"/>
+                            <input type="text" v-model="model.enName" :readonly="permission && permission.mark"/>
                         </h-formitem>
                         <h-formitem label="权限名称" icon="h-icon-complete" prop="cnName">
                             <input type="text" v-model="model.cnName"/>
@@ -74,6 +71,11 @@
                 validationRules: {
                     required: ['enName', 'cnName']
                 },
+            }
+        },
+        mounted() {
+            document.onkeyup = (e) => {
+                if (e.code === 'Escape') this.$emit('close');
             }
         },
         methods: {
@@ -128,7 +130,7 @@
         methods: {
             showAddPop() {
                 this.$Modal({
-                    title: '添加权限', middle: true, draggable: true,
+                    title: '添加权限', draggable: true,
                     component: {
                         vue: addEditPop,
                         datas: {}
@@ -144,7 +146,7 @@
             },
             showUpdatePop(permission) {
                 this.$Modal({
-                    title: `更新: ${permission.cnName}`, middle: true, draggable: true,
+                    title: `更新: ${permission.cnName}`, draggable: true,
                     component: {
                         vue: addEditPop,
                         datas: {permission: permission}

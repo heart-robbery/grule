@@ -43,7 +43,7 @@ class DecisionManager extends ServerTpl {
     DecisionHolder findDecision(String decisionId) {
         def holder = decisionMap.get(decisionId)
         if (holder == null) {
-            addDecision(repo.find(Decision) { root, query, cb -> cb.equal(root.get('decisionId'), decisionId)})
+            initDecision(repo.find(Decision) { root, query, cb -> cb.equal(root.get('decisionId'), decisionId)})
             holder = decisionMap.get(decisionId)
         }
         return holder
@@ -59,7 +59,7 @@ class DecisionManager extends ServerTpl {
             log.info("delDecision: " + id)
         } else {
             log.info("decisionChanged: " + decision.name + ", " + decision.decisionId + ", " + decision.id)
-            addDecision(decision)
+            initDecision(decision)
         }
         def remoter = bean(Remoter)
         if (remoter && ec?.source() != remoter) { // 不是远程触发的事件
@@ -93,7 +93,7 @@ class DecisionManager extends ServerTpl {
                 ls.each { decision ->
                     ids?.add(decision.decisionId)
                     try {
-                        addDecision(decision)
+                        initDecision(decision)
                     } catch (ex) {
                         log.error("加载决策'${decision.name}:${decision.decisionId}'错误", ex)
                     }
@@ -105,10 +105,10 @@ class DecisionManager extends ServerTpl {
 
 
     /**
-     * 添加决策
+     * 初始化决策
      * @param decision
      */
-    protected void addDecision(Decision decision) {
+    protected void initDecision(Decision decision) {
         if (!decision || !decision.dsl) return
         def spec = DecisionSpec.of(decision.dsl)
         def apiConfig = decision.apiConfig ? JSON.parseArray(decision.apiConfig) : null
@@ -219,7 +219,7 @@ class DecisionManager extends ServerTpl {
                         if (!format) throw new IllegalArgumentException("Param '$code' type is Time, format must config")
                         try {
                             // if (value.toString().length() != format.length()) throw new Exception()
-                            value = new SimpleDateFormat(format).parse(value.toString())
+                            new SimpleDateFormat(format).parse(value.toString())
                         } catch (ex) {
                             throw new IllegalArgumentException("Param '$code' format error. format: $format, value: $value")
                         }
@@ -258,7 +258,8 @@ class DecisionManager extends ServerTpl {
                         }
                     }
                 }
-                params.put(code, value) // 类型矫正
+
+                if (value != null || params.containsKey(code)) params.put(code, value) // 类型矫正
                 true
             }
         } : null)))

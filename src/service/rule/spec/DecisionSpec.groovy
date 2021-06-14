@@ -88,6 +88,7 @@ class DecisionSpec extends BaseSpec {
                 DecideResult result = node.v2.call(ctx)
                 if (result && result.block) return result
             } else if ("Operate" == node.v1) {
+                DecisionContext.log.trace(ctx.logPrefix() + "[操作]开始执行")
                 node.v2.call(ctx)
             } else throw new IllegalArgumentException("Unknown type: " + node.v1)
         }

@@ -80,7 +80,7 @@ class MntDecisionCtrl extends ServerTpl {
                 )
             }
             if (collector) {
-                ps << cb.equal(root.get("dataCollector"), collector)
+                ps << cb.function("JSON_SEARCH", String, root.get('collectorOptions'), cb.literal('one'), cb.literal(collector)).isNotNull()
             }
             if (decision) {
                 ps << cb.equal(root.get("decision"), decision)
@@ -89,7 +89,14 @@ class MntDecisionCtrl extends ServerTpl {
         }.to{ Utils.toMapper(it).ignore("metaClass")
             .addConverter("decision", "decisionName") {dId -> dId ? decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name : null}
             .addConverter("decision", "decisionId") {dId -> dId ? decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.decisionId : null}
-            .addConverter("dataCollector", "dataCollectorName") {collectorId -> collectorId ? fieldManager.collectors.get(collectorId)?.collector?.name : null}
+            .addConverter("collectorOptions") {String opts ->
+                JSON.parseArray(opts).collect {JSONObject jo ->
+                    jo.fluentPut(
+                            "collectorName",
+                            fieldManager.collectorHolders.find {it.key == jo['collectorId']}?.value?.collector?.name
+                    )
+                }
+            }
             .build()
         })
     }
@@ -155,7 +162,6 @@ class MntDecisionCtrl extends ServerTpl {
         Date end = endTime ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(endTime) : null
         ApiResp.ok(
                 repo.findPage(DecideRecord, page, pageSize?:10) { root, query, cb ->
-                    query.orderBy(cb.desc(root.get('occurTime')))
                     def ps = []
                     if (start) ps << cb.greaterThanOrEqualTo(root.get('occurTime'), start)
                     if (end) ps << cb.lessThanOrEqualTo(root.get('occurTime'), end)
@@ -165,34 +171,45 @@ class MntDecisionCtrl extends ServerTpl {
                     if (spend) ps << cb.ge(root.get('spend'), spend)
                     if (result) ps << cb.equal(root.get('result'), result)
                     if (exception) ps << cb.like(root.get('exception'), '%' + exception + '%')
+                    def orders = []
                     if (attrConditions) { // json查询 暂时只支持mysql5.7+,MariaDB 10.2.3+
                         JSON.parseArray(attrConditions).each {JSONObject jo ->
                             def fieldId = jo.getLong('fieldId')
                             if (!fieldId) return
-                            def field = fieldManager.fieldMap.find {it.value.id == fieldId}?.value
+                            def field = fieldManager.fieldHolders.find {it.value.field.id == fieldId}?.value?.field
                             if (field == null) return
+
+                            def exp = cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName))
                             def op = jo['op']
-                            String value = jo['value']
+                            if (op == "desc") { //降序
+                                orders << cb.desc(exp.as(field.type.clzType))
+                                return
+                            } else if (op == 'asc') { //升序
+                                orders << cb.asc(exp.as(field.type.clzType))
+                                return
+                            }
+                            def value = jo['value']
                             if (value == null || value.empty) return
-                            if (field.type == FieldType.Int) value = jo.getInteger('value')
-                            else if (field.type == FieldType.Decimal) value = jo.getBigDecimal('value')
-                            else if (field.type == FieldType.Bool) value = jo.getBoolean('value')
 
                             if (op == '=') {
-                                ps << cb.equal(cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName)), value)
+                                ps << cb.equal(exp, value)
                             } else if (op == '>') {
-                                ps << cb.gt(cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName)), cb.literal(value))
+                                ps << cb.gt(exp.as(field.type.clzType), Utils.to(value, field.type.clzType))
                             } else if (op == '<') {
-                                ps << cb.lt(cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName)), cb.literal(value))
+                                ps << cb.lt(exp.as(field.type.clzType), Utils.to(value, field.type.clzType))
                             } else if (op == '>=') {
-                                ps << cb.ge(cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName)), cb.literal(value))
+                                ps << cb.ge(exp.as(field.type.clzType), Utils.to(value, field.type.clzType))
                             } else if (op == '<=') {
-                                ps << cb.le(cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName)), cb.literal(value))
+                                ps << cb.le(exp.as(field.type.clzType), Utils.to(value, field.type.clzType))
                             } else if (op == 'contains') {
-                                // ps << cb.equal(cb.function("JSON_CONTAINS", String, root.get('data'), cb.function('json_quote', String, cb.literal(value)), cb.literal('$.' + field.enName)), 1)
-                                ps << cb.like(cb.function("JSON_EXTRACT", String, root.get('data'), cb.literal('$.' + field.enName)), '%' + value + '%')
+                                ps << cb.like(exp, '%' + value + '%')
                             } else throw new IllegalArgumentException("Param attrCondition op('$op') unknown")
                         }
+                    }
+                    if (orders) { // 按照data中的属性进行排序
+                        query.orderBy(orders)
+                    } else { // 默认时间降序
+                        query.orderBy(cb.desc(root.get('occurTime')))
                     }
                     if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
                 }.to{
@@ -201,7 +218,7 @@ class MntDecisionCtrl extends ServerTpl {
                                 decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name
                             }).addConverter('data', {String jsonStr ->
                                 it == null ? null : JSON.parseObject(jsonStr, Feature.OrderedField).collect { e ->
-                                    [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
+                                    [enName: e.key, cnName: fieldManager.fieldHolders.get(e.key)?.field?.cnName, value: e.value]
                                 }}).addConverter('input', {jsonStr ->
                                     it == null ? null : JSON.parseObject(jsonStr)
                                 }).addConverter('dataCollectResult', {String jsonStr ->
@@ -212,7 +229,7 @@ class MntDecisionCtrl extends ServerTpl {
                                         if (arr.length == 1) collectorId = e.key
                                         else collectorId = arr[0]
                                         [
-                                                (fieldManager.collectors.findResult {
+                                                (fieldManager.collectorHolders.findResult {
                                                     it.value.collector.id == collectorId ? it.value.collector.name + (arr.length > 1 ? '_' + arr.drop(1).join('_') : '') : null
                                                 }?:e.key): e.value
                                         ]
@@ -222,15 +239,15 @@ class MntDecisionCtrl extends ServerTpl {
                                     def detailJo = JSON.parseObject(detailJsonStr, Feature.OrderedField)
                                     // 数据转换
                                     detailJo.put('data', detailJo.getJSONObject('data')?.collect { Entry<String, Object> e ->
-                                        [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
+                                        [enName: e.key, cnName: fieldManager.fieldHolders.get(e.key)?.field?.cnName, value: e.value]
                                     }?:null)
                                     detailJo.getJSONArray('policies')?.each {JSONObject pJo ->
                                         pJo.put('data', pJo.getJSONObject('data')?.collect { Entry<String, Object> e ->
-                                            [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
+                                            [enName: e.key, cnName: fieldManager.fieldHolders.get(e.key)?.field?.cnName, value: e.value]
                                         }?:null)
                                         pJo.getJSONArray('items')?.each {JSONObject rJo ->
                                             rJo.put('data', rJo.getJSONObject('data')?.collect { Entry<String, Object> e ->
-                                                [enName: e.key, cnName: fieldManager.fieldMap.get(e.key)?.cnName, value: e.value]
+                                                [enName: e.key, cnName: fieldManager.fieldHolders.get(e.key)?.field?.cnName, value: e.value]
                                             }?:null)
                                         }
                                     }
@@ -293,7 +310,7 @@ class MntDecisionCtrl extends ServerTpl {
                 .addConverter('decisionId', 'decisionName', {String dId ->
                     decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name
                 }).addConverter('collector', 'collectorName', {String cId ->
-                    fieldManager.collectors.get(cId)?.collector?.name
+                    fieldManager.collectorHolders.get(cId)?.collector?.name
                 }).build()
             }
         )
@@ -376,22 +393,23 @@ class MntDecisionCtrl extends ServerTpl {
 
 
     @Path(path = 'addField', method = 'post')
-    ApiResp addField(HttpContext hCtx, String enName, String cnName, FieldType type, String comment, String dataCollector, String decision) {
+    ApiResp addField(HttpContext hCtx, String enName, String cnName, FieldType type, String comment, String collectorOptions) {
         hCtx.auth('field-add')
         if (!enName) return ApiResp.fail("Param enName not empty")
         if (!cnName) return ApiResp.fail("Param cnName not empty")
         if (!type) return ApiResp.fail("Param type not empty")
-        String decisionName
-        if (decision) {
-            def d = repo.findById(Decision, decision)
-            if (!d) {
-                return ApiResp.fail("Param decision not exist")
+        // 验证 collectorOptions
+        if (collectorOptions) {
+            JSON.parseArray(collectorOptions).each {JSONObject jo ->
+                if (!jo['collectorId']) throw new IllegalArgumentException("Param collectorOptions.collectorId not empty")
+                if (!repo.count(DataCollector) {root, query, cb -> cb.equal(root.get("id"), jo['collectorId'])}) {
+                    throw new IllegalArgumentException("Param collectorOptions.collectorId not exist")
+                }
             }
-            decisionName = d.name
         }
         def field = new RuleField(
-            enName: enName, cnName: cnName, type: type, comment: comment, decision: decision == null ? '' : decision,
-            dataCollector: dataCollector, creator: hCtx.getSessionAttr('uName')
+            enName: enName, cnName: cnName, type: type, comment: comment,
+            collectorOptions: collectorOptions, creator: hCtx.getSessionAttr('uName')
         )
         try {
             repo.saveOrUpdate(field)
@@ -399,11 +417,11 @@ class MntDecisionCtrl extends ServerTpl {
             def cause = ex
             while (cause != null) {
                 if (cause.message.contains("Duplicate entry")) {
-                    if (cause.message.contains(RuleField.idx_cnName_decision)) {
-                        return ApiResp.fail("$cnName${decision ? ', ' + decisionName + ' ' : ''} aleady exist")
+                    if (cause.message.contains("cnName")) {
+                        return ApiResp.fail("$cnName aleady exist")
                     }
-                    if (cause.message.contains(RuleField.idx_enName_decision)) {
-                        return ApiResp.fail("$enName${decision ? ', ' + decisionName + ' ' : ''} aleady exist")
+                    if (cause.message.contains("enName")) {
+                        return ApiResp.fail("$enName aleady exist")
                     }
                 }
                 cause = cause.cause
@@ -420,7 +438,7 @@ class MntDecisionCtrl extends ServerTpl {
     ApiResp addDataCollector(
         HttpContext hCtx, String name, String type, String url, String bodyStr,
         String method, String parseScript, String contentType, String comment, String computeScript, String dataSuccessScript,
-        String sqlScript, Integer minIdle, Integer maxActive, Integer timeout, Boolean enabled, String cacheKey, Integer cacheTimeout
+        String sqlScript, Integer minIdle, Integer maxActive, Integer timeout, Boolean enabled, String cacheKey, String cacheTimeoutFn
     ) {
         hCtx.auth('dataCollector-add')
         DataCollector collector = new DataCollector(name: name, type: type, comment: comment, enabled: (enabled == null ? true : enabled))
@@ -460,7 +478,7 @@ class MntDecisionCtrl extends ServerTpl {
         } else return ApiResp.fail('Not support type: ' + collector.type)
         collector.creator = hCtx.getSessionAttr("uName")
         collector.cacheKey = cacheKey
-        collector.cacheTimeout = cacheTimeout
+        collector.cacheTimeoutFn = cacheTimeoutFn
         try {
             repo.saveOrUpdate(collector)
         } catch (ex) {
@@ -480,7 +498,7 @@ class MntDecisionCtrl extends ServerTpl {
 
 
     @Path(path = 'updateField', method = 'post')
-    ApiResp updateField(HttpContext hCtx, Long id, String enName, String cnName, FieldType type, String comment, String dataCollector, String decision) {
+    ApiResp updateField(HttpContext hCtx, Long id, String enName, String cnName, FieldType type, String comment, String collectorOptions) {
         hCtx.auth('field-update')
         if (!id) return ApiResp.fail("Param id not legal")
         if (!enName) return ApiResp.fail("Param enName not empty")
@@ -488,21 +506,21 @@ class MntDecisionCtrl extends ServerTpl {
         if (!type) return ApiResp.fail("Param type not empty")
         def field = repo.findById(RuleField, id)
         if (field == null) return ApiResp.fail("Param id: $id not found")
-        // if (enName != field.enName) return ApiResp.fail('enName can not change')
-        String decisionName
-        if (decision) {
-            def d = repo.findById(Decision, decision)
-            if (!d) {
-                return ApiResp.fail("Param decision not exist")
+
+        // 验证 collectorOptions
+        if (collectorOptions) {
+            JSON.parseArray(collectorOptions).each {JSONObject jo ->
+                if (!jo['collectorId']) throw new IllegalArgumentException("Param collectorOptions.collectorId not empty")
+                if (!repo.count(DataCollector) {root, query, cb -> cb.equal(root.get("id"), jo['collectorId'])}) {
+                    throw new IllegalArgumentException("Param collectorOptions.collectorId not exist")
+                }
             }
-            decisionName = d.name
         }
         field.enName = enName
         field.cnName = cnName
         field.type = type
         field.comment = comment
-        field.dataCollector = dataCollector
-        field.decision = decision == null ? '' : decision
+        field.collectorOptions = collectorOptions
         field.updater = hCtx.getSessionAttr("uName")
         try {
             repo.saveOrUpdate(field)
@@ -510,11 +528,11 @@ class MntDecisionCtrl extends ServerTpl {
             def cause = ex
             while (cause != null) {
                 if (cause.message.contains("Duplicate entry")) {
-                    if (cause.message.contains(RuleField.idx_cnName_decision)) {
-                        return ApiResp.fail("$cnName${decision ? ', ' + decisionName + ' ' : ''} aleady exist")
+                    if (cause.message.contains("cnName")) {
+                        return ApiResp.fail("$cnName aleady exist")
                     }
-                    if (cause.message.contains(RuleField.idx_enName_decision)) {
-                        return ApiResp.fail("$enName${decision ? ', ' + decisionName + ' ' : ''} aleady exist")
+                    if (cause.message.contains("enName")) {
+                        return ApiResp.fail("$enName aleady exist")
                     }
                 }
                 cause = cause.cause
@@ -531,7 +549,7 @@ class MntDecisionCtrl extends ServerTpl {
     ApiResp updateDataCollector(
         HttpContext hCtx, String id, String name, String url, String bodyStr,
         String method, String parseScript, String contentType, String comment, String computeScript, String dataSuccessScript,
-        String sqlScript, Integer minIdle, Integer maxActive, Integer timeout, Boolean enabled, String cacheKey, Integer cacheTimeout
+        String sqlScript, Integer minIdle, Integer maxActive, Integer timeout, Boolean enabled, String cacheKey, String cacheTimeoutFn
     ) {
         hCtx.auth('dataCollector-update')
         if (!id) return ApiResp.fail("Param id not legal")
@@ -579,7 +597,7 @@ class MntDecisionCtrl extends ServerTpl {
         collector.comment = comment
         collector.enabled = enabled == null ? true : enabled
         collector.cacheKey = cacheKey
-        collector.cacheTimeout = cacheTimeout
+        collector.cacheTimeoutFn = cacheTimeoutFn
         collector.updater = hCtx.getSessionAttr("uName")
 
         try {

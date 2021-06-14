@@ -123,8 +123,10 @@ class PolicySpec extends BaseSpec {
                 result = node.v2.call(ctx)
                 if (result && result.block) break
             } else if ("Condition" == node.v1) {
+                DecisionContext.log.trace(ctx.logPrefix() + "[条件]开始执行")
                 if (!node.v2.call(ctx)) break
             } else if ("Operate" == node.v1) {
+                DecisionContext.log.trace(ctx.logPrefix() + "[操作]开始执行")
                 node.v2.call(ctx)
             } else if ("Scorecard" == node.v1) {
                 node.v2.call(ctx)

@@ -2,18 +2,17 @@ package entity
 
 import cn.xnatural.jpa.LongIdEntity
 import org.hibernate.annotations.DynamicUpdate
+import org.hibernate.annotations.Type
 
 import javax.persistence.*
 
 @Table(indexes = [
-    @Index(name = idx_enName_decision, columnList = "enName,decision", unique = true),
-    @Index(name = idx_cnName_decision, columnList = "cnName,decision", unique = true)
+    @Index(name = "idx_enName", columnList = "enName", unique = true),
+    @Index(name = "idx_cnName", columnList = "cnName", unique = true),
 ])
 @Entity
 @DynamicUpdate
 class RuleField extends LongIdEntity {
-    static final String idx_enName_decision = "idx_enName_decision"
-    static final String idx_cnName_decision = "idx_cnName_decision"
     /**
      * 英文名 唯一
      */
@@ -32,15 +31,13 @@ class RuleField extends LongIdEntity {
     @Enumerated(EnumType.STRING)
     FieldType type
     /**
-     * 值函数名 对应 {@link DataCollector#id}
+     * 收集器选项
+     * [{collectorId: '收集器id', chooseFn: '选择函数,返回true则使用此收集器'}]
      */
-    String    dataCollector
-    /**
-     * 关联到哪个decision#id
-     * 如果为空 则是公用字段
-     */
-    @Column(nullable = false)
-    String    decision
+    @Lob
+    @Basic
+    @Type(type = "text")
+    String    collectorOptions
     /**
      * 创建者
      */

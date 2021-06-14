@@ -7,15 +7,20 @@ import org.hibernate.annotations.Type
 import javax.persistence.Basic
 import javax.persistence.Column
 import javax.persistence.Entity
+import javax.persistence.Index
 import javax.persistence.Lob
+import javax.persistence.Table
 
 @Entity
 @DynamicUpdate
+@Table(indexes = [
+        @Index(name = "idx_name", columnList = "name", unique = true),
+])
 class User extends LongIdEntity  {
     /**
      * 用户登录名
      */
-    @Column(unique = true)
+    @Column(nullable = false)
     String name
     /**
      * 用户组

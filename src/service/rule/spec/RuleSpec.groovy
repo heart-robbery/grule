@@ -85,17 +85,22 @@ class RuleSpec extends BaseSpec {
         DecideResult result
         for (def node : nodes) {
             if ("Reject" == node.v1) {
+                DecisionContext.log.trace(ctx.logPrefix() + "[拒绝]开始执行")
                 result = node.v2.call(ctx)
                 if (result && result.block) break
             } else if ("Accept" == node.v1) {
+                DecisionContext.log.trace(ctx.logPrefix() + "[接受]开始执行")
                 result = node.v2.call(ctx)
                 if (result && result.block) break
             } else if ("Review" == node.v1) {
+                DecisionContext.log.trace(ctx.logPrefix() + "[人工]开始执行")
                 result = node.v2.call(ctx)
                 if (result && result.block) break
             } else if ("Clear" == node.v1) {
+                DecisionContext.log.trace(ctx.logPrefix() + "[清除]开始执行")
                 node.v2.call(ctx)
             } else if ("Operate" == node.v1) {
+                DecisionContext.log.trace(ctx.logPrefix() + "[操作]开始执行")
                 node.v2.call(ctx)
             } else throw new IllegalArgumentException("Unknown type: " + node.v1)
         }

@@ -90,7 +90,7 @@ class HttpSrv extends ServerTpl {
                     redis.exec {jedis -> jedis.hgetAll(cKey).entrySet()}
                 }
             }
-        } else { // 默认用ehcache 做session 数据管理
+        } else { // 默认用内存缓存做session 数据管理
             String cKey
             if (!sId || ((cKey = 'session_' + sId) && (sData = cacheSrv.get(cKey)) == null)) {
                 sId = UUID.randomUUID().toString().replace('-', '')
