@@ -1,11 +1,12 @@
 import cn.xnatural.app.AppContext
+import cn.xnatural.app.CacheSrv
 import cn.xnatural.app.ServerTpl
 import cn.xnatural.enet.event.EL
 import cn.xnatural.enet.event.EP
 import cn.xnatural.jpa.Repo
 import cn.xnatural.remoter.Remoter
 import cn.xnatural.sched.Sched
-import core.CacheSrv
+
 import core.HttpSrv
 import core.OkHttpSrv
 import core.RedisClient
@@ -19,7 +20,6 @@ import service.TestService
 import service.rule.*
 
 import java.time.Duration
-import java.util.function.Supplier
 
 System.setProperty("configdir", "../conf")
 @Field final Logger log = LoggerFactory.getLogger(getClass())
@@ -38,14 +38,10 @@ app.addSource(new ServerTpl("sched") { // 定时任务
         exposeBean(sched)
         ep.fire("${name}.started")
     }
+
     @EL(name = "sched.after")
     void after(Duration duration, Runnable fn) {sched.after(duration, fn)}
-    @EL(name = "sched.time")
-    void time(Date time, Runnable fn) {sched.time(time, fn)}
-    @EL(name = "sched.cron")
-    void cron(String cron, Runnable fn) {sched.cron(cron, fn)}
-    @EL(name = "sched.dyn")
-    void dyn(Supplier<Date> dateSupplier, Runnable fn) {sched.dyn(dateSupplier, fn)}
+
     @EL(name = "sys.stopping", async = true)
     void stop() { sched?.stop() }
 })

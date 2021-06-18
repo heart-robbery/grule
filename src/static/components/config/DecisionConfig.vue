@@ -366,7 +366,7 @@
             },
             save(decision) {
                 decision = decision || this.curDecision;
-                this.$Message.success('更新决策: ' + decision.name + ' ...');
+                this.$Message.info((decision.id ? '更新' : '新增') + '决策: ' + decision.name + ' ...');
                 $.ajax({
                     url: 'mnt/setDecision',
                     type: 'post',

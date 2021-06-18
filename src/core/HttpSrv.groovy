@@ -1,5 +1,6 @@
 package core
 
+import cn.xnatural.app.CacheSrv
 import cn.xnatural.app.ServerTpl
 import cn.xnatural.enet.event.EL
 import cn.xnatural.http.HttpContext
