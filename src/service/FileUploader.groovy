@@ -30,7 +30,7 @@ class FileUploader extends ServerTpl {
 
     @EL(name = 'web.started', async = false)
     protected init() {
-        log.info('save upload file local dir: {}', new File(localDir).canonicalPath)
+        log.info('save upload file local dir: {}', localDir)
         log.info('access upload file url prefix: {}', accessUrlPrefix)
         if (remoteUrl) {log.info('remote file server http url: {}', remoteUrl)}
     }
@@ -48,7 +48,7 @@ class FileUploader extends ServerTpl {
 
     /**
      * 查找文件
-     * @param fileName
+     * @param fileName 文件名
      * @return 文件
      */
     File findFile(String fileName) { new File(localDir, fileName) }
@@ -100,17 +100,7 @@ class FileUploader extends ServerTpl {
         }
 
         // 并发上传
-        if (fds.size() >= 2) {
-            ExecutorService execs
-            try {
-                execs = Executors.newFixedThreadPool(fds.size() - 1)
-                def fs = fds.drop(1).collect {fd -> execs.submit{doSave(fd)}}.collect()
-                doSave(fds[0])
-                fs.each {f -> f.get()}
-            } finally {
-                execs?.shutdown()
-            }
-        } else if (fds.size() == 1){ doSave(fds[0]) }
+        fds.findResults {fd -> exec().submit {doSave(fd)}}.each {it.get()}
         fds
     }
 }
