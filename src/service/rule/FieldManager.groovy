@@ -1,5 +1,6 @@
 package service.rule
 
+import cn.xnatural.app.CacheSrv
 import cn.xnatural.app.ServerTpl
 import cn.xnatural.app.Utils
 import cn.xnatural.enet.event.EC
@@ -9,7 +10,7 @@ import cn.xnatural.remoter.Remoter
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
 import com.alibaba.fastjson.serializer.SerializerFeature
-import core.CacheSrv
+
 import core.OkHttpSrv
 import core.RedisClient
 import entity.CollectRecord
