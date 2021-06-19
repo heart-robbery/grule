@@ -59,7 +59,10 @@ class MntDecisionCtrl extends ServerTpl {
                     if (kw) ps << cb.like(root.get('dsl'), '%' + kw + '%')
                     cb.and(ps.toArray(new Predicate[ps.size()]))
                 }.to{decision ->
-                    Utils.toMapper(decision).add("_deletable", delIds?.contains(decision.id)).add("_readonly", !updateIds?.contains(decision.id)).build()
+                    Utils.toMapper(decision)
+                            .add("_deletable", delIds?.contains(decision.id))
+                            .add("_readonly", !updateIds?.contains(decision.id))
+                            .build()
                 }
         )
     }
@@ -387,7 +390,20 @@ class MntDecisionCtrl extends ServerTpl {
         }
         decision.apiConfig = apiConfig
 
-        repo.saveOrUpdate(decision)
+        try {
+            repo.saveOrUpdate(decision)
+        } catch (ex) {
+            def cause = ex
+            while (cause != null) {
+                if (cause.message.contains("Duplicate entry")) {
+                    if (cause.message.contains("decisionId")) {
+                        return ApiResp.fail("决策id($spec.决策id)已存在")
+                    }
+                }
+                cause = cause.cause
+            }
+            throw ex
+        }
         ep.fire("decisionChange", decision.id)
         ep.fire('enHistory', decision, hCtx.getSessionAttr('uName'))
         ApiResp.ok(decision)
