@@ -1,6 +1,7 @@
 package entity
 
 import cn.xnatural.jpa.IEntity
+import org.hibernate.annotations.DynamicUpdate
 import org.hibernate.annotations.Type
 
 import javax.persistence.*
@@ -13,6 +14,7 @@ import javax.persistence.*
         @Index(name = "idx_collectDate", columnList = "collectDate"),
         @Index(name = "idx_decideId", columnList = "decideId")
 ])
+@DynamicUpdate
 class CollectRecord implements IEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

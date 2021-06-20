@@ -10,7 +10,6 @@ import cn.xnatural.remoter.Remoter
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
 import com.alibaba.fastjson.serializer.SerializerFeature
-
 import core.OkHttpSrv
 import core.RedisClient
 import entity.CollectRecord
@@ -40,15 +39,15 @@ class FieldManager extends ServerTpl {
     /**
      * RuleField(enName, cnName), RuleField
      */
-    final Map<String, FieldHolder> fieldHolders = new ConcurrentHashMap<>(1000)
+    final Map<String, FieldHolder> fieldHolders = new ConcurrentHashMap<>(500)
     /**
      * 数据获取函数. 收集器id -> 收集器
      */
     final Map<String, CollectorHolder> collectorHolders = new ConcurrentHashMap(100)
     /**
-     * 决策id -> 因延迟计算的收集器记录
+     * 决策id -> 保存延迟计算的收集器记录函数
      */
-    protected final Map<String, List<CollectRecord>> lazyCollectRecords = new ConcurrentHashMap<>()
+    protected final Map<String, List<Closure>> lazyCollectRecords = new ConcurrentHashMap<>()
 
 
     @EL(name = 'jpa_rule.started', async = true)
@@ -133,7 +132,7 @@ class FieldManager extends ServerTpl {
 
     @EL(name = 'decision.end', async = true)
     void endDecision(DecisionContext ctx) {
-        lazyCollectRecords.remove(ctx.id)?.each {repo.saveOrUpdate(it)}
+        lazyCollectRecords.remove(ctx.id)?.each { it.call() }
     }
 
 
@@ -145,36 +144,42 @@ class FieldManager extends ServerTpl {
         queue(DATA_COLLECTED) {
             // 是否有延迟计算值
             boolean hasLazyValue
-            String resolveResultStr
-            if (resolveResult instanceof Map) {
-                resolveResultStr = JSON.toJSONString(
-                        resolveResult.findAll {e ->
-                            if (e.value instanceof Closure) {
-                                hasLazyValue = true
-                                return false
-                            }
-                            else true
-                        },
-                        SerializerFeature.WriteMapNullValue
-                )
-            } else {
-                resolveResultStr = resolveResult.toString()
+            def resolveResultStrFn = {
+                if (resolveResult instanceof Map) {
+                    return JSON.toJSONString(
+                            resolveResult.findAll {e ->
+                                if (e.value instanceof Closure) {
+                                    hasLazyValue = true
+                                    return false
+                                }
+                                else true
+                            },
+                            SerializerFeature.WriteMapNullValue
+                    )
+                } else {
+                    return resolveResult?.toString()
+                }
             }
+
             String status = '0000'
             if (ex instanceof ConnectException) status = 'E001'
             else if (ex != null) status = 'EEEE'
             else if (resolveException != null) status = 'E002'
-            def record = repo.saveOrUpdate(
-                    new CollectRecord(
-                            decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.id,
-                            status: status, dataStatus: dataStatus,
-                            collectDate: collectDate, cache: cache, spend: spend, url: url, body: body,
-                            result: result, exception: ex.message?:ex.class.simpleName,
-                            resolveResult: resolveResultStr, resolveException: resolveException.message?:resolveException.class.simpleName
-                    )
+            def record = new CollectRecord(
+                    decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.id,
+                    status: status, dataStatus: dataStatus,
+                    collectDate: collectDate, cache: cache, spend: spend, url: url, body: body,
+                    result: result, exception: ex == null ? null : ex.message?:ex.class.simpleName,
+                    resolveResult: resolveResultStrFn(),
+                    resolveException: resolveException == null ? null : resolveException.message?:resolveException.class.simpleName
             )
             if (hasLazyValue) { // 如果有延迟计算值, 则在决策结束后更新收集器结果
-                lazyCollectRecords.computeIfAbsent(ctx.id, new LinkedList<>()).add(record)
+                lazyCollectRecords.computeIfAbsent(ctx.id, { new LinkedList<>() }).add({
+                    record.resolveResult = resolveResultStrFn()
+                    repo.saveOrUpdate(record)
+                })
+            } else {
+                repo.saveOrUpdate(record)
             }
         }
     }

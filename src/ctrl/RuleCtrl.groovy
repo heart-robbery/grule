@@ -76,11 +76,9 @@ class RuleCtrl extends ServerTpl {
                 status  : dr.status,
                 desc    : dr.exception,
                 attrs   : decisionHolder.spec.returnAttrs.collectEntries { name ->
-                    def v = attrs.get(name)
-                    if (v instanceof Optional) {
-                        v = v.orElseGet({ null })
-                    }
                     def field = fieldManager.fieldHolders.get(name)?.field
+                    def v = attrs.containsKey(name) ? attrs.get(name) : attrs.get(fieldManager.alias(name))
+                    if (v instanceof Optional) {v = v.orElse( null)}
                     //如果key是中文, 则翻译成对应的英文名
                     if (field && field.cnName == name) return [field.enName, v]
                     else return [name, v]

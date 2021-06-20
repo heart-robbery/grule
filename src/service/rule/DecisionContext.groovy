@@ -372,7 +372,13 @@ class DecisionContext {
                          ]
                      }
                 ],
-                dataCollectResult: dataCollectResult?.findAll {!(it.value instanceof Closure)}?:null // 执行过程中数据收集的结果集
+                // 执行过程中数据收集的结果集
+                dataCollectResult: dataCollectResult?.collectEntries {e ->
+                    if (e.value instanceof Map) {
+                        return [e.key, ((Map) e.value).findAll {!(it.value instanceof Closure)}]
+                    }
+                    return e
+                }?:null
         ]
         this._summary
     }
@@ -389,9 +395,7 @@ class DecisionContext {
                 desc    : exception?.toString(),
                 data    : end.get() && decisionHolder.spec.returnAttrs ? decisionHolder.spec.returnAttrs.collectEntries { name ->
                 def v = data.get(name)
-                if (v instanceof Optional) {
-                    v = v.orElseGet({ null })
-                }
+                if (v instanceof Optional) {v = v.orElse(null)}
                 def field = fieldManager.fieldHolders.get(name)?.field
                 //如果key是中文, 则翻译成对应的英文名
                 if (field && field.cnName == name) return [field.enName, v]

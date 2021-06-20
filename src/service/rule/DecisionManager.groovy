@@ -29,12 +29,6 @@ class DecisionManager extends ServerTpl {
     final Map<String, DecisionHolder> decisionMap = new ConcurrentHashMap<>()
 
 
-    @EL(name = 'jpa_rule.started', async = true)
-    void start() {
-        load()
-    }
-
-
     /**
      * 查找 决策
      * @param decisionId
@@ -68,6 +62,7 @@ class DecisionManager extends ServerTpl {
     }
 
 
+    @EL(name = 'jpa_rule.started', async = true)
     protected void load() {
         log.debug("加载决策")
         Set<String> ids = (decisionMap ? new HashSet<>() : null)
@@ -82,8 +77,8 @@ class DecisionManager extends ServerTpl {
                 }
             }
         }
-        for (int page = 0, limit = 20; ; page++) {
-            def ls = repo.findList(Decision, page * limit, limit, null)
+        for (int page = 0, limit = 10; ; page++) {
+            def ls = repo.findList(Decision, page * limit, limit)
             if (!ls) { // 结束
                 tryCompleteFn()
                 break
@@ -106,7 +101,6 @@ class DecisionManager extends ServerTpl {
 
     /**
      * 初始化决策
-     * @param decision
      */
     protected void initDecision(Decision decision) {
         if (!decision || !decision.dsl) return
