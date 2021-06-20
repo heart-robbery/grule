@@ -209,12 +209,17 @@
                 this.$refs.policyTb.foldAll();
                 if (this.ruleKw && this.item.detail.policies) {
                     this.policies = this.item.detail.policies.filter((item, index, arr) => {
-                        item.children = item.rules.filter(o => o.attrs.规则名.indexOf(this.ruleKw) >= 0)
+                        item.children = item.items.filter(o => {
+                            if (o.attrs['规则名'] && o.attrs['规则名'].indexOf(this.ruleKw) >= 0) return true
+                            if (o.attrs['评分卡名'] && o.attrs['评分卡名'].indexOf(this.ruleKw) >= 0) return true
+                            if (o.attrs['决策名'] && o.attrs['决策名'].indexOf(this.ruleKw) >= 0) return true
+                            return false
+                        })
                         if (item.attrs.策略名 && item.attrs.策略名.indexOf(this.ruleKw) === -1 && item.children.length === 0) return false;
                         return true;
                     });
                 } else {
-                    this.item.detail.policies.map(p => p.children = p.rules)
+                    this.item.detail.policies.map(p => p.children = p.items)
                     this.policies = this.item.detail.policies;
                 }
                 this.$nextTick(() => {

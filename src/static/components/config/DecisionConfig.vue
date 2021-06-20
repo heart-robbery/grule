@@ -22,7 +22,7 @@
                             <span>{{item.updater}}</span>
 
                             <span class="float-right">
-                                <h-button text-color="yellow" :circle="true" @click.stop="showApiPop(item)">API配置</h-button>
+                                <h-button v-if="!item._readonly" text-color="yellow" :circle="true" @click.stop="showApiPop(item)">API配置</h-button>
                                 <h-button text-color="yellow" :circle="true" @click.stop="showTestPop(item)">测试</h-button>
                                 <h-button v-if="item._deletable || !item.id" text-color="red" :circle="true" icon="h-icon-trash" @click.stop="del(item)">删除</h-button>
                             </span>
@@ -382,7 +382,7 @@
                                 this.$Message.success('新增成功: ' + res.data.name);
                                 this.load();
                             }
-                        } else this.$Notice.error(res.desc)
+                        } else this.$Message.error(res.desc)
                     }
                 })
             },

@@ -10,7 +10,6 @@ import cn.xnatural.remoter.Remoter
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
 import com.alibaba.fastjson.serializer.SerializerFeature
-
 import core.OkHttpSrv
 import core.RedisClient
 import entity.CollectRecord
@@ -40,11 +39,15 @@ class FieldManager extends ServerTpl {
     /**
      * RuleField(enName, cnName), RuleField
      */
-    final Map<String, FieldHolder> fieldHolders = new ConcurrentHashMap<>(1000)
+    final Map<String, FieldHolder> fieldHolders = new ConcurrentHashMap<>(500)
     /**
      * 数据获取函数. 收集器id -> 收集器
      */
     final Map<String, CollectorHolder> collectorHolders = new ConcurrentHashMap(100)
+    /**
+     * 决策id -> 保存延迟计算的收集器记录函数
+     */
+    protected final Map<String, List<Closure>> lazyCollectRecords = new ConcurrentHashMap<>()
 
 
     @EL(name = 'jpa_rule.started', async = true)
@@ -102,7 +105,7 @@ class FieldManager extends ServerTpl {
         }
         // 得到收集器
         def collectorHolder = collectorHolders.get(collectorId)
-        if (!collectorHolder) {
+        if (collectorHolder == null) {
             // 重新去数据库中查找
             initDataCollector(repo.findById(DataCollector, collectorId))
             collectorHolder = collectorHolders.get(collectorId)
@@ -127,13 +130,57 @@ class FieldManager extends ServerTpl {
     }
 
 
-    /**
-     * 决策产生的数据接口调用
-     * @param collectRecord CollectResult
-     */
-    protected void dataCollected(CollectRecord collectRecord) {
+    @EL(name = 'decision.end', async = true)
+    void endDecision(DecisionContext ctx) {
+        lazyCollectRecords.remove(ctx.id)?.each { it.call() }
+    }
+
+
+    // 决策产生的数据收集
+    protected void dataCollected(
+            DataCollector collector, DecisionContext ctx, Boolean cache, Date collectDate, Long spend, String dataStatus,
+            Object result, Exception ex, def resolveResult, Exception resolveException, String url = null, String body = null
+    ) {
         queue(DATA_COLLECTED) {
-            repo.saveOrUpdate(collectRecord)
+            // 是否有延迟计算值
+            boolean hasLazyValue
+            def resolveResultStrFn = {
+                if (resolveResult instanceof Map) {
+                    return JSON.toJSONString(
+                            resolveResult.findAll {e ->
+                                if (e.value instanceof Closure) {
+                                    hasLazyValue = true
+                                    return false
+                                }
+                                else true
+                            },
+                            SerializerFeature.WriteMapNullValue
+                    )
+                } else {
+                    return resolveResult?.toString()
+                }
+            }
+
+            String status = '0000'
+            if (ex instanceof ConnectException) status = 'E001'
+            else if (ex != null) status = 'EEEE'
+            else if (resolveException != null) status = 'E002'
+            def record = new CollectRecord(
+                    decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.id,
+                    status: status, dataStatus: dataStatus,
+                    collectDate: collectDate, cache: cache, spend: spend, url: url, body: body,
+                    result: result, exception: ex == null ? null : ex.message?:ex.class.simpleName,
+                    resolveResult: resolveResultStrFn(),
+                    resolveException: resolveException == null ? null : resolveException.message?:resolveException.class.simpleName
+            )
+            if (hasLazyValue) { // 如果有延迟计算值, 则在决策结束后更新收集器结果
+                lazyCollectRecords.computeIfAbsent(ctx.id, { new LinkedList<>() }).add({
+                    record.resolveResult = resolveResultStrFn()
+                    repo.saveOrUpdate(record)
+                })
+            } else {
+                repo.saveOrUpdate(record)
+            }
         }
     }
 
@@ -468,16 +515,14 @@ if (idNumber && idNumber.length() > 17) {
                 setCache(ctx, cacheTimeoutFn, dataKey, result)
             }
             //4. 保存结果
-            dataCollected(new CollectRecord(
-                decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.id,
-                status: (exx ? 'EEEE' : '0000'), dataStatus: (exx ? 'EEEE' : '0000'), collectDate: start, collectorType: collector.type,
-                spend: spend, cache: cache,
-                result: result instanceof Map ? JSON.toJSONString(result, SerializerFeature.WriteMapNullValue) : result?.toString(),
-                scriptException: exx == null ? null : exx.message?:exx.class.simpleName
-            ))
+            dataCollected(collector, ctx, cache, start, spend, (exx ? '0001' : '0000'), result, exx, null, null)
             return result
         }, testComputeFn: {param -> // 测试:sql脚本执行函数
-            sqlScript.rehydrate(param, sqlScript, this)()
+            def result = sqlScript.rehydrate(param, sqlScript, this)()
+            if (result instanceof Map) {
+                return result.collectEntries {e -> [e.key, e.value instanceof Closure ? e.value() : e.value]}
+            }
+            return result
         }))
     }
 
@@ -504,8 +549,6 @@ if (idNumber && idNumber.length() > 17) {
         // 缓存时间计算函数
         Closure cacheTimeoutFn = buildCacheTimeoutFn(collector)
 
-        // GString 模板替换
-        def tplEngine = new GStringTemplateEngine(Thread.currentThread().contextClassLoader)
         collectorHolders.put(collector.id, new CollectorHolder(collector: collector, dataKeyFn: { ctx -> //数据结果唯一性key计算逻辑
             computeCollectDataKey(collector, ctx)
         }, computeFn: { ctx ->
@@ -551,16 +594,14 @@ if (idNumber && idNumber.length() > 17) {
                 setCache(ctx, cacheTimeoutFn, dataKey, result)
             }
             //4. 保存结果
-            dataCollected(new CollectRecord(
-                decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.id,
-                status: (ex ? 'EEEE' : '0000'), dataStatus: (ex ? 'EEEE' : '0000'), collectDate: start, collectorType: collector.type,
-                spend: spend, cache: cache,
-                result: result instanceof Map ? JSON.toJSONString(result, SerializerFeature.WriteMapNullValue) : result?.toString(),
-                scriptException: ex == null ? null : ex.message?:ex.class.simpleName
-            ))
+            dataCollected(collector, ctx, cache, start, spend, (ex ? '0001' : '0000'), result, ex, null, null)
             return result
         }, testComputeFn: {param ->
-            script.rehydrate(param, script, this)()
+            def result = script.rehydrate(param, script, this)()
+            if (result instanceof Map) {
+                return result.collectEntries {e -> [e.key, e.value instanceof Closure ? e.value() : e.value]}
+            }
+            return result
         }))
     }
 
@@ -621,7 +662,7 @@ if (idNumber && idNumber.length() > 17) {
 
             String retryMsg = '' //重试消息
             // 日志字符串
-            def logMsg = "${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}接口收集器'$collector.name(${collector.id})'${ -> retryMsg}, url: ${ -> url}${ -> bodyStr == null ? '' : ', body: ' + bodyStr}${ -> spend ? ', spend: ' + spend : ''}${ -> respCode ? ', respCode: ' + respCode : ''}${ -> ', result: ' + result}${ -> resolveResult == null ? '' : ', resolveResult: ' + resolveResult}"
+            def logMsg = "${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}接口收集器'$collector.name(${collector.id})'${ -> retryMsg}, url: ${ -> url}${ -> bodyStr == null ? '' : ', body: ' + bodyStr}${ -> spend ? ', spend: ' + spend : ''}${ -> respCode ? ', respCode: ' + respCode : ''}${ -> ', result: ' + result}${ -> resolveResult == null ? '' : ', resolveResult: ' + (resolveResult instanceof Map ? resolveResult.findAll {e -> !(e.value instanceof Closure)} : (resolveResult instanceof Closure ? '' : resolveResult))}"
 
             //1. 先从缓存中取
             if (collector.cacheTimeoutFn && collector.cacheKey) {
@@ -704,12 +745,7 @@ if (idNumber && idNumber.length() > 17) {
                     }
                 } catch (ex) {
                     log.error(logMsg.toString(), ex)
-                    dataCollected(new CollectRecord(
-                        decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.id,
-                        status: (ex instanceof ConnectException) ? 'E001': 'EEEE', dataStatus: (ex instanceof ConnectException) ? 'E001': 'EEEE',
-                        collectDate: start, collectorType: collector.type, cache: cache,
-                        spend: spend, url: url, body: bodyStr, result: result, httpException: ex.message?:ex.class.simpleName
-                    ))
+                    dataCollected(collector, ctx, cache, start, spend, '0001', result, ex, null, null, url, bodyStr)
                     return null
                 } finally {
                     retryMsg = ''
@@ -739,23 +775,13 @@ if (idNumber && idNumber.length() > 17) {
                     } else {
                         log.info(logMsg.toString())
                     }
-                    dataCollected(new CollectRecord(
-                        decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.id,
-                        status: ex ? 'E002': '0000', dataStatus: dataStatus, cache: cache,
-                        collectDate: start, collectorType: collector.type,
-                        spend: spend, url: url, body: bodyStr, result: result, parseException: ex == null ? null : ex.message?:ex.class.simpleName,
-                        resolveResult: resolveResult instanceof Map ? JSON.toJSONString(resolveResult, SerializerFeature.WriteMapNullValue) : resolveResult?.toString()
-                    ))
+                    dataCollected(collector, ctx, cache, start, spend, dataStatus, result, null, resolveResult, ex, url, bodyStr)
                 }
                 return resolveResult
             }
 
             log.info(logMsg.toString())
-            dataCollected(new CollectRecord(
-                decideId: ctx.id, decisionId: ctx.decisionHolder.decision.id, collector: collector.id,
-                status: '0000', dataStatus: dataStatus, collectDate: start, collectorType: collector.type,
-                spend: spend, url: url, body: bodyStr, result: result, cache: cache
-            ))
+            dataCollected(collector, ctx, cache, start, spend, dataStatus, result, null, resolveResult, null, url, bodyStr)
             return dataStatus == '0000' ? result : null
         }, testComputeFn: {param ->
             // http请求 url
@@ -802,7 +828,7 @@ if (idNumber && idNumber.length() > 17) {
             // if (bodyStr.endsWith(',}')) bodyStr = bodyStr.substring(0, bodyStr.length() - 3) + '}'
 
             String result // 接口返回结果字符串
-            Object resolveResult // 解析接口返回结果
+            def resolveResult // 解析接口返回结果
 
             Integer respCode //http响应码
             if ('get'.equalsIgnoreCase(collector.method)) {
@@ -819,7 +845,11 @@ if (idNumber && idNumber.length() > 17) {
             String dataStatus = successFn ? (successFn.rehydrate(param, successFn, this)(result, respCode) ? '0000' : '0001') : '0000'
 
             if (parseFn && dataStatus == '0000') { // 解析接口返回结果
-                return parseFn.rehydrate(param, parseFn, this)(result, respCode)
+                resolveResult = parseFn.rehydrate(param, parseFn, this)(result, respCode)
+                if (resolveResult instanceof Map) {
+                    return resolveResult.collectEntries {e -> [e.key, e.value instanceof Closure ? e.value() : e.value]}
+                }
+                return resolveResult
             }
             return dataStatus == '0000' ? result : null
         }))
@@ -950,6 +980,7 @@ if (idNumber && idNumber.length() > 17) {
             } catch (ex) {}
         }
 
+
         /**
          * 属性值收集
          * @param aName 属性名
@@ -958,11 +989,33 @@ if (idNumber && idNumber.length() > 17) {
          */
         def populate(String aName, DecisionContext ctx) {
             String dataKey = dataKeyFn.apply(ctx) //数据key,判断是否需要重新执行收集器的计算函数拿结果
-            if (ctx.dataCollectResult.containsKey(dataKey)) { // 已查询过
+            // 值get函数
+            def valueGetFn = { ->
                 def collectResult = ctx.dataCollectResult.get(dataKey)
-                return collectResult instanceof Map ? (collectResult.containsKey(aName) ? collectResult.get(aName) : collectResult.get(alias(aName))) : collectResult
+                if (collectResult instanceof Map) { //收集器有多个属性的值
+                    def value
+                    String key
+                    if (collectResult.containsKey(aName)) {
+                        key = aName
+                        value = collectResult.get(key)
+                    } else {
+                        key = alias(aName)
+                        value = collectResult.get(key)
+                    }
+                    if (value instanceof Closure) { // 延迟计算函数,只计算一次
+                        value = value()
+                        collectResult.put(key, value)
+                    }
+                    return value
+                } else if (collectResult instanceof Closure) {
+                    log.error(ctx.logPrefix() + "收集器'${collector.name}(${collector.id})'结果不能是个函数")
+                }
+                return collectResult
             }
+            // 收集器已经执行过
+            if (ctx.dataCollectResult.containsKey(dataKey)) return valueGetFn()
 
+            ctx.dataCollectResult.put(dataKey, null) //占位,避免循环计算
             // 函数执行
             log.debug(ctx.logPrefix() + "Get '${aName}' value apply function: '${collector.name}(${collector.id})'".toString())
             def collectResult = null
@@ -971,14 +1024,8 @@ if (idNumber && idNumber.length() > 17) {
             } catch (ex) { // 接口执行报错, 默认继续往下执行规则
                 log.error(ctx.logPrefix() + "数据收集器'${collector.name}(${collector.id})' 执行错误".toString(), ex)
             }
-            if (collectResult instanceof Map) { // 收集器,收集结果为多个属性的值, 则暂先保存
-                ctx.dataCollectResult.put(dataKey, collectResult)
-                return collectResult.containsKey(aName) ? collectResult.get(aName) : collectResult.get(alias(aName))
-            }
-            else {
-                ctx.dataCollectResult.put(dataKey, collectResult)
-                return collectResult
-            }
+            ctx.dataCollectResult.put(dataKey, collectResult)
+            return valueGetFn()
         }
     }
 }
