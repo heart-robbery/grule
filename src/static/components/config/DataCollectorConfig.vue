@@ -301,7 +301,7 @@
                         vue: addEditPop, datas: {}
                     },
                     width: 850,
-                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false, closeOnMask: false,
+                    hasCloseIcon: true, fullScreen: false, middle: true, transparent: false, closeOnMask: false,
                     events: {
                         reload: () => {
                             this.load()
@@ -317,7 +317,7 @@
                         datas: {collector: collector}
                     },
                     width: 850,
-                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false, closeOnMask: false,
+                    hasCloseIcon: true, fullScreen: false, middle: true, transparent: false, closeOnMask: false,
                 })
             },
             showTestPop(item) {
@@ -328,7 +328,7 @@
                         datas: {collector: item}
                     },
                     width: 750, closeOnMask: false,
-                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false,
+                    hasCloseIcon: true, fullScreen: false, middle: true, transparent: false,
                 })
             },
             enableSwitch(item) {

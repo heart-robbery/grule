@@ -136,7 +136,7 @@
                         datas: {}
                     },
                     width: 650,
-                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false,
+                    hasCloseIcon: true, fullScreen: false, middle: true, transparent: false,
                     events: {
                         reload: () => {
                             this.load()
@@ -152,7 +152,7 @@
                         datas: {permission: permission}
                     },
                     width: 650,
-                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false
+                    hasCloseIcon: true, fullScreen: false, middle: true, transparent: false
                 })
             },
             del(permission) {

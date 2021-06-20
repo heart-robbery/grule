@@ -331,7 +331,7 @@
                 // h-table-tr-hovered
                 //console.log('===========', event)
                 this.$Modal({
-                    middle: false, draggable: false,
+                    middle: true, draggable: false,
                     type: 'drawer-right',
                     component: {
                         vue: detail,

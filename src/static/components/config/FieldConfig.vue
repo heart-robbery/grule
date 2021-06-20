@@ -303,7 +303,7 @@
                         datas: {}
                     },
                     width: 680,
-                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false, closeOnMask: false,
+                    hasCloseIcon: true, fullScreen: false, middle: true, transparent: false, closeOnMask: false,
                     events: {
                         reload: () => {
                             this.load()
@@ -319,7 +319,7 @@
                         datas: {field: field}
                     },
                     width: 680,
-                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false,
+                    hasCloseIcon: true, fullScreen: false, middle: true, transparent: false,
                     events: {
                         reload: () => {
                             this.load()

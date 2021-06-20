@@ -323,7 +323,7 @@
                         datas: {decision: item}
                     },
                     //width: 1200,
-                    middle: false, draggable: true, closeOnMask: false, hasCloseIcon: true, fullScreen: true, transparent: false,
+                    middle: true, draggable: true, closeOnMask: false, hasCloseIcon: true, fullScreen: true, transparent: false,
                     events: {
                         update: () => {
                             this.save()
@@ -339,7 +339,7 @@
                         datas: {decision: item}
                     },
                     width: 750, closeOnMask: false,
-                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false,
+                    hasCloseIcon: true, fullScreen: false, middle: true, transparent: false,
                 })
             },
             del(item) {

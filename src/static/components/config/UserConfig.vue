@@ -248,7 +248,7 @@
                         datas: {}
                     },
                     width: 800,
-                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false,
+                    hasCloseIcon: true, fullScreen: false, middle: true, transparent: false,
                     events: {
                         reload: () => {
                             this.load()
@@ -264,7 +264,7 @@
                         datas: {user: user}
                     },
                     width: 800,
-                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false,
+                    hasCloseIcon: true, fullScreen: false, middle: true, transparent: false,
                     events: {
                         reload: () => {
                             this.load()
@@ -280,7 +280,7 @@
                         datas: {user: user}
                     },
                     width: 400,
-                    hasCloseIcon: true, fullScreen: false, middle: false, transparent: false,
+                    hasCloseIcon: true, fullScreen: false, middle: true, transparent: false,
                 })
             },
             edit(item) {
