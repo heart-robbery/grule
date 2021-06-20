@@ -367,7 +367,9 @@ class FieldManager extends ServerTpl {
         if (repo.count(DataCollector) == 0) {
             log.info("初始化默认数据收集器")
             repo.saveOrUpdate(new DataCollector(type: 'script', name: '星期几', enabled: true, comment: '值: 1,2,3,4,5,6,7', computeScript: """
-Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1
+def week = Calendar.getInstance().get(Calendar.DAY_OF_WEEK)
+if (week == 1) 7
+else week - 1
             """.trim()))
 
             repo.saveOrUpdate(new DataCollector(type: 'script', name: '当前日期时间', enabled: true, comment: '值: yyyy-MM-dd HH:mm:ss', cacheKey: '${(long) (System.currentTimeMillis() / 1000)}', computeScript: """

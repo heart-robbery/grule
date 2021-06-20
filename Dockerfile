@@ -1,5 +1,5 @@
 FROM docker.io/gradle:6.8
-ENV TZ Asia/Shanghai
+ENV TZ Asia/Chongqing
 
 RUN mkdir -p /srv/rule
 
