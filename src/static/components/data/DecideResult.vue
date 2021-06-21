@@ -331,14 +331,13 @@
                 // h-table-tr-hovered
                 //console.log('===========', event)
                 this.$Modal({
-                    middle: true, draggable: false,
+                    draggable: false, hasCloseIcon: true, fullScreen: false, transparent: false, closeOnMask: true,
                     type: 'drawer-right',
                     component: {
                         vue: detail,
                         datas: {item: item}
                     },
                     width: document.body.clientWidth - 250,
-                    hasCloseIcon: true, fullScreen: false, transparent: false, closeOnMask: true,
                     events: {
                         // reload: () => {
                         //     this.load()

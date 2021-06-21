@@ -116,7 +116,6 @@ class OkHttpSrv extends ServerTpl {
      * @param urlStr 连接地址
      * @param tryInterval 重连接时间间隔. 秒
      * @param msgFn 消息处理函数
-     * @return
      */
     WebSocket ws(String urlStr, Integer tryInterval, BiConsumer<String, WebSocket> msgFn = null) {
         def req = new Request.Builder().url(urlStr).build()
