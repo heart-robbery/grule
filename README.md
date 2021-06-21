@@ -14,7 +14,7 @@
 # 框架概念
 * 框架抽象一个业务需求(一般程序,一个接口)为一条决策,一条决策包含多个业务规则
 * 框架用自创DSL策略规则语言表达业务逻辑
-```
+```groovy
     规则 {
         规则名 = '芝麻分限制'
         拒绝 { 芝麻分 < 620 }
@@ -26,25 +26,25 @@
 > 例子 http://xnatural.cn:9090/ test:test
 
 # 规则定义
-```
+```groovy
 规则 {
     规则名 = '大小比较'
     拒绝 { 年龄 > 40 || 年龄 < 25 }
 }
 ```
-```
+```groovy
 规则 {
     规则名 = '通过规则'
     通过 { 年龄 == 30 }
 }
 ```
-```
+```groovy
 规则 {
     规则名 = '赋值规则'
     操作 { 产品代码 = 'xx' }
 }
 ```
-```
+```groovy
 规则 { // 电商价格规则
     规则名 = '条件赋值规则'
     操作 {
@@ -54,7 +54,7 @@
     }
 }
 ```
-```
+```groovy
 规则 {
     规则名 = '列表判断规则'
 
@@ -63,18 +63,19 @@
     拒绝 { 工作省 in 禁入省 }
 }
 ```
-```
+```groovy
 规则 {
     规则名 = '包含规则'
     拒绝 { "$姓名".contains("xx") }
 }
 ```
+
 # 策略定义
 * 多个规则,评分卡,子决策组成, 按顺序依次执行
 * 策略执行规则前, 会按顺序执行操作,条件函数
 * 条件函数返回false, 则跳出, 继续执行下一个策略
 ## 规则策略
-```
+```groovy
 策略 {
     策略名 = '004244'
     
@@ -91,7 +92,7 @@
 * 每个条目由 属性名, 值匹配范围, 分值 组成
 * 模型分计算: 依次遍历每个条目,得到匹配的分值相加
 * 最终评分 = 基础分 + 模型计算得分
-```
+```groovy
 策略 {
     策略名 = '测试评分卡'
     
@@ -122,7 +123,7 @@
 * 嵌套其它决策执行. 不会形成一条单独的决策执行记录
 * 当子决策执行结果为Reject的时,会结束当前决策执行
 * 子决策的返回属性 会设置 到当前执行上下文,可以使用
-```
+```groovy
 策略 {
     策略名 = '测试子决策'
     
@@ -149,7 +150,7 @@
 }
 ```
 * 依次从上往下执行
-```
+```groovy
 决策id = 'test1'
 决策名 = '测试1'
 决策描述 = ''
@@ -178,7 +179,7 @@
 }
 ```
 ## 自定义决策函数
-```
+```groovy
 决策id = 'test1'
 决策名 = '测试1'
 
@@ -198,29 +199,115 @@
         )).debug().execute()
 }
 ```
-# 功能预览图
-## 决策定义
+
 ![Image text](https://gitee.com/xnat/tmp/raw/master/img/decisions.png)
 
-## 决策执行统计 
-![Image text](https://gitee.com/xnat/tmp/raw/master/img/decision_dashbrod.png)
 
-## 决策规则统计 
-![Image text](https://gitee.com/xnat/tmp/raw/master/img/countRule.png)
+# 指标/字段/属性
+## 使用 '年龄' 指标
+```groovy
+拒绝 { 年龄 > 50 }
+```
 
+## 指标值获取
+<!-- 
+@startuml
+skinparam ConditionEndStyle hline
+:指标名;
+if (执行上下文) then (已存在值)
+  if (值来源是否为收集器) then (是)
+    :收集器;
+  else (否)
+  :返回值;
+  detach
+  endif
+else (不存在值)
+  if (入参) then (存在值)
+    :保存指标值到 __执行上下文__;
+    :返回值;
+    detach
+  else (不存在)
+    :收集器;
+  endif
+endif
+->//计算//;
+:指标值;
+:保存指标值到 __执行上下文__;
+:返回值;
+@enduml
+-->
+![Image text](http://www.plantuml.com/plantuml/png/SoWkIImgAStDuIhEpimhI2nAp5LmpizBoIp9pCzppKi9BgdCILN8oCdCI-MoUjRJ_cn1-zC9lTPScMaA6iywbxzOsFDaHzUJ7TtFfhLhAfHafEOfQ3pTlkdfsXbFvwnush17aqj10QGKo7msT-cpNHEUpLZ_TCAo9pjsFPkoxUNijgSpLy2q0MM0ge702Yvb3UIdvXIdAcW0zO0ahLxid_9qzZoWQI2fbDIInEGCa1gWUzEu82gVxEZ5jBrrwTF-9fX5S6ceTK_spmKAGVm657tQiK4XFXxDR_7n80lH7O3a13JBCNm2ToM4rBNJrt-nRk7pTTFrzQrX0GisbMZd83l50MWgC0u1)
+
+## 指标列表
+![Image text](https://gitee.com/xnat/tmp/raw/master/img/rule_fields.png)
+
+# 收集器(数据源)
+> 支持从SQL(数据库),http(接口),script(自定义groovy脚本函数)获取数据
+## 收集器执行
+<!--
+@startuml
+skinparam ConditionEndStyle hline
+:指标名;
+-> 选择;
+:收集器;
+-> 根据上下文计算;
+:数据key;
+note left
+  用于判断是否需要重复计算
+end note
+if (执行上下文) then(存在key)
+  :收集结果;
+else (不存在)
+  :执行收集器;
+  :保存收集结果到 __执行上下文__;
+  note right
+    收集结果可能是多个指标的值映射
+    也可能是单个指标值
+  end note
+endif
+
+split
+ :多值映射;
+  note left
+    收集结果是个Map
+  end note
+  -> get;
+  if (指标值) then(是个函数)
+      :值函数计算;
+  endif
+split again
+ :单值;
+end split
+
+:指标值;
+:返回值;
+@enduml
+-->
+![Image text](http://www.plantuml.com/plantuml/png/PLBDpX8n5DttARhaM_W2Cudv4kFIbGymcOG2pJSKmjG5Eup40M6KH404H4W8eWa_ApEeX9UPTcRUmjkMZAXTDQVdd7lklRttkTlWBweUyXyegxiDjugVr5YHSbfZJrdnEMzw15SyoWYoP3-Goq0CGXizUeopLbVslje03xzdizVYurR3SdcIuJwEtiHHJuw3TBzAzXyKQtG4_84qRSHgd62Fb3Z2E1bkunzlHMSjnpivEOZ19fktqitBB0Z5EZHgH5WHAn6Y9LoGtI_fgfyNkCEyGbX1x2PYlWNxEp2zHaf-lfUBkOs8vnDSYAFGa3J3kDn41oo-V0B6hLPqZjXn_gdeE8gjcsZGSWMwWFENwjqXVNLMtQodSVJDZ2sPjaNhbvminR6j5V7fynzYECg9m8Btl6Muq192VjsZKCa2ozmcZm6p_3y5s8BdCxT-wuOnhAXCk9AgOUObhsCq8X6SOLqm9tqiU3Q8MOVIwbGc57RBBcKgMZW2fgstPUBcNqR1LdePYjb2t--10v_kDm00)
+
+## 决策执行过程中生产的数据收集
+![Image text](https://gitee.com/xnat/tmp/raw/master/img/collect_records.png)
+
+# 决策执行
 ## 决策执行记录
 ![Image text](https://gitee.com/xnat/tmp/raw/master/img/decision_records.png)
 
 ## 决策执行详情
 ![Image text](https://gitee.com/xnat/tmp/raw/master/img/decision_result_detail.png)
 
-## 决策执行过程中生产的数据收集
-![Image text](https://gitee.com/xnat/tmp/raw/master/img/collect_records.png)
+# 统计图
+## 决策执行统计 
+![Image text](https://gitee.com/xnat/tmp/raw/master/img/decision_dashbrod.png)
+
+## 决策规则统计 
+![Image text](https://gitee.com/xnat/tmp/raw/master/img/countRule.png)
+
 
 # 权限
-静态权限: 权限管理, 用户管理, 用户登陆, 新增用户, 删除用户, 决策创建, 查看字段, 新增字段, 更新字段, 删除字段, 查看收集器, 新增收集器, 更新收集器, 删除收集器, 查看操作历史, 查看决策结果, 查看收集记录
+> 静态权限: 权限管理, 用户管理, 用户登陆, 新增用户, 删除用户, 决策创建, 查看字段, 新增字段, 更新字段, 删除字段, 查看收集器, 新增收集器, 更新收集器, 删除收集器, 查看操作历史, 查看决策结果, 查看收集记录
 
-动态资源(决策)权限: 每添加一个决策 就会生成3个与之对应的动态权限(读, 删, 改)
+> 动态资源(决策)权限: 每添加一个决策 就会生成3个与之对应的动态权限(读, 删, 改)
+
 ## 用户分类
 * 超级用户(系统管理员): 拥有 权限管理 的用户
 * 用户管理员(组管理员: 管理组相同的用户): 拥有 用户管理 的用户
@@ -237,39 +324,6 @@
 
 ![Image text](https://gitee.com/xnat/tmp/raw/master/img/userchange.png)
 
-# 决策执行
-## 属性字段
-![Image text](https://gitee.com/xnat/tmp/raw/master/img/field_sex.png)
-```
-规则 { //使用 年龄 属性子段
-  规则名 = 'xx'
-  拒绝 { 年龄 > 50 }
-}
-```
-```
-规则 { //赋值 买入日期 属性子段
-  规则名 = 'aa'
-  操作 { 买入日期 = '2021-04-26 13:16:24' }
-}
-```
-## 属性的动态数据源
-> 属性可以配置多个数据源,每次根据当前执行上下文来动态选择一个数据源
-
-![Image text](https://gitee.com/xnat/tmp/raw/master/img/rule_field_dyn.png)
-
-> 每个收集器对应一个选择函数, 依次遍历选择函数执行直到函数返回true,即被选择
-
-## 收集器(数据源)
-![Image text](https://gitee.com/xnat/tmp/raw/master/img/collector_sex.png)
-## 执行上下文
-1. 如果属性值不存在
-  - 先默认填充 空 null (避免属性循环获取)
-  - 再从输入(入参)获取
-  - 最后从收集器获取
-2. 如果属性值存在
-  - 属性值之前是从收集器获取, 则重新尝试从收集器获取
-
-
 # 使用说明
 jdk8, gradle6.5+, mysql5.7+/MariaDB10.2+
 
@@ -280,6 +334,8 @@ jdk8, gradle6.5+, mysql5.7+/MariaDB10.2+
  * linux: nohup sh start.sh -Xmx512m -Xms512m > /dev/null 2>&1 &
  * windows: ./start
 
+# TODO
+## redis 收集器
 
 # 参与贡献
 xnatural@msn.cn
