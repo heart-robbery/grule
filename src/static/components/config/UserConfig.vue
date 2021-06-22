@@ -116,6 +116,9 @@
         mounted() {
             // this.loadPermissions()
             // this.permissionPage()
+            document.onkeyup = (e) => {
+                if (e.code === 'Escape') this.$emit('close');
+            }
         },
         methods: {
             update() {
@@ -242,7 +245,7 @@
             },
             showAddPop() {
                 this.$Modal({
-                    title: '添加用户', draggable: true,
+                    title: '添加用户', draggable: true, closeOnMask: false,
                     component: {
                         vue: addEditPop,
                         datas: {}

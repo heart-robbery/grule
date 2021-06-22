@@ -134,6 +134,7 @@
             }
         },
         mounted() {
+            this.initQuery()
             this.load()
         },
         activated() {
