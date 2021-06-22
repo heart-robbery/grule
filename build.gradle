@@ -41,8 +41,8 @@ dependencies {
     compile "org.codehaus.groovy:groovy:$groovyVersion"
     compile "org.codehaus.groovy:groovy-templates:$groovyVersion"
     compile "org.codehaus.groovy:groovy-sql:$groovyVersion"
-    compile "org.codehaus.groovy:groovy-json:$groovyVersion"
-    compile "org.codehaus.groovy:groovy-jmx:$groovyVersion"
+    // compile "org.codehaus.groovy:groovy-json:$groovyVersion"
+    // compile "org.codehaus.groovy:groovy-jmx:$groovyVersion"
 
     //compile 'com.alibaba:fastjson:1.2.73'
     compile 'javax.inject:javax.inject:1'
