@@ -444,7 +444,7 @@
                 this.decision = {};
                 $.ajax({
                     url: 'mnt/decisionPage',
-                    data: $.extend({page: page.page || 1, pageSize: 5, decisionId: this.tabs.showId}, this.model),
+                    data: $.extend({page: page.page || 1, pageSize: 10, decisionId: this.tabs.showId}, this.model),
                     success: (res) => {
                         this.decisionLoading = false;
                         if (res.code === '00') {
