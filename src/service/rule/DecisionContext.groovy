@@ -257,10 +257,7 @@ class DecisionContext {
                 }
             }
             def value = super.get(aName)
-            if (value instanceof Optional) {
-                if (value.present) value = value.get()
-                else value = null
-            }
+            if (value instanceof Optional) value = value.orElse(null)
 
             ctx.recordData(aName.toString(), value)
             return value
