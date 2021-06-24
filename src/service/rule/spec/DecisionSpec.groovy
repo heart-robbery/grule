@@ -33,6 +33,7 @@ class DecisionSpec extends BaseSpec {
     DecisionSpec() {
         Logger log = LoggerFactory.getLogger("ROOT")
         globalFunctions.put("INFO", { String msg -> if (msg) log.info(msg.toString()) })
+        globalFunctions.put("ERROR", { String msg, Exception ex -> if (msg) log.error(msg.toString(), ex) })
     }
 
 
