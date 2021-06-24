@@ -44,8 +44,8 @@ class DecisionSrv extends ServerTpl {
     protected void stop() {
         // 尽量等到 对列中的 数据都持久化完成
         long start = System.currentTimeMillis()
+        if (queue(SAVE_RESULT).waitingCount > 0) log.warn("等待决策结果数据保存完...")
         while (queue(SAVE_RESULT).waitingCount > 0 && System.currentTimeMillis() - start < 1000 * 60 * 2) {
-            log.warn("等待决策结果数据保存完...")
             Thread.sleep(1000)
         }
     }

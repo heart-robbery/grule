@@ -79,8 +79,8 @@ class FieldManager extends ServerTpl {
         collectorHolders.each {it.value.close()}
         // 尽量等到 对列中的 数据都持久化完成
         long start = System.currentTimeMillis()
+        if (queue(DATA_COLLECTED).waitingCount > 0) log.warn("等待数据收集结果数据保存完...")
         while (queue(DATA_COLLECTED).waitingCount > 0 && System.currentTimeMillis() - start < 1000 * 60 * 2) {
-            log.warn("等待数据收集结果数据保存完...")
             Thread.sleep(1000)
         }
     }
