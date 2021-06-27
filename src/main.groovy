@@ -120,4 +120,8 @@ void heartbeat() {
     field.setAccessible(true)
     Map<String, Object> m = field.get(Thread.currentThread().contextClassLoader.parent.parent)
     m.clear()
+    // 删除 Classloader 中只进不出的 classes
+    field = ClassLoader.getDeclaredField('classes')
+    field.setAccessible(true)
+    field.get(Thread.currentThread().contextClassLoader.parent).clear()
 }
