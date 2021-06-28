@@ -118,8 +118,8 @@ void heartbeat() {
     // 删除 Classloader 中只进不出的 parallelLockMap
     def field = ClassLoader.getDeclaredField('parallelLockMap')
     field.setAccessible(true)
-    Map<String, Object> m = field.get(Thread.currentThread().contextClassLoader.parent.parent)
-    m.clear()
+    field.get(Thread.currentThread().contextClassLoader.parent.parent).clear()
+    field.get(Thread.currentThread().contextClassLoader.parent.parent.parent).clear()
     // 删除 Classloader 中只进不出的 classes
     field = ClassLoader.getDeclaredField('classes')
     field.setAccessible(true)
