@@ -108,7 +108,7 @@ class MntAnalyseCtrl extends ServerTpl {
         """.trim()
 
         def ls = [] as LinkedList
-        for (int page = 1, pageSize = 200; ;page++) {
+        for (int page = 1, pageSize = 100; ;page++) {
             Page rPage = end ? repo.sqlPage(sql, page, pageSize, start, end, ids) : repo.sqlPage(sql, page, pageSize, start, ids)
             ls.addAll(rPage.list)
             if (page >= rPage.totalPage) break
@@ -117,7 +117,7 @@ class MntAnalyseCtrl extends ServerTpl {
         ApiResp.ok(
             ls.findResults {Map<String, String> record ->
                 record["detail"] ? JSON.parseObject(record["detail"])?.getJSONArray("policies")?.findResults {JSONObject pJo ->
-                    pJo.getJSONArray("items")?.findResults { JSONObject rJo ->
+                    pJo.getJSONArray("items")?.findAll {JSONObject rJo -> rJo['attrs']['规则名']}?.findResults { JSONObject rJo ->
                         record['decisionId'] + '||' + record['decisionName'] + '||' + pJo['attrs']['策略名'] +'||' + rJo['attrs']['规则名'] + '||' + (rJo['result']?:DecideResult.Accept)
                     }?:[]
                 }?.flatten() : []
