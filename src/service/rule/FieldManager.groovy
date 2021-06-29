@@ -908,11 +908,12 @@ if (idNumber && idNumber.length() > 17) {
             }
             cacheTimeout = Duration.ofMillis(v)
         } else if (cacheTimeout instanceof Integer) {
-            if (cacheTimeout < 0) throw new RuntimeException("缓存时间不能小于0")
+            if (cacheTimeout <= 0) return
             cacheTimeout = Duration.ofMinutes(cacheTimeout)
         } else if (cacheTimeout instanceof Duration) {
 
         } else throw new RuntimeException("缓存过期时间函数返回类型错误")
+        if (cacheTimeout.seconds <= 0) return
         String key = getStr("collectorCacheKeyPrefix", "collector") +":"+ dataKey
         if (redis) {
             redis.set(key, result.toString())
