@@ -42,7 +42,7 @@ app.addSource(new ServerTpl("sched") { // 定时任务
     @EL(name = "sched.after")
     void after(Duration duration, Runnable fn) {sched.after(duration, fn)}
 
-    @EL(name = "sys.stopping", async = true)
+    @EL(name = "sys.stopping", async = true, order = 1f)
     void stop() { sched?.stop() }
 })
 app.addSource(new ServerTpl("remoter") { // 集群配置

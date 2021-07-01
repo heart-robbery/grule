@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class HttpSrv extends ServerTpl {
     @Lazy protected def         cacheSrv          = bean(CacheSrv)
-    @Lazy protected String      sessionCookieName = getStr("sessionCookieName", "sId")
+    @Lazy protected String      sessionCookieName = getStr("sessionCookieName", "sessionId")
     protected final List<Class> ctrlClzs          = new LinkedList<>()
     @Lazy protected HttpServer  server            = new HttpServer(attrs(), exec()) {
         @Override
@@ -43,13 +43,12 @@ class HttpSrv extends ServerTpl {
     }
 
 
-    @EL(name = 'sys.stopping', async = true)
+    @EL(name = 'sys.stopping')
     void stop() { server.stop() }
 
 
     /**
      * 提供session 数据操作
-     * @param hCtx
      */
     protected Map<String, Object> getSessionDelegate(HttpContext hCtx) {
         Map<String, Object> sData
