@@ -41,12 +41,12 @@ class RedisClient extends ServerTpl {
         )
 
         exposeBean(pool)
-        ep.fire("${name}.started")
         log.info("Created '{}' Client", name)
+        ep.fire("${name}.started")
     }
 
 
-    @EL(name = "sys.stopping", async = true)
+    @EL(name = "sys.stopping", async = true, order = 2f)
     void stop() {
         log.info("Close '{}' Client", name)
         pool?.close(); pool = null
@@ -111,7 +111,7 @@ class RedisClient extends ServerTpl {
 
 
     @EL(name = '${name}.hexists', async = false)
-    boolean hexists(String cName, String key) { if (key == null) return false else exec{it.hexists(cName, key)} }
+    boolean hexists(String cName, String key) { if (key == null) false else exec{it.hexists(cName, key)} }
 
 
     @EL(name = '${name}.exists', async = false)
@@ -133,18 +133,11 @@ class RedisClient extends ServerTpl {
 
 
     @EL(name = '${name}.exec', async = false)
-    Object exec(Function<Jedis, Object> fn) {
-        try (Jedis c = pool.getResource()) {fn.apply(c)}
-    }
+    def exec(Function<Jedis, Object> fn) { try (Jedis c = pool.getResource()) { fn.apply(c) } }
 
 
+    // 默认12小时过期
     protected Duration getExpire(String cName) {
-        if (attrs().expire?.(cName) instanceof Duration) return attrs().expire?.(cName)
-        else if (attrs().expire?.(cName) instanceof Number || attrs().expire?.(cName) instanceof String) return Duration.ofMinutes(Long.valueOf(attrs().expire?.(cName)))
-
-        if (attrs().defaultExpire instanceof Duration) return attrs().defaultExpire
-        else if (attrs().defaultExpire instanceof Number || attrs().defaultExpire instanceof String) return Duration.ofMinutes(Long.valueOf(attrs().defaultExpire))
-
-        Duration.ofHours(12) // 默认12小时过期
+        Duration.ofMinutes(getLong("expire." + cName, getLong("defaultExpire", 12 * 60L)))
     }
 }
