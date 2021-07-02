@@ -125,15 +125,11 @@ class FieldManager extends ServerTpl {
      * @param id 收集器id
      * @param param 参数
      */
-    def testCollector(String id, Map param) {
-        collectorHolders.get(id)?.testComputeFn?.apply(param)
-    }
+    def testCollector(String id, Map param) { collectorHolders.get(id)?.testComputeFn?.apply(param) }
 
 
     @EL(name = 'decision.end', async = true)
-    void endDecision(DecisionContext ctx) {
-        lazyCollectRecords.remove(ctx.id)?.each { it.call() }
-    }
+    void endDecision(DecisionContext ctx) { lazyCollectRecords.remove(ctx.id)?.each { it.call() } }
 
 
     // 决策产生的数据收集
@@ -319,7 +315,6 @@ class FieldManager extends ServerTpl {
 
     /**
      * 初始化 {@link RuleField}
-     * @param field
      */
     protected void initField(RuleField field) {
         Binding binding = new Binding()
@@ -413,11 +408,12 @@ if (idNumber && idNumber.length() > 17) {
 
     /**
      * 初始全数据收集器
-     * @param collector
      */
     void initDataCollector(DataCollector collector) {
         if (!collector) return
         try {
+            collectorHolders.remove(collector.id)?.close()
+            if (!collector.enabled) return
             if ('http' == collector.type) { // http 接口
                 initHttpCollector(collector)
             } else if ('script' == collector.type) { // groovy 脚本
@@ -433,11 +429,9 @@ if (idNumber && idNumber.length() > 17) {
 
     /**
      * 初始化 sql 收集器
-     * @param collector
      */
     protected void initSqlCollector(DataCollector collector) {
         if ('sql' != collector.type) return
-        collectorHolders.remove(collector.id)?.close()
         if (!collector.enabled) return
         if (!collector.url) {
             log.warn('sql url must not be empty'); return
@@ -469,9 +463,6 @@ if (idNumber && idNumber.length() > 17) {
 
         // 缓存时间计算函数
         Closure cacheTimeoutFn = buildCacheTimeoutFn(collector)
-
-        // GString 模板替换
-        def tplEngine = new GStringTemplateEngine(Thread.currentThread().contextClassLoader)
         collectorHolders.put(collector.id, new CollectorHolder(collector: collector, sql: db, dataKeyFn: { ctx -> //数据结果唯一性key计算逻辑
             computeCollectDataKey(collector, ctx)
         }, computeFn: { ctx -> //sql脚本执行函数
@@ -484,14 +475,13 @@ if (idNumber && idNumber.length() > 17) {
             def logMsg = "${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}Sql收集器'${collector.name}(${collector.id})'${ -> spend ? ', spend: ' + spend : ''}, result: ${ -> result}"
 
             //1. 先从缓存中取
-            if (collector.cacheTimeoutFn && collector.cacheKey) {
+            if (cacheTimeoutFn) {
                 dataKey = computeCollectDataKey(collector, ctx)
                 if (redis) {
                     start = new Date() // 调用时间
                     result = redis.get(getStr("collectorCacheKeyPrefix", "collector") + ":" + dataKey)
                     spend = System.currentTimeMillis() - start.time
-                }
-                else if (cacheSrv) {
+                } else if (cacheSrv) {
                     start = new Date() // 调用时间
                     result = cacheSrv.get(getStr("collectorCacheKeyPrefix", "collector") +":"+ dataKey)?.toString()
                     spend = System.currentTimeMillis() - start.time
@@ -531,11 +521,9 @@ if (idNumber && idNumber.length() > 17) {
 
     /**
      * 初始化 script 收集器
-     * @param collector DataCollector
      */
     protected void initScriptCollector(DataCollector collector) {
         if ('script' != collector.type) return
-        collectorHolders.remove(collector.id)?.close()
         if (!collector.enabled) return
         if (!collector.computeScript) {
             log.warn("Script collector'$collector.name' script must not be empty".toString()); return
@@ -550,7 +538,6 @@ if (idNumber && idNumber.length() > 17) {
 
         // 缓存时间计算函数
         Closure cacheTimeoutFn = buildCacheTimeoutFn(collector)
-
         collectorHolders.put(collector.id, new CollectorHolder(collector: collector, dataKeyFn: { ctx -> //数据结果唯一性key计算逻辑
             computeCollectDataKey(collector, ctx)
         }, computeFn: { ctx ->
@@ -563,14 +550,13 @@ if (idNumber && idNumber.length() > 17) {
             def logMsg = "${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}脚本收集器'${collector.name}(${collector.id})'${ -> ', spend: ' + spend}, result: ${ -> result}"
 
             //1. 先从缓存中取
-            if (collector.cacheTimeoutFn && collector.cacheKey) {
+            if (cacheTimeoutFn) {
                 dataKey = computeCollectDataKey(collector, ctx)
                 if (redis) {
                     start = new Date() // 调用时间
                     result = redis.get(getStr("collectorCacheKeyPrefix", "collector") + ":" +dataKey)
                     spend = System.currentTimeMillis() - start.time
-                }
-                else if (cacheSrv) {
+                } else if (cacheSrv) {
                     start = new Date() // 调用时间
                     result = cacheSrv.get(getStr("collectorCacheKeyPrefix", "collector") + ":" +dataKey)?.toString()
                     spend = System.currentTimeMillis() - start.time
@@ -610,11 +596,9 @@ if (idNumber && idNumber.length() > 17) {
 
     /**
      * 初始化 http 收集器
-     * @param collector
      */
     protected void initHttpCollector(DataCollector collector) {
         if ('http' != collector.type) return
-        collectorHolders.remove(collector.id)?.close()
         if (!collector.enabled) return
         // 创建 http 客户端
         def http = new OkHttpSrv('okHttp_' + collector.id); app().inject(http)
@@ -667,14 +651,13 @@ if (idNumber && idNumber.length() > 17) {
             def logMsg = "${ctx.logPrefix()}${ -> cache ? '(缓存)' : ''}接口收集器'$collector.name(${collector.id})'${ -> retryMsg}, url: ${ -> url}${ -> bodyStr == null ? '' : ', body: ' + bodyStr}${ -> spend ? ', spend: ' + spend : ''}${ -> respCode ? ', respCode: ' + respCode : ''}${ -> ', result: ' + result}${ -> resolveResult == null ? '' : ', resolveResult: ' + (resolveResult instanceof Map ? resolveResult.findAll {e -> !(e.value instanceof Closure)} : (resolveResult instanceof Closure ? '' : resolveResult))}"
 
             //1. 先从缓存中取
-            if (collector.cacheTimeoutFn && collector.cacheKey) {
+            if (cacheTimeoutFn) {
                 dataKey = computeCollectDataKey(collector, ctx)
                 if (redis) {
                     start = new Date() // 调用时间
                     result = redis.get(getStr("collectorCacheKeyPrefix", "collector") + ":" +dataKey)
                     spend = System.currentTimeMillis() - start.time
-                }
-                else if (cacheSrv) {
+                } else if (cacheSrv) {
                     start = new Date() // 调用时间
                     result = cacheSrv.get(getStr("collectorCacheKeyPrefix", "collector") + ":" +dataKey)?.toString()
                     spend = System.currentTimeMillis() - start.time
@@ -760,9 +743,7 @@ if (idNumber && idNumber.length() > 17) {
             String dataStatus = successFn ? (successFn.rehydrate(ctx.data, successFn, this)(result, respCode) ? '0000' : '0001') : '0000'
 
             //4. 如果接口返回的是有效数据, 则缓存
-            if ('0000' == dataStatus && dataKey && !cache) {
-                setCache(ctx, cacheTimeoutFn, dataKey, result)
-            }
+            if ('0000' == dataStatus && dataKey && !cache) setCache(ctx, cacheTimeoutFn, dataKey, result)
 
             //5. 解析接口返回结果
             if (parseFn && dataStatus == '0000') {
@@ -772,11 +753,8 @@ if (idNumber && idNumber.length() > 17) {
                 } catch (e) {
                     ex = e
                 } finally {
-                    if (ex) {
-                        log.error(logMsg.toString() + ", 解析函数执行失败", ex)
-                    } else {
-                        log.info(logMsg.toString())
-                    }
+                    if (ex) log.error(logMsg.toString() + ", 解析函数执行失败", ex)
+                    else log.info(logMsg.toString())
                     dataCollected(collector, ctx, cache, start, spend, dataStatus, result, null, resolveResult, ex, url, bodyStr)
                 }
                 return resolveResult
@@ -864,7 +842,7 @@ if (idNumber && idNumber.length() > 17) {
      * @param ctx 当前执行上下文
      * @return dataKey
      */
-    String computeCollectDataKey(DataCollector collector, DecisionContext ctx) {
+    protected String computeCollectDataKey(DataCollector collector, DecisionContext ctx) {
         if (!collector.cacheKey) return collector.id //未配置,dataKey为收集器id
         String dataKey = collector.cacheKey
         if (dataKey.contains('${')) {
@@ -898,7 +876,7 @@ if (idNumber && idNumber.length() > 17) {
      * @param dataKey 缓存数据key
      * @param result 要缓存的数据
      */
-    void setCache(DecisionContext ctx, Closure timeoutFn, String dataKey, def result) {
+    protected void setCache(DecisionContext ctx, Closure timeoutFn, String dataKey, def result) {
         def cacheTimeout = timeoutFn.rehydrate(ctx.data, timeoutFn, this)()
         if (cacheTimeout instanceof Date) {
             long v = cacheTimeout.time - System.currentTimeMillis()
@@ -929,7 +907,7 @@ if (idNumber && idNumber.length() > 17) {
      * 构建收集器 缓存时间计算函数
      * @param collector 收集器
      */
-    Closure buildCacheTimeoutFn(DataCollector collector) {
+    protected Closure buildCacheTimeoutFn(DataCollector collector) {
         if (collector.cacheTimeoutFn) {
             Binding binding = new Binding()
             def config = new CompilerConfiguration()
@@ -940,6 +918,7 @@ if (idNumber && idNumber.length() > 17) {
         }
         null
     }
+
 
     /**
      * 字段/属性/指标 Holder

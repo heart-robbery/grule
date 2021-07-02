@@ -335,7 +335,8 @@ jdk8, gradle6.5+, mysql5.7+/MariaDB10.2+
  * windows: ./start
 
 # TODO
-## redis 收集器
+* redis 收集器
+* password 加密
 
 # 参与贡献
 xnatural@msn.cn

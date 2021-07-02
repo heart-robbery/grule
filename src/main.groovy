@@ -22,7 +22,7 @@ import service.rule.*
 import java.time.Duration
 
 System.setProperty("configdir", "../conf")
-@Field final Logger log = LoggerFactory.getLogger(getClass())
+@Field final Logger log = LoggerFactory.getLogger("ROOT")
 @Field final AppContext app = new AppContext() //应用上下文
 @Lazy @Field EP ep = app.bean(EP, null)
 

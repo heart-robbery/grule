@@ -391,13 +391,13 @@ class DecisionContext {
                 status  : status,
                 desc    : exception?.toString(),
                 data    : end.get() && decisionHolder.spec.returnAttrs ? decisionHolder.spec.returnAttrs.collectEntries { name ->
-                def v = data.get(name)
-                if (v instanceof Optional) {v = v.orElse(null)}
-                def field = fieldManager.fieldHolders.get(name)?.field
-                //如果key是中文, 则翻译成对应的英文名
-                if (field && field.cnName == name) return [field.enName, v]
-                else return [name, v]
-            } : null
+                    def v = data.get(name)
+                    if (v instanceof Optional) {v = v.orElse(null)}
+                    def field = fieldManager.fieldHolders.get(name)?.field
+                    //如果key是中文, 则翻译成对应的英文名
+                    if (field && field.cnName == name) return [field.enName, v]
+                    else return [name, v]
+                } : null
         ]
     }
 
