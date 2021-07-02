@@ -2,6 +2,7 @@ package entity
 
 
 import cn.xnatural.jpa.IEntity
+import org.hibernate.annotations.DynamicUpdate
 import org.hibernate.annotations.Type
 import service.rule.DecideResult
 
@@ -11,6 +12,7 @@ import javax.persistence.*
  * 决策记录
  */
 @Entity
+@DynamicUpdate
 @Table(indexes = [@Index(name = "idx_occurTime", columnList = "occurTime")])
 class DecideRecord implements IEntity {
     /**
