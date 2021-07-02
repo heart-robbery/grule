@@ -79,15 +79,13 @@ class DecisionSrv extends ServerTpl {
         if (Boolean.valueOf(ctx.input.getOrDefault('async', false).toString())) {
             async {
                 String cbUrl = ctx.input['callback'] // 回调Url
-                if (cbUrl && cbUrl.startsWith('http')) {
-                    def result = ctx.result()
-                    (1..getInteger("callbackMaxTry", 2)).each {
-                        try {
-                            http.post(cbUrl).jsonBody(JSON.toJSONString(result, SerializerFeature.WriteMapNullValue)).debug().execute()
-                        } catch (ex) {
-                            log.error("回调失败. id: " + ctx.id + ", url: " + cbUrl, ex)
-                        }
-                    }
+                if (!cbUrl?.startsWith('http')) return
+                def result = JSON.toJSONString(ctx.result(), SerializerFeature.WriteMapNullValue)
+                for (i in 0..< getInteger("callbackMaxTry", 2)) {
+                    try {
+                        http.post(cbUrl).jsonBody(result).debug().execute()
+                        break
+                    } catch (ex) {}
                 }
             }
         }
@@ -171,7 +169,11 @@ class DecisionSrv extends ServerTpl {
             while (cause != null) {
                 if (cause.message.contains("Duplicate entry")) {
                     def exist = repo.find(Lock) {root, query, cb -> cb.equal(root.get("name"), lock.name)}
-                    throw new RuntimeException("清理中... 开始时间: " + new SimpleDateFormat('yyyy-MM-dd HH:mm:ss').format(exist.createTime))
+                    if (exist) {
+                        throw new RuntimeException("清理中... 开始时间: " + new SimpleDateFormat('yyyy-MM-dd HH:mm:ss').format(exist.createTime))
+                    } else {
+                        throw new RuntimeException("刚清理完")
+                    }
                 }
                 cause = cause.cause
             }
