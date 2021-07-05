@@ -42,24 +42,27 @@
         methods: {
             submit() {
                 let validResult = this.$refs.form.valid();
-                if (validResult.result) {
-                    this.$Message('验证成功');
-                    this.isLoading = true;
-                    $.ajax({
-                        url: 'mnt/user/changePwd',
-                        type: 'post',
-                        data: {id: app.$data.user.id, newPassword: this.data.newpassword2, oldPassword: this.data.oldpassword},
-                        success: (res) => {
-                            if (res.code === '00') {
-                                this.$Message.success(`更新密码成功`);
-                                this.data = {};
-                                this.isLoading = false;
-                            } else this.$Notice.error(res.desc)
-                        }
-                    })
-                } else {
-                    this.$Message.error(`还有${validResult.messages.length}个错误未通过验证。`);
+                if (!validResult.result) {
+                    this.$Message.error(`还有${validResult.messages.length}个错误未通过验证`);
+                    return
                 }
+                this.isLoading = true;
+                $.ajax({
+                    url: 'mnt/user/changePwd',
+                    type: 'post',
+                    data: {id: app.$data.user.id, newPassword: md5(this.data.newpassword2), oldPassword: md5(this.data.oldpassword)},
+                    success: (res) => {
+                        if (res.code === '00') {
+                            this.$Message.success(`更新密码成功`);
+                            this.data = {};
+                            this.isLoading = false;
+                        } else this.$Message.error(res.desc)
+                    },
+                    error: (xhr, status) => {
+                        this.isLoading = false
+                        this.$Message.error(`${status} : ${xhr.responseText}`)
+                    }
+                })
             }
         }
     }

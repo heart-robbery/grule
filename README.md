@@ -336,7 +336,8 @@ jdk8, gradle6.5+, mysql5.7+/MariaDB10.2+
 
 # TODO
 * redis 收集器
-* password 加密
+* ~~password 加密~~
+* 用户权限关联独为单独一个实体
 
 # 参与贡献
 xnatural@msn.cn

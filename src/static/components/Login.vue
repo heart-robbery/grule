@@ -27,8 +27,9 @@
     </h-modal>
 </template>
 <script>
+    loadJs('md5')
     module.exports = {
-        data: function() {
+        data() {
             return {
                 opened: true,
                 isLoading: false,
@@ -45,34 +46,34 @@
             submit() {
                 this.isLoading = true;
                 let validResult = this.$refs.form.valid();
-                if (validResult.result) {
-                    $.ajax({
-                        url: 'mnt/login',
-                        type: 'post',
-                        data: this.model,
-                        success: (res) => {
-                            this.isLoading = true;
-                            if (res.code === '00') {
-                                this.$Message.success('登录成功');
-                                // $.extend(app.$data.user, res.data);
-                                app.$data.user = res.data;
-                                if (app.$data.user.permissionIds == undefined || app.$data.user.permissionIds == null) app.$data.user.permissionIds = [];
-                                localStorage.setItem('rule.login.username', this.model.username);
-                                localStorage.setItem('rule.login.password', this.model.password);
-                            } else {
-                                this.isLoading = false;
-                                this.$Notice.error(res.desc)
-                            }
-                        },
-                        error: (xhr) => {
-                            this.isLoading = false;
-                            if (xhr.status != 403 && xhr.status != 401) this.$Message.error('登陆错误. ' + xhr.status)
-                        }
-                    })
-                } else {
+                if (!validResult.result) {
                     // app.$Message('验证失败');
                     this.isLoading = false;
+                    return
                 }
+                $.ajax({
+                    url: 'mnt/login',
+                    type: 'post',
+                    data: {username: this.model.username, password: md5(this.model.password)},
+                    success: (res) => {
+                        this.isLoading = true;
+                        if (res.code === '00') {
+                            this.$Message.success('登录成功');
+                            // $.extend(app.$data.user, res.data);
+                            app.$data.user = res.data;
+                            if (app.$data.user.permissionIds === undefined || app.$data.user.permissionIds == null) app.$data.user.permissionIds = [];
+                            localStorage.setItem('rule.login.username', this.model.username);
+                            localStorage.setItem('rule.login.password', this.model.password);
+                        } else {
+                            this.isLoading = false;
+                            this.$Notice.error(res.desc)
+                        }
+                    },
+                    error: (xhr) => {
+                        this.isLoading = false;
+                        if (xhr.status !== 403 && xhr.status !== 401) this.$Message.error('登陆错误. ' + xhr.status)
+                    }
+                })
             },
             reset() {
                 this.model = {}

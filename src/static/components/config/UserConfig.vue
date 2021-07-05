@@ -38,6 +38,7 @@
     </div>
 </template>
 <script>
+    loadJs('md5')
     const addEditPop = { //添加,编辑窗口组件
         template: `
                 <div style="padding-top: 10px">
@@ -146,6 +147,7 @@
                 let data = $.extend({}, this.model);
                 delete data.permissions;
                 data.permissionIds = this.model.permissions.map(o => o.enName);
+                data.password = md5(data.password)
                 $.ajax({
                     url: 'mnt/user/add',
                     type: 'post',
@@ -158,7 +160,10 @@
                             this.$emit('reload');
                         } else this.$Message.error(res.desc)
                     },
-                    error: () => this.isLoading = false
+                    error: (xhr, status) => {
+                        this.isLoading = false
+                        this.$Message.error(`${status} : ${xhr.responseText}`)
+                    }
                 })
             },
         }
@@ -189,15 +194,18 @@
                 $.ajax({
                     url: 'mnt/user/restPassword',
                     type: 'post',
-                    data: {id: this.model.id, newPassword: this.model.newPassword},
+                    data: {id: this.model.id, newPassword: md5(this.model.newPassword)},
                     success: (res) => {
                         this.isLoading = false;
                         if (res.code === '00') {
                             this.$emit('close');
                             this.$Message.success(`用户 ${this.model.name} 密码重置成功`);
-                        } else this.$Notice.error(res.desc)
+                        } else this.$Message.error(res.desc)
                     },
-                    error: () => this.isLoading = false
+                    error: (xhr, status) => {
+                        this.isLoading = false
+                        this.$Message.error(`${status} : ${xhr.responseText}`)
+                    }
                 })
             }
         }
@@ -306,7 +314,10 @@
                             this.list = res.data.list;
                         } else this.$Notice.error(res.desc)
                     },
-                    error: () => this.loading = false
+                    error: (xhr, status) => {
+                        this.loading = false
+                        this.$Message.error(`${status} : ${xhr.responseText}`)
+                    }
                 })
             }
         }

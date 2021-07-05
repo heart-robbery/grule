@@ -10,6 +10,7 @@
     </div>
 </template>
 <script>
+    loadJs('md5')
     module.exports = {
         data() {
             let types = {UserConfig: '用户列表'};

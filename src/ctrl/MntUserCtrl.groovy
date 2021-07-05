@@ -157,7 +157,6 @@ class MntUserCtrl extends ServerTpl {
      * 删除用户
      * @param hCtx
      * @param id id
-     * @return
      */
     @Path(path = 'del/:id')
     ApiResp del(HttpContext hCtx, Long id) {
