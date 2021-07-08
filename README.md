@@ -1,5 +1,4 @@
 # Groovy DSL 动态规则(rule)执行引擎
-持续更新中...
 
 > DSL(特定领域语言): 开发 和 业务 共识的语言. 方便业务表达需求, 方便开发理解业务
 
@@ -338,6 +337,7 @@ jdk8, gradle6.5+, mysql5.7+/MariaDB10.2+
 * redis 收集器
 * ~~password 加密~~
 * 用户权限关联独为单独一个实体
+* 拆FieldManager-可用trait
 
 # 参与贡献
 xnatural@msn.cn

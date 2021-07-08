@@ -108,7 +108,7 @@ class DecisionManager extends ServerTpl {
         def apiConfig = decision.apiConfig ? JSON.parseArray(decision.apiConfig) : null
         Map<String, Function<Object, Boolean>> validFunMap = [:]
         Map<String, Pattern> patternMap = [:]
-        decisionMap.put(spec.决策id, new DecisionHolder(decision: decision, spec: spec, paramValidator: (apiConfig ? { Map<String, Object> params ->
+        decisionMap.put(spec.决策id, new DecisionHolder(decision: decision, spec: spec, paramValidator: (apiConfig ? {Map<String, Object> params ->
             apiConfig.each { JSONObject paramCfg ->
                 String code = paramCfg.getString('code') // 参数code
                 def value = params.get(code)
@@ -254,8 +254,8 @@ class DecisionManager extends ServerTpl {
                 }
 
                 if (value != null || params.containsKey(code)) params.put(code, value) // 类型矫正
-                true
             }
+            true
         } : null)))
         log.info("初始化决策(${decision.id}): ${decision.name}, ${decision.decisionId}".toString())
     }

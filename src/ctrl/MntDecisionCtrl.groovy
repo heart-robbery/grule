@@ -13,6 +13,7 @@ import com.alibaba.fastjson.JSONArray
 import com.alibaba.fastjson.JSONObject
 import com.alibaba.fastjson.parser.Feature
 import entity.*
+import service.rule.CollectorManager
 import service.rule.DecideResult
 import service.rule.DecisionManager
 import service.rule.DecisionSrv
@@ -29,6 +30,7 @@ class MntDecisionCtrl extends ServerTpl {
     @Lazy def repo = bean(Repo, 'jpa_rule_repo')
     @Lazy def decisionManager = bean(DecisionManager)
     @Lazy def fieldManager = bean(FieldManager)
+    @Lazy def collectorManager = bean(CollectorManager)
 
 
     @Path(path = 'decisionPage')
@@ -96,7 +98,7 @@ class MntDecisionCtrl extends ServerTpl {
                 JSON.parseArray(opts).collect {JSONObject jo ->
                     jo.fluentPut(
                             "collectorName",
-                            fieldManager.collectorHolders.find {it.key == jo['collectorId']}?.value?.collector?.name
+                            collectorManager.collectorHolders.find {it.key == jo['collectorId']}?.value?.collector?.name
                     )
                 }
             }
@@ -232,7 +234,7 @@ class MntDecisionCtrl extends ServerTpl {
                                         if (arr.length == 1) collectorId = e.key
                                         else collectorId = arr[0]
                                         [
-                                                (fieldManager.collectorHolders.findResult {
+                                                (collectorManager.collectorHolders.findResult {
                                                     it.value.collector.id == collectorId ? it.value.collector.name + (arr.length > 1 ? '_' + arr.drop(1).join('_') : '') : null
                                                 }?:e.key): e.value
                                         ]
@@ -313,9 +315,9 @@ class MntDecisionCtrl extends ServerTpl {
                 .addConverter('decisionId', 'decisionName', {String dId ->
                     decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name
                 }).addConverter('collector', 'collectorName', {String cId ->
-                    fieldManager.collectorHolders.get(cId)?.collector?.name
+                    collectorManager.collectorHolders.get(cId)?.collector?.name
                 }).addConverter('collector', 'collectorType', {String cId ->
-                    fieldManager.collectorHolders.get(cId)?.collector?.type
+                    collectorManager.collectorHolders.get(cId)?.collector?.type
                 }).build()
             }
         )
@@ -675,7 +677,7 @@ class MntDecisionCtrl extends ServerTpl {
 
     @Path(path = 'testCollector/:id')
     ApiResp testCollector(String id, HttpContext hCtx) {
-        ApiResp.ok(fieldManager?.testCollector(id, hCtx.params()))
+        ApiResp.ok(bean(CollectorManager).testCollector(id, hCtx.params()))
     }
 
 

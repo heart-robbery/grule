@@ -16,7 +16,7 @@ import java.time.Duration
  * 决策Service
  */
 class DecisionSrv extends ServerTpl {
-    static final String SAVE_RESULT = 'save_result'
+    protected static final String SAVE_RESULT = 'save_result'
 
     @Lazy def http = bean(OkHttpSrv)
     @Lazy def repo = bean(Repo, 'jpa_rule_repo')
