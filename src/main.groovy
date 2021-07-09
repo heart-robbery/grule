@@ -83,6 +83,7 @@ app.addSource(new HttpSrv().ctrls(
         TestCtrl, MainCtrl, RuleCtrl, MntCtrl, MntUserCtrl, MntDecisionCtrl, MntAnalyseCtrl
 ))
 app.addSource(new FileUploader())
+app.addSource(new CollectorManager())
 app.addSource(new TestService())
 app.addSource(new FieldManager())
 app.addSource(new DecisionSrv())
