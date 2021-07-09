@@ -1,7 +1,6 @@
 package ctrl
 
 import cn.xnatural.app.ServerTpl
-import cn.xnatural.app.Utils
 import cn.xnatural.enet.event.EL
 import cn.xnatural.http.*
 import cn.xnatural.jpa.Repo
@@ -14,17 +13,6 @@ class MntCtrl extends ServerTpl {
 
     @Lazy def repo = bean(Repo, 'jpa_rule_repo')
     protected final Set<WebSocket> wss = ConcurrentHashMap.newKeySet()
-
-
-    @Filter
-    void filter(HttpContext ctx) {
-        if (ctx.pieces?[0] !in ['login']) { // session 判断, login 不拦截
-            def res = getCurrentUser(ctx)
-            if (res.code != '00') { // 判断当前session 是否过期
-                ctx.render(res)
-            }
-        }
-    }
 
 
     @EL(name = 'wsMsg_rule')
@@ -84,26 +72,5 @@ class MntCtrl extends ServerTpl {
         ctx.setSessionAttr('uId', null)
         ctx.setSessionAttr('uName', null)
         ApiResp.ok()
-    }
-
-
-    /**
-     * 获取当前 会话 中的用户信息
-     * @param hCtx
-     * @return
-     */
-    @Path(path = 'getCurrentUser')
-    ApiResp getCurrentUser(HttpContext hCtx) {
-        String name = hCtx.getSessionAttr('uName')
-        if (name) {
-            def uId = hCtx.getSessionAttr('uId')
-            def permissions = repo.findById(User, Utils.to(uId, Long)).permissions
-            hCtx.setSessionAttr('permissions', permissions)
-            return ApiResp.ok().attr('id', uId).attr('name', name)
-                    .attr('permissionIds', permissions.split(",")?:[])
-        } else {
-            hCtx.response.status(401)
-            return ApiResp.fail('用户会话已失效, 请重新登录')
-        }
     }
 }

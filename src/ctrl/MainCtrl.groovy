@@ -2,16 +2,51 @@ package ctrl
 
 import cn.xnatural.app.ServerTpl
 import cn.xnatural.app.Utils
-import cn.xnatural.http.ApiResp
-import cn.xnatural.http.Ctrl
-import cn.xnatural.http.HttpContext
-import cn.xnatural.http.Path
+import cn.xnatural.http.*
+import cn.xnatural.jpa.Repo
+import entity.User
 import service.FileUploader
 
 @Ctrl
 class MainCtrl extends ServerTpl {
 
-    @Lazy def fu = bean(FileUploader)
+    @Lazy def fileUploader = bean(FileUploader)
+    @Lazy def repo = bean(Repo, 'jpa_rule_repo')
+    // 需要登录权限的页面
+    final Set<String> auth_page = ["OpHistory.vue", "FieldConfig.vue", "DataCollectorConfig.vue", "Permission.vue", "DecideResult.vue", "CollectResult.vue"]
+
+    @Filter
+    void filter(HttpContext hCtx) {
+        // 需要登录权限的请求路径过虑判断
+        if (
+            (hCtx.pieces?[0] == 'mnt' && !(hCtx.pieces?[1] == 'login')) ||
+            (hCtx.pieces?[0] == 'components' && hCtx.pieces?[2] in auth_page)
+        ) {
+            def res = getCurrentUser(hCtx)
+            if (res.code != '00') { // 判断当前session 是否过期
+                hCtx.render(res)
+            }
+        }
+    }
+
+
+    /**
+     * 获取当前 会话 中的用户信息
+     */
+    @Path(path = 'getCurrentUser')
+    ApiResp getCurrentUser(HttpContext hCtx) {
+        def uId = hCtx.getSessionAttr('uId')
+        if (uId) {
+            def permissions = repo.findById(User, Utils.to(uId, Long)).permissions
+            hCtx.setSessionAttr('permissions', permissions)
+            return ApiResp.ok().attr('id', uId)
+                    .attr('name', hCtx.getSessionAttr('uName'))
+                    .attr('permissionIds', permissions.split(",")?:[])
+        } else {
+            hCtx.response.status(401)
+            return ApiResp.fail('用户会话已失效, 请重新登录')
+        }
+    }
 
 
     @Path(path = ['index.html', '/'])
@@ -51,7 +86,7 @@ class MainCtrl extends ServerTpl {
         if (app().profile == 'pro') {
             hCtx.response.cacheControl(1800)
         }
-        fu.findFile(fName)
+        fileUploader.findFile(fName)
     }
 
 
