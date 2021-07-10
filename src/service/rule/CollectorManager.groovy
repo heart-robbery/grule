@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory
 
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Function
 
 /**
@@ -44,7 +45,7 @@ class CollectorManager extends ServerTpl {
 
     @EL(name = 'jpa_rule.started', async = true)
     void init() {
-        loadDataCollector()
+        load()
 
         Long lastWarn // 上次告警时间
         queue(DATA_COLLECTED)
@@ -173,25 +174,35 @@ class CollectorManager extends ServerTpl {
 
 
     /**
-     * 加载数据集成
+     * 加载所有数据收集器
      */
-    void loadDataCollector() {
+    void load() {
         initDefaultCollector()
-        Set<String> ids = (collectorHolders.isEmpty() ? null : new HashSet<>(50))
-        for (int page = 0, limit = 50; ; page++) {
-            def ls = repo.findList(DataCollector, page * limit, limit, null)
-            if (!ls) break
-            ls.each {collector ->
-                initDataCollector(collector)
-                ids?.add(collector.id)
+        final Set<String> ids = (collectorHolders ? ConcurrentHashMap.newKeySet(collectorHolders.size()) : null)
+        final def threshold = new AtomicInteger(1)
+        final def tryComplete = {
+            if (threshold.decrementAndGet() > 0) return
+            if (ids) { // 重新加载, 要删除内存中有, 但库中没有
+                collectorHolders.findAll {!ids.contains(it.key)}.each { e ->
+                    collectorHolders.remove(e.key)
+                }
+            }
+            log.info("加载数据收集器 {}个", collectorHolders.size())
+        }
+        for (int page = 0, limit = 20; ; page++) {
+            def ls = repo.findList(DataCollector, page * limit, limit)
+            threshold.incrementAndGet()
+            async {
+                ls.each {collector ->
+                    initDataCollector(collector)
+                    ids?.add(collector.id)
+                }
+                tryComplete()
+            }
+            if (!ls || ls.size() < limit) {
+                tryComplete(); break
             }
         }
-        if (ids) { // 重新加载, 要删除内存中有, 但库中没有
-            collectorHolders.findAll {!ids.contains(it.key)}.each { e ->
-                collectorHolders.remove(e.key)
-            }
-        }
-        log.info("加载数据收集器 {}个", collectorHolders.size())
     }
 
 
@@ -287,9 +298,9 @@ if (idNumber && idNumber.length() > 17) {
         }
 
         def db = new Sql(Repo.createDataSource([ //创建一个DB. 用于界面配置sql脚本
-                                                 url: collector.url, jdbcUrl: collector.url,
-                                                 minIdle: collector.minIdle, maxActive: collector.maxActive,
-                                                 minimumIdle: collector.minIdle, maximumPoolSize: collector.maxActive
+            url: collector.url, jdbcUrl: collector.url,
+            minIdle: collector.minIdle, maxActive: collector.maxActive,
+            minimumIdle: collector.minIdle, maximumPoolSize: collector.maxActive
         ]))
 
         Binding binding = new Binding()

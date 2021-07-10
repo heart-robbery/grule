@@ -677,7 +677,7 @@ class MntDecisionCtrl extends ServerTpl {
 
     @Path(path = 'testCollector/:id')
     ApiResp testCollector(String id, HttpContext hCtx) {
-        ApiResp.ok(bean(CollectorManager).testCollector(id, hCtx.params()))
+        ApiResp.ok(collectorManager.testCollector(id, hCtx.params()))
     }
 
 

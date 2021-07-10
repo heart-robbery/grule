@@ -62,27 +62,23 @@ class DecisionManager extends ServerTpl {
     }
 
 
+    /**
+     * 加载所有决策
+     */
     @EL(name = 'jpa_rule.started', async = true)
-    protected void load() {
-        log.debug("加载决策")
-        Set<String> ids = (decisionMap ? new HashSet<>() : null)
-        def threshold = new AtomicInteger(1)
-        def tryCompleteFn = {
+    void load() {
+        final Set<String> ids = (decisionMap ? ConcurrentHashMap.newKeySet(decisionMap.size()) : null)
+        final def threshold = new AtomicInteger(1)
+        final def tryComplete = {
             if (threshold.decrementAndGet() > 0) return
-            if (ids) {
-                decisionMap.collect {it.key}.each { decisionId ->
-                    if (!ids.contains(decisionId)) { // 删除库里面没有, 内存里面有的数据
-                        decisionMap.remove(decisionId)
-                    }
+            if (ids) { // 删除库里面没有, 内存里面有的数据
+                decisionMap.findAll {!ids.contains(it.key)}.each {
+                    decisionMap.remove(it.key)
                 }
             }
         }
         for (int page = 0, limit = 10; ; page++) {
             def ls = repo.findList(Decision, page * limit, limit)
-            if (!ls) { // 结束
-                tryCompleteFn()
-                break
-            }
             threshold.incrementAndGet()
             async { // 异步加载
                 ls.each { decision ->
@@ -93,7 +89,10 @@ class DecisionManager extends ServerTpl {
                         log.error("加载决策'${decision.name}:${decision.decisionId}'错误", ex)
                     }
                 }
-                tryCompleteFn()
+                tryComplete()
+            }
+            if (!ls || ls.size() < limit) {
+                tryComplete(); break
             }
         }
     }

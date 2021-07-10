@@ -17,6 +17,7 @@ import org.codehaus.groovy.control.customizers.ImportCustomizer
 import org.slf4j.LoggerFactory
 
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 属性管理
@@ -104,27 +105,37 @@ class FieldManager extends ServerTpl {
 
 
     /**
-     * 加载属性
+     * 加载所有指标
      */
     @EL(name = 'jpa_rule.started', async = true, order = 1f)
-    void loadField() {
+    void load() {
         initDefaultField()
-        Set<String> names = (fieldHolders.isEmpty() ? null : new HashSet<>(100))
+        final Set<String> names = (fieldHolders ? ConcurrentHashMap.newKeySet(fieldHolders.size() / 2) : null)
+        final def threshold = new AtomicInteger(1)
+        final def tryComplete = {
+            if (threshold.decrementAndGet() > 0) return
+            if (names) { // 重新加载, 要删除内存中有, 但库中没有
+                fieldHolders.findAll {!names.contains(it.key)}.each { e ->
+                    fieldHolders.remove(e.key)
+                }
+            }
+            log.info("加载字段属性 {}个", fieldHolders.size() / 2)
+        }
         for (int page = 0, limit = 50; ; page++) {
-            def ls = repo.findList(RuleField, page * limit, limit, null)
-            if (!ls) break
-            ls.each {field ->
-                initField(field)
-                names?.add(field.enName)
-                names?.add(field.cnName)
+            def ls = repo.findList(RuleField, page * limit, limit)
+            threshold.incrementAndGet()
+            async {
+                ls.each {field ->
+                    initField(field)
+                    names?.add(field.enName)
+                    names?.add(field.cnName)
+                }
+                tryComplete()
+            }
+            if (!ls || ls.size() < limit) {
+                tryComplete(); break
             }
         }
-        if (names) { // 重新加载, 要删除内存中有, 但库中没有
-            fieldHolders.findAll {!names.contains(it.key)}.each { e ->
-                fieldHolders.remove(e.key)
-            }
-        }
-        log.info("加载字段属性 {}个", fieldHolders.size() / 2)
     }
 
 
