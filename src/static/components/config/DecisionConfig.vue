@@ -51,7 +51,7 @@
                     </div>
                 </div>
                 <div class="h-panel-body">
-                    <h-table v-if="decision.apiConfigO" :datas="decision.apiConfigO" stripe select-when-click-tr border :height="480">
+                    <h-table v-if="decision.apiConfigO" :datas="decision.apiConfigO" stripe select-when-click-tr border>
                         <h-tableitem title="参数名" align="center" :width="220">
                             <template slot-scope="{data}">
                                 <input type="text" v-model="data.code" :readonly="data._readonly"/>
@@ -128,7 +128,7 @@
                                         <input type="text" v-model="data.regex" />
                                     </h-formitem>
                                     <h-formitem v-if="data.type == 'Str'" label="验证函数">
-                                        <ace-groovy v-model="data.validFun" style="height: 80px}"></ace-groovy>
+                                        <ace-groovy v-model="data.validFun" style="height: 80px"></ace-groovy>
                                     </h-formitem>
 
                                     <h-formitem v-if="data.type == 'Int'" label="最小值">
@@ -322,8 +322,7 @@
                         vue: apiConfig,
                         datas: {decision: item}
                     },
-                    //width: 1200,
-                    middle: true, draggable: true, closeOnMask: false, hasCloseIcon: true, fullScreen: true, transparent: false,
+                    middle: false, draggable: true, closeOnMask: false, hasCloseIcon: true, fullScreen: true, transparent: false,
                     events: {
                         update: () => {
                             this.save()
