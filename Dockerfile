@@ -1,15 +1,15 @@
-FROM docker.io/gradle:6.8
-ENV TZ Asia/Chongqing
+FROM gradle:7.1.1-jdk8
+ENV TZ Asia/Shanghai
 
-RUN mkdir -p /srv/rule
+RUN mkdir -p /srv/grule
 
-ADD bin /srv/rule/bin
-ADD conf /srv/rule/conf
-ADD src /srv/rule/src
-ADD build.gradle /srv/rule/build.gradle
-ADD start.sh /srv/rule/start.sh
+ADD bin /srv/grule/bin
+ADD conf /srv/grule/conf
+ADD src /srv/grule/src
+ADD build.gradle /srv/grule/build.gradle
+ADD start.sh /srv/grule/start.sh
 
-WORKDIR /srv/rule/
+WORKDIR /srv/grule/
 
 RUN gradle deps
 

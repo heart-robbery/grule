@@ -99,7 +99,7 @@ task deps(type: Copy) {
 
 
 task tgz(dependsOn: ['deps'], type: Tar) {
-    new File("${buildDir}/rule.tgz").deleteOnExit()
+    new File("${buildDir}/grule.tgz").deleteOnExit()
 
     into("bin") {from("bin")}
     into("conf") {from "conf"}
@@ -110,14 +110,14 @@ task tgz(dependsOn: ['deps'], type: Tar) {
     from "start.bat"
     from("start.sh")
 
-    archiveFileName = "rule.tgz"
+    archiveFileName = "grule.tgz"
     compression(Compression.GZIP)
     destinationDirectory = file("${buildDir}")
 }
 
 
 task tarDir(dependsOn: ['deps'], type: Copy) {
-    new File("${buildDir}/rule").deleteDir()
+    new File("${buildDir}/grule").deleteDir()
 
     into("bin") {from("bin")}
     into("conf") {from "conf"}
@@ -128,5 +128,5 @@ task tarDir(dependsOn: ['deps'], type: Copy) {
     from "start.bat"
     from("start.sh")
 
-    into "${buildDir}/rule"
+    into "${buildDir}/grule"
 }
