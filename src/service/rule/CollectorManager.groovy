@@ -33,6 +33,7 @@ class CollectorManager extends ServerTpl {
     @Lazy def repo = bean(Repo, 'jpa_rule_repo')
     @Lazy def redis = bean(RedisClient)
     @Lazy def cacheSrv = bean(CacheSrv)
+    @Lazy def fieldManager = bean(FieldManager)
     /**
      * 数据获取函数. 收集器id -> 收集器
      */
@@ -812,7 +813,7 @@ if (idNumber && idNumber.length() > 17) {
                         key = aName
                         value = collectResult.get(key)
                     } else {
-                        key = alias(aName)
+                        key = fieldManager.alias(aName)
                         value = collectResult.get(key)
                     }
                     if (value instanceof Closure) { // 延迟计算函数,只计算一次
