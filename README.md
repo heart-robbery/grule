@@ -333,15 +333,10 @@ jdk8, gradle6.8+, mysql5.7+/MariaDB10.2+
  * linux: nohup sh start.sh -Xmx512m -Xms512m > /dev/null 2>&1 &
  * windows: ./start
 
-# v1.2.3 ing...
-* redis 收集器
-* ~~password 加密~~
-* 用户权限关联独为单独一个实体
-* ~~拆FieldManager-CollectorManager~~
-* ~~指标,收集器异步并发加载~~
-* ace-groovy placeholder
-* ~~fix 决策api配置样式~~
-* ~~收集器: 配了缓存时间就缓存~~
+# v1.2.4 ing...
+- [ ] ace-groovy placeholder
+- [ ] 用户权限关联独为单独一个实体
+- [ ] redis 收集器
 
 # 参与贡献
 xnatural@msn.cn
