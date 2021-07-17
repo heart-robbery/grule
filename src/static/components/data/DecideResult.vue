@@ -360,10 +360,9 @@
                 this.list = [];
                 let data = $.extend(true, {page: page.page || 1}, this.model);
                 if (data.attrFilters) {
-                    data.attrFilters.forEach((item, index) => delete item.fieldAc);
+                    data.attrConditions = JSON.stringify(data.attrFilters.map(item => {delete item.fieldAc; return item}).filter(o => o.fieldId != null));
+                    delete data.attrFilters;
                 }
-                data.attrConditions = JSON.stringify(data.attrFilters);
-                delete data.attrFilters;
                 $.ajax({
                     url: 'mnt/decisionResultPage',
                     data: data,
