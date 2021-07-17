@@ -1,5 +1,6 @@
 package ctrl
 
+import cn.xnatural.app.CacheSrv
 import cn.xnatural.app.ServerTpl
 import cn.xnatural.app.Utils
 import cn.xnatural.http.ApiResp
@@ -18,7 +19,8 @@ import javax.persistence.criteria.Predicate
  */
 @Ctrl(prefix = 'mnt/user')
 class MntUserCtrl extends ServerTpl {
-    @Lazy def repo = bean(Repo, 'jpa_rule_repo')
+    @Lazy protected cacheSrv = bean(CacheSrv)
+    @Lazy protected repo = bean(Repo, 'jpa_rule_repo')
 
 
     /**
@@ -115,7 +117,6 @@ class MntUserCtrl extends ServerTpl {
      * @param password 密码
      * @param group 组名
      * @param permissionIds 权限标识
-     * @return
      */
     @Path(path = 'add')
     ApiResp add(HttpContext hCtx, String name, String password, String group, String[] permissionIds) {
@@ -185,6 +186,8 @@ class MntUserCtrl extends ServerTpl {
             }
         }
         //3. grant用户: 随便删
+
+        cacheSrv.remove("permission_" + id)
         return ApiResp.ok(repo.delete(User, id))
     }
 
@@ -195,7 +198,6 @@ class MntUserCtrl extends ServerTpl {
      * @param id id
      * @param group 组
      * @param permissionIds 权限标识
-     * @return
      */
     @Path(path = 'update')
     ApiResp update(HttpContext hCtx, Long id, String group, String[] permissionIds) {
@@ -274,6 +276,7 @@ class MntUserCtrl extends ServerTpl {
         } else {
             repo.saveOrUpdate(user)
         }
+        cacheSrv.remove("permission_" + user.id)
         return resp.attr('id', user.id).attr('name', user.name)
                 .attr('permissions', user.permissions?.split(","))
     }
@@ -449,7 +452,6 @@ class MntUserCtrl extends ServerTpl {
 
     /**
      * 组 分页查询
-     * @return
      */
     @Path(path = 'groupPage')
     ApiResp<Page<String>> groupPage(HttpContext hCxt, Integer page, Integer pageSize, String kw) {
