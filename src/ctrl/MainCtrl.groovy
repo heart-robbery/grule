@@ -1,5 +1,6 @@
 package ctrl
 
+import cn.xnatural.app.CacheSrv
 import cn.xnatural.app.ServerTpl
 import cn.xnatural.app.Utils
 import cn.xnatural.http.*
@@ -10,17 +11,22 @@ import service.FileUploader
 @Ctrl
 class MainCtrl extends ServerTpl {
 
-    @Lazy def fileUploader = bean(FileUploader)
-    @Lazy def repo = bean(Repo, 'jpa_rule_repo')
+    @Lazy protected fileUploader = bean(FileUploader)
+    @Lazy protected cacheSrv = bean(CacheSrv)
+    @Lazy protected repo = bean(Repo, 'jpa_rule_repo')
     // 需要登录权限的页面
-    final Set<String> auth_page = ["OpHistory.vue", "FieldConfig.vue", "DataCollectorConfig.vue", "Permission.vue", "DecideResult.vue", "CollectResult.vue"]
+    protected final Map<String, String> auth_page = [
+            "config/OpHistory.vue": "opHistory-read", "config/FieldConfig.vue": "field-read",
+            "config/DataCollectorConfig.vue": "dataCollector-read", "config/Permission.vue": "grant",
+            "data/DecideResult.vue": "decideResult-read", "data/CollectResult.vue": "collectResult-read"
+    ]
 
     @Filter
     void filter(HttpContext hCtx) {
         // 需要登录权限的请求路径过虑判断
         if (
             (hCtx.pieces?[0] == 'mnt' && !(hCtx.pieces?[1] == 'login')) ||
-            (hCtx.pieces?[0] == 'components' && hCtx.pieces?[2] in auth_page)
+            auth_page.keySet().find {hCtx.request.path.endsWith(it)}
         ) {
             def res = getCurrentUser(hCtx)
             if (res.code != '00') { // 判断当前session 是否过期
@@ -37,11 +43,16 @@ class MainCtrl extends ServerTpl {
     ApiResp getCurrentUser(HttpContext hCtx) {
         def uId = hCtx.getSessionAttr('uId')
         if (uId) {
-            def permissions = repo.findById(User, Utils.to(uId, Long)).permissions
-            hCtx.setSessionAttr('permissions', permissions)
+            def pIds = cacheSrv.get("permission_" + uId)
+            if (pIds == null) {
+                def permissions = repo.findById(User, Utils.to(uId, Long)).permissions
+                pIds = permissions?.split(',')?.toList()?.toSet()?:Collections.emptySet()
+                cacheSrv.set("permission_" + uId, pIds)
+            }
+            hCtx.setAttr('permissions', pIds)
             return ApiResp.ok().attr('id', uId)
                     .attr('name', hCtx.getSessionAttr('uName'))
-                    .attr('permissionIds', permissions.split(",")?:[])
+                    .attr('permissionIds', pIds)
         } else {
             hCtx.response.status(401)
             return ApiResp.fail('用户会话已失效, 请重新登录')
@@ -127,13 +138,8 @@ class MainCtrl extends ServerTpl {
         if (app().profile == 'pro') {
             hCtx.response.cacheControl(1800)
         }
-        if (fName.contains("OpHistory.vue")) hCtx.auth("opHistory-read")
-        if (fName.contains("FieldConfig.vue")) hCtx.auth("field-read")
-        if (fName.contains("DataCollectorConfig.vue")) hCtx.auth("dataCollector-read")
-        // if (fName.contains("DecisionConfig.vue")) hCtx.auth("decision-read")
-        if (fName.contains("Permission.vue")) hCtx.auth("grant")
-        if (fName.contains("DecideResult.vue")) hCtx.auth("decideResult-read")
-        if (fName.contains("CollectResult.vue")) hCtx.auth("collectResult-read")
+        def permission = auth_page.get(fName)
+        if (permission) hCtx.auth(permission)
         Utils.baseDir("static/components/$fName")
     }
 
