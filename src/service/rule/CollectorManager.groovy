@@ -30,10 +30,12 @@ import java.util.function.Function
  */
 class CollectorManager extends ServerTpl {
     protected static final String DATA_COLLECTED = "data_collected"
-    @Lazy def repo = bean(Repo, 'jpa_rule_repo')
-    @Lazy def redis = bean(RedisClient)
-    @Lazy def cacheSrv = bean(CacheSrv)
-    @Lazy def fieldManager = bean(FieldManager)
+    @Lazy protected repo = bean(Repo, 'jpa_rule_repo')
+    @Lazy protected redis = bean(RedisClient)
+    @Lazy protected cacheSrv = bean(CacheSrv)
+    @Lazy protected fieldManager = bean(FieldManager)
+    // 是否异步保存决策结果
+    @Lazy protected asyncSave = getBoolean("asyncSave", true)
     /**
      * 数据获取函数. 收集器id -> 收集器
      */
@@ -48,19 +50,21 @@ class CollectorManager extends ServerTpl {
     void init() {
         load()
 
-        Long lastWarn // 上次告警时间
-        queue(DATA_COLLECTED)
-                .failMaxKeep(getInteger(DATA_COLLECTED + ".failMaxKeep", 10000))
-                .parallel(getInteger("saveResult.parallel", 10))
-                .errorHandle {ex, me ->
-                    if (lastWarn == null || (System.currentTimeMillis() - lastWarn >= Duration.ofSeconds(getLong(DATA_COLLECTED + ".warnInterval", 60 * 5L)).toMillis())) {
-                        lastWarn = System.currentTimeMillis()
-                        log.error("保存数据收集结果到数据库错误", ex)
-                        ep.fire("globalMsg", "保存数据收集结果到数据库错误: " + (ex.message?:ex.class.simpleName))
+        if (asyncSave) {
+            Long lastWarn // 上次告警时间
+            queue(DATA_COLLECTED)
+                    .failMaxKeep(getInteger(DATA_COLLECTED + ".failMaxKeep", 10000))
+                    .parallel(getInteger("saveResult.parallel", 10))
+                    .errorHandle {ex, me ->
+                        if (lastWarn == null || (System.currentTimeMillis() - lastWarn >= Duration.ofSeconds(getLong(DATA_COLLECTED + ".warnInterval", 60 * 5L)).toMillis())) {
+                            lastWarn = System.currentTimeMillis()
+                            log.error("保存数据收集结果到数据库错误", ex)
+                            ep.fire("globalMsg", "保存数据收集结果到数据库错误: " + (ex.message?:ex.class.simpleName))
+                        }
+                        // 暂停一会
+                        me.suspend(Duration.ofMillis(500 + new Random().nextInt(1000)))
                     }
-                    // 暂停一会
-                    me.suspend(Duration.ofMillis(500 + new Random().nextInt(1000)))
-                }
+        }
 
         ep.fire("${name}.started")
     }
@@ -78,8 +82,11 @@ class CollectorManager extends ServerTpl {
     }
 
 
-    @EL(name = 'decision.end', async = true)
-    void endDecision(DecisionContext ctx) { lazyCollectRecords.remove(ctx.id)?.each { it.call() } }
+    @EL(name = 'decision.end')
+    void endDecision(DecisionContext ctx) {
+        if (asyncSave) async { lazyCollectRecords.remove(ctx.id)?.each { it.call() } }
+        else lazyCollectRecords.remove(ctx.id)?.each { it.call() }
+    }
 
 
     @EL(name = ['dataCollectorChange', 'dataCollector.dataVersion'], async = true)
@@ -130,7 +137,7 @@ class CollectorManager extends ServerTpl {
             DataCollector collector, DecisionContext ctx, Boolean cache, Date collectDate, Long spend, String dataStatus,
             Object result, Exception ex, def resolveResult, Exception resolveException, String url = null, String body = null
     ) {
-        queue(DATA_COLLECTED) {
+        final Runnable save = () -> {
             // 是否有延迟计算值
             boolean hasLazyValue
             def resolveResultStrFn = {
@@ -171,6 +178,8 @@ class CollectorManager extends ServerTpl {
                 repo.saveOrUpdate(record)
             }
         }
+        if (asyncSave) queue(DATA_COLLECTED, save)
+        else save.run()
     }
 
 

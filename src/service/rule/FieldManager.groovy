@@ -25,8 +25,8 @@ import java.util.concurrent.atomic.AtomicInteger
  * 属性值函数
  */
 class FieldManager extends ServerTpl {
-    @Lazy def repo = bean(Repo, 'jpa_rule_repo')
-    @Lazy def collectorManager = bean(CollectorManager)
+    @Lazy protected repo = bean(Repo, 'jpa_rule_repo')
+    @Lazy protected collectorManager = bean(CollectorManager)
     /**
      * RuleField(enName, cnName), RuleField
      */

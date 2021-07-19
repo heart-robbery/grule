@@ -18,25 +18,29 @@ import java.time.Duration
 class DecisionSrv extends ServerTpl {
     protected static final String SAVE_RESULT = 'save_result'
 
-    @Lazy def http = bean(OkHttpSrv)
-    @Lazy def repo = bean(Repo, 'jpa_rule_repo')
+    @Lazy protected http = bean(OkHttpSrv)
+    @Lazy protected repo = bean(Repo, 'jpa_rule_repo')
+    // 是否异步保存决策结果
+    @Lazy protected asyncSave = getBoolean("asyncSave", true)
 
 
     @EL(name = 'sys.starting', async = true)
     protected void init() {
-        Long lastWarn // 上次告警时间
-        queue(SAVE_RESULT)
-            .failMaxKeep(getInteger(SAVE_RESULT + ".failMaxKeep", 10000))
-            .parallel(getInteger("saveResult.parallel", 5))
-            .errorHandle {ex, me ->
-                if (lastWarn == null || (System.currentTimeMillis() - lastWarn >= Duration.ofSeconds(getLong(SAVE_RESULT + ".warnInterval", 60 * 3L)).toMillis())) {
-                    lastWarn = System.currentTimeMillis()
-                    log.error("保存决策结果到数据库错误", ex)
-                    ep.fire("globalMsg", "保存决策结果到数据库错误: " + (ex.message?:ex.class.simpleName))
-                }
-                // 暂停一会
-                me.suspend(Duration.ofMillis(500 + new Random().nextInt(1000)))
-            }
+        if (asyncSave) {
+            Long lastWarn // 上次告警时间
+            queue(SAVE_RESULT)
+                    .failMaxKeep(getInteger(SAVE_RESULT + ".failMaxKeep", 10000))
+                    .parallel(getInteger("saveResult.parallel", 5))
+                    .errorHandle {ex, me ->
+                        if (lastWarn == null || (System.currentTimeMillis() - lastWarn >= Duration.ofSeconds(getLong(SAVE_RESULT + ".warnInterval", 60 * 3L)).toMillis())) {
+                            lastWarn = System.currentTimeMillis()
+                            log.error("保存决策结果到数据库错误", ex)
+                            ep.fire("globalMsg", "保存决策结果到数据库错误: " + (ex.message?:ex.class.simpleName))
+                        }
+                        // 暂停一会
+                        me.suspend(Duration.ofMillis(500 + new Random().nextInt(1000)))
+                    }
+        }
     }
 
 
@@ -44,9 +48,11 @@ class DecisionSrv extends ServerTpl {
     protected void stop() {
         // 尽量等到 对列中的 数据都持久化完成
         long start = System.currentTimeMillis()
-        if (queue(SAVE_RESULT).waitingCount > 0) log.warn("等待决策结果数据保存完...")
-        while (queue(SAVE_RESULT).waitingCount > 0 && System.currentTimeMillis() - start < 1000 * 60 * 2) {
-            Thread.sleep(1000)
+        if (asyncSave) {
+            if (queue(SAVE_RESULT).waitingCount > 0) log.warn("等待决策结果数据保存完...")
+            while (queue(SAVE_RESULT).waitingCount > 0 && System.currentTimeMillis() - start < 1000 * 60 * 2) {
+                Thread.sleep(1000)
+            }
         }
     }
 
@@ -71,27 +77,12 @@ class DecisionSrv extends ServerTpl {
 
 
     // 决策执行结果监听
-    @EL(name = 'decision.end', async = true)
+    @EL(name = 'decision.end')
     void endDecision(DecisionContext ctx) {
         log.info("end decision: " + JSON.toJSONString(ctx.summary(), SerializerFeature.WriteMapNullValue))
 
-        // 异步查询的, 异步回调通知
-        if (Boolean.valueOf(ctx.input.getOrDefault('async', false).toString())) {
-            async {
-                String cbUrl = ctx.input['callback'] // 回调Url
-                if (!cbUrl?.startsWith('http')) return
-                def result = JSON.toJSONString(ctx.result(), SerializerFeature.WriteMapNullValue)
-                for (i in 0..< getInteger("callbackMaxTry", 2)) {
-                    try {
-                        http.post(cbUrl).jsonBody(result).debug().execute()
-                        break
-                    } catch (ex) {}
-                }
-            }
-        }
-
         // 保存决策结果到数据库
-        queue(SAVE_RESULT) {
+        final Runnable doSave = () -> {
             repo.saveOrUpdate(
                     repo.findById(DecideRecord, ctx.id).tap {
                         status = ctx.status
@@ -104,6 +95,23 @@ class DecisionSrv extends ServerTpl {
                         if (dr) dataCollectResult = JSON.toJSONString(dr, SerializerFeature.WriteMapNullValue)
                     }
             )
+        }
+        if (asyncSave) queue(SAVE_RESULT, doSave)
+        else doSave.run()
+
+        // 异步决策的, 异步回调通知
+        if (Boolean.valueOf(ctx.input.getOrDefault('async', false).toString())) {
+            async {
+                String cbUrl = ctx.input['callback'] // 回调Url
+                if (!cbUrl?.startsWith('http')) return
+                def result = JSON.toJSONString(ctx.result(), SerializerFeature.WriteMapNullValue)
+                for (i in 0..< getInteger("callbackMaxTry", 2)) {
+                    try {
+                        http.post(cbUrl).jsonBody(result).debug().execute()
+                        break
+                    } catch (ex) {}
+                }
+            }
         }
     }
 

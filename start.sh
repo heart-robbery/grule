@@ -18,4 +18,4 @@ export JAVA_OPTS
 cd src
 sh ../bin/groovy -pa main.groovy
 
-# nohup sh start.sh [-Dprofile=pro] -Xms128m -Xmx512m > /dev/null 2>&1 &
+# nohup sh start.sh -Xms512m -Xmx512m [-Dprofile=pro] -Dlog.totalSizeCap=50GB > /dev/null 2>&1 &

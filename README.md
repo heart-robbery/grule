@@ -326,7 +326,7 @@ end split
 # 使用说明
 jdk8, gradle6.8+, mysql5.7+/MariaDB10.2+
 
-> 系统使用groovy应用开发模板: [GY](https://gitee.com/xnat/gy)
+> 系统基于java轻量级框架: [APP](https://gitee.com/xnat/app)
 
 1. IntelliJ IDEA 运行 main.groovy
 2. 
@@ -334,6 +334,8 @@ jdk8, gradle6.8+, mysql5.7+/MariaDB10.2+
  * windows: ./start
 
 # v1.2.4 ing...
+- [x] 支持可配置是否同步保存决策相关数据
+- [ ] 收集器结果配置是否需要持久化结果
 - [ ] ace-groovy placeholder
 - [ ] 用户权限关联独为单独一个实体
 - [ ] redis 收集器

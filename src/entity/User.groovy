@@ -16,7 +16,7 @@ import javax.persistence.Table
 @Table(indexes = [
         @Index(name = "idx_name", columnList = "name", unique = true),
 ])
-class User extends LongIdEntity  {
+class User extends LongIdEntity {
     /**
      * 用户登录名
      */

@@ -40,7 +40,6 @@ class MntCtrl extends ServerTpl {
      * @param username
      * @param password
      * @param hCtx
-     * @return
      */
     @Path(path = 'login')
     ApiResp login(String username, String password, HttpContext hCtx) {
@@ -55,6 +54,7 @@ class MntCtrl extends ServerTpl {
         hCtx.setSessionAttr('uId', user.id)
         hCtx.setSessionAttr('uName', username)
         hCtx.setSessionAttr('uGroup', user.group)
+
         user.login = new Date()
         repo.saveOrUpdate(user)
         ApiResp.ok().attr('id', user.id).attr('name', username)
@@ -69,8 +69,8 @@ class MntCtrl extends ServerTpl {
      */
     @Path(path = 'logout')
     ApiResp logout(HttpContext ctx) {
-        ctx.setSessionAttr('uId', null)
-        ctx.setSessionAttr('uName', null)
+        ctx.removeSessionAttr('uId')
+        ctx.removeSessionAttr('uName')
         ApiResp.ok()
     }
 }
