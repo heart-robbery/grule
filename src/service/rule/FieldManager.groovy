@@ -145,35 +145,35 @@ class FieldManager extends ServerTpl {
     protected void initDefaultField() {
         if (repo.count(RuleField) == 0) {
             log.info("初始化默认属性集")
-            repo.saveOrUpdate(new RuleField(enName: 'idNumber', cnName: '身份证号码', type: FieldType.Str, decision: ''))
-            repo.saveOrUpdate(new RuleField(enName: 'name', cnName: '姓名', type: FieldType.Str, decision: ''))
-            repo.saveOrUpdate(new RuleField(enName: 'mobileNo', cnName: '手机号码', type: FieldType.Str, decision: ''))
-            repo.saveOrUpdate(new RuleField(enName: 'age', cnName: '年龄', type: FieldType.Int, decision: '', comment: '根据身份整计算',
+            repo.saveOrUpdate(new RuleField(enName: 'idNumber', cnName: '身份证号码', type: FieldType.Str))
+            repo.saveOrUpdate(new RuleField(enName: 'name', cnName: '姓名', type: FieldType.Str))
+            repo.saveOrUpdate(new RuleField(enName: 'mobileNo', cnName: '手机号码', type: FieldType.Str))
+            repo.saveOrUpdate(new RuleField(enName: 'age', cnName: '年龄', type: FieldType.Int, comment: '根据身份整计算',
                 collectorOptions: JSON.toJSONString([[
                         collectorId: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "年龄")}?.id,
                         chooseFn: 'true'
                 ]])))
-            repo.saveOrUpdate(new RuleField(enName: 'gender', cnName: '性别', type: FieldType.Str, decision: '', comment: '值: F(女),M(男)',
+            repo.saveOrUpdate(new RuleField(enName: 'gender', cnName: '性别', type: FieldType.Str, comment: '值: F(女),M(男)',
                 collectorOptions: JSON.toJSONString([[
                         collectorId: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "性别")}?.id,
                         chooseFn: 'true'
                 ]])))
-            repo.saveOrUpdate(new RuleField(enName: 'week', cnName: '星期几', type: FieldType.Int, decision: '', comment: '值: 1,2,3,4,5,6,7',
+            repo.saveOrUpdate(new RuleField(enName: 'week', cnName: '星期几', type: FieldType.Int, comment: '值: 1,2,3,4,5,6,7',
                 collectorOptions: JSON.toJSONString([[
                         collectorId: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "星期几")}?.id,
                         chooseFn: 'true'
                 ]])))
-            repo.saveOrUpdate(new RuleField(enName: 'currentDateTime', cnName: '当前日期时间', type: FieldType.Str, decision: '', comment: '值: yyyy-MM-dd HH:mm:ss',
+            repo.saveOrUpdate(new RuleField(enName: 'currentDateTime', cnName: '当前日期时间', type: FieldType.Str, comment: '值: yyyy-MM-dd HH:mm:ss',
                 collectorOptions: JSON.toJSONString([[
                         collectorId: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "当前日期时间")}?.id,
                         chooseFn: 'true'
                 ]])))
-            repo.saveOrUpdate(new RuleField(enName: 'currentDate', cnName: '当前日期', type: FieldType.Str, decision: '', comment: '值: yyyy-MM-dd',
+            repo.saveOrUpdate(new RuleField(enName: 'currentDate', cnName: '当前日期', type: FieldType.Str, comment: '值: yyyy-MM-dd',
                 collectorOptions: JSON.toJSONString([[
                         collectorId: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "当前日期")}?.id,
                         chooseFn: 'true'
                 ]])))
-            repo.saveOrUpdate(new RuleField(enName: 'currentTime', cnName: '当前时间', type: FieldType.Str, decision: '', comment: '值: HH:mm:ss',
+            repo.saveOrUpdate(new RuleField(enName: 'currentTime', cnName: '当前时间', type: FieldType.Str, comment: '值: HH:mm:ss',
                 collectorOptions: JSON.toJSONString([[
                         collectorId: repo.find(DataCollector) {root, query, cb -> cb.equal(root.get("name"), "当前时间")}?.id,
                         chooseFn: 'true'
