@@ -335,6 +335,8 @@ jdk8, gradle6.8+, mysql5.7+/MariaDB10.2+
 
 # v1.2.4 ing...
 - [x] 支持可配置是否同步保存决策相关数据
+- [x] fix bug: 初始化默认属性集 miss property decision
+- [x] 启用禁用收集器提供单独接口
 - [ ] 收集器结果配置是否需要持久化结果
 - [ ] ace-groovy placeholder
 - [ ] 用户权限关联独为单独一个实体

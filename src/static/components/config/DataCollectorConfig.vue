@@ -332,19 +332,23 @@
                 })
             },
             enableSwitch(item) {
+                this.$Message.info(`${item.enabled ? '启用' : '禁用'}: ${item.name} ...`);
                 $.ajax({
-                    url: 'mnt/updateDataCollector',
+                    url: 'mnt/enableDataCollector',
                     type: 'post',
-                    data: item,
+                    data: {id: item.id, enabled: item.enabled},
                     success: (res) => {
                         if (res.code === '00') {
                             this.$Message.success(`${item.enabled ? '启用' : '禁用'}: ${item.name} 成功`);
                         } else {
-                            this.$Notice.error(res.desc);
+                            this.$Message.error(res.desc);
                             setTimeout(() => item.enabled = !item.enabled, 200)
                         }
                     },
-                    error: () => this.isLoading = false
+                    error: (xhr, status) => {
+                      setTimeout(() => item.enabled = !item.enabled, 200)
+                      this.$Message.error(`${status} : ${xhr.responseText}`)
+                    }
                 })
             },
             del(collector) {

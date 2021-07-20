@@ -572,7 +572,7 @@ class MntDecisionCtrl extends ServerTpl {
         String sqlScript, Integer minIdle, Integer maxActive, Integer timeout, Boolean enabled, String cacheKey, String cacheTimeoutFn
     ) {
         hCtx.auth('dataCollector-update')
-        if (!id) return ApiResp.fail("Param id not legal")
+        if (!id) return ApiResp.fail("Param id not required")
         if (!name) return ApiResp.fail("Param name not empty")
         def collector = repo.findById(DataCollector, id)
         if (collector == null) return ApiResp.fail("Param id: $id not found")
@@ -632,6 +632,21 @@ class MntDecisionCtrl extends ServerTpl {
             }
             throw ex
         }
+        ep.fire('dataCollectorChange', collector.id)
+        ep.fire('enHistory', collector, hCtx.getSessionAttr('uName'))
+        ApiResp.ok(collector)
+    }
+
+
+    @Path(path = 'enableDataCollector', method = 'post')
+    ApiResp enableDataCollector(HttpContext hCtx, String id, Boolean enabled) {
+        hCtx.auth('dataCollector-update')
+        if (!id) return ApiResp.fail("Param id required")
+        if (enabled == null) return ApiResp.fail("Param enabled required")
+        def collector = repo.findById(DataCollector, id)
+        if (collector == null) return ApiResp.fail("Param id: $id not found")
+        collector.enabled = enabled
+        repo.saveOrUpdate(collector)
         ep.fire('dataCollectorChange', collector.id)
         ep.fire('enHistory', collector, hCtx.getSessionAttr('uName'))
         ApiResp.ok(collector)
