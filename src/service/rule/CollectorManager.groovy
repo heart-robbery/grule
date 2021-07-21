@@ -137,6 +137,7 @@ class CollectorManager extends ServerTpl {
             DataCollector collector, DecisionContext ctx, Boolean cache, Date collectDate, Long spend, String dataStatus,
             Object result, Exception ex, def resolveResult, Exception resolveException, String url = null, String body = null
     ) {
+        if (!collector.recordResult) return
         final Runnable save = () -> {
             // 是否有延迟计算值
             boolean hasLazyValue

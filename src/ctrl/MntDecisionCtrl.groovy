@@ -456,12 +456,12 @@ class MntDecisionCtrl extends ServerTpl {
 
     @Path(path = 'addDataCollector', method = 'post')
     ApiResp addDataCollector(
-        HttpContext hCtx, String name, String type, String url, String bodyStr,
+        HttpContext hCtx, String name, String type, String url, String bodyStr, Boolean recordResult,
         String method, String parseScript, String contentType, String comment, String computeScript, String dataSuccessScript,
         String sqlScript, Integer minIdle, Integer maxActive, Integer timeout, Boolean enabled, String cacheKey, String cacheTimeoutFn
     ) {
         hCtx.auth('dataCollector-add')
-        DataCollector collector = new DataCollector(name: name, type: type, comment: comment, enabled: (enabled == null ? true : enabled))
+        DataCollector collector = new DataCollector(name: name, type: type, comment: comment, enabled: (enabled == null ? true : enabled), recordResult: recordResult == null ? true : recordResult)
         if (!collector.name) return ApiResp.fail('Param name not empty')
         if (!collector.type) return ApiResp.fail('Param type not empty')
         if ('http' == collector.type) {
@@ -567,7 +567,7 @@ class MntDecisionCtrl extends ServerTpl {
 
     @Path(path = 'updateDataCollector', method = 'post')
     ApiResp updateDataCollector(
-        HttpContext hCtx, String id, String name, String url, String bodyStr,
+        HttpContext hCtx, String id, String name, String url, String bodyStr, Boolean recordResult,
         String method, String parseScript, String contentType, String comment, String computeScript, String dataSuccessScript,
         String sqlScript, Integer minIdle, Integer maxActive, Integer timeout, Boolean enabled, String cacheKey, String cacheTimeoutFn
     ) {
@@ -616,6 +616,7 @@ class MntDecisionCtrl extends ServerTpl {
         collector.name = name
         collector.comment = comment
         collector.enabled = enabled == null ? true : enabled
+        collector.recordResult = recordResult == null ? true : recordResult
         collector.cacheKey = cacheKey
         collector.cacheTimeoutFn = cacheTimeoutFn
         collector.updater = hCtx.getSessionAttr("uName")

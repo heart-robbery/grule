@@ -81,6 +81,9 @@
                         <h-formitem label="缓存超时(m)" icon="h-icon-user" prop="timeout">
                             <input type="text" v-model="model.cacheTimeoutFn" />
                         </h-formitem>
+                        <h-formitem label="记录结果" icon="h-icon-complete" prop="recordResult">
+                          <h-checkbox v-model="model.recordResult" />
+                        </h-formitem>
                         <h-formitem v-if="model.type == 'http' && model.method == 'POST'" label="ContentType" icon="h-icon-user" prop="contentType">
                             <h-select v-model="model.contentType" :datas="contentTypes"></h-select>
                         </h-formitem>
@@ -128,7 +131,7 @@
             return {
                 isLoading: false,
                 model: this.collector ? $.extend({sqlScript: '', computeScript: '', parseScript: '', dataSuccessScript: ''}, this.collector): {
-                    type: 'http', method: 'GET', timeout: 10000, minIdle: 1, maxActive: 5, dataSuccessScript:
+                    type: 'http', method: 'GET', timeout: 10000, minIdle: 0, maxActive: 5, recordResult: true, dataSuccessScript:
 `{resultStr, respCode -> // 接口返回的字符串, 接口http响应码(如果是缓存则为空)
     return (respCode == null || respCode == 200) && resultStr
 }`, parseScript: `{resultStr, respCode -> // 接口返回的字符串, 接口http响应码(如果是缓存则为空)

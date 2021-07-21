@@ -60,6 +60,10 @@ class DataCollector extends UUIDEntity {
      */
     @Column(length = 1000)
     String cacheTimeoutFn
+    /**
+     * 是否记录收集结果
+     */
+    boolean recordResult
 
 
     /**
