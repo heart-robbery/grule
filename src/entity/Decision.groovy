@@ -18,7 +18,7 @@ class Decision extends UUIDEntity {
     /**
      * 决策id
      */
-    @Column(nullable = false)
+    @Column(nullable = false, length = 36)
     String decisionId
     /**
      * 决策名

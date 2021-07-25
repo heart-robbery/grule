@@ -22,10 +22,12 @@ class CollectRecord implements IEntity {
     /**
      * 执行决策流水id
      */
+    @Column(length = 36)
     String decideId
     /**
      * 决策id {@link Decision#id}
      */
+    @Column(length = 36)
     String decisionId
     /**
      * 收集器id {@link DataCollector#id}

@@ -19,10 +19,12 @@ class DecideRecord implements IEntity {
      * 决策流水id
      */
     @Id
+    @Column(length = 36)
     String       id
     /**
      * 决策id
      */
+    @Column(length = 36)
     String       decisionId
     /**
      * 执行结果状态
@@ -31,6 +33,7 @@ class DecideRecord implements IEntity {
     /**
      * 决策结果
      */
+    @Column(length = 30)
     @Enumerated(EnumType.STRING)
     DecideResult result
     /**
