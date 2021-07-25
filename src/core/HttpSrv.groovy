@@ -19,8 +19,13 @@ class HttpSrv extends ServerTpl {
     @Lazy protected cacheSrv = bean(CacheSrv)
     @Lazy protected repo = bean(Repo, 'jpa_rule_repo')
     @Lazy protected sessionCookieName = getStr("sessionCookieName", "sessionId")
+    // 用户session过期
     @Lazy protected expire = Duration.ofMinutes(getInteger('session.expire', 30))
+    // 用户session最迟过期时间
     @Lazy protected continuousExpire = Duration.ofMinutes(getInteger('session.continuousExpire', 60 * 24 * 5))
+    // 用户session数据保存时间
+    @Lazy protected keep = Duration.ofMinutes(getInteger('session.keep', 60 * 24 * 180))
+    // Controller层 Class
     protected final ctrlClzs = new LinkedList<Class>()
     @Lazy protected server = new HttpServer(attrs(), exec()) {
         @Override
@@ -130,6 +135,15 @@ class HttpSrv extends ServerTpl {
                 // 一段时间不操作过期
                 if (System.currentTimeMillis() - session.updateTime.time > expire.toMillis()) {
                     session.valid = false
+                    async { // 删除过期session数据
+                        def e = repo.find(UserSession) {root, query, cb ->
+                            cb.and(
+                                    cb.equal(root.get("valid"), false),
+                                    cb.lessThan(root.get("updateTime"), new Date(System.currentTimeMillis() - keep.toMillis()))
+                            )
+                        }
+                        if (e) repo.delete(e)
+                    }
                 }
                 // 如果一直操作, 则等超出continuousExpire时间后的下一天过期(在下一天第一次重新登录)
                 else if (
