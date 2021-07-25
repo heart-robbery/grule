@@ -69,7 +69,7 @@ app.addSource(new ServerTpl("jpa_rule") { //数据库 jpa_rule
     void start() {
         repo = new Repo(attrs()).entities( // jpa封装
             Decision, RuleField, DataCollector, OpHistory, DecideRecord, CollectRecord,
-            User, Permission, GlobalConfig, Lock
+            User, Permission, GlobalConfig, Lock, UserSession
         ).init()
         exposeBean(repo, name + "_repo")
         ep.fire("${name}.started")

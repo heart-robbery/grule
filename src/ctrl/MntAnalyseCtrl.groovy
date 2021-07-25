@@ -31,7 +31,7 @@ class MntAnalyseCtrl extends ServerTpl {
         if (startTime == null) return ApiResp.fail("Param startTime required")
         Date start = startTime ? new SimpleDateFormat('yyyy-MM-dd HH:mm:ss').parse(startTime) : null
         Date end = endTime ? new SimpleDateFormat('yyyy-MM-dd HH:mm:ss').parse(endTime) : null
-        def ids = hCtx.getSessionAttr("permissions").split(",")
+        def ids = hCtx.getAttr("permissions", Set)
             .findAll {String p -> p.startsWith("decision-read-")}
             .findResults {String p -> p.replace("decision-read-", "")}
             .findAll {it}
@@ -58,7 +58,7 @@ class MntAnalyseCtrl extends ServerTpl {
         if (startTime == null) return ApiResp.fail("Param startTime required")
         Date start = startTime ? new SimpleDateFormat('yyyy-MM-dd HH:mm:ss').parse(startTime) : null
         Date end = endTime ? new SimpleDateFormat('yyyy-MM-dd HH:mm:ss').parse(endTime) : null
-        def ids = hCtx.getSessionAttr("permissions").split(",")
+        def ids = hCtx.getAttr("permissions", Set)
             .findAll {String p -> p.startsWith("decision-read-")}
             .findResults {String p -> p.replace("decision-read-", "")}
             .findAll {it}

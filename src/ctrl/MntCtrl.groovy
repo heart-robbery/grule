@@ -1,10 +1,13 @@
 package ctrl
 
+import cn.xnatural.app.CacheSrv
 import cn.xnatural.app.ServerTpl
 import cn.xnatural.enet.event.EL
 import cn.xnatural.http.*
 import cn.xnatural.jpa.Repo
+import com.alibaba.fastjson.JSON
 import entity.User
+import entity.UserSession
 
 import java.util.concurrent.ConcurrentHashMap
 
@@ -39,7 +42,6 @@ class MntCtrl extends ServerTpl {
      * 登录
      * @param username
      * @param password
-     * @param hCtx
      */
     @Path(path = 'login')
     ApiResp login(String username, String password, HttpContext hCtx) {
@@ -47,30 +49,37 @@ class MntCtrl extends ServerTpl {
         if (!password) return ApiResp.fail('Param password not empty')
         def user = repo.find(User) {root, query, cb -> cb.equal(root.get('name'), username)}
         if (!user) return ApiResp.fail("用户不存在")
-        hCtx.setSessionAttr('permissions', user.permissions)
+        def pIds = user.permissions?.split(',')?.toList()?.toSet()?:Collections.emptySet()
+        hCtx.setAttr('permissions', pIds)
         hCtx.auth("mnt-login")
         if (password != user.password) return ApiResp.fail('密码错误')
+        bean(CacheSrv).set("permission_" + user.id, pIds)
 
         hCtx.setSessionAttr('uId', user.id)
-        hCtx.setSessionAttr('uName', username)
+        hCtx.setSessionAttr('uName', user.name)
         hCtx.setSessionAttr('uGroup', user.group)
 
         user.login = new Date()
         repo.saveOrUpdate(user)
-        ApiResp.ok().attr('id', user.id).attr('name', username)
-            .attr('permissionIds', user.permissions?.split(",")?:[])
+        repo.saveOrUpdate(new UserSession(valid: true, sessionId: hCtx.sessionId, userId: user.id, data: JSON.toJSONString([uId: user.id, uName: user.name, uGroup: user.group])))
+        ApiResp.ok().attr('id', user.id).attr('name', username).attr('permissionIds', pIds)
     }
 
 
     /**
      * 退出会话
-     * @param ctx
-     * @return
      */
     @Path(path = 'logout')
-    ApiResp logout(HttpContext ctx) {
-        ctx.removeSessionAttr('uId')
-        ctx.removeSessionAttr('uName')
+    ApiResp logout(HttpContext hCtx) {
+        hCtx.removeSessionAttr('uId')
+        hCtx.removeSessionAttr('uName')
+        hCtx.regFinishedFn {
+            def session = repo.findById(UserSession, hCtx.sessionId)
+            if (session && session.valid) {
+                session.valid = false
+                repo.saveOrUpdate(session)
+            }
+        }
         ApiResp.ok()
     }
 }

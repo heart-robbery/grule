@@ -38,16 +38,16 @@ class MntDecisionCtrl extends ServerTpl {
         if (pageSize && pageSize > 20) return ApiResp.fail("Param pageSize <=20")
         // hCtx.auth("decision-read")
         // 允许访问的决策id
-        def ids = hCtx.getSessionAttr("permissions").split(",")
+        def ids = hCtx.getAttr("permissions", Set)
             .findAll {String p -> p.startsWith("decision-read-")}
             .findResults {String p -> p.replace("decision-read-", "")}
             .findAll {it}
         if (!ids) return ApiResp.ok(Page.empty())
-        def delIds = hCtx.getSessionAttr("permissions").split(",")
+        def delIds = hCtx.getAttr("permissions", Set)
             .findAll {String p -> p.startsWith("decision-del-")}
             .findResults {String p -> p.replace("decision-del-", "")}
             .findAll {it}
-        def updateIds = hCtx.getSessionAttr("permissions").split(",")
+        def updateIds = hCtx.getAttr("permissions", Set)
             .findAll {String p -> p.startsWith("decision-update-")}
             .findResults {String p -> p.replace("decision-update-", "")}
             .findAll {it}
@@ -158,7 +158,7 @@ class MntDecisionCtrl extends ServerTpl {
     ) {
         hCtx.auth("decideResult-read")
         if (pageSize && pageSize > 10) return ApiResp.fail("Param pageSize <=10")
-        def ids = hCtx.getSessionAttr("permissions").split(",")
+        def ids = hCtx.getAttr("permissions", Set)
             .findAll {String p -> p.startsWith("decision-read-")}
             .findResults {String p -> p.replace("decision-read-", "")}
             .findAll {it}
@@ -269,7 +269,7 @@ class MntDecisionCtrl extends ServerTpl {
         Long spend, Boolean success, Boolean dataSuccess, Boolean cache, String startTime, String endTime
     ) {
         hCtx.auth("collectResult-read")
-        def ids = hCtx.getSessionAttr("permissions").split(",")
+        def ids = hCtx.getAttr("permissions", Set)
             .findAll {String p -> p.startsWith("decision-read-")}
             .findResults {String p -> p.replace("decision-read-", "")}
             .findAll {it}

@@ -5,18 +5,24 @@ import cn.xnatural.app.ServerTpl
 import cn.xnatural.enet.event.EL
 import cn.xnatural.http.HttpContext
 import cn.xnatural.http.HttpServer
+import cn.xnatural.jpa.Repo
+import com.alibaba.fastjson.JSON
+import com.alibaba.fastjson.JSONObject
+import entity.UserSession
 
 import java.time.Duration
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * web 服务
  */
 class HttpSrv extends ServerTpl {
-    @Lazy protected def         cacheSrv          = bean(CacheSrv)
-    @Lazy protected String      sessionCookieName = getStr("sessionCookieName", "sessionId")
-    protected final List<Class> ctrlClzs          = new LinkedList<>()
-    @Lazy protected HttpServer  server            = new HttpServer(attrs(), exec()) {
+    @Lazy protected cacheSrv = bean(CacheSrv)
+    @Lazy protected repo = bean(Repo, 'jpa_rule_repo')
+    @Lazy protected sessionCookieName = getStr("sessionCookieName", "sessionId")
+    @Lazy protected expire = Duration.ofMinutes(getInteger('session.expire', 30))
+    @Lazy protected continuousExpire = Duration.ofMinutes(getInteger('session.continuousExpire', 60 * 24 * 5))
+    protected final ctrlClzs = new LinkedList<Class>()
+    @Lazy protected server = new HttpServer(attrs(), exec()) {
         @Override
         protected Map<String, Object> sessionDelegate(HttpContext hCtx) { getSessionDelegate(hCtx) }
     }
@@ -53,7 +59,6 @@ class HttpSrv extends ServerTpl {
     protected Map<String, Object> getSessionDelegate(HttpContext hCtx) {
         Map<String, Object> sData
         String sId = hCtx.request.getCookie(sessionCookieName)
-        def expire = Duration.ofMinutes(getInteger('session.expire', 30))
         if ('redis' == getStr('session.type', null)) { // session的数据, 用redis 保存 session 数据
             def redis = bean(RedisClient)
             String cKey
@@ -90,23 +95,60 @@ class HttpSrv extends ServerTpl {
                     redis.exec {jedis -> jedis.hgetAll(cKey).entrySet()}
                 }
             }
-        } else { // 默认用内存缓存做session 数据管理
-            String cKey
-            if (!sId || ((cKey = 'session_' + sId) && (sData = cacheSrv.get(cKey)) == null)) {
-                sId = UUID.randomUUID().toString().replace('-', '')
-                cKey = 'session_' + sId
-                log.info("New session '{}'", sId)
-            }
-
-            if (sData == null) {
-                sData = new ConcurrentHashMap<>()
-                cacheSrv.set(cKey, sData, expire)
-            } else {
-                cacheSrv.expire(cKey, expire)
-            }
+        } else { // 默认用数据库做session 数据管理
+            return dbSessionDelegate(hCtx)
+//            String cKey
+//            if (!sId || ((cKey = 'session_' + sId) && (sData = cacheSrv.get(cKey)) == null)) {
+//                sId = UUID.randomUUID().toString().replace('-', '')
+//                cKey = 'session_' + sId
+//                log.info("New session '{}'", sId)
+//            }
+//
+//            if (sData == null) {
+//                sData = new ConcurrentHashMap<>()
+//                cacheSrv.set(cKey, sData, expire)
+//            } else {
+//                cacheSrv.expire(cKey, expire)
+//            }
         }
         sData.put("id", sId)
         hCtx.response.cookie(sessionCookieName, sId, expire.seconds as Integer, null, "/", false, false)
+        return sData
+    }
+
+
+    /**
+     * 数据库session
+     */
+    protected Map<String, Object> dbSessionDelegate(HttpContext hCtx) {
+        Map<String, Object> sData
+        String sessionId = hCtx.request.getCookie(sessionCookieName)
+        UserSession session
+        if (sessionId) {
+            session = repo.findById(UserSession, sessionId)
+            if (session) {
+                // 一段时间不操作过期
+                if (System.currentTimeMillis() - session.updateTime.time > expire.toMillis()) {
+                    session.valid = false
+                }
+                // 如果一直操作, 则等超出continuousExpire时间后的下一天过期(在下一天第一次重新登录)
+                else if (
+                    System.currentTimeMillis() - session.createTime.time > continuousExpire.toMillis() &&
+                    (int) (System.currentTimeMillis() / (1000 * 60 * 60 * 24)) > (int) (session.updateTime / (1000 * 60 * 60 * 24))
+                ) {
+                    session.valid = false
+                }
+                else {
+                    session.updateTime = new Date()
+                    sData = session.data ? JSON.parseObject(session.data) : new JSONObject()
+                }
+                hCtx.regFinishedFn { session.data = sData.toString(); repo.saveOrUpdate(session) }
+            }
+        }
+        sessionId = session && session.valid ? session.sessionId : UUID.randomUUID().toString().replace('-', '')
+        sData = sData == null ? new JSONObject() : sData
+        sData.put("id", sessionId)
+        hCtx.response.cookie(sessionCookieName, sessionId, expire.seconds as Integer, null, "/", false, false)
         return sData
     }
 

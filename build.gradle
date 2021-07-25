@@ -1,7 +1,7 @@
 repositories {
     mavenLocal()
-    maven { url 'https://maven.aliyun.com/repository/public' }
     maven { url 'https://maven.aliyun.com/repository/central' }
+    maven { url 'https://maven.aliyun.com/repository/public' }
     mavenCentral()
 }
 
@@ -47,9 +47,9 @@ dependencies {
     implementation 'javax.inject:javax.inject:1'
     implementation 'ch.qos.logback:logback-classic:1.2.3'
 
-    implementation 'cn.xnatural.app:app:1.0.4'
-    implementation 'cn.xnatural.http:http:1.0.8'
-    implementation 'cn.xnatural.jpa:jpa:1.0.5'
+    implementation 'cn.xnatural.app:app:1.0.5'
+    implementation 'cn.xnatural.http:http:1.0.9'
+    implementation 'cn.xnatural.jpa:jpa:1.0.6'
     implementation 'cn.xnatural.sched:sched:1.0.2'
     implementation 'cn.xnatural.remoter:remoter:1.0.2'
     implementation 'cn.xnatural.task:task:1.0.1'
