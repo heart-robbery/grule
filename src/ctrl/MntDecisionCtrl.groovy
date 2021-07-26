@@ -1,5 +1,6 @@
 package ctrl
 
+
 import cn.xnatural.app.ServerTpl
 import cn.xnatural.app.Utils
 import cn.xnatural.http.ApiResp
@@ -13,11 +14,7 @@ import com.alibaba.fastjson.JSONArray
 import com.alibaba.fastjson.JSONObject
 import com.alibaba.fastjson.parser.Feature
 import entity.*
-import service.rule.CollectorManager
-import service.rule.DecideResult
-import service.rule.DecisionManager
-import service.rule.DecisionSrv
-import service.rule.FieldManager
+import service.rule.*
 import service.rule.spec.DecisionSpec
 
 import javax.persistence.criteria.Predicate
@@ -658,7 +655,6 @@ class MntDecisionCtrl extends ServerTpl {
     ApiResp delDecision(HttpContext hCtx, String id) {
         if (!id) return ApiResp.fail("Param id required")
         hCtx.auth( 'decision-del-' + id)
-        // log.info("delDecision. decisionId: {}, byUser: {}", decisionId, hCtx.getSessionAttr("uName"))
         def decision = repo.find(Decision) {root, query, cb -> cb.equal(root.get('id'), id)}
         repo.delete(decision)
         ep.fire('decisionChange', decision.id)

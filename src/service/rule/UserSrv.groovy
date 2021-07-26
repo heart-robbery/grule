@@ -1,5 +1,6 @@
 package service.rule
 
+import cn.xnatural.app.CacheSrv
 import cn.xnatural.app.ServerTpl
 import cn.xnatural.enet.event.EC
 import cn.xnatural.enet.event.EL
@@ -89,7 +90,7 @@ class UserSrv extends ServerTpl {
      * @param ec
      * @param decisionId
      */
-    @EL(name = ['decisionChange'], async = true)
+    @EL(name = ['decisionChange'])
     protected void listenDecisionChange(EC ec, String id) {
         if (!id) return
         if ((ec?.source() == bean(Remoter))) return
@@ -105,6 +106,7 @@ class UserSrv extends ServerTpl {
                             ls.each {u ->
                                 u.permissions = u.permissions.split(",").findAll {it != p.enName}.join(",")
                                 repo.saveOrUpdate(u)
+                                bean(CacheSrv).remove("permission_" + u.id)
                             }
                         } while (true)
                     }
@@ -120,6 +122,7 @@ class UserSrv extends ServerTpl {
                 ps.each {ls.add(it.enName)}
                 u.permissions = ls.join(",")
                 repo.saveOrUpdate(u)
+                bean(CacheSrv).remove("permission_" + u.id)
             }
             repo.findList(Permission) { root, query, cb -> cb.equal(root.get("mark"), decision.id)}
                     ?.each {p ->
@@ -142,6 +145,7 @@ class UserSrv extends ServerTpl {
                         ls.add(p.enName)
                         gUser.permissions = ls.join(",")
                         repo.saveOrUpdate(gUser)
+                        bean(CacheSrv).remove("permission_" + gUser.id)
                     }
                 }
                 repo.saveOrUpdate(p)
