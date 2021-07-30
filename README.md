@@ -326,6 +326,15 @@ end split
 # 使用说明
 jdk8, gradle6.8+, mysql5.7+/MariaDB10.2+
 
+```sql
+-- 创建数据库
+CREATE DATABASE IF NOT EXISTS rule DEFAULT CHARSET utf8 COLLATE utf8_general_ci;
+```
+```properties
+# jdbcUrl
+jpa_rule.url=jdbc:mysql://localhost:3306/rule?useSSL=false&user=root&password=root&useUnicode=true&characterEncoding=utf-8
+```
+
 > 系统基于java轻量级框架: [APP](https://gitee.com/xnat/app)
 
 1. IntelliJ IDEA 运行 main.groovy
@@ -334,14 +343,14 @@ jdk8, gradle6.8+, mysql5.7+/MariaDB10.2+
  * windows: ./start
 
 # v1.2.4 ing...
-- [x] 支持可配置是否同步保存决策相关数据
-- [x] fix bug: 初始化默认属性集 miss property decision
-- [x] 启用禁用收集器提供单独接口
-- [x] 用户session持久化
-- [x] 收集器结果配置是否需要持久化结果
-- [ ] ace-groovy placeholder
-- [ ] 用户权限关联独为单独一个实体
-- [ ] redis 收集器
+- [x] feat: 支持可配置是否同步保存决策相关数据
+- [x] fix: 初始化默认属性集 miss property decision
+- [x] feat: 启用禁用收集器提供单独接口
+- [x] feat: 用户session持久化
+- [x] feat: 收集器结果配置是否需要持久化结果
+- [ ] style: ace-groovy placeholder
+- [ ] feat: redis 收集器
+- [ ] pref: static components -> view
 
 # 参与贡献
 xnatural@msn.cn
