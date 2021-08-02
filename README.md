@@ -343,6 +343,7 @@ jpa_rule.url=jdbc:mysql://localhost:3306/rule?useSSL=false&user=root&password=ro
  * windows: ./start
 
 # v1.2.5 ing...
+- [x] pref: 指标名字符限制: 字母,中文开头,可包含字数,字母,下划线,中文
 - [ ] style: ace-groovy placeholder
 - [ ] feat: redis 收集器
 - [ ] pref: static components -> view

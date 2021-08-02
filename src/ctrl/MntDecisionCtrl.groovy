@@ -17,23 +17,23 @@ import entity.*
 import service.rule.*
 import service.rule.spec.DecisionSpec
 
-import javax.persistence.criteria.Predicate
 import java.text.SimpleDateFormat
 import java.util.Map.Entry
 
 @Ctrl(prefix = 'mnt')
 class MntDecisionCtrl extends ServerTpl {
 
-    @Lazy def repo = bean(Repo, 'jpa_rule_repo')
-    @Lazy def decisionManager = bean(DecisionManager)
-    @Lazy def fieldManager = bean(FieldManager)
-    @Lazy def collectorManager = bean(CollectorManager)
+    @Lazy protected repo = bean(Repo, 'jpa_rule_repo')
+    @Lazy protected decisionManager = bean(DecisionManager)
+    @Lazy protected fieldManager = bean(FieldManager)
+    @Lazy protected collectorManager = bean(CollectorManager)
+    // 指标字符限制: 字母,中文开头,可包含字数,字母,下划线,中文
+    @Lazy protected fieldNamePattern = /^[a-zA-Z\u4E00-\u9FA5]+[0-9a-zA-Z\u4E00-\u9FA5_]*$/
 
 
     @Path(path = 'decisionPage')
     ApiResp decisionPage(HttpContext hCtx, Integer page, Integer pageSize, String kw, String nameLike, String decisionId) {
         if (pageSize && pageSize > 20) return ApiResp.fail("Param pageSize <=20")
-        // hCtx.auth("decision-read")
         // 允许访问的决策id
         def ids = hCtx.getAttr("permissions", Set)
             .findAll {String p -> p.startsWith("decision-read-")}
@@ -56,7 +56,7 @@ class MntDecisionCtrl extends ServerTpl {
                     if (decisionId) ps << cb.equal(root.get('id'), decisionId)
                     if (nameLike) ps << cb.or(cb.like(root.get('name'), '%' + nameLike + '%'), cb.like(root.get('decisionId'), '%' + nameLike + '%'))
                     if (kw) ps << cb.like(root.get('dsl'), '%' + kw + '%')
-                    cb.and(ps.toArray(new Predicate[ps.size()]))
+                    ps ? ps.inject {p1, p2 -> cb.and(p1, p2)} : null
                 }.to{decision ->
                     Utils.toMapper(decision)
                             .add("_deletable", delIds?.contains(decision.id))
@@ -87,7 +87,7 @@ class MntDecisionCtrl extends ServerTpl {
             if (decision) {
                 ps << cb.equal(root.get("decision"), decision)
             }
-            cb.and(ps.toArray(new Predicate[ps.size()]))
+            ps ? ps.inject {p1, p2 -> cb.and(p1, p2)} : null
         }.to{ Utils.toMapper(it).ignore("metaClass")
             .addConverter("decision", "decisionName") {dId -> dId ? decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name : null}
             .addConverter("decision", "decisionId") {dId -> dId ? decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.decisionId : null}
@@ -120,7 +120,7 @@ class MntDecisionCtrl extends ServerTpl {
                 }
                 if (id) ps << cb.equal(root.get("id"), id)
                 if (type) ps << cb.equal(root.get('type'), type)
-                cb.and(ps.toArray(new Predicate[ps.size()]))
+                ps ? ps.inject {p1, p2 -> cb.and(p1, p2)} : null
             }
         )
     }
@@ -142,7 +142,7 @@ class MntDecisionCtrl extends ServerTpl {
                 if (type) {
                     ps << cb.equal(root.get('tbName'), repo.tbName(Class.forName(Decision.package.name + "." + type)).replace("`", ""))
                 }
-                cb.and(ps.toArray(new Predicate[ps.size()]))
+                ps ? ps.inject {p1, p2 -> cb.and(p1, p2)} : null
             }
         )
     }
@@ -213,7 +213,7 @@ class MntDecisionCtrl extends ServerTpl {
                     } else { // 默认时间降序
                         query.orderBy(cb.desc(root.get('occurTime')))
                     }
-                    if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
+                    ps ? ps.inject {p1, p2 -> cb.and(p1, p2)} : null
                 }.to{
                     Utils.toMapper(it).ignore("metaClass")
                             .addConverter('decisionId', 'decisionName', { String dId ->
@@ -307,7 +307,7 @@ class MntDecisionCtrl extends ServerTpl {
                         ps << cb.notEqual(root.get('cache'), true)
                     }
                 }
-                if (ps) cb.and(ps.toArray(new Predicate[ps.size()]))
+                ps ? ps.inject {p1, p2 -> cb.and(p1, p2)} : null
             }.to{record -> Utils.toMapper(record).ignore("metaClass")
                 .addConverter('decisionId', 'decisionName', {String dId ->
                     decisionManager.decisionMap.find {it.value.decision.id == dId}?.value?.decision?.name
@@ -415,6 +415,12 @@ class MntDecisionCtrl extends ServerTpl {
         if (!enName) return ApiResp.fail("Param enName not empty")
         if (!cnName) return ApiResp.fail("Param cnName not empty")
         if (!type) return ApiResp.fail("Param type not empty")
+        if (!(enName ==~ fieldNamePattern)) {
+            return ApiResp.fail("Param enName illegal: 字母,中文开头,可包含字数,字母,下划线,中文")
+        }
+        if (!(cnName ==~ fieldNamePattern)) {
+            return ApiResp.fail("Param enName illegal: 字母,中文开头,可包含字数,字母,下划线,中文")
+        }
         // 验证 collectorOptions
         if (collectorOptions) {
             JSON.parseArray(collectorOptions).each {JSONObject jo ->
@@ -517,10 +523,16 @@ class MntDecisionCtrl extends ServerTpl {
     @Path(path = 'updateField', method = 'post')
     ApiResp updateField(HttpContext hCtx, Long id, String enName, String cnName, FieldType type, String comment, String collectorOptions) {
         hCtx.auth('field-update')
-        if (!id) return ApiResp.fail("Param id not legal")
+        if (!id) return ApiResp.fail("Param id illegal")
         if (!enName) return ApiResp.fail("Param enName not empty")
         if (!cnName) return ApiResp.fail("Param cnName not empty")
         if (!type) return ApiResp.fail("Param type not empty")
+        if (!(enName ==~ fieldNamePattern)) {
+            return ApiResp.fail("Param enName illegal: 字母,中文开头,可包含字数,字母,下划线,中文")
+        }
+        if (!(cnName ==~ fieldNamePattern)) {
+            return ApiResp.fail("Param enName illegal: 字母,中文开头,可包含字数,字母,下划线,中文")
+        }
         def field = repo.findById(RuleField, id)
         if (field == null) return ApiResp.fail("Param id: $id not found")
 
