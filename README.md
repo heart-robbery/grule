@@ -342,12 +342,7 @@ jpa_rule.url=jdbc:mysql://localhost:3306/rule?useSSL=false&user=root&password=ro
  * linux: nohup sh start.sh -Xmx512m -Xms512m > /dev/null 2>&1 &
  * windows: ./start
 
-# v1.2.4 ing...
-- [x] feat: 支持可配置是否同步保存决策相关数据
-- [x] fix: 初始化默认属性集 miss property decision
-- [x] feat: 启用禁用收集器提供单独接口
-- [x] feat: 用户session持久化
-- [x] feat: 收集器结果配置是否需要持久化结果
+# v1.2.5 ing...
 - [ ] style: ace-groovy placeholder
 - [ ] feat: redis 收集器
 - [ ] pref: static components -> view
