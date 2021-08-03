@@ -47,7 +47,7 @@ dependencies {
     implementation 'javax.inject:javax.inject:1'
     implementation 'ch.qos.logback:logback-classic:1.2.3'
 
-    implementation 'cn.xnatural.app:app:1.0.5'
+    implementation 'cn.xnatural.app:app:1.0.6'
     implementation 'cn.xnatural.http:http:1.0.9'
     implementation 'cn.xnatural.jpa:jpa:1.0.6'
     implementation 'cn.xnatural.sched:sched:1.0.2'
